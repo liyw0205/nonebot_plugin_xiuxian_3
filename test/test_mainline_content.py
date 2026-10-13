@@ -95,9 +95,29 @@ def test_xuantian_mainline_chapter_two_content_runs_on_both_adapters() -> None:
                 mine_claim = await send("claim-云铁入山", "领取主线奖励 云铁入山")
                 assert mine_claim.code == "MAINLINE_REWARD_CLAIMED"
                 assert mine_claim.data["next_stage_key"] == "chapter.3.stage.2"
-                for alias in ("矿兽试锋",):
-                    assert (await send(f"start-{alias}", f"开始主线 {alias}")).ok
-                    assert (await send(f"claim-{alias}", f"领取主线奖励 {alias}")).ok
+                assert (await send("start-矿兽试锋", "开始主线 矿兽试锋")).ok
+                beast_early = await send("claim-矿兽试锋-early", "领取主线奖励 矿兽试锋")
+                assert beast_early.code == "MAINLINE_OBJECTIVES_INCOMPLETE"
+                with runtime.repository._connect() as connection:
+                    player_row = connection.execute(
+                        "SELECT id, inventory_json, stamina FROM players WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    ).fetchone()
+                    inventory = json.loads(player_row["inventory_json"] or "{}")
+                    inventory["item.permit.cloud_mine"] = max(int(inventory.get("item.permit.cloud_mine", 0)), 1)
+                    connection.execute(
+                        "UPDATE players SET inventory_json=?, stamina=MAX(stamina, 40) WHERE id=?",
+                        (json.dumps(inventory, ensure_ascii=False, sort_keys=True), player_row["id"]),
+                    )
+                mining = await send("mine-start", "开始探索 云铁矿区采集")
+                assert mining.code == "EXPLORATION_STARTED", mining.message
+                now[0] += timedelta(minutes=3)
+                settled = await send("mine-settle", "结算探索")
+                assert settled.code == "EXPLORATION_SETTLED", settled.message
+                assert settled.data["result"].get("item.material.cloud_iron", 0) >= 1
+                beast_claim = await send("claim-矿兽试锋", "领取主线奖励 矿兽试锋")
+                assert beast_claim.code == "MAINLINE_REWARD_CLAIMED"
+                assert beast_claim.data["next_stage_key"] == "chapter.3.stage.3"
                 for alias in ("云舟试航", "阵堂初会", "阵纹试炼", "玄天新章"):
                     assert (await send(f"start-{alias}", f"开始主线 {alias}")).ok
                     claimed = await send(f"claim-{alias}", f"领取主线奖励 {alias}")
