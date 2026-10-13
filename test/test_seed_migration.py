@@ -13,13 +13,13 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 HELPER = ROOT / "scripts/install_plugin_source.py"
 MAINLINE = Path("剧情/主线.json")
-OLD_SHA = "0fdbd50bb733ba252a1a427b0a5a2ff2482edc99a14d2d8641f7cf7b2035f2e0"
+OLD_SHA = "abf2d0ccef654c22f70f3bf7744a225ae57096f9412303b10b95726cedbf93c9"
 
 
 def old_official_mainline() -> bytes:
-    # Reverse only the current chapter.2.stage.3 content delta; pin the cloud-city stage.2 blob.
+    # Reverse only the current chapter.3.stage.1 content delta; pin the guild-tide blob.
     text = (ROOT / "data" / MAINLINE).read_text(encoding="utf-8")
-    for key in ("chapter.2.stage.3",):
+    for key in ("chapter.3.stage.1",):
         start = text.index(f'      "key": "{key}"')
         end = text.index("\n    },", start)
         section = text[start:end]
