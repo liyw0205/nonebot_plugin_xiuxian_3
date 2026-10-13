@@ -118,7 +118,27 @@ def test_xuantian_mainline_chapter_two_content_runs_on_both_adapters() -> None:
                 beast_claim = await send("claim-矿兽试锋", "领取主线奖励 矿兽试锋")
                 assert beast_claim.code == "MAINLINE_REWARD_CLAIMED"
                 assert beast_claim.data["next_stage_key"] == "chapter.3.stage.3"
-                for alias in ("云舟试航", "阵堂初会", "阵纹试炼", "玄天新章"):
+                assert (await send("start-云舟试航", "开始主线 云舟试航")).ok
+                trial_early = await send("claim-云舟试航-early", "领取主线奖励 云舟试航")
+                assert trial_early.code == "MAINLINE_OBJECTIVES_INCOMPLETE"
+                with runtime.repository._connect() as connection:
+                    connection.execute(
+                        "UPDATE players SET spirit_stones = spirit_stones + 600 WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    )
+                for hop, wait_minutes in (("前往 青石镇", 1), ("前往 云城", 3), ("前往 云舟渡口", 1)):
+                    assert (await send(f"return-travel-{hop}", hop)).code == "TRAVEL_STARTED"
+                    now[0] += timedelta(minutes=wait_minutes)
+                    assert (await send(f"return-settle-{hop}", "结算移动")).code == "TRAVEL_COMPLETED"
+                assert (await send("trial-start", "开始探索 云舟试炼")).code == "EXPLORATION_STARTED"
+                now[0] += timedelta(minutes=5)
+                trial_settled = await send("trial-settle", "结算探索")
+                assert trial_settled.code == "EXPLORATION_SETTLED"
+                assert trial_settled.data["result"].get("item.ticket.cloud_boat_fragment", 0) >= 1
+                trial_claim = await send("claim-云舟试航", "领取主线奖励 云舟试航")
+                assert trial_claim.code == "MAINLINE_REWARD_CLAIMED"
+                assert trial_claim.data["next_stage_key"] == "chapter.4.stage.1"
+                for alias in ("阵堂初会", "阵纹试炼", "玄天新章"):
                     assert (await send(f"start-{alias}", f"开始主线 {alias}")).ok
                     claimed = await send(f"claim-{alias}", f"领取主线奖励 {alias}")
                     assert claimed.code == "MAINLINE_REWARD_CLAIMED"
