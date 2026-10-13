@@ -106,14 +106,17 @@ M5 最终当前树本地阶段验收、审查与提交推送已完成；保留�
 正文、`exploration_reward` 目标（结算后的公开 `explore.gather_basalt_pass` 采掘
 取得阵砂 ≥1，公开通路 阵堂→宗门山门→青石镇→近郊→玄武岩径、既有门槛/次数/成本
 不变）、行动、首通状态事件、`next_stage_key` 指向 `chapter.4.stage.3` 与失败重试
-规则均已落地；本轮同时把主线公开链测试改为内容包驱动（与生产一致，travel 以区域
-JSON 通路为唯一真源），并修正两处旧空目录 runtime 中失效的跳点为公开通路。
-`chapter.4.stage.3` 玄天新章保持题录，是下一个待内容化关卡。
-数据改动为 `fd73925`/`b6ffef2`/`71f6a56`/`9c612ae`/`27a5de8`/`8a0b43f` 与
-`e9efe27`（ch4.stage.2）；官方 `剧情/主线.json`
+规则均已落地；`chapter.4.stage.3` 玄天新章内容化切片已随后在 `develop` 完成：
+作为玄天主线当前收录的收尾关，正文、`travel_arrival` 目标（结算后沿公开通路
+玄武岩径→近郊→青石镇回镇合卷）、行动、首通状态事件与失败重试规则均已落地，
+`next_stage_key` 如实留空；校验器改为数据驱动——内容化关卡必须前链，仅本故事
+收录的最后一关可无后继，并由专项测试钉住两端。玄天 12 关内容化阶段至此完成；
+后续卷章（航路/界壁/洞天各线）仍按题录保持未内容化，未批量展开。
+数据改动为 `fd73925`/`b6ffef2`/`71f6a56`/`9c612ae`/`27a5de8`/`8a0b43f`/`e9efe27`
+与 `3496a13`（ch4.stage.3）；官方 `剧情/主线.json`
 各版 SHA-256 与 Git provenance 已登记 `scripts/seed_migrations.json`，聚焦组
 `test_mainline.py`、`test_mainline_content.py`、`test_mainline_vertical_slice.py`
-20 passed，`test_seed_migration.py` 7 passed（迁移测试覆盖旧官方 blob 升级、
+21 passed，`test_seed_migration.py` 7 passed（迁移测试覆盖旧官方 blob 升级、
 重复升级幂等、用户自定义保留与回退），未重跑全量/压测。
 
 本轮有限任务已完成：`chapter.1.stage.3` 雾中守门与 `chapter.2.stage.1` 城镇委托两关的正文、人物/场景、

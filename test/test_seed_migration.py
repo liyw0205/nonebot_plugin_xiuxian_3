@@ -13,13 +13,13 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 HELPER = ROOT / "scripts/install_plugin_source.py"
 MAINLINE = Path("剧情/主线.json")
-OLD_SHA = "a8b10117ffa0d33045d06de750d44e0a90ba70a96b37cad63987a699c771ad60"
+OLD_SHA = "e1e5314aac26164f775086ea946c2c0d39b2e42adff63f1566cda99991425527"
 
 
 def old_official_mainline() -> bytes:
-    # Reverse only the current chapter.4.stage.2 content delta; pin the array-hall blob.
+    # Reverse only the current chapter.4.stage.3 content delta; pin the array-pattern blob.
     text = (ROOT / "data" / MAINLINE).read_text(encoding="utf-8")
-    for key in ("chapter.4.stage.2",):
+    for key in ("chapter.4.stage.3",):
         start = text.index(f'      "key": "{key}"')
         end = text.index("\n    },", start)
         section = text[start:end]
@@ -32,7 +32,8 @@ def old_official_mainline() -> bytes:
             r'^      "retry": \{\n.*?^      \},\n',
         ):
             section, count = re.subn(pattern, "", section, count=1, flags=re.M | re.S)
-            assert count == 1
+            # The closing tail stage legitimately omits next_stage_key.
+            assert count == (0 if pattern.startswith('^      "next_stage_key"') else 1)
         text = text[:start] + section + text[end:]
     blob = text.encode("utf-8")
     assert hashlib.sha256(blob).hexdigest() == OLD_SHA
