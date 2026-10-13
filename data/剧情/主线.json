@@ -257,6 +257,28 @@
       "stage": 2,
       "name": "矿兽试锋",
       "desc": "守住云铁矿脉，取得一块完整云铁作为凭证。",
+      "body": "矿口监工不要豪言，只要凭证：在册行修得亲自在矿道里走完一轮采掘，把云铁灵脉的脾气摸清楚。许可、矿镐或采矿辅修任备其一，就能开工；矿脉深处偶有矿兽出没，服务端按开始快照自动应对，你只需等这轮探索结算。结算袋里取出一块完整云铁，监工便在名册上记下你的名号——采掘未满、灵石体力不足或当日次数用尽都不记名，明日再上山即可。",
+      "objectives": [
+        {
+          "key": "mine_cloud_iron_proof",
+          "type": "exploration_reward",
+          "label": "在主线开始后的云铁矿区采掘结算中取得云铁",
+          "mode_key": "explore.cloud_mine",
+          "location_key": "xuantian.cloud_mine",
+          "item_key": "item.material.cloud_iron",
+          "quantity": 1
+        }
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "云铁矿区采集", "description": "备好许可、矿镐或采矿辅修后开工，行程结束结算采掘，取得至少一块云铁。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.3.stage.2"]},
+      "next_stage_key": "chapter.3.stage.3",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "本轮采掘尚未结算或尚无云铁时关卡保持进行中，不扣主线奖励；补齐准入后再次采掘并结算，即可领取。"
+      },
       "status": "open",
       "aliases": ["矿兽试锋"],
       "prerequisites": ["chapter.3.stage.1"],
