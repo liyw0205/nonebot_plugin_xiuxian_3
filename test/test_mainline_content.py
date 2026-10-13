@@ -81,7 +81,21 @@ def test_xuantian_mainline_chapter_two_content_runs_on_both_adapters() -> None:
                 tide_claim = await send("claim-商会听潮", "领取主线奖励 商会听潮")
                 assert tide_claim.code == "MAINLINE_REWARD_CLAIMED"
                 assert tide_claim.data["next_stage_key"] == "chapter.3.stage.1"
-                for alias in ("云铁入山", "矿兽试锋"):
+                with runtime.repository._connect() as connection:
+                    connection.execute(
+                        "UPDATE players SET location_key='xuantian.cloud_city' WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    )
+                assert (await send("start-云铁入山", "开始主线 云铁入山")).ok
+                mine_early = await send("claim-云铁入山-early", "领取主线奖励 云铁入山")
+                assert mine_early.code == "MAINLINE_OBJECTIVES_INCOMPLETE"
+                assert (await send("mine-travel-start", "前往 云铁矿区")).code == "TRAVEL_STARTED"
+                now[0] += timedelta(minutes=3)
+                assert (await send("mine-travel-settle", "结算移动")).code == "TRAVEL_COMPLETED"
+                mine_claim = await send("claim-云铁入山", "领取主线奖励 云铁入山")
+                assert mine_claim.code == "MAINLINE_REWARD_CLAIMED"
+                assert mine_claim.data["next_stage_key"] == "chapter.3.stage.2"
+                for alias in ("矿兽试锋",):
                     assert (await send(f"start-{alias}", f"开始主线 {alias}")).ok
                     assert (await send(f"claim-{alias}", f"领取主线奖励 {alias}")).ok
                 for alias in ("云舟试航", "阵堂初会", "阵纹试炼", "玄天新章"):
