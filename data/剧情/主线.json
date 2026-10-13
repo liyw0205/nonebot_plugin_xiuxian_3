@@ -297,6 +297,28 @@
       "stage": 3,
       "name": "云舟试航",
       "desc": "以云铁为引登上云舟，确认通往洞天深处的航路。",
+      "body": "渡口管事捏着你名册上的云铁记号，把一张试航签推过案面：云舟不渡没有走过航线的人。从矿区下山，经青石镇、云城一路回到渡口，备好渡资登上首班云舟，沿浮舟航线完整走完一轮试炼并在结算时留下试航签——这一段航路才算被你亲自确认过。试炼没有结算就不签发，灵石不足或当日次数用尽都不扣名册，明日首班舟前再来即可。",
+      "objectives": [
+        {
+          "key": "cloud_boat_trial_proof",
+          "type": "exploration_reward",
+          "label": "在主线开始后的云舟试炼结算中取得试航签",
+          "mode_key": "explore.cloud_boat_trial",
+          "location_key": "xuantian.floating_boat",
+          "item_key": "item.ticket.cloud_boat_fragment",
+          "quantity": 1
+        }
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "云舟试炼", "description": "结丹一层后在云舟渡口登舟，走完一轮航线并结算探索，取得至少一枚试航签。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.3.stage.3"]},
+      "next_stage_key": "chapter.4.stage.1",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "本轮试炼尚未结算或尚无试航签时关卡保持进行中，不扣主线奖励；补齐渡资与体力后再次登舟结算，即可领取。"
+      },
       "status": "open",
       "aliases": ["云舟试航"],
       "prerequisites": ["chapter.3.stage.2"],
