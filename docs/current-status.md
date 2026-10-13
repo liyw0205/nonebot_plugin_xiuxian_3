@@ -98,9 +98,13 @@ M5 最终当前树本地阶段验收、审查与提交推送已完成；保留�
 `exploration_reward` 目标（结算后的公开 `explore.cloud_boat_trial` 试炼取得试航签
 ≥1，既有结丹一层门槛、渡资与每日次数不变，回归路线矿区→青石镇→云城→渡口全部
 为既有通路）、行动、首通状态事件、`next_stage_key` 指向 `chapter.4.stage.1` 与
-失败重试规则均已落地；`chapter.4.stage.1` 阵堂初会保持题录，是下一个待内容化关卡。
-数据改动为 `fd73925`（stage.2）、`b6ffef2`（stage.3）、`71f6a56`（ch3.stage.1）、
-`9c612ae`（ch3.stage.2）与 `27a5de8`（ch3.stage.3）；官方 `剧情/主线.json`
+失败重试规则均已落地；`chapter.4.stage.1` 阵堂初会内容化切片已随后在 `develop`
+完成：正文、`travel_arrival` 目标（结算后的公开抵达 `xuantian.array_hall`，公开
+来源地点云城/宗门山门、既有结丹一层门槛不变；阵堂研习门禁与旁观初会分离，本关
+只要求抵达）、行动、首通状态事件、`next_stage_key` 指向 `chapter.4.stage.2` 与
+失败重试规则均已落地；`chapter.4.stage.2` 阵纹试炼保持题录，是下一个待内容化关卡。
+数据改动为 `fd73925`/`b6ffef2`/`71f6a56`/`9c612ae`/`27a5de8` 与 `8a0b43f`
+（ch4.stage.1）；官方 `剧情/主线.json`
 各版 SHA-256 与 Git provenance 已登记 `scripts/seed_migrations.json`，聚焦组
 `test_mainline.py`、`test_mainline_content.py`、`test_mainline_vertical_slice.py`
 20 passed，`test_seed_migration.py` 7 passed（迁移测试覆盖旧官方 blob 升级、
