@@ -337,6 +337,20 @@
       "stage": 1,
       "name": "阵堂初会",
       "desc": "在阵堂前递上云铁凭证，获准旁观护城阵纹。",
+      "body": "阵堂执事验过你名册上的云铁与试航记号，只给一句指引：护城阵纹在殿前石台上流转，看得懂多少全凭自己。阵堂不考境界高低，只认亲至——航路不直渡，先从渡口乘云舟绕行深渊门，再转回程航线回到云城，或取道宗门山门，最后从云城沿阶上到阵堂；行程结算、站在石台前看过一轮阵纹起落，初会才算成礼。堂中阵法研习另有宗门或讲学之请的门禁，今日只算旁观；行程没有结算就不记名，随时可再来。",
+      "objectives": [
+        {"key": "arrive_array_hall", "type": "travel_arrival", "label": "在主线开始后抵达玄天阵堂", "destination_key": "xuantian.array_hall"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "玄天阵堂", "description": "沿公开航路回到云城（渡口可乘云舟绕行深渊门转回），从云城或宗门山门启程，等待行程结束并结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.4.stage.1"]},
+      "next_stage_key": "chapter.4.stage.2",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "行程尚未抵达结算时关卡保持进行中，不扣主线奖励；恢复体力后重新启程并结算移动，即可再次领取。"
+      },
       "status": "open",
       "aliases": ["阵堂初会"],
       "prerequisites": ["chapter.3.stage.3"],

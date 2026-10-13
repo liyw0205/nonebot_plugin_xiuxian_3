@@ -138,7 +138,29 @@ def test_xuantian_mainline_chapter_two_content_runs_on_both_adapters() -> None:
                 trial_claim = await send("claim-云舟试航", "领取主线奖励 云舟试航")
                 assert trial_claim.code == "MAINLINE_REWARD_CLAIMED"
                 assert trial_claim.data["next_stage_key"] == "chapter.4.stage.1"
-                for alias in ("阵堂初会", "阵纹试炼", "玄天新章"):
+                assert (await send("start-阵堂初会", "开始主线 阵堂初会")).ok
+                hall_early = await send("claim-阵堂初会-early", "领取主线奖励 阵堂初会")
+                assert hall_early.code == "MAINLINE_OBJECTIVES_INCOMPLETE"
+                # 公开回程航线自深渊门/洞天二层始发：渡口→深渊门→返回云舟，全程公开玩法
+                with runtime.repository._connect() as connection:
+                    connection.execute(
+                        "UPDATE players SET spirit_stones = MAX(spirit_stones, 1200), stamina = MAX(stamina, 40) "
+                        "WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    )
+                assert (await send("abyss-board", "乘坐云舟 魔界引导")).code == "CLOUD_BOAT_STARTED"
+                now[0] += timedelta(minutes=5)
+                assert (await send("abyss-settle", "结算云舟")).ok
+                assert (await send("return-board", "乘坐云舟 返回云城")).code == "CLOUD_BOAT_STARTED"
+                now[0] += timedelta(minutes=3)
+                assert (await send("return-settle", "结算云舟")).ok
+                assert (await send("hall-travel-start", "前往 玄天阵堂")).code == "TRAVEL_STARTED"
+                now[0] += timedelta(minutes=1)
+                assert (await send("hall-travel-settle", "结算移动")).code == "TRAVEL_COMPLETED"
+                hall_claim = await send("claim-阵堂初会", "领取主线奖励 阵堂初会")
+                assert hall_claim.code == "MAINLINE_REWARD_CLAIMED"
+                assert hall_claim.data["next_stage_key"] == "chapter.4.stage.2"
+                for alias in ("阵纹试炼", "玄天新章"):
                     assert (await send(f"start-{alias}", f"开始主线 {alias}")).ok
                     claimed = await send(f"claim-{alias}", f"领取主线奖励 {alias}")
                     assert claimed.code == "MAINLINE_REWARD_CLAIMED"
