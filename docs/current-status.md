@@ -86,9 +86,13 @@ M5 最终当前树本地阶段验收、审查与提交推送已完成；保留�
 `chapter.2.stage.3` 商会听潮内容化切片已随后在 `develop` 完成：正文、`travel_arrival`
 目标（结算后的公开抵达 `xuantian.floating_boat`，含五百灵石渡资的既有行程成本）、
 行动、首通状态事件、`next_stage_key` 指向 `chapter.3.stage.1` 与失败重试规则均已
-落地，境界门槛保持既有 `foundation` L1，与渡口路线要求一致；`chapter.3.stage.1`
-云铁入山保持题录，是下一个待内容化关卡。
-数据改动为 `fd73925`（stage.2）与 `b6ffef2`（stage.3）；官方 `剧情/主线.json`
+落地，境界门槛保持既有 `foundation` L1，与渡口路线要求一致。
+`chapter.3.stage.1` 云铁入山内容化切片已随后在 `develop` 完成：正文、`travel_arrival`
+目标（结算后的公开抵达 `xuantian.cloud_mine`，公开来源地点云城/青石镇、既有筑基
+四层门槛不变）、行动、首通状态事件、`next_stage_key` 指向 `chapter.3.stage.2`
+与失败重试规则均已落地；`chapter.3.stage.2` 矿兽试锋保持题录，是下一个待内容化关卡。
+数据改动为 `fd73925`（stage.2）、`b6ffef2`（stage.3）与 `71f6a56`（ch3.stage.1）；
+官方 `剧情/主线.json`
 各版 SHA-256 与 Git provenance 已登记 `scripts/seed_migrations.json`，聚焦组
 `test_mainline.py`、`test_mainline_content.py`、`test_mainline_vertical_slice.py`
 20 passed，`test_seed_migration.py` 7 passed（迁移测试覆盖旧官方 blob 升级、
