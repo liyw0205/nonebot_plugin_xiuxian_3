@@ -410,6 +410,19 @@
       "stage": 3,
       "name": "玄天新章",
       "desc": "把云城、矿区与阵堂的线索合入商路，开启玄天中层的新篇。",
+      "body": "镇口老修士把这条线的每一站都替你数过：近郊的木牌、灵泉的叶、雾里的灯、药铺的账、云城的门、矿口的砂、阵堂的纹——商路要翻开新的一页，得由走完这条路的人亲自把线索交回起点。从玄武岩径下山，经玄天近郊回到青石镇，行程结算后把这些年在玄天中层走过的路讲给镇务账册听。玄天的中层对你彻底敞开，而更远的航路、界壁与洞天仍在雾后等你——本卷至此合上，新章各路由镇外的关口自行开验。",
+      "objectives": [
+        {"key": "return_new_town", "type": "travel_arrival", "label": "在主线开始后回到青石镇合上商路线索", "destination_key": "xuantian.new_town"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "青石镇", "description": "从玄武岩径经玄天近郊下山回镇（均为公开通路），等待行程结束并结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.4.stage.3"]},
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "行程尚未回到青石镇结算时关卡保持进行中，不扣主线奖励；重新启程并结算移动，即可领取合卷之礼。"
+      },
       "status": "open",
       "aliases": ["玄天新章"],
       "prerequisites": ["chapter.4.stage.2"],

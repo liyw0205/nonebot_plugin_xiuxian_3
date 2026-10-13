@@ -11,6 +11,8 @@ import pytest
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
+from nonebot_plugin_xiuxian_3.xiuxian.adventures.mainline import MAINLINE_STORY_KEY, mainline_definitions
+from nonebot_plugin_xiuxian_3.xiuxian.content import ContentBundle, ContentError
 from mainline_fixtures import (
     grant_blood_grass,
     grant_spirit_field_prerequisites,
@@ -205,12 +207,20 @@ def test_xuantian_mainline_chapter_two_content_runs_on_both_adapters() -> None:
                 sand_claim = await send("claim-阵纹试炼", "领取主线奖励 阵纹试炼")
                 assert sand_claim.code == "MAINLINE_REWARD_CLAIMED"
                 assert sand_claim.data["next_stage_key"] == "chapter.4.stage.3"
-                for alias in ("玄天新章",):
-                    assert (await send(f"start-{alias}", f"开始主线 {alias}")).ok
-                    claimed = await send(f"claim-{alias}", f"领取主线奖励 {alias}")
-                    assert claimed.code == "MAINLINE_REWARD_CLAIMED"
-                    replay = await send(f"claim-{alias}", f"领取主线奖励 {alias}")
-                    assert replay.data["idempotent_replay"] is True
+                assert (await send("start-玄天新章", "开始主线 玄天新章")).ok
+                finale_early = await send("claim-玄天新章-early", "领取主线奖励 玄天新章")
+                assert finale_early.code == "MAINLINE_OBJECTIVES_INCOMPLETE"
+                for hop, wait_minutes in (("前往 近郊", 1), ("前往 青石镇", 1)):
+                    hop_result = await send(f"finale-travel-{hop}", hop)
+                    assert hop_result.code == "TRAVEL_STARTED", (hop, hop_result.code, hop_result.message)
+                    now[0] += timedelta(minutes=wait_minutes)
+                    settle_result = await send(f"finale-settle-{hop}", "结算移动")
+                    assert settle_result.code == "TRAVEL_COMPLETED", (hop, settle_result.code, settle_result.message)
+                finale_claim = await send("claim-玄天新章", "领取主线奖励 玄天新章")
+                assert finale_claim.code == "MAINLINE_REWARD_CLAIMED"
+                assert finale_claim.data["next_stage_key"] is None
+                replay = await send("claim-玄天新章", "领取主线奖励 玄天新章")
+                assert replay.data["idempotent_replay"] is True
                 with runtime.repository._connect() as connection:
                     count = connection.execute(
                         "SELECT COUNT(*) FROM mainline_runs WHERE player_id=(SELECT id FROM players WHERE platform=? AND platform_user_id=?) AND story_key=? AND first_clear_claimed=1",
@@ -225,6 +235,24 @@ def test_xuantian_mainline_chapter_two_content_runs_on_both_adapters() -> None:
             await runtime.close()
 
     asyncio.run(run())
+
+
+def test_mainline_tail_stage_may_close_without_next_stage_key(tmp_path: Path) -> None:
+    source = Path(__file__).parents[1] / "data"
+    data_dir = tmp_path / "content"
+    shutil.copytree(source, data_dir)
+    definitions = mainline_definitions(ContentBundle.load(data_dir), story_key=MAINLINE_STORY_KEY)
+    finale = next(item for item in definitions if item.key == "chapter.4.stage.3")
+    assert finale.next_stage_key is None
+    assert finale.objectives and finale.actions and finale.state_events and finale.retry_message
+
+    story_path = data_dir / "剧情" / "主线.json"
+    document = json.loads(story_path.read_text(encoding="utf-8"))
+    middle = next(row for row in document["records"] if row["key"] == "chapter.4.stage.2")
+    del middle["next_stage_key"]
+    story_path.write_text(json.dumps(document, ensure_ascii=False), encoding="utf-8")
+    with pytest.raises(ContentError, match="requires next_stage_key"):
+        mainline_definitions(ContentBundle.load(data_dir), story_key=MAINLINE_STORY_KEY)
 
 
 def test_mainline_runtime_behavior_changes_with_content_json(tmp_path: Path) -> None:
