@@ -135,6 +135,19 @@ TOML 与本次种子，自定义数据保留。聚焦证据：修前
 业务只跑一次策略改为 `qq.official` 单份并 1 passed in 24.14s；当前官方数据全量解析 84 关
 通过、正常部署 `returncode 0` 且 `matchers=1 handlers=1`；未跑全量/压测/部署，未验 QQ 真机。
 
+守界线三关可玩序列已在 `develop` 完成（数据提交 `ba89012`）：`domain_frontier.guard.2`
+巡守裂隙（`travel_arrival` → `cave.boundary_realm`）、`guard.3` 鏖战边关
+（`exploration_battle_victory`，`explore.boundary_rift`/`cave.boundary_realm`）、
+`guard.4` 镇纹回响（`exploration_reward` 取 `item.domain_core_fragment` ×1）三关均补齐正文、
+目标、行动、首通状态事件、前链（`guard.2→guard.3→guard.4→guard.5`）与失败重试规则，
+并列入内容化校验集合。可达性以内容图为准：界隙秘境只有经 `xuantian.war_front` 一条入边，
+而魔界战线受每周界战窗口（`weekday_utc=2`，即周三 20:00–23:00 UTC）约束，故三关只在
+界战窗口内成行，正文与重试文案如实说明；未新增地点、通路、探索模式、奖池或物品。
+聚焦证据：`test_domain_frontier_mainline.py` 1 passed in 24.72s（同一 `qq.official` 共享链
+真实结算 18 关，含界隙巡查的战斗胜利与核心碎片掉落，种子按生产随机契约推导而非硬编码），
+`test_seed_migration.py` 8 passed in 130.37s（旧官方 blob 升级、重复升级幂等、自定义保留与冲突回退）。
+未跑全量/压测/部署，未验 QQ 真机；`guard.5/.6` 与净渊、护祖两线仍为题录。
+
 本轮有限任务已完成：`chapter.1.stage.3` 雾中守门与 `chapter.2.stage.1` 城镇委托两关的正文、人物/场景、
 可执行目标、来源/奖励/后续引用、失败重试规则及现有战斗/委托、快照、事务、幂等消费者已落地。
 沿用本轮已确认的 `19 passed`、`lastfailed={}` 聚焦证据；不重跑全量、不扩展 travel/world，不重开 M9，
