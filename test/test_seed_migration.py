@@ -13,13 +13,13 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 HELPER = ROOT / "scripts/install_plugin_source.py"
 MAINLINE = Path("剧情/主线.json")
-OLD_SHA = "968587251933f8264242f55b1bb8930a36c13aa275c29e4aa593592b762c1cb0"
+OLD_SHA = "7c7ab7f5ebd4009f99bdd858419257815547c73668d08545f268f2ed9ff0c497"
 
 
 def old_official_mainline() -> bytes:
-    # Reverse only the current domain_frontier.guard.1 content delta; pin the arc-closing blob.
+    # Reverse only the current guard.2-4 content delta; pin the frontier-oath blob.
     text = (ROOT / "data" / MAINLINE).read_text(encoding="utf-8")
-    for key in ("domain_frontier.guard.1",):
+    for key in ("domain_frontier.guard.2", "domain_frontier.guard.3", "domain_frontier.guard.4"):
         start = text.index(f'      "key": "{key}"')
         end = text.index("\n    },", start)
         section = text[start:end]
