@@ -117,6 +117,9 @@ _VERTICAL_SLICE_STAGES = frozenset(
         "chapter.4.stage.2",
         "chapter.4.stage.3",
         "domain_frontier.guard.1",
+        "domain_frontier.guard.2",
+        "domain_frontier.guard.3",
+        "domain_frontier.guard.4",
     }
 )
 

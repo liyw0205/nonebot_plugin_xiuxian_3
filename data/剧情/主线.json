@@ -470,6 +470,20 @@
       "stage": 2,
       "name": "巡守裂隙",
       "desc": "沿着破碎的界纹巡行，寻回失散的守界灵印。",
+      "body": "界战一起，界隙那边的裂口就顺着界纹往这边蔓延。守界的规矩是趁烽火未熄走一遍界纹：从领域前线随军道出关，踏过魔界战线，进界隙秘境，沿裂隙边缘把每一道碎纹都巡到。灵印是哨位留下的记号，巡到哪一段，哪一段的守军就知道这条线还有人认；巡不到的地方界纹会自己长回去，名册上那一节也就空着。界隙只认界战窗口，窗口不开，军道不放行，这段巡守便只能等下一次烽火。",
+      "objectives": [
+        {"key": "patrol_boundary_rift", "type": "travel_arrival", "label": "在界战窗口内抵达界隙秘境", "destination_key": "cave.boundary_realm"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "界隙秘境", "description": "界战窗口开启后，从领域前线经青石镇与魔界战线出关，等待行程结束并结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.guard.2"]},
+      "next_stage_key": "domain_frontier.guard.3",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "界纹尚未巡到尽头时关卡保持进行中，不扣主线奖励；等界战窗口再启程并结算移动，即可继续巡守。"
+      },
       "status": "open",
       "aliases": ["守界二关"],
       "required_realm": "soul_transformation",
@@ -485,6 +499,20 @@
       "stage": 3,
       "name": "鏖战边关",
       "desc": "与领域守军并肩迎敌，守住一线将倾的天门。",
+      "body": "界隙的守望者不认名册，只认站在裂口前的人。守界三关要在界隙巡查里正面接战：从秘境边缘起巡查，等界隙守望者现身，把它压回裂口另一侧，战线才算守住。战斗结算写进战线记录，守军按这一笔认你的战功；退让一次，缺口就得由别人补上。巡查有次数，战线不等人，接不住这一战，名册上仍只留一行空白。",
+      "objectives": [
+        {"key": "repel_rift_watcher", "type": "exploration_battle_victory", "label": "在界隙巡查中击退界隙守望者", "mode_key": "explore.boundary_rift", "location_key": "cave.boundary_realm"}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "界隙巡查", "description": "在界隙秘境开始界隙巡查，等待结算并在遭遇中取胜。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.guard.3"]},
+      "next_stage_key": "domain_frontier.guard.4",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "界隙守望者尚未被击退时关卡保持进行中，不扣主线奖励；恢复体力后重新巡查并在遭遇中取胜，即可领取。"
+      },
       "status": "open",
       "aliases": ["守界三关"],
       "required_realm": "soul_transformation",
@@ -500,6 +528,20 @@
       "stage": 4,
       "name": "镇纹回响",
       "desc": "将战场所得化作镇纹，令动荡的领域重新回应众生。",
+      "body": "巡守所得要镇回纹上，否则界纹只是被走过一遍。守界四关要在界隙巡查里拾回领域核心碎片：碎片是界纹断裂时崩落的核屑，只有它能在前线把裂口重新钉住。拾到碎片、带回前线镇纹，动荡的领域才会重新回应众生；空手而归，这一节界纹仍算未镇，名册上的战功也立不住。",
+      "objectives": [
+        {"key": "recover_domain_core", "type": "exploration_reward", "label": "在界隙巡查中拾回领域核心碎片", "mode_key": "explore.boundary_rift", "location_key": "cave.boundary_realm", "item_key": "item.domain_core_fragment", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "界隙巡查", "description": "在界隙秘境开始界隙巡查，等待结算并在所得中取得领域核心碎片。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.guard.4"]},
+      "next_stage_key": "domain_frontier.guard.5",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未拾回领域核心碎片时关卡保持进行中，不扣主线奖励；恢复体力后重新巡查并取回碎片，即可镇纹领取。"
+      },
       "status": "open",
       "aliases": ["守界四关"],
       "required_realm": "soul_transformation",
