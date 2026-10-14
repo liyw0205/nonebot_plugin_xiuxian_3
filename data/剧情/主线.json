@@ -441,6 +441,20 @@
       "stage": 1,
       "name": "烽火初燃",
       "desc": "响应领域前线召令，在边界烽火中立下守望之誓。",
+      "body": "召令送达青石镇那晚，界隙方向的天光整夜没有暗下去。守望之誓不在纸上——烽火台的规矩只有一条：誓要在界前立。备好体力，带上已选的领域，从青石镇沿军道直奔领域前线；行程结算、站到烽火之下，值夜的哨人才会把你的名字报进守望名册，界前巡防与后方补给线此后都算认了你这条路。誓不由代立，也没人替你赶路：行程没有结算，名册上就永远只留着一行空白。",
+      "objectives": [
+        {"key": "arrive_domain_front", "type": "travel_arrival", "label": "在主线开始后抵达领域前线", "destination_key": "xuantian.domain_front"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "领域前线", "description": "达到化神一层并已选择领域后从青石镇等来源地点启程，等待行程结束并结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.guard.1"]},
+      "next_stage_key": "domain_frontier.guard.2",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "行程尚未抵达前线结算时关卡保持进行中，不扣主线奖励；恢复体力后重新启程并结算移动，即可立誓领取。"
+      },
       "status": "open",
       "aliases": ["守界一关"],
       "required_realm": "soul_transformation",
