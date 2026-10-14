@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import shutil
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -73,12 +74,21 @@ def _prepare_player(runtime, adapter: str, user: str, sect_id: str) -> None:
     equip_damage_weapon(runtime, adapter, user, 50000)
 
 
-def test_domain_frontier_mainline_runs_all_lanes_on_both_adapters() -> None:
+def test_domain_frontier_mainline_shared_lane_runs_once() -> None:
+    # Policy: the shared gameplay lane executes exactly once (qq.official);
+    # OneBot v11 differences are covered by the messaging contract tests only.
     async def run() -> None:
-        for adapter in ("qq.official", "onebot.v11"):
+        for adapter in ("qq.official",):
             clock = MutableClock(datetime(2026, 9, 25, 12, 5, tzinfo=timezone.utc))
-            with TemporaryDirectory() as data_dir:
-                runtime = create_runtime(data_dir=Path(data_dir), clock=clock)
+            with TemporaryDirectory() as tmp_dir:
+                # Travel truth must come from the content pack, exactly as production runtime.
+                data_dir = Path(tmp_dir) / "content"
+                shutil.copytree(
+                    Path(__file__).resolve().parents[1] / "data",
+                    data_dir,
+                    ignore=shutil.ignore_patterns("*.sqlite3", "*.sqlite3-*", "*.db", "*.db-*"),
+                )
+                runtime = create_runtime(data_dir=data_dir, clock=clock)
                 user = f"frontier-mainline-{adapter}"
                 dispatch = lambda request, command, operation="": runtime.adapters.dispatch(
                     adapter, _context(adapter, user, request, operation), command
@@ -100,6 +110,29 @@ def test_domain_frontier_mainline_runs_all_lanes_on_both_adapters() -> None:
                 assert replay.data["idempotent_replay"] is True
                 conflict = await dispatch("same-operation", "开始领域前线主线 净渊一关", "same-mainline")
                 assert conflict.code == "OPERATION_CONFLICT"
+
+                early_claim = await dispatch(
+                    "guard1-early", "领取领域前线主线奖励 守界一关", "guard1-early"
+                )
+                assert early_claim.code == "MAINLINE_OBJECTIVES_INCOMPLETE"
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE players SET stamina = MAX(stamina, 60) "
+                        "WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    )
+                travel_out = await dispatch("guard1-travel-out", "前往 青石镇", "guard1-travel-out")
+                assert travel_out.code == "TRAVEL_STARTED", travel_out.message
+                clock.advance(seconds=301)
+                settle_out = await dispatch("guard1-settle-out", "结算移动", "guard1-settle-out")
+                assert settle_out.code == "TRAVEL_COMPLETED", settle_out.message
+                travel_back = await dispatch(
+                    "guard1-travel-back", "前往 领域前线", "guard1-travel-back"
+                )
+                assert travel_back.code == "TRAVEL_STARTED", travel_back.message
+                clock.advance(seconds=301)
+                settle_back = await dispatch("guard1-settle-back", "结算移动", "guard1-settle-back")
+                assert settle_back.code == "TRAVEL_COMPLETED", settle_back.message
 
                 for lane, final_alias in (("守界", "守界终关"), ("净渊", "净渊终关"), ("护祖", "护祖终关")):
                     aliases = [f"{lane}{name}关" for name in ("一", "二", "三", "四", "五")] + [final_alias]
@@ -139,6 +172,11 @@ def test_domain_frontier_mainline_runs_all_lanes_on_both_adapters() -> None:
                         "access.project.abyss_purification",
                         "access.project.ancestral_habitat",
                     }
+                    oath_events = connection.execute(
+                        "SELECT COUNT(*) FROM activity_events WHERE player_id=(SELECT id FROM players WHERE platform=? AND platform_user_id=?) AND event_key=?",
+                        (adapter, user, "story.mainline.domain_frontier:domain_frontier.guard.1"),
+                    ).fetchone()[0]
+                    assert int(oath_events) == 1
                 projects = await dispatch("projects", "公共项目")
                 assert projects.code == "PROJECT_LIST"
                 assert {item["project_key"] for item in projects.data["projects"]} >= {

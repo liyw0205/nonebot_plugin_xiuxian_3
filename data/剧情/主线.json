@@ -369,6 +369,29 @@
       "stage": 2,
       "name": "阵纹试炼",
       "desc": "补全一段护城阵纹，留下属于自己的阵砂印记。",
+      "body": "阵堂执事把一段残破的护城阵纹拓片推到你面前：补纹不用灵石，用的是阵砂——玄武岩径裸露山层里挖出来的细砂。堂里没有存砂，也不会替你垫一份：从阵堂下阶到宗门山门，经青石镇出外，过玄天近郊上玄武岩径，在裸露山层采掘到带着灵纹碎屑的阵砂，带回堂前把那段阵纹描完，试炼才算留名。一趟采不尽就再采一趟，当日次数用尽明日再来；残纹不扣人，堂前的石阶永远留着你的位置。",
+      "objectives": [
+        {
+          "key": "basalt_array_sand_proof",
+          "type": "exploration_reward",
+          "label": "在主线开始后的玄武岩径采掘结算中取得阵砂",
+          "mode_key": "explore.gather_basalt_pass",
+          "location_key": "xuantian.basalt_pass",
+          "item_key": "item.mat.array_sand",
+          "quantity": 1
+        }
+      ],
+      "actions": [
+        {"command": "前往", "argument": "玄武岩径", "description": "从阵堂经宗门山门、青石镇、玄天近郊一路进山（均为公开通路），行程结束后结算移动。"},
+        {"command": "开始探索", "argument": "玄武岩径采集", "description": "在山层采掘铁石与阵砂，结算时取得至少一份阵砂。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.4.stage.2"]},
+      "next_stage_key": "chapter.4.stage.3",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "本轮采掘尚未结算或尚无阵砂时关卡保持进行中，不扣主线奖励；再采一轮并结算后即可领取。"
+      },
       "status": "open",
       "aliases": ["阵纹试炼"],
       "prerequisites": ["chapter.4.stage.1"],
@@ -387,6 +410,19 @@
       "stage": 3,
       "name": "玄天新章",
       "desc": "把云城、矿区与阵堂的线索合入商路，开启玄天中层的新篇。",
+      "body": "镇口老修士把这条线的每一站都替你数过：近郊的木牌、灵泉的叶、雾里的灯、药铺的账、云城的门、矿口的砂、阵堂的纹——商路要翻开新的一页，得由走完这条路的人亲自把线索交回起点。从玄武岩径下山，经玄天近郊回到青石镇，行程结算后把这些年在玄天中层走过的路讲给镇务账册听。玄天的中层对你彻底敞开，而更远的航路、界壁与洞天仍在雾后等你——本卷至此合上，新章各路由镇外的关口自行开验。",
+      "objectives": [
+        {"key": "return_new_town", "type": "travel_arrival", "label": "在主线开始后回到青石镇合上商路线索", "destination_key": "xuantian.new_town"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "青石镇", "description": "从玄武岩径经玄天近郊下山回镇（均为公开通路），等待行程结束并结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.4.stage.3"]},
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "行程尚未回到青石镇结算时关卡保持进行中，不扣主线奖励；重新启程并结算移动，即可领取合卷之礼。"
+      },
       "status": "open",
       "aliases": ["玄天新章"],
       "prerequisites": ["chapter.4.stage.2"],
@@ -405,6 +441,20 @@
       "stage": 1,
       "name": "烽火初燃",
       "desc": "响应领域前线召令，在边界烽火中立下守望之誓。",
+      "body": "召令送达青石镇那晚，界隙方向的天光整夜没有暗下去。守望之誓不在纸上——烽火台的规矩只有一条：誓要在界前立。备好体力，带上已选的领域，从青石镇沿军道直奔领域前线；行程结算、站到烽火之下，值夜的哨人才会把你的名字报进守望名册，界前巡防与后方补给线此后都算认了你这条路。誓不由代立，也没人替你赶路：行程没有结算，名册上就永远只留着一行空白。",
+      "objectives": [
+        {"key": "arrive_domain_front", "type": "travel_arrival", "label": "在主线开始后抵达领域前线", "destination_key": "xuantian.domain_front"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "领域前线", "description": "达到化神一层并已选择领域后从青石镇等来源地点启程，等待行程结束并结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.guard.1"]},
+      "next_stage_key": "domain_frontier.guard.2",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "行程尚未抵达前线结算时关卡保持进行中，不扣主线奖励；恢复体力后重新启程并结算移动，即可立誓领取。"
+      },
       "status": "open",
       "aliases": ["守界一关"],
       "required_realm": "soul_transformation",

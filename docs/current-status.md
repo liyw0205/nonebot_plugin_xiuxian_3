@@ -1,6 +1,6 @@
 # 当前开发状态
 
-本文是当前工作队列、运行状态、发布进度和验收证据的唯一入口。更新日期：2026-10-12。
+本文是当前工作队列、运行状态、发布进度和验收证据的唯一入口。更新日期：2026-10-14。
 产品范围与规则见[完整内容开发总表](content-development.md)和领域合同；工程规则见
 [开发指南](development-guide.md)，测试触发条件见[测试策略](testing.md)。
 不得从历史切片、JSON 已存在或测试夹具推断玩家已可执行。
@@ -102,13 +102,38 @@ M5 最终当前树本地阶段验收、审查与提交推送已完成；保留�
 完成：正文、`travel_arrival` 目标（结算后的公开抵达 `xuantian.array_hall`，公开
 来源地点云城/宗门山门、既有结丹一层门槛不变；阵堂研习门禁与旁观初会分离，本关
 只要求抵达）、行动、首通状态事件、`next_stage_key` 指向 `chapter.4.stage.2` 与
-失败重试规则均已落地；`chapter.4.stage.2` 阵纹试炼保持题录，是下一个待内容化关卡。
-数据改动为 `fd73925`/`b6ffef2`/`71f6a56`/`9c612ae`/`27a5de8` 与 `8a0b43f`
-（ch4.stage.1）；官方 `剧情/主线.json`
+失败重试规则均已落地；`chapter.4.stage.2` 阵纹试炼内容化切片已在 `develop` 完成：
+正文、`exploration_reward` 目标（结算后的公开 `explore.gather_basalt_pass` 采掘
+取得阵砂 ≥1，公开通路 阵堂→宗门山门→青石镇→近郊→玄武岩径、既有门槛/次数/成本
+不变）、行动、首通状态事件、`next_stage_key` 指向 `chapter.4.stage.3` 与失败重试
+规则均已落地；`chapter.4.stage.3` 玄天新章内容化切片已随后在 `develop` 完成：
+作为玄天主线当前收录的收尾关，正文、`travel_arrival` 目标（结算后沿公开通路
+玄武岩径→近郊→青石镇回镇合卷）、行动、首通状态事件与失败重试规则均已落地，
+`next_stage_key` 如实留空；校验器改为数据驱动——内容化关卡必须前链，仅本故事
+收录的最后一关可无后继，并由专项测试钉住两端。玄天 12 关内容化阶段至此完成；
+后续卷章（航路/界壁/洞天各线）仍按题录保持未内容化，未批量展开。
+数据改动为 `fd73925`/`b6ffef2`/`71f6a56`/`9c612ae`/`27a5de8`/`8a0b43f`/`e9efe27`
+与 `3496a13`（ch4.stage.3）；官方 `剧情/主线.json`
 各版 SHA-256 与 Git provenance 已登记 `scripts/seed_migrations.json`，聚焦组
 `test_mainline.py`、`test_mainline_content.py`、`test_mainline_vertical_slice.py`
-20 passed，`test_seed_migration.py` 7 passed（迁移测试覆盖旧官方 blob 升级、
+21 passed，`test_seed_migration.py` 7 passed（迁移测试覆盖旧官方 blob 升级、
 重复升级幂等、用户自定义保留与回退），未重跑全量/压测。
+
+`domain_frontier.guard.1` 烽火初燃内容化切片已在 `develop` 完成（数据提交 `f1cc95e`）：
+正文、`travel_arrival` 目标（结算后的公开抵达 `xuantian.domain_front`，青石镇↔领域前线既有
+通路）、行动、首通状态事件、`next_stage_key` 指向 `domain_frontier.guard.2` 与失败重试规则
+（keep_running/0 秒）均已落地，该关列入内容化校验集合；官方 `剧情/主线.json` 新旧 SHA-256
+与 Git provenance 已登记 `scripts/seed_migrations.json`，迁移测试反向助手只回退本关增量。
+同时修复部署验载的校验覆盖缺口：`mainline.py` 导入期此前只解析 `story.mainline.xuantian`
+一个故事，保留的自定义/未知主线若只在其他故事（本关所属 `story.mainline.domain_frontier`）
+缺正文，部署会误判成功（returncode 0）而不回退；现导入期解析全部故事，部署验载同时显式
+校验玄天/领域前线/虚空档案三个已收录故事，冲突种子在插件加载或验载即失败并回退源码、
+TOML 与本次种子，自定义数据保留。聚焦证据：修前
+`test_custom_title_only_conflict_rolls_back_source_toml_and_seeds` 两参数化用例 `assert 0 == 1`，
+修后 `3 passed, 5 deselected in 28.03s`，新增
+`test_official_seed_domain_frontier_stage_is_content_validated` 1 passed；frontier E2E 按共享
+业务只跑一次策略改为 `qq.official` 单份并 1 passed in 24.14s；当前官方数据全量解析 84 关
+通过、正常部署 `returncode 0` 且 `matchers=1 handlers=1`；未跑全量/压测/部署，未验 QQ 真机。
 
 本轮有限任务已完成：`chapter.1.stage.3` 雾中守门与 `chapter.2.stage.1` 城镇委托两关的正文、人物/场景、
 可执行目标、来源/奖励/后续引用、失败重试规则及现有战斗/委托、快照、事务、幂等消费者已落地。

@@ -114,6 +114,9 @@ _VERTICAL_SLICE_STAGES = frozenset(
         "chapter.3.stage.2",
         "chapter.3.stage.3",
         "chapter.4.stage.1",
+        "chapter.4.stage.2",
+        "chapter.4.stage.3",
+        "domain_frontier.guard.1",
     }
 )
 
@@ -375,8 +378,21 @@ def mainline_definitions(
         next_stage_key = row.get("next_stage_key")
         if next_stage_key is not None and (not isinstance(next_stage_key, str) or not next_stage_key.strip()):
             raise ContentError(f"mainline {key} next_stage_key must be a non-empty string")
+        # A content-ized stage must chain forward unless it is the last recorded
+        # stage of its story; the tail stage legitimately closes the arc.
         if is_vertical_slice_stage and not next_stage_key:
-            raise ContentError(f"mainline {key} requires next_stage_key")
+            same_story = [
+                item for item in rows
+                if isinstance(item, dict)
+                and item.get("story_key") == record_story_key
+                and isinstance(item.get("chapter"), int)
+                and isinstance(item.get("stage"), int)
+                and not isinstance(item.get("chapter"), bool)
+                and not isinstance(item.get("stage"), bool)
+            ]
+            tail = max(same_story, key=lambda item: (item["chapter"], item["stage"]))
+            if (chapter, stage) != (tail.get("chapter"), tail.get("stage")):
+                raise ContentError(f"mainline {key} requires next_stage_key")
         retry = row.get("retry")
         if retry is None and not is_vertical_slice_stage:
             retry_message = ""
@@ -484,6 +500,10 @@ def mainline_definitions(
 
 
 MAINLINE_STAGES = mainline_definitions(story_key=MAINLINE_STORY_KEY)
+# Parse every story at import as well: a host seed that still carries a
+# title-only stage for a content-ized key must fail plugin load (and roll the
+# deploy back) instead of escaping validation until that stage is first played.
+mainline_definitions()
 MAINLINE_STAGE_COUNT = len(MAINLINE_STAGES)
 MAINLINE_DEFINITIONS: Mapping[str, MainlineStageDefinition] = {
     definition.key: definition for definition in MAINLINE_STAGES
