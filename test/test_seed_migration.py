@@ -13,13 +13,13 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 HELPER = ROOT / "scripts/install_plugin_source.py"
 MAINLINE = Path("剧情/主线.json")
-OLD_SHA = "e1e5314aac26164f775086ea946c2c0d39b2e42adff63f1566cda99991425527"
+OLD_SHA = "968587251933f8264242f55b1bb8930a36c13aa275c29e4aa593592b762c1cb0"
 
 
 def old_official_mainline() -> bytes:
-    # Reverse only the current chapter.4.stage.3 content delta; pin the array-pattern blob.
+    # Reverse only the current domain_frontier.guard.1 content delta; pin the arc-closing blob.
     text = (ROOT / "data" / MAINLINE).read_text(encoding="utf-8")
-    for key in ("chapter.4.stage.3",):
+    for key in ("domain_frontier.guard.1",):
         start = text.index(f'      "key": "{key}"')
         end = text.index("\n    },", start)
         section = text[start:end]
@@ -32,8 +32,11 @@ def old_official_mainline() -> bytes:
             r'^      "retry": \{\n.*?^      \},\n',
         ):
             section, count = re.subn(pattern, "", section, count=1, flags=re.M | re.S)
-            # The closing tail stage legitimately omits next_stage_key.
-            assert count == (0 if pattern.startswith('^      "next_stage_key"') else 1)
+            if pattern.startswith('^      "next_stage_key"'):
+                # Only the closing tail stage omits ahead reference; others must drop one.
+                assert count == (0 if key == "chapter.4.stage.3" else 1)
+            else:
+                assert count == 1
         text = text[:start] + section + text[end:]
     blob = text.encode("utf-8")
     assert hashlib.sha256(blob).hexdigest() == OLD_SHA
@@ -66,6 +69,33 @@ def preserved(host: Path) -> None:
     assert (host / ".env").read_bytes() == b"preserve_env=1\n"
     assert (host / "data/xiuxian3.sqlite3").read_bytes() == b"database-must-not-change"
     assert (host / "data/custom.json").read_bytes() == b'{"user": "keep"}\n'
+
+
+def test_official_seed_domain_frontier_stage_is_content_validated(tmp_path: Path) -> None:
+    # The "body is too short" gate lives in explicit story validation at deploy time:
+    # an official seed whose guard.1 keeps only title text must fail the validator.
+    from nonebot_plugin_xiuxian_3.xiuxian.adventures.mainline import (
+        DOMAIN_FRONTIER_STORY_KEY,
+        mainline_definitions,
+    )
+    from nonebot_plugin_xiuxian_3.xiuxian.content import ContentBundle, ContentError
+
+    data_dir = tmp_path / "data"
+    shutil.copytree(ROOT / "data", data_dir)
+    mainline_path = data_dir / MAINLINE
+    mainline = json.loads(mainline_path.read_text(encoding="utf-8"))
+    records = list(mainline["records"])
+    for index, row in enumerate(records):
+        if row.get("key") == "domain_frontier.guard.1":
+            records[index] = {k: v for k, v in row.items()
+                              if k in {"key", "story_key", "chapter", "stage", "name", "desc", "status"}}
+    mainline["records"] = records
+    mainline_path.write_text(json.dumps(mainline, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    bundle = ContentBundle.load(data_dir)
+    with pytest.raises(ContentError, match="domain_frontier.guard.1 body is too short"):
+        mainline_definitions(bundle, story_key=DOMAIN_FRONTIER_STORY_KEY)
+    # The shipped official seed itself must always pass the same validator.
+    assert mainline_definitions(None, story_key=DOMAIN_FRONTIER_STORY_KEY)
 
 
 @pytest.mark.parametrize("data_only", [False, True])

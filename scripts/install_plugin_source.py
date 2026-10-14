@@ -340,6 +340,17 @@ def validate(target: Path) -> None:
     if len(registered) != len(plugin.matcher) or set(registered) != plugin.matcher:
         raise ValueError("插件 matcher 注册不一致或重复")
     handlers = sum(len(matcher.handlers) for matcher in plugin.matcher)
+    # The story validators are lazy per story; exercise the recorded arcs against the
+    # host data so stale or stubbed seeds fail the deploy gate instead of the runtime.
+    import importlib
+
+    mainline = importlib.import_module(f"{expected_module}.xiuxian.adventures.mainline")
+    for story in (
+        mainline.MAINLINE_STORY_KEY,
+        mainline.DOMAIN_FRONTIER_STORY_KEY,
+        mainline.VOID_ARCHIVE_STORY_KEY,
+    ):
+        mainline.mainline_definitions(story_key=story)
     print(
         f"NoneBot 已加载 {expected_module} "
         f"module_file={module_file} matchers={len(plugin.matcher)} handlers={handlers}"

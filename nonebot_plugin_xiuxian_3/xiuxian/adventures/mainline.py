@@ -500,6 +500,10 @@ def mainline_definitions(
 
 
 MAINLINE_STAGES = mainline_definitions(story_key=MAINLINE_STORY_KEY)
+# Parse every story at import as well: a host seed that still carries a
+# title-only stage for a content-ized key must fail plugin load (and roll the
+# deploy back) instead of escaping validation until that stage is first played.
+mainline_definitions()
 MAINLINE_STAGE_COUNT = len(MAINLINE_STAGES)
 MAINLINE_DEFINITIONS: Mapping[str, MainlineStageDefinition] = {
     definition.key: definition for definition in MAINLINE_STAGES

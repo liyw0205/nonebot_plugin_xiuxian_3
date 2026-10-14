@@ -74,9 +74,11 @@ def _prepare_player(runtime, adapter: str, user: str, sect_id: str) -> None:
     equip_damage_weapon(runtime, adapter, user, 50000)
 
 
-def test_domain_frontier_mainline_runs_all_lanes_on_both_adapters() -> None:
+def test_domain_frontier_mainline_shared_lane_runs_once() -> None:
+    # Policy: the shared gameplay lane executes exactly once (qq.official);
+    # OneBot v11 differences are covered by the messaging contract tests only.
     async def run() -> None:
-        for adapter in ("qq.official", "onebot.v11"):
+        for adapter in ("qq.official",):
             clock = MutableClock(datetime(2026, 9, 25, 12, 5, tzinfo=timezone.utc))
             with TemporaryDirectory() as tmp_dir:
                 # Travel truth must come from the content pack, exactly as production runtime.
