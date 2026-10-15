@@ -229,7 +229,7 @@ boss 层越段、factions 不符、max_floor 不符、缺字段）；回归 `tes
 `ContentError`。敌人与奖励键按标识符校验：战斗层把内容记录与生成敌人合成解析（三界塔同样只校验敌人前缀），
 奖励层含非内容命名空间。节点解析保持稳定 key/中文标签/1 基序号三种写法，遗府保留 `LegacyManorDefinition`
 与按实例取用接口，恶魔深渊风险函数仍为代码。审计中发现两处既有悬空引用并如实保留、未新增内容：
-`enemy.ancient_domain_lord` 既不在内容也不在战斗层旧 `ENEMIES` 表，`item.clue.demon_abyss_echo` 不在物品内容中。
+`enemy.ancient_domain_lord` 经复核**存在**于战斗层旧 `ENEMIES` 表（`enemy_definition()` 可解析，此前误判源于 grep 输出被 `head` 截断），`item.clue.demon_abyss_echo` 确不在物品内容中，已在后续轮次补齐为同族线索记录。
 聚焦证据：新增 `test_secret_realm_instance_content.py` 24 passed（8 条记录合同、7 个模块常量与记录一致、
 三种节点别名解析、12 项校验失败用例）；`test_ancient_domain_secret_realm.py`、`test_ancient_domain_open_event.py`、
 `test_heaven_echo_secret_realm.py` 10 passed；`test_dao_origin_secret_realm.py`、`test_demon_abyss_secret_realm.py`、
