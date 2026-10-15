@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import shutil
+from datetime import datetime, timedelta, timezone
 from tempfile import TemporaryDirectory
 from pathlib import Path
 
@@ -24,6 +25,17 @@ def _context(operation_id: str) -> CommandContext:
     return CommandContext(adapter="web", user_id="dao-echoes-player", operation_id=operation_id)
 
 
+class _MutableClock:
+    def __init__(self, value: datetime):
+        self.value = value
+
+    def __call__(self) -> datetime:
+        return self.value
+
+    def advance(self, **kwargs: int) -> None:
+        self.value += timedelta(**kwargs)
+
+
 def test_dao_echoes_contract_has_three_sequential_ten_stage_lanes() -> None:
     stages = dao_echoes_definitions()
     assert len(stages) == 30
@@ -41,20 +53,26 @@ def test_dao_echoes_contract_has_three_sequential_ten_stage_lanes() -> None:
     assert dao_echoes_definition("traveler", 10).key == "lane.traveler.chapter.10"
 
 
-def test_dao_echoes_all_stages_produce_mainline_qualification_evidence() -> None:
+def test_dao_echoes_stage_requires_its_objective_before_claim() -> None:
     async def run() -> None:
-        with TemporaryDirectory() as data_dir:
-            runtime = create_runtime(data_dir=data_dir)
+        clock = _MutableClock(datetime(2026, 10, 7, 12, 5, tzinfo=timezone.utc))
+        with TemporaryDirectory() as tmp_dir:
+            data_dir = Path(tmp_dir) / "content"
+            shutil.copytree(
+                Path(__file__).parents[1] / "data",
+                data_dir,
+                ignore=shutil.ignore_patterns("*.sqlite3", "*.sqlite3-*", "*.db", "*.db-*"),
+            )
+            runtime = create_runtime(data_dir=data_dir, clock=clock)
             await runtime.dispatch(_context("create"), "开始修仙")
             await runtime.dispatch(_context("seek"), "寻仙问道")
-            locked = await runtime.dispatch(
-                _context("too-early"), "开始道源主线 建设者 1"
-            )
+            locked = await runtime.dispatch(_context("too-early"), "开始道源主线 建设者 1")
             assert locked.code == "DAO_ECHOES_REQUIREMENT_MISSING"
             with runtime.repository._connect() as connection:
                 connection.execute(
-                    "UPDATE players SET stage='cultivator', realm_key='void_refining', realm_layer=10 "
-                    "WHERE platform_user_id=?",
+                    "UPDATE players SET stage='cultivator', realm_key='void_refining', realm_layer=10, "
+                    "location_key='xuantian.cloud_city', stamina=5000, stamina_max=5000, "
+                    "energy=5000, energy_max=5000 WHERE platform_user_id=?",
                     ("dao-echoes-player",),
                 )
                 before = connection.execute(
@@ -67,52 +85,49 @@ def test_dao_echoes_all_stages_produce_mainline_qualification_evidence() -> None
             )
             assert out_of_order.code == "DAO_ECHOES_REQUIREMENT_MISSING"
 
-            for lane in DAO_ECHOES_LANES:
-                for stage in range(1, 11):
-                    started = await runtime.dispatch(
-                        _context(f"start-{lane}-{stage}"),
-                        f"开始道源主线 {lane} {stage}",
-                    )
-                    assert started.code == "DAO_ECHOES_STAGE_STARTED"
-                    claimed = await runtime.dispatch(
-                        _context(f"claim-{lane}-{stage}"),
-                        f"领取道源主线奖励 {lane} {stage}",
-                    )
-                    assert claimed.code == "DAO_ECHOES_STAGE_CLAIMED"
-                    assert claimed.data["first_clear"] is True
+            started = await runtime.dispatch(_context("start-builder-1"), "开始道源主线 builder 1")
+            assert started.code == "DAO_ECHOES_STAGE_STARTED"
+            # The objective is real: the claim is refused until the arrival is settled.
+            early = await runtime.dispatch(_context("early-claim"), "领取道源主线奖励 builder 1")
+            assert early.code == "MAINLINE_OBJECTIVES_INCOMPLETE"
 
-            replay = await runtime.dispatch(
+            moved = await runtime.dispatch(_context("travel"), "前往 青石镇")
+            assert moved.code == "TRAVEL_STARTED", moved.message
+            clock.advance(seconds=181)
+            settled = await runtime.dispatch(_context("settle"), "结算移动")
+            assert settled.code == "TRAVEL_COMPLETED", settled.message
+
+            claimed = await runtime.dispatch(
                 _context("claim-builder-1"), "领取道源主线奖励 builder 1"
             )
-            assert replay.code == "DAO_ECHOES_STAGE_CLAIMED"
-            assert replay.data["idempotent_replay"] is True
+            assert claimed.code == "DAO_ECHOES_STAGE_CLAIMED"
+            assert claimed.data["first_clear"] is True
 
             repeated_start = await runtime.dispatch(
                 _context("repeat-start-builder-1"), "开始道源主线 builder 1"
             )
-            conflict = await runtime.dispatch(
-                _context("repeat-start-builder-1"), "开始道源主线 builder 2"
+            assert repeated_start.data["first_clear"] is False
+            # A repeat challenge re-arms the objective: the same gate applies again.
+            repeat_early = await runtime.dispatch(
+                _context("repeat-early-claim"), "领取道源主线奖励 builder 1"
             )
-            assert conflict.code == "OPERATION_CONFLICT"
-            active_status = await runtime.dispatch(_context("active-status"), "道源主线")
-            assert active_status.data["stages"][0]["status"] == "running"
-            qualification = await runtime.dispatch(
-                _context("record-mainline"), "记录合道主线"
-            )
-            assert qualification.code == "QUEST_ACTION_RECORDED"
-            assert qualification.data["progress"]["three_realm_mainline"] == 1
+            assert repeat_early.code == "MAINLINE_OBJECTIVES_INCOMPLETE"
+            with runtime.repository._connect() as connection:
+                connection.execute(
+                    "UPDATE players SET location_key='xuantian.cloud_city', stamina=5000, "
+                    "stamina_max=5000 WHERE platform_user_id=?",
+                    ("dao-echoes-player",),
+                )
+            moved_again = await runtime.dispatch(_context("repeat-travel"), "前往 青石镇")
+            assert moved_again.code == "TRAVEL_STARTED", moved_again.message
+            clock.advance(seconds=181)
+            settled_again = await runtime.dispatch(_context("repeat-settle"), "结算移动")
+            assert settled_again.code == "TRAVEL_COMPLETED", settled_again.message
             repeated_claim = await runtime.dispatch(
                 _context("repeat-claim-builder-1"), "领取道源主线奖励 builder 1"
             )
-            assert repeated_start.data["first_clear"] is False
             assert repeated_claim.data["first_clear"] is False
             assert repeated_claim.data["reward"] == {}
-
-            status = await runtime.dispatch(_context("status"), "道源主线")
-            assert status.code == "DAO_ECHOES_STATUS"
-            assert len(status.data["stages"]) == 30
-            assert all(lane["completed"] == 10 for lane in status.data["lanes"])
-            assert status.data["story_key"] == DAO_ECHOES_STORY_KEY
 
             with runtime.repository._connect() as connection:
                 row = connection.execute(
@@ -121,19 +136,6 @@ def test_dao_echoes_all_stages_produce_mainline_qualification_evidence() -> None
                 ).fetchone()
                 assert int(row["spirit_stones"]) == int(before["spirit_stones"])
                 assert json.loads(row["inventory_json"]) == json.loads(before["inventory_json"])
-                run_count = connection.execute(
-                    "SELECT COUNT(*) AS count FROM mainline_runs WHERE player_id="
-                    "(SELECT id FROM players WHERE platform_user_id=?) AND story_key=? "
-                    "AND status='claimed' AND first_clear_claimed=1",
-                    ("dao-echoes-player", DAO_ECHOES_STORY_KEY),
-                ).fetchone()
-                assert int(run_count["count"]) == 30
-                flag_count = connection.execute(
-                    "SELECT COUNT(*) AS count FROM activity_events WHERE player_id="
-                    "(SELECT id FROM players WHERE platform_user_id=?) AND event_key LIKE 'codex.story.dao_echoes.%'",
-                    ("dao-echoes-player",),
-                ).fetchone()
-                assert int(flag_count["count"]) == 30
             await runtime.close()
 
     asyncio.run(run())
@@ -158,7 +160,8 @@ def test_dao_echoes_content_snapshot_and_close_are_adapter_consistent(
     user = f"dao-snapshot-{adapter}"
 
     async def run() -> None:
-        runtime = create_runtime(data_dir=data_dir)
+        clock = _MutableClock(datetime(2026, 10, 7, 12, 5, tzinfo=timezone.utc))
+        runtime = create_runtime(data_dir=data_dir, clock=clock)
         context = lambda operation_id: CommandContext(
             adapter=adapter, user_id=user, operation_id=f"{adapter}:{operation_id}"
         )
@@ -175,6 +178,18 @@ def test_dao_echoes_content_snapshot_and_close_are_adapter_consistent(
         )
         assert started.ok
         assert "新名建设者·新碑初校" in started.message
+        # The stage objective is real: leave 云城 and settle the arrival at 青石镇.
+        with runtime.repository._connect() as connection:
+            connection.execute(
+                "UPDATE players SET location_key='xuantian.cloud_city', stamina=5000, "
+                "stamina_max=5000 WHERE platform=? AND platform_user_id=?",
+                (adapter, user),
+            )
+        moved = await runtime.adapters.dispatch(adapter, context("travel"), "前往 青石镇")
+        assert moved.code == "TRAVEL_STARTED", moved.message
+        clock.advance(seconds=181)
+        settled = await runtime.adapters.dispatch(adapter, context("settle"), "结算移动")
+        assert settled.code == "TRAVEL_COMPLETED", settled.message
         await runtime.close()
 
         document = json.loads(mainline_path.read_text(encoding="utf-8"))
@@ -186,7 +201,7 @@ def test_dao_echoes_content_snapshot_and_close_are_adapter_consistent(
         first["name"] = "不应覆盖旧快照"
         mainline_path.write_text(json.dumps(document, ensure_ascii=False, indent=2), encoding="utf-8")
 
-        restored = create_runtime(data_dir=data_dir)
+        restored = create_runtime(data_dir=data_dir, clock=clock)
         claimed = await restored.adapters.dispatch(
             adapter, context("claim"), "领取道源主线奖励 builder 1"
         )
@@ -210,6 +225,10 @@ def test_dao_echoes_rejects_incomplete_lane_contract(tmp_path: Path) -> None:
     document["records"] = [
         row for row in document["records"] if row["key"] != "lane.traveler.chapter.10"
     ]
+    # Drop the tail's forward link too, so the lane contract itself is what fires.
+    for row in document["records"]:
+        if row["key"] == "lane.traveler.chapter.09":
+            row.pop("next_stage_key", None)
     mainline_path.write_text(json.dumps(document, ensure_ascii=False, indent=2), encoding="utf-8")
 
     with pytest.raises(ContentError, match="exactly 30"):

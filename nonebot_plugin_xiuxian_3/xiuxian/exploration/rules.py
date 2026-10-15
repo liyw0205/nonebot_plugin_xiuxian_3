@@ -258,22 +258,29 @@ def has_cloud_mine_access(*, subprofession_key: str | None, inventory: dict[str,
     return any(inventory_amount(inventory, key) > 0 for key in CLOUD_MINE_ACCESS_ITEMS)
 
 
-def realm_rank(realm_key: str) -> int:
-    return {
-        "mortal": 0,
-        "qi_sensing": 1,
-        "qi_gathering": 2,
-        "foundation": 3,
-        "golden_core": 4,
-        "nascent_soul": 5,
-        "soul_transformation": 6,
-    }.get(realm_key, -1)
+def realm_rank(realm_key: str, content: ContentBundle | None = None) -> int:
+    # Rank comes from the realm data, never from a hardcoded table: a table that
+    # stops at 化神 silently ranks every later realm as -1 and locks those
+    # cultivators out of every lower-realm exploration mode.
+    row = (content or bundled_content()).get("realm", str(realm_key))
+    if row is None or not isinstance(row.get("rank"), int) or isinstance(row.get("rank"), bool):
+        return -1
+    return int(row["rank"])
 
 
-def meets_realm(realm_key: str, layer: int, required_realm: str | None, required_layer: int) -> bool:
+def meets_realm(
+    realm_key: str,
+    layer: int,
+    required_realm: str | None,
+    required_layer: int,
+    content: ContentBundle | None = None,
+) -> bool:
     if required_realm is None:
         return True
-    return (realm_rank(realm_key), int(layer)) >= (realm_rank(required_realm), required_layer)
+    return (realm_rank(str(realm_key), content), int(layer)) >= (
+        realm_rank(required_realm, content),
+        required_layer,
+    )
 
 
 def battle_roll_bp(seed: str) -> int:

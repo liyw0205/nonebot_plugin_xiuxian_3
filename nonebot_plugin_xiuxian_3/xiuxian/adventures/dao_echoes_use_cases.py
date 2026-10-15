@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ...contracts import CommandContext, CommandResult
+from .mainline import MainlineObjectivesIncompleteError
 from ..persistence.errors import (
     MainlineAlreadyRunningError,
     MainlineContentClosedError,
@@ -176,6 +177,15 @@ class DaoEchoesApplication:
             return CommandResult(False, "CONTENT_CLOSED", "这条道源主线关卡尚未开放。", context.request_id, operation_id)
         except MainlineNotStartedError:
             return CommandResult(False, "MAINLINE_NOT_STARTED", "请先开始这条道源主线关卡。", context.request_id, operation_id)
+        except MainlineObjectivesIncompleteError as exc:
+            missing = "、".join(exc.missing)
+            return CommandResult(
+                False,
+                "MAINLINE_OBJECTIVES_INCOMPLETE",
+                f"尚未完成：{missing}。{exc.retry_message}",
+                context.request_id,
+                operation_id,
+            )
         except PlayerNotFoundError:
             return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
         except PlayerSuspendedError:

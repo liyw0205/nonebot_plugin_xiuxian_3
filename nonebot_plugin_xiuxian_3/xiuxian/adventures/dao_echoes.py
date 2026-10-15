@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Mapping
 
 from ..content import ContentBundle, ContentError, bundled_content
-from .mainline import MainlineStageDefinition, mainline_definitions
+from .mainline import MainlineStageDefinition, mainline_definitions, meets_realm
 
 
 DAO_ECHOES_STORY_KEY = "story.mainline.dao_echoes"
@@ -35,7 +35,13 @@ def dao_echoes_definitions(content: ContentBundle | None = None) -> tuple[DaoEch
         lane = definition.lane
         if lane not in by_lane:
             raise ContentError(f"dao echoes stage {definition.key} has an unsupported lane")
-        if definition.chapter != 1 or definition.required_realm != "void_refining" or definition.required_layer != 10:
+        if definition.chapter != 1 or not meets_realm(
+            definition.required_realm,
+            definition.required_layer,
+            "void_refining",
+            10,
+            content,
+        ):
             raise ContentError(f"dao echoes stage {definition.key} has an invalid qualification")
         if not definition.lane_label:
             raise ContentError(f"dao echoes lane {lane} requires a display name")
