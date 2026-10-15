@@ -1,51 +1,26 @@
-"""Route and reward rules for the ancient-domain party instance."""
+"""Route and reward rules for the ancient-domain party instance (content-backed)."""
 
 from __future__ import annotations
 
+from .secret_realm_content import node_aliases, node_labels, secret_realm_record
 
 ANCIENT_DOMAIN_KEY = "instance.secret_realm.ancient_domain"
-ANCIENT_DOMAIN_LOCATION = "cave.ancient_domain"
-ANCIENT_DOMAIN_PARTY_TYPE = "secret_realm_ancient"
-ANCIENT_DOMAIN_NODES = (
-    "domain_approach",
-    "fractured_gallery",
-    "seal_archive",
-    "primordial_garden",
-    "domain_spring",
-    "ancient_domain_lord",
-    "weathered_steps",
-    "origin_seal",
-)
-ANCIENT_DOMAIN_ENEMY = "enemy.ancient_domain_lord"
-ANCIENT_DOMAIN_STAMINA_COST = 40
-ANCIENT_DOMAIN_WEEKLY_LIMIT = 1
-ANCIENT_DOMAIN_EXPIRY_SECONDS = 60 * 60
-ANCIENT_DOMAIN_FIRST_REWARD = {"item.ancient_fruit": 2}
-ANCIENT_DOMAIN_REPEAT_REWARD = {"item.ancient_fruit": 1}
-ANCIENT_DOMAIN_ENERGY_SUPPRESSION = 10
 
-ANCIENT_DOMAIN_NODE_LABELS = {
-    "domain_approach": "洞天入口",
-    "fractured_gallery": "裂痕回廊",
-    "seal_archive": "封印古藏",
-    "primordial_garden": "太初灵园",
-    "domain_spring": "洞天灵泉",
-    "ancient_domain_lord": "远古洞天之主",
-    "weathered_steps": "风化天阶",
-    "origin_seal": "本源封印",
-}
+_RECORD = secret_realm_record(ANCIENT_DOMAIN_KEY)
 
-ANCIENT_DOMAIN_NODE_ALIASES = {
-    **{key: key for key in ANCIENT_DOMAIN_NODES},
-    "洞天入口": "domain_approach",
-    "裂痕回廊": "fractured_gallery",
-    "封印古藏": "seal_archive",
-    "太初灵园": "primordial_garden",
-    "洞天灵泉": "domain_spring",
-    "远古洞天之主": "ancient_domain_lord",
-    "风化天阶": "weathered_steps",
-    "本源封印": "origin_seal",
-}
+ANCIENT_DOMAIN_LOCATION = str(_RECORD["location_key"])
+ANCIENT_DOMAIN_PARTY_TYPE = str(_RECORD["party_type"])
+ANCIENT_DOMAIN_NODES = tuple(str(node["key"]) for node in _RECORD["nodes"])
+ANCIENT_DOMAIN_ENEMY = str(_RECORD["enemy_key"])
+ANCIENT_DOMAIN_STAMINA_COST = int(_RECORD["stamina_cost"])
+ANCIENT_DOMAIN_WEEKLY_LIMIT = int(_RECORD["weekly_limit"])
+ANCIENT_DOMAIN_EXPIRY_SECONDS = int(_RECORD["expiry_seconds"])
+ANCIENT_DOMAIN_FIRST_REWARD = dict(_RECORD["first_reward"])
+ANCIENT_DOMAIN_REPEAT_REWARD = dict(_RECORD["repeat_reward"])
+ANCIENT_DOMAIN_ENERGY_SUPPRESSION = int(_RECORD["energy_suppression"])
+
+ANCIENT_DOMAIN_NODE_LABELS = node_labels(_RECORD)
+ANCIENT_DOMAIN_NODE_ALIASES = node_aliases(_RECORD)
 
 
 def resolve_ancient_domain_node(value: str) -> str | None:

@@ -36,6 +36,81 @@
           "label": "始祖祭坛"
         }
       ]
+    },
+    {
+      "key": "instance.secret_realm.ancient_domain",
+      "name": "远古洞天",
+      "desc": "以封印古藏与太初灵园为路的远古洞天秘境。",
+      "status": "active",
+      "location_key": "cave.ancient_domain",
+      "party_type": "secret_realm_ancient",
+      "enemy_key": "enemy.ancient_domain_lord",
+      "stamina_cost": 40,
+      "weekly_limit": 1,
+      "expiry_seconds": 3600,
+      "energy_suppression": 10,
+      "first_reward": {
+        "item.ancient_fruit": 2
+      },
+      "repeat_reward": {
+        "item.ancient_fruit": 1
+      },
+      "nodes": [
+        {
+          "key": "domain_approach",
+          "label": "洞天入口"
+        },
+        {
+          "key": "fractured_gallery",
+          "label": "裂痕回廊"
+        },
+        {
+          "key": "seal_archive",
+          "label": "封印古藏"
+        },
+        {
+          "key": "primordial_garden",
+          "label": "太初灵园"
+        },
+        {
+          "key": "domain_spring",
+          "label": "洞天灵泉"
+        },
+        {
+          "key": "ancient_domain_lord",
+          "label": "远古洞天之主"
+        },
+        {
+          "key": "weathered_steps",
+          "label": "风化天阶"
+        },
+        {
+          "key": "origin_seal",
+          "label": "本源封印"
+        }
+      ]
+    },
+    {
+      "key": "instance.secret_realm.heaven_echo",
+      "name": "天劫回音",
+      "desc": "以天劫门槛与回音长廊为路的天劫回音秘境。",
+      "status": "active",
+      "expiry_seconds": 3600,
+      "story_flag": "story.heaven_echo",
+      "nodes": [
+        {
+          "key": "heaven_threshold",
+          "label": "天劫门槛"
+        },
+        {
+          "key": "echo_corridor",
+          "label": "回音长廊"
+        },
+        {
+          "key": "side_story_gate",
+          "label": "旁线之门"
+        }
+      ]
     }
   ]
 }

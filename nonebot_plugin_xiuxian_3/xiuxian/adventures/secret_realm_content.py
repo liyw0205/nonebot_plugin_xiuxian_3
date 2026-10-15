@@ -1,4 +1,10 @@
-"""Content-backed contracts for the dedicated secret realms."""
+"""Content-backed contracts for the dedicated secret realms.
+
+Enemy identifiers are validated as non-empty identifiers only: the combat
+layer resolves them by composing content records with generated enemies
+(the same reason the three-realms tower validates an enemy prefix rather
+than concrete enemy keys).
+"""
 
 from __future__ import annotations
 
@@ -48,7 +54,7 @@ def _reward_map(value: Any, *, field: str, key: str, bundle: ContentBundle) -> d
         amount = _positive_int(raw_amount, f"{field}.{reward_key}", key)
         if reward_key.startswith("item."):
             try:
-                bundle.require("item", reward_key, include_locked=False)
+                bundle.require("item", reward_key, include_locked=True)
             except KeyError as exc:
                 raise ContentError(
                     f"secret realm {key} {field} references unknown item {reward_key}"
@@ -82,12 +88,6 @@ def _nodes(value: Any, *, key: str, bundle: ContentBundle) -> tuple[dict[str, An
         if enemy_key is not None:
             if not isinstance(enemy_key, str) or not enemy_key.strip():
                 raise ContentError(f"secret realm {key} node {index} has an invalid enemy")
-            try:
-                bundle.require("enemy", enemy_key, include_locked=False)
-            except KeyError as exc:
-                raise ContentError(
-                    f"secret realm {key} node {index} references unknown enemy {enemy_key}"
-                ) from exc
             normalized["enemy_key"] = enemy_key
         nodes.append(normalized)
     return tuple(nodes)
@@ -107,7 +107,7 @@ def _validated(row: dict[str, Any], bundle: ContentBundle) -> dict[str, Any]:
         if not isinstance(location_key, str) or not location_key.strip():
             raise ContentError(f"secret realm {key} has an invalid location")
         try:
-            bundle.require("location", location_key, include_locked=False)
+            bundle.require("location", location_key, include_locked=True)
         except KeyError as exc:
             raise ContentError(
                 f"secret realm {key} references unknown location {location_key}"
@@ -118,10 +118,6 @@ def _validated(row: dict[str, Any], bundle: ContentBundle) -> dict[str, Any]:
     if enemy_key is not None:
         if not isinstance(enemy_key, str) or not enemy_key.strip():
             raise ContentError(f"secret realm {key} has an invalid enemy")
-        try:
-            bundle.require("enemy", enemy_key, include_locked=False)
-        except KeyError as exc:
-            raise ContentError(f"secret realm {key} references unknown enemy {enemy_key}") from exc
         record["enemy_key"] = enemy_key
 
     for field in _OPTIONAL_STRING_FIELDS:
@@ -149,7 +145,7 @@ def _validated(row: dict[str, Any], bundle: ContentBundle) -> dict[str, Any]:
         if not isinstance(ticket_key, str) or not ticket_key.strip():
             raise ContentError(f"secret realm {key} has an invalid ticket")
         try:
-            bundle.require("item", ticket_key, include_locked=False)
+            bundle.require("item", ticket_key, include_locked=True)
         except KeyError as exc:
             raise ContentError(f"secret realm {key} references unknown ticket {ticket_key}") from exc
         record["ticket_key"] = ticket_key
