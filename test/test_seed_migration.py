@@ -13,13 +13,28 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 HELPER = ROOT / "scripts/install_plugin_source.py"
 MAINLINE = Path("剧情/主线.json")
-OLD_SHA = "7c7ab7f5ebd4009f99bdd858419257815547c73668d08545f268f2ed9ff0c497"
+OLD_SHA = "9fd8d8a3675f4b04f58e3b3c631e8995a8bd2db51467abb64f8a4a66e6156341"
 
 
 def old_official_mainline() -> bytes:
-    # Reverse only the current guard.2-4 content delta; pin the frontier-oath blob.
+    # Reverse only the current guard.5-protect.6 content delta; pin the patrol blob.
     text = (ROOT / "data" / MAINLINE).read_text(encoding="utf-8")
-    for key in ("domain_frontier.guard.2", "domain_frontier.guard.3", "domain_frontier.guard.4"):
+    for key in (
+        "domain_frontier.guard.5",
+        "domain_frontier.guard.6",
+        "domain_frontier.purify.1",
+        "domain_frontier.purify.2",
+        "domain_frontier.purify.3",
+        "domain_frontier.purify.4",
+        "domain_frontier.purify.5",
+        "domain_frontier.purify.6",
+        "domain_frontier.protect.1",
+        "domain_frontier.protect.2",
+        "domain_frontier.protect.3",
+        "domain_frontier.protect.4",
+        "domain_frontier.protect.5",
+        "domain_frontier.protect.6",
+    ):
         start = text.index(f'      "key": "{key}"')
         end = text.index("\n    },", start)
         section = text[start:end]
@@ -34,7 +49,9 @@ def old_official_mainline() -> bytes:
             section, count = re.subn(pattern, "", section, count=1, flags=re.M | re.S)
             if pattern.startswith('^      "next_stage_key"'):
                 # Only the closing tail stage omits ahead reference; others must drop one.
-                assert count == (0 if key == "chapter.4.stage.3" else 1)
+                # Only story-tail stages legitimately omit the ahead reference.
+                tail = key in ("chapter.4.stage.3", "domain_frontier.protect.6")
+                assert count == (0 if tail else 1)
             else:
                 assert count == 1
         text = text[:start] + section + text[end:]
