@@ -557,6 +557,20 @@
       "stage": 5,
       "name": "共铸守门",
       "desc": "汇聚诸宗之力修补守门阵基，为最后的封界作准备。",
+      "body": "守门阵基不是一块石头，是百宗各自认下的那一角。守界五关要在界隙巡查里把阵材凑齐：雾隐核心是界纹的骨料，巡一趟界隙，把能带回来的都带回前线，阵基才立得住。诸宗看的是名册上的实绩，不是口头上的同盟；阵材没到位，封界就只能再等一轮烽火。",
+      "objectives": [
+        {"key": "gather_gate_core", "type": "exploration_reward", "label": "在界隙巡查中带回雾隐核心", "mode_key": "explore.boundary_rift", "location_key": "cave.boundary_realm", "item_key": "item.material.mist_core", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "界隙巡查", "description": "在界隙秘境开始界隙巡查，等待结算并在所得中取得雾隐核心。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.guard.5"]},
+      "next_stage_key": "domain_frontier.guard.6",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "阵材尚未凑齐时关卡保持进行中，不扣主线奖励；恢复体力后重新巡查并带回雾隐核心，即可共铸守门。"
+      },
       "status": "open",
       "aliases": ["守界五关"],
       "required_realm": "soul_transformation",
@@ -572,6 +586,20 @@
       "stage": 6,
       "name": "守界封天",
       "desc": "以守望之心镇定边界，换得一方安宁与继续建设的道途。",
+      "body": "守界最后一关不在界隙，而在前线：把巡守与鏖战的所得带回领域前线，当着守望名册把界纹镇住。回程只有一条路——从界隙退回魔界战场，再经青石镇入关；界战窗口一关，战场就不放行，这一趟只能等下一次烽火。镇纹一落，界前巡防、后方补给与百宗阵基才算连成一条线；回不到前线，前面的战功就只是别处的一段行程。",
+      "objectives": [
+        {"key": "seal_domain_front", "type": "travel_arrival", "label": "结算行程回到领域前线", "destination_key": "xuantian.domain_front"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "领域前线", "description": "从界隙秘境经魔界战场与青石镇返回领域前线，逐段结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.guard.6"]},
+      "next_stage_key": "domain_frontier.purify.1",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未回到前线镇纹时关卡保持进行中，不扣主线奖励；恢复体力后重新启程并结算移动，即可封界领取。"
+      },
       "status": "open",
       "aliases": ["守界终关"],
       "reputation_key": "local.xuantian.domain_front",
@@ -588,6 +616,20 @@
       "stage": 1,
       "name": "浊潮初见",
       "desc": "踏入污染边缘，辨认浊潮侵蚀领域的第一道痕迹。",
+      "body": "守界封住的是这一侧，另一侧的浊潮还在。净渊线从云舟渡口开始：在渡口等魔界引导的云舟，隔着界壁就能看见被浊气浸过的天光，那是污染侵蚀领域的第一道痕迹。渡口只认灵石与体力，备不齐就上不了船，也就看不到这道痕迹。",
+      "objectives": [
+        {"key": "reach_cloud_dock", "type": "travel_arrival", "label": "结算行程抵达云舟渡口", "destination_key": "xuantian.floating_boat"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "云舟渡口", "description": "从妖界万兽山返回云舟渡口，等待行程结束并结算移动；随后登上魔界引导航线。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.purify.1"]},
+      "next_stage_key": "domain_frontier.purify.2",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未抵达云舟渡口时关卡保持进行中，不扣主线奖励；备好灵石与体力后重新启程并结算移动，即可继续净渊。"
+      },
       "status": "open",
       "aliases": ["净渊一关"],
       "required_realm": "soul_transformation",
@@ -603,6 +645,20 @@
       "stage": 2,
       "name": "引流归墟",
       "desc": "引浊潮入阵，借天地回旋之势为净渊开出一线生机。",
+      "body": "浊潮不是死水，它顺着灵脉回流。净渊二关要在深渊门备材：在魔渊入口附近收集补给与浊气凝成的灵魂晶石，把回流的势头引向阵眼，为净渊开出一线生机。晶石要自己采回来，阵眼才认这一笔。",
+      "objectives": [
+        {"key": "draw_turbid_tide", "type": "exploration_reward", "label": "在深渊门备材中取得灵魂晶石", "mode_key": "explore.demon_threshold", "location_key": "demon.abyss_gate", "item_key": "item.soul_crystal", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "深渊门备材", "description": "在魔渊入口开始深渊门备材，等待结算并取得灵魂晶石。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.purify.2"]},
+      "next_stage_key": "domain_frontier.purify.3",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未取得灵魂晶石时关卡保持进行中，不扣主线奖励；恢复体力与虚力后重新备材，即可引流归墟。"
+      },
       "status": "open",
       "aliases": ["净渊二关"],
       "required_realm": "soul_transformation",
@@ -618,6 +674,20 @@
       "stage": 3,
       "name": "净火照渊",
       "desc": "以净火照彻深渊，斩断污染与领域灵脉之间的暗线。",
+      "body": "污染与灵脉之间有一条暗线，肉眼看不见，只认魔核的回响。净渊三关要在深渊门备材中取回魔核：以净火照彻深渊，用魔核的余温把暗线烧断，污染才不会再顺着灵脉爬回领域。暗线一日不烧断，污染就一日顺着灵脉往回爬。",
+      "objectives": [
+        {"key": "burn_turbid_line", "type": "exploration_reward", "label": "在深渊门备材中取得魔核", "mode_key": "explore.demon_threshold", "location_key": "demon.abyss_gate", "item_key": "item.demon_core", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "深渊门备材", "description": "在魔渊入口开始深渊门备材，等待结算并取得魔核。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.purify.3"]},
+      "next_stage_key": "domain_frontier.purify.4",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未取得魔核时关卡保持进行中，不扣主线奖励；恢复体力与虚力后重新备材，即可照渊。"
+      },
       "status": "open",
       "aliases": ["净渊三关"],
       "required_realm": "soul_transformation",
@@ -633,6 +703,20 @@
       "stage": 4,
       "name": "洗剑沉渊",
       "desc": "把战意沉入渊底，以一剑洗去附着在界壁上的旧秽。",
+      "body": "暗线断了，旧秽还附着在界壁上。净渊四关要下到魔界堕落遗迹：把战意沉入渊底，在遗迹里走一趟，以一剑洗去附着的旧秽。遗迹只认魔界入口资格，没确认过风险的人进不去，也就洗不动这层旧秽。",
+      "objectives": [
+        {"key": "descend_fallen_ruins", "type": "travel_arrival", "label": "结算行程抵达魔界堕落遗迹", "destination_key": "demon.fallen_ruins"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "堕落遗迹", "description": "从魔渊入口出发抵达魔界堕落遗迹，等待行程结束并结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.purify.4"]},
+      "next_stage_key": "domain_frontier.purify.5",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未抵达堕落遗迹时关卡保持进行中，不扣主线奖励；恢复体力后重新启程并结算移动，即可沉渊洗剑。"
+      },
       "status": "open",
       "aliases": ["净渊四关"],
       "required_realm": "soul_transformation",
@@ -648,6 +732,20 @@
       "stage": 5,
       "name": "百宗同契",
       "desc": "邀百宗共立净渊契约，让清明之气沿着前线重归人间。",
+      "body": "净渊不是一个人能立下的契。百宗同契要在堕落遗迹的探索中拾回契约线索：浊潮的源头与谁签过旧约，线索上写得明白。把线索带回前线，百宗才肯共立净渊契约，清明之气才有名分沿着前线重归人间。",
+      "objectives": [
+        {"key": "recover_abyss_contract", "type": "exploration_reward", "label": "在魔界堕落遗迹探索中取得契约线索", "mode_key": "explore.demon_abyss", "location_key": "demon.fallen_ruins", "item_key": "item.clue.demon_contract", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "魔界堕落遗迹探索", "description": "在魔界堕落遗迹开始探索，等待结算并取得契约线索。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.purify.5"]},
+      "next_stage_key": "domain_frontier.purify.6",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未取得契约线索时关卡保持进行中，不扣主线奖励；恢复体力后重新探索，即可同契。"
+      },
       "status": "open",
       "aliases": ["净渊五关"],
       "required_realm": "soul_transformation",
@@ -663,6 +761,20 @@
       "stage": 6,
       "name": "净渊开明",
       "desc": "封住浊潮源头，留下可供众修继续修复的净渊法脉。",
+      "body": "契约立了，源头还得封。净渊开明要在堕落遗迹的探索里正面接战：浊潮源头的守卫不认契约，只认谁站在渊底。把它击退，源头才算封住，净渊法脉才能留给众修继续修复。退让一次，浊潮会顺着旧线再涨回来。",
+      "objectives": [
+        {"key": "seal_abyss_source", "type": "exploration_battle_victory", "label": "在魔界堕落遗迹探索中击退源头守卫", "mode_key": "explore.demon_abyss", "location_key": "demon.fallen_ruins"}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "魔界堕落遗迹探索", "description": "在魔界堕落遗迹开始探索，等待结算并在遭遇中取胜。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.purify.6"]},
+      "next_stage_key": "domain_frontier.protect.1",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "源头守卫尚未被击退时关卡保持进行中，不扣主线奖励；恢复体力后重新探索并在遭遇中取胜，即可开明。"
+      },
       "status": "open",
       "aliases": ["净渊终关"],
       "reputation_key": "local.demon.abyss_market",
@@ -679,6 +791,20 @@
       "stage": 1,
       "name": "祖脉来书",
       "desc": "从前线收到祖灵湖急信，循着血脉回响踏上护祖之路。",
+      "body": "祖灵湖的急信比前线军报还急。护祖一关要先到湖边：循着血脉回响从万兽山走进祖灵湖，站上祖脉震荡的那片水面。妖界只认声望够的人，声望不到，湖边的路就断在万兽山口。急信上只写了一句：祖脉在震，速来。",
+      "objectives": [
+        {"key": "reach_ancestral_lake", "type": "travel_arrival", "label": "结算行程抵达祖灵湖", "destination_key": "beast.ancestral_lake"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "祖灵湖", "description": "从妖界万兽山出发抵达祖灵湖，等待行程结束并结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.protect.1"]},
+      "next_stage_key": "domain_frontier.protect.2",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未抵达祖灵湖时关卡保持进行中，不扣主线奖励；备好体力后重新启程并结算移动，即可护祖。"
+      },
       "status": "open",
       "aliases": ["护祖一关"],
       "required_realm": "soul_transformation",
@@ -694,6 +820,20 @@
       "stage": 2,
       "name": "护脉踏歌",
       "desc": "踏过震荡的灵脉，将散落的护祖符骨一一归位。",
+      "body": "祖脉一震荡，护祖符骨就散了一地。护祖二关要在祖灵湖探索里把符骨一一定回原位：踏过震荡的灵脉，把散落的骨片归位，祖脉才重新连成一条。符骨要靠自己走回来，别人代不了这一趟。",
+      "objectives": [
+        {"key": "restore_ancestral_bones", "type": "exploration_reward", "label": "在祖灵湖探索中取得祖灵血", "mode_key": "explore.ancestral_lake", "location_key": "beast.ancestral_lake", "item_key": "item.ancestral_blood", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "祖灵湖探索", "description": "在祖灵湖开始探索，等待结算并取得祖灵血。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.protect.2"]},
+      "next_stage_key": "domain_frontier.protect.3",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未取得祖灵血时关卡保持进行中，不扣主线奖励；恢复体力后重新探索，即可护脉踏歌。"
+      },
       "status": "open",
       "aliases": ["护祖二关"],
       "required_realm": "soul_transformation",
@@ -709,6 +849,20 @@
       "stage": 3,
       "name": "祖影临阵",
       "desc": "迎着祖影降临的异象守住阵脚，不让前线再失一寸。",
+      "body": "符骨归位，祖影也就来了。护祖三关要在祖灵湖探索里正面接战：祖影临阵不是吉兆也不是凶兆，是祖脉在试谁站得住。把祖影守回去，阵脚才算稳住；守不住，刚归位的符骨会再散一次。",
+      "objectives": [
+        {"key": "hold_ancestral_shadow", "type": "exploration_battle_victory", "label": "在祖灵湖探索中守住祖影临阵", "mode_key": "explore.ancestral_lake", "location_key": "beast.ancestral_lake"}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "祖灵湖探索", "description": "在祖灵湖开始探索，等待结算并在遭遇中取胜。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.protect.3"]},
+      "next_stage_key": "domain_frontier.protect.4",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "祖影尚未退去时关卡保持进行中，不扣主线奖励；恢复体力后重新探索并在遭遇中取胜，即可临阵。"
+      },
       "status": "open",
       "aliases": ["护祖三关"],
       "required_realm": "soul_transformation",
@@ -724,6 +878,20 @@
       "stage": 4,
       "name": "血誓回潮",
       "desc": "以血誓安抚回潮的祖灵之力，使其不再冲击界门。",
+      "body": "祖影退了，回潮的祖灵之力还要安抚。护祖四关要在万兽山狩猎中取回兽血：以血誓为引，把回潮之力重新压回祖脉，不让它再冲界门。兽血要在万兽山自己猎回来，买来的血立不住誓。",
+      "objectives": [
+        {"key": "swear_blood_oath", "type": "exploration_reward", "label": "在万兽山狩猎中取得兽血", "mode_key": "explore.beast_hunt", "location_key": "beast.ten_thousand_hills", "item_key": "item.beast_blood", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "万兽山狩猎", "description": "从祖灵湖返回万兽山开始狩猎，等待结算并取得兽血。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.protect.4"]},
+      "next_stage_key": "domain_frontier.protect.5",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未取得兽血时关卡保持进行中，不扣主线奖励；恢复体力后重新狩猎，即可立誓。"
+      },
       "status": "open",
       "aliases": ["护祖四关"],
       "required_realm": "soul_transformation",
@@ -739,6 +907,20 @@
       "stage": 5,
       "name": "万灵同守",
       "desc": "召集万灵共守祖脉，为祖灵栖地留下长久的护生阵。",
+      "body": "血誓立了，还得让万灵认这一脉。万灵同守要在万兽山狩猎中找回血脉线索：线索记着祖脉与各族的旧约，把旧约一一对上，万灵才肯共守祖脉。线索不是战利品，是各家认亲的凭据。",
+      "objectives": [
+        {"key": "gather_bloodline_clue", "type": "exploration_reward", "label": "在万兽山狩猎中取得血脉线索", "mode_key": "explore.beast_hunt", "location_key": "beast.ten_thousand_hills", "item_key": "item.clue.beast_bloodline", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "万兽山狩猎", "description": "在万兽山开始狩猎，等待结算并取得血脉线索。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.protect.5"]},
+      "next_stage_key": "domain_frontier.protect.6",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未取得血脉线索时关卡保持进行中，不扣主线奖励；恢复体力后重新狩猎，即可同守。"
+      },
       "status": "open",
       "aliases": ["护祖五关"],
       "required_realm": "soul_transformation",
@@ -754,6 +936,19 @@
       "stage": 6,
       "name": "护祖长明",
       "desc": "护住祖脉长明不灭，换得祖灵栖地的修复之权与一方名望。",
+      "body": "护祖最后一关落在三界贸易口：把护住的祖脉与万灵的旧约带到渡口备案，祖灵栖地的修复之权才算落到名册上。长明不是一句祝词，是备案之后才有的名望与权限。走不到渡口，前面的护持就只是湖上的一段往事。",
+      "objectives": [
+        {"key": "register_ancestral_habitat", "type": "travel_arrival", "label": "结算行程抵达三界贸易口", "destination_key": "beast.three_realms_trade_port"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "三界贸易口", "description": "从妖界万兽山出发抵达三界贸易口，等待行程结束并结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.protect.6"]},
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未抵达三界贸易口时关卡保持进行中，不扣主线奖励；恢复体力后重新启程并结算移动，即可长明领取。"
+      },
       "status": "open",
       "aliases": ["护祖终关"],
       "reputation_key": "local.beast.three_realms_trade_port",

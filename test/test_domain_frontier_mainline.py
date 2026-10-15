@@ -78,8 +78,9 @@ def _prepare_player(runtime, adapter: str, user: str, sect_id: str) -> None:
             UPDATE players
             SET stage='cultivator', realm_key='soul_transformation', realm_layer=1,
                 domain_key='domain.fire', location_key='xuantian.domain_front', stamina=1000,
-                stamina_max=1000, max_hp=100000, initiative=1000, qualification_json=?,
-                intro_json=?, faction_reputation_json='{"demon":300,"beast":300}'
+                stamina_max=1000, energy=5000, energy_max=5000, spirit_stones=50000,
+                bloodline_stability=100, max_hp=100000, initiative=1000, qualification_json=?,
+                intro_json=?, faction_reputation_json='{"demon":300,"beast":3000}'
             WHERE id=?
             """,
             (
@@ -233,18 +234,244 @@ def test_domain_frontier_mainline_shared_lane_runs_once() -> None:
                 )
                 assert guard4_claim.code == "MAINLINE_REWARD_CLAIMED", guard4_claim.message
 
-                for lane, final_alias in (("守界", "守界终关"), ("净渊", "净渊终关"), ("护祖", "护祖终关")):
-                    aliases = [f"{lane}{name}关" for name in ("一", "二", "三", "四", "五")] + [final_alias]
-                    for index, alias in enumerate(aliases, start=1):
-                        if lane == "守界" and index <= 4:
-                            # guard.1-4 already ran their real objectives above.
-                            continue
-                        started = await dispatch(f"start-{lane}-{index}", f"开始领域前线主线 {alias}", f"start-{lane}-{index}")
-                        assert started.code == "MAINLINE_STARTED"
-                        claim = await dispatch(f"claim-{lane}-{index}", f"领取领域前线主线奖励 {alias}", f"claim-{lane}-{index}")
-                        assert claim.code == "MAINLINE_REWARD_CLAIMED"
-                    replay = await dispatch(f"replay-{lane}", f"领取领域前线主线奖励 {final_alias}", f"claim-{lane}-6")
-                    assert replay.data["idempotent_replay"] is True
+                # guard.5 (共铸守门): gather the gate's mist core from the rift patrol.
+                started = await dispatch("start-guard-5", "开始领域前线主线 守界五关", "start-guard-5")
+                assert started.code == "MAINLINE_STARTED"
+                mist_operation = _reward_seed(
+                    "guard5-rift",
+                    str(rift_mode["reward_pool_key"]),
+                    "item.material.mist_core",
+                    runtime.content,
+                )
+                patrol = await dispatch("guard5-explore", "开始探索 界隙巡查", mist_operation)
+                assert patrol.code == "EXPLORATION_STARTED", patrol.message
+                clock.advance(seconds=601)
+                settled = await dispatch("guard5-settle", "结算探索", "guard5-settle")
+                assert settled.code == "EXPLORATION_SETTLED", settled.message
+                assert settled.data["result"].get("item.material.mist_core", 0) >= 1, settled.data
+                claim = await dispatch("claim-guard-5", "领取领域前线主线奖励 守界五关", "claim-guard-5")
+                assert claim.code == "MAINLINE_REWARD_CLAIMED", claim.message
+
+                # guard.6 (守界封天): carry the patrol gains back to the frontier and seal it.
+                started = await dispatch("start-guard-6", "开始领域前线主线 守界终关", "start-guard-6")
+                assert started.code == "MAINLINE_STARTED"
+                for index, (destination, wait) in enumerate(
+                    (("魔界战线", 301), ("青石镇", 301), ("领域前线", 301)), start=1
+                ):
+                    hop = await dispatch(f"guard6-hop-{index}", f"前往 {destination}", f"guard6-hop-{index}")
+                    assert hop.code == "TRAVEL_STARTED", hop.message
+                    clock.advance(seconds=wait)
+                    settled = await dispatch(f"guard6-settle-{index}", "结算移动", f"guard6-settle-{index}")
+                    assert settled.code == "TRAVEL_COMPLETED", settled.message
+                claim = await dispatch("claim-guard-6", "领取领域前线主线奖励 守界终关", "claim-guard-6")
+                assert claim.code == "MAINLINE_REWARD_CLAIMED", claim.message
+                replay = await dispatch("guard6-replay", "领取领域前线主线奖励 守界终关", "claim-guard-6")
+                assert replay.data["idempotent_replay"] is True
+
+                # protect.1 (祖脉来书): answer the ancestral summons at the lake.
+                started = await dispatch("start-protect-1", "开始领域前线主线 护祖一关", "start-protect-1")
+                assert started.code == "MAINLINE_STARTED"
+                for index, (destination, wait) in enumerate(
+                    (("青石镇", 301), ("云城", 181), ("云舟渡口", 61), ("万兽山", 301), ("祖灵湖", 601)),
+                    start=1,
+                ):
+                    hop = await dispatch(f"protect1-hop-{index}", f"前往 {destination}", f"protect1-hop-{index}")
+                    assert hop.code == "TRAVEL_STARTED", hop.message
+                    clock.advance(seconds=wait)
+                    settled = await dispatch(f"protect1-settle-{index}", "结算移动", f"protect1-settle-{index}")
+                    assert settled.code == "TRAVEL_COMPLETED", settled.message
+                claim = await dispatch("claim-protect-1", "领取领域前线主线奖励 护祖一关", "claim-protect-1")
+                assert claim.code == "MAINLINE_REWARD_CLAIMED", claim.message
+
+                # protect.2 (护脉踏歌): bring back the ancestral blood from the lake.
+                started = await dispatch("start-protect-2", "开始领域前线主线 护祖二关", "start-protect-2")
+                assert started.code == "MAINLINE_STARTED"
+                lake_mode = runtime.content.require("exploration_mode", "explore.ancestral_lake")
+                blood_operation = _reward_seed(
+                    "protect2-lake",
+                    str(lake_mode["reward_pool_key"]),
+                    "item.ancestral_blood",
+                    runtime.content,
+                )
+                patrol = await dispatch("protect2-explore", "开始探索 祖灵湖探索", blood_operation)
+                assert patrol.code == "EXPLORATION_STARTED", patrol.message
+                clock.advance(seconds=1201)
+                settled = await dispatch("protect2-settle", "结算探索", "protect2-settle")
+                assert settled.code == "EXPLORATION_SETTLED", settled.message
+                assert settled.data["result"].get("item.ancestral_blood", 0) >= 1, settled.data
+                claim = await dispatch("claim-protect-2", "领取领域前线主线奖励 护祖二关", "claim-protect-2")
+                assert claim.code == "MAINLINE_REWARD_CLAIMED", claim.message
+
+                # protect.3 (祖影临阵): hold the line when the ancestral shadow appears.
+                started = await dispatch("start-protect-3", "开始领域前线主线 护祖三关", "start-protect-3")
+                assert started.code == "MAINLINE_STARTED"
+                shadow_operation = _battle_seed("protect3-lake", int(lake_mode["battle_chance_bp"]))
+                patrol = await dispatch("protect3-explore", "开始探索 祖灵湖探索", shadow_operation)
+                assert patrol.code == "EXPLORATION_STARTED", patrol.message
+                clock.advance(seconds=1201)
+                settled = await dispatch("protect3-settle", "结算探索", "protect3-settle")
+                assert settled.code == "EXPLORATION_SETTLED", settled.message
+                assert settled.data["battle_outcome"] == "won", settled.data
+                claim = await dispatch("claim-protect-3", "领取领域前线主线奖励 护祖三关", "claim-protect-3")
+                assert claim.code == "MAINLINE_REWARD_CLAIMED", claim.message
+
+                # protect.4 (血誓回潮): swear the blood oath with beast blood from the hills.
+                started = await dispatch("start-protect-4", "开始领域前线主线 护祖四关", "start-protect-4")
+                assert started.code == "MAINLINE_STARTED"
+                hop = await dispatch("protect4-travel", "前往 万兽山", "protect4-travel")
+                assert hop.code == "TRAVEL_STARTED", hop.message
+                clock.advance(seconds=601)
+                settled = await dispatch("protect4-settle", "结算移动", "protect4-settle")
+                assert settled.code == "TRAVEL_COMPLETED", settled.message
+                hunt_mode = runtime.content.require("exploration_mode", "explore.beast_hunt")
+                blood_hunt_operation = _reward_seed(
+                    "protect4-hunt",
+                    str(hunt_mode["reward_pool_key"]),
+                    "item.beast_blood",
+                    runtime.content,
+                )
+                hunt = await dispatch("protect4-explore", "开始探索 万兽山狩猎", blood_hunt_operation)
+                assert hunt.code == "EXPLORATION_STARTED", hunt.message
+                clock.advance(seconds=901)
+                settled = await dispatch("protect4-explore-settle", "结算探索", "protect4-explore-settle")
+                assert settled.code == "EXPLORATION_SETTLED", settled.message
+                assert settled.data["result"].get("item.beast_blood", 0) >= 1, settled.data
+                claim = await dispatch("claim-protect-4", "领取领域前线主线奖励 护祖四关", "claim-protect-4")
+                assert claim.code == "MAINLINE_REWARD_CLAIMED", claim.message
+
+                # protect.5 (万灵同守): recover the bloodline clue that binds the spirits.
+                started = await dispatch("start-protect-5", "开始领域前线主线 护祖五关", "start-protect-5")
+                assert started.code == "MAINLINE_STARTED"
+                clue_operation = _reward_seed(
+                    "protect5-hunt",
+                    str(hunt_mode["reward_pool_key"]),
+                    "item.clue.beast_bloodline",
+                    runtime.content,
+                )
+                hunt = await dispatch("protect5-explore", "开始探索 万兽山狩猎", clue_operation)
+                assert hunt.code == "EXPLORATION_STARTED", hunt.message
+                clock.advance(seconds=901)
+                settled = await dispatch("protect5-settle", "结算探索", "protect5-settle")
+                assert settled.code == "EXPLORATION_SETTLED", settled.message
+                assert settled.data["result"].get("item.clue.beast_bloodline", 0) >= 1, settled.data
+                claim = await dispatch("claim-protect-5", "领取领域前线主线奖励 护祖五关", "claim-protect-5")
+                assert claim.code == "MAINLINE_REWARD_CLAIMED", claim.message
+
+                # protect.6 (护祖长明): register the habitat at the three-realms trade port.
+                started = await dispatch("start-protect-6", "开始领域前线主线 护祖终关", "start-protect-6")
+                assert started.code == "MAINLINE_STARTED"
+                hop = await dispatch("protect6-travel", "前往 三界贸易口", "protect6-travel")
+                assert hop.code == "TRAVEL_STARTED", hop.message
+                clock.advance(seconds=181)
+                settled = await dispatch("protect6-settle", "结算移动", "protect6-settle")
+                assert settled.code == "TRAVEL_COMPLETED", settled.message
+                claim = await dispatch("claim-protect-6", "领取领域前线主线奖励 护祖终关", "claim-protect-6")
+                assert claim.code == "MAINLINE_REWARD_CLAIMED", claim.message
+                replay = await dispatch("protect6-replay", "领取领域前线主线奖励 护祖终关", "claim-protect-6")
+                assert replay.data["idempotent_replay"] is True
+
+                # purify.1 (浊潮初见): cross to the abyss gate and accept the demon intro.
+                started = await dispatch("start-purify-1", "开始领域前线主线 净渊一关", "start-purify-1")
+                assert started.code == "MAINLINE_STARTED"
+                for index, (destination, wait) in enumerate(
+                    (("万兽山", 601), ("云舟渡口", 301)), start=1
+                ):
+                    hop = await dispatch(f"purify1-hop-{index}", f"前往 {destination}", f"purify1-hop-{index}")
+                    assert hop.code == "TRAVEL_STARTED", hop.message
+                    clock.advance(seconds=wait)
+                    settled = await dispatch(f"purify1-settle-{index}", "结算移动", f"purify1-settle-{index}")
+                    assert settled.code == "TRAVEL_COMPLETED", settled.message
+                claim = await dispatch("claim-purify-1", "领取领域前线主线奖励 净渊一关", "claim-purify-1")
+                assert claim.code == "MAINLINE_REWARD_CLAIMED", claim.message
+                boarded = await dispatch("purify1-board", "登上云舟 魔界引导", "purify1-board")
+                assert boarded.code == "CLOUD_BOAT_STARTED", boarded.message
+                clock.advance(seconds=301)
+                arrived = await dispatch("purify1-arrive", "结算云舟", "purify1-arrive")
+                assert arrived.code == "CLOUD_BOAT_ARRIVED", arrived.message
+                intro = await dispatch("purify1-intro", "接受魔界引导", "purify1-intro")
+                assert intro.code == "DEMON_INTRO_ACCEPTED", intro.message
+
+                # purify.2 (引流归墟): draw the turbid tide with soul crystals from the gate.
+                started = await dispatch("start-purify-2", "开始领域前线主线 净渊二关", "start-purify-2")
+                assert started.code == "MAINLINE_STARTED"
+                gate_mode = runtime.content.require("exploration_mode", "explore.demon_threshold")
+                crystal_operation = _reward_seed(
+                    "purify2-gate",
+                    str(gate_mode["reward_pool_key"]),
+                    "item.soul_crystal",
+                    runtime.content,
+                )
+                gathered = await dispatch("purify2-explore", "开始探索 深渊门备材", crystal_operation)
+                assert gathered.code == "EXPLORATION_STARTED", gathered.message
+                clock.advance(seconds=241)
+                settled = await dispatch("purify2-settle", "结算探索", "purify2-settle")
+                assert settled.code == "EXPLORATION_SETTLED", settled.message
+                assert settled.data["result"].get("item.soul_crystal", 0) >= 1, settled.data
+                claim = await dispatch("claim-purify-2", "领取领域前线主线奖励 净渊二关", "claim-purify-2")
+                assert claim.code == "MAINLINE_REWARD_CLAIMED", claim.message
+
+                # purify.3 (净火照渊): burn the hidden line with a demon core.
+                started = await dispatch("start-purify-3", "开始领域前线主线 净渊三关", "start-purify-3")
+                assert started.code == "MAINLINE_STARTED"
+                core_operation = _reward_seed(
+                    "purify3-gate",
+                    str(gate_mode["reward_pool_key"]),
+                    "item.demon_core",
+                    runtime.content,
+                )
+                gathered = await dispatch("purify3-explore", "开始探索 深渊门备材", core_operation)
+                assert gathered.code == "EXPLORATION_STARTED", gathered.message
+                clock.advance(seconds=241)
+                settled = await dispatch("purify3-settle", "结算探索", "purify3-settle")
+                assert settled.code == "EXPLORATION_SETTLED", settled.message
+                assert settled.data["result"].get("item.demon_core", 0) >= 1, settled.data
+                claim = await dispatch("claim-purify-3", "领取领域前线主线奖励 净渊三关", "claim-purify-3")
+                assert claim.code == "MAINLINE_REWARD_CLAIMED", claim.message
+
+                # purify.4 (洗剑沉渊): descend into the fallen ruins.
+                started = await dispatch("start-purify-4", "开始领域前线主线 净渊四关", "start-purify-4")
+                assert started.code == "MAINLINE_STARTED"
+                hop = await dispatch("purify4-travel", "前往 堕落遗迹", "purify4-travel")
+                assert hop.code == "TRAVEL_STARTED", hop.message
+                clock.advance(seconds=481)
+                settled = await dispatch("purify4-settle", "结算移动", "purify4-settle")
+                assert settled.code == "TRAVEL_COMPLETED", settled.message
+                claim = await dispatch("claim-purify-4", "领取领域前线主线奖励 净渊四关", "claim-purify-4")
+                assert claim.code == "MAINLINE_REWARD_CLAIMED", claim.message
+
+                # purify.5 (百宗同契): recover the old abyss contract from the ruins.
+                started = await dispatch("start-purify-5", "开始领域前线主线 净渊五关", "start-purify-5")
+                assert started.code == "MAINLINE_STARTED"
+                ruins_mode = runtime.content.require("exploration_mode", "explore.demon_abyss")
+                contract_operation = _reward_seed(
+                    "purify5-ruins",
+                    str(ruins_mode["reward_pool_key"]),
+                    "item.clue.demon_contract",
+                    runtime.content,
+                )
+                patrol = await dispatch("purify5-explore", "开始探索 魔界堕落遗迹探索", contract_operation)
+                assert patrol.code == "EXPLORATION_STARTED", patrol.message
+                clock.advance(seconds=901)
+                settled = await dispatch("purify5-settle", "结算探索", "purify5-settle")
+                assert settled.code == "EXPLORATION_SETTLED", settled.message
+                assert settled.data["result"].get("item.clue.demon_contract", 0) >= 1, settled.data
+                claim = await dispatch("claim-purify-5", "领取领域前线主线奖励 净渊五关", "claim-purify-5")
+                assert claim.code == "MAINLINE_REWARD_CLAIMED", claim.message
+
+                # purify.6 (净渊开明): seal the source by beating its guardian.
+                started = await dispatch("start-purify-6", "开始领域前线主线 净渊终关", "start-purify-6")
+                assert started.code == "MAINLINE_STARTED"
+                source_operation = _battle_seed("purify6-ruins", int(ruins_mode["battle_chance_bp"]))
+                patrol = await dispatch("purify6-explore", "开始探索 魔界堕落遗迹探索", source_operation)
+                assert patrol.code == "EXPLORATION_STARTED", patrol.message
+                clock.advance(seconds=901)
+                settled = await dispatch("purify6-settle", "结算探索", "purify6-settle")
+                assert settled.code == "EXPLORATION_SETTLED", settled.message
+                assert settled.data["battle_outcome"] == "won", settled.data
+                claim = await dispatch("claim-purify-6", "领取领域前线主线奖励 净渊终关", "claim-purify-6")
+                assert claim.code == "MAINLINE_REWARD_CLAIMED", claim.message
+                replay = await dispatch("purify6-replay", "领取领域前线主线奖励 净渊终关", "claim-purify-6")
+                assert replay.data["idempotent_replay"] is True
 
                 with sqlite3.connect(runtime.settings.database_path) as connection:
                     rows = connection.execute(
@@ -277,6 +504,20 @@ def test_domain_frontier_mainline_shared_lane_runs_once() -> None:
                         "domain_frontier.guard.2",
                         "domain_frontier.guard.3",
                         "domain_frontier.guard.4",
+                        "domain_frontier.guard.5",
+                        "domain_frontier.guard.6",
+                        "domain_frontier.protect.1",
+                        "domain_frontier.protect.2",
+                        "domain_frontier.protect.3",
+                        "domain_frontier.protect.4",
+                        "domain_frontier.protect.5",
+                        "domain_frontier.protect.6",
+                        "domain_frontier.purify.1",
+                        "domain_frontier.purify.2",
+                        "domain_frontier.purify.3",
+                        "domain_frontier.purify.4",
+                        "domain_frontier.purify.5",
+                        "domain_frontier.purify.6",
                     ):
                         oath_events = connection.execute(
                             "SELECT COUNT(*) FROM activity_events WHERE player_id=(SELECT id FROM players WHERE platform=? AND platform_user_id=?) AND event_key=?",

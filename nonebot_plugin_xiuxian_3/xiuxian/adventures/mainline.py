@@ -120,6 +120,20 @@ _VERTICAL_SLICE_STAGES = frozenset(
         "domain_frontier.guard.2",
         "domain_frontier.guard.3",
         "domain_frontier.guard.4",
+        "domain_frontier.guard.5",
+        "domain_frontier.guard.6",
+        "domain_frontier.purify.1",
+        "domain_frontier.purify.2",
+        "domain_frontier.purify.3",
+        "domain_frontier.purify.4",
+        "domain_frontier.purify.5",
+        "domain_frontier.purify.6",
+        "domain_frontier.protect.1",
+        "domain_frontier.protect.2",
+        "domain_frontier.protect.3",
+        "domain_frontier.protect.4",
+        "domain_frontier.protect.5",
+        "domain_frontier.protect.6",
     }
 )
 
