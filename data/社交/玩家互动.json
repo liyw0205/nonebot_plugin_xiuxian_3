@@ -2,15 +2,20 @@
   "kind": "social_interaction",
   "records": [
     {
-      "key": "social.spar",
-      "name": "玩家直接切磋",
-      "desc": "直接使用双方当前角色快照进行中性场景自动战，只展示回放，不计竞技积分且不改变玩家状态。",
+      "key": "social.mentor",
+      "name": "师徒规则",
+      "desc": "师徒关系的邀请时限、收徒名额与准入境界。",
       "status": "active",
-      "max_rounds": 15,
-      "environment": {
-        "key": "spar.neutral",
-        "relation": "neutral"
-        }
+      "invitation_ttl_seconds": 86400,
+      "max_apprentices": 3,
+      "master_realm": "foundation",
+      "master_min_layer": 4,
+      "apprentice_realms": [
+        "mortal",
+        "qi_sensing",
+        "qi_gathering"
+      ],
+      "apprentice_max_qi_gathering_layer": 6
     },
     {
       "key": "social.mentor_graduation",
@@ -36,6 +41,17 @@
       "reunion_cooldown_seconds": 259200,
       "max_active_relations": 1,
       "cooldown_scope": "pair"
+    },
+    {
+      "key": "social.spar",
+      "name": "玩家直接切磋",
+      "desc": "直接使用双方当前角色快照进行中性场景自动战，只展示回放，不计竞技积分且不改变玩家状态。",
+      "status": "active",
+      "max_rounds": 15,
+      "environment": {
+        "key": "spar.neutral",
+        "relation": "neutral"
+      }
     }
   ],
   "schema": "xiuxian.content"
