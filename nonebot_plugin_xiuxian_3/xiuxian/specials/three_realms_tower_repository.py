@@ -41,10 +41,10 @@ from .three_realms_tower_models import (
 from .three_realms_tower_rules import (
     FACTIONS,
     MAX_FLOOR,
-    NASCENT_SOUL_MAX_FLOOR,
     TOWER_KEY,
     enemy_key_for,
     floor_definition,
+    floor_gate,
     rebuild_reputation_total,
     reward_for,
     week_start,
@@ -82,7 +82,7 @@ class ThreeRealmsTowerRepositoryMixin:
                 "AND status<>'aborted' AND substr(created_at,1,10)>=? AND substr(created_at,1,10)<=?",
                 (player["id"], TOWER_KEY, next_floor, week_start(now), now.date().isoformat()),
             ).fetchone()[0])
-            definition = floor_definition(next_floor)
+            definition = floor_definition(next_floor, self.content)
             return ThreeRealmsTowerPreviewRecord(
                 player=self._row_to_player(player),
                 highest_floor=highest,
@@ -113,7 +113,9 @@ class ThreeRealmsTowerRepositoryMixin:
             battle = await self.start_quest_battle(
                 platform=platform,
                 platform_user_id=platform_user_id,
-                enemy_key=enemy_key_for(floor_no, self._tower_run_faction(record.run_id)),
+                enemy_key=enemy_key_for(
+                    floor_no, self._tower_run_faction(record.run_id), self.content
+                ),
                 battle_type="pve.tower",
                 operation_id=operation,
                 ignore_tower_run_id=record.run_id,
@@ -130,7 +132,7 @@ class ThreeRealmsTowerRepositoryMixin:
         self, platform: str, platform_user_id: str, floor_no: int, operation_id: str
     ) -> ThreeRealmsTowerRunRecord:
         try:
-            definition = floor_definition(floor_no)
+            definition = floor_definition(floor_no, self.content)
         except ValueError as exc:
             raise TowerRequirementError(str(exc)) from exc
         operation_name = "specials.start_three_realms_tower"
@@ -161,20 +163,23 @@ class ThreeRealmsTowerRepositoryMixin:
 
             player = self._require_player(connection, platform, platform_user_id)
             flags = self._json_object(player["intro_json"], {}).get("flags", ())
-            has_story_permit = "story.mainline.three_realms" in {str(value) for value in flags}
+            permit_flag, rebuild_threshold = floor_gate(floor_no, self.content)
+            has_story_permit = bool(permit_flag) and permit_flag in {str(value) for value in flags}
             meets_realm = self._meets_realm_values(
                 str(player["realm_key"]),
                 player_integer(player, "realm_layer"),
                 definition.required_realm,
                 definition.required_layer,
             )
-            if floor_no <= NASCENT_SOUL_MAX_FLOOR:
-                if not meets_realm and not has_story_permit:
+            if not meets_realm and not has_story_permit:
+                if rebuild_threshold:
+                    local = player_local_reputations(connection, int(player["id"]))
+                    if rebuild_reputation_total(local) < rebuild_threshold:
+                        raise TowerRequirementError(
+                            "soul-transformation rank or 500 rebuild reputation is required"
+                        )
+                else:
                     raise TowerRequirementError("nascent-soul rank or three-realms story permit is required")
-            elif not meets_realm:
-                local = player_local_reputations(connection, int(player["id"]))
-                if rebuild_reputation_total(local) < 500:
-                    raise TowerRequirementError("soul-transformation rank or 500 rebuild reputation is required")
             if self._has_active_long_action(connection, int(player["id"])):
                 raise TowerBusyError("another long action is active")
             active = connection.execute(
@@ -215,7 +220,7 @@ class ThreeRealmsTowerRepositoryMixin:
                 now_text,
             )
             run_id = uuid4().hex
-            reward = reward_for(floor_no, run_id, first_clear=first_clear)
+            reward = reward_for(floor_no, run_id, first_clear=first_clear, content=self.content)
             change_player_state(
                 connection,
                 player,
@@ -533,7 +538,7 @@ class ThreeRealmsTowerRepositoryMixin:
             ).fetchone()
             if run is None:
                 return
-            stamina_cost = floor_definition(int(run["floor_no"])).stamina_cost
+            stamina_cost = floor_definition(int(run["floor_no"]), self.content).stamina_cost
             player = connection.execute(
                 "SELECT * FROM players WHERE id = ?", (run["player_id"],)
             ).fetchone()

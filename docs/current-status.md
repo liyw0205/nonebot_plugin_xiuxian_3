@@ -201,6 +201,23 @@ TOML 与本次种子，自定义数据保留。聚焦证据：修前
 与 Git provenance 已登记 `scripts/seed_migrations.json`，迁移测试反向助手只回退本弧 30 关增量（含末关境界还原）。
 未跑全量/压测/部署，未验 QQ 真机。
 
+三界塔系统内容化已在 `develop` 完成（数据提交 `0f3b39b`）：新增 `data/特殊/三界塔.json`（kind `three_realms_tower`，
+记录 `tower.three_realms`）承载 40 层塔契约——4 段连续层段（1–10/11–20 元婴 L1、21–30/31–40 化神 L1，
+每段体力 12、每周 2 次、10/20/30/40 层 boss）、三阵营敌人前缀 `enemy.three_realms_tower`、
+首通奖励 `{item.mat.array_sand:2, spirit_stones:60}` 与重复奖励 `{item.mat.array_sand:1}`、
+重建声望三键，以及每段的许可旗标（≤20 层 `story.mainline.three_realms`）与重建声望门槛（>20 层 500）。
+`three_realms_tower_rules.py` 改为内容驱动并校验（层段连续覆盖 1..40、境界已开放、层数/体力/次数为正、
+boss 层落在本段内、奖励引用已开放物品或灵石、factions/重建键与开放集合一致），未知境界或物品引用抛
+`ContentError`；新增 `floor_gate()` 让仓库的门槛判断（元婴或三界许可 / 化神或 500 重建声望）由数据给出，
+`three_realms_tower_repository.py` 与双人仓库改为传入 `self.content`，`three_realms_tower_duo_rules.py` 继续再导出。
+层数、次数、体力、敌人键、奖励数值与声望键全部保持原值（数据化只改变「从哪里读」）。
+聚焦证据：`test_three_realms_tower_content.py` 10 passed（合同覆盖 40 层×3 阵营、每个组合的敌人键都能被
+战斗层解析、首通/重复奖励与门槛现值一致；并逐项断言校验失败：层段空洞、重叠、未知境界、未知物品、
+boss 层越段、factions 不符、max_floor 不符、缺字段）；回归 `test_three_realms_tower.py`、
+`test_three_realms_tower_duo.py`、`test_tower.py`、`test_tower_snapshot_integrity.py`、
+`test_tower_snapshot_migration.py` 全绿；`data/内容清单.json` 新增该文件并登记种子迁移
+（`8121ad7f…`→`e504acb5…`，provenance `eaed711`）。未跑全量/压测/部署，未验 QQ 真机。
+
 本轮有限任务已完成：`chapter.1.stage.3` 雾中守门与 `chapter.2.stage.1` 城镇委托两关的正文、人物/场景、
 可执行目标、来源/奖励/后续引用、失败重试规则及现有战斗/委托、快照、事务、幂等消费者已落地。
 沿用本轮已确认的 `19 passed`、`lastfailed={}` 聚焦证据；不重跑全量、不扩展 travel/world，不重开 M9，

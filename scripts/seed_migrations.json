@@ -40,5 +40,12 @@
     },
     "new_sha256": "0f7cd87d1a9502dd2006ccc809b85383a1c26eea2f79dbd1ff3b4d0c9736e1db",
     "new_commit": "aae19b2c8a1302cec064a3eef011126f885548b1"
+  },
+  "内容清单.json": {
+    "old_sha256": {
+      "8121ad7fa52be7f9129bb39f9408494dc8b9c4f051c03387e763831e12cb0c1d": "eaed7115257db5a67933e8bdf833c003319d940d:data/内容清单.json"
+    },
+    "new_sha256": "e504acb578a74a493c9c98ca363fbe1ad8443554843df1ae0c1bbbe2c457ed20",
+    "new_commit": "0f3b39ba9e727db33aa031294d398d705866c881"
   }
 }

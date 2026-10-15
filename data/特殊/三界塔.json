@@ -1,0 +1,115 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "three_realms_tower",
+  "records": [
+    {
+      "key": "tower.three_realms",
+      "name": "三界塔",
+      "desc": "逐层挑战三界塔中守关敌手，三阵营各自记名。",
+      "status": "active",
+      "max_floor": 40,
+      "weekly_attempt_limit": 2,
+      "factions": [
+        "xuantian",
+        "demon",
+        "beast"
+      ],
+      "rebuild_reputation_keys": [
+        "local.xuantian.domain_front",
+        "local.demon.abyss_market",
+        "local.beast.three_realms_trade_port"
+      ],
+      "enemy_prefix": "enemy.three_realms_tower",
+      "segments": [
+        {
+          "floor_min": 1,
+          "floor_max": 10,
+          "required_realm": "nascent_soul",
+          "required_layer": 1,
+          "stamina_cost": 12,
+          "weekly_limit": 2,
+          "encounter_key": "vanguard",
+          "boss_encounter_key": "floor_10_boss",
+          "boss_floors": [
+            10
+          ],
+          "permit_flag": "story.mainline.three_realms",
+          "rebuild_reputation_threshold": 0,
+          "first_clear_reward": {
+            "item.mat.array_sand": 2,
+            "spirit_stones": 60
+          },
+          "repeat_reward": {
+            "item.mat.array_sand": 1
+          }
+        },
+        {
+          "floor_min": 11,
+          "floor_max": 20,
+          "required_realm": "nascent_soul",
+          "required_layer": 1,
+          "stamina_cost": 12,
+          "weekly_limit": 2,
+          "encounter_key": "veteran",
+          "boss_encounter_key": "floor_20_boss",
+          "boss_floors": [
+            20
+          ],
+          "permit_flag": "story.mainline.three_realms",
+          "rebuild_reputation_threshold": 0,
+          "first_clear_reward": {
+            "item.mat.array_sand": 2,
+            "spirit_stones": 60
+          },
+          "repeat_reward": {
+            "item.mat.array_sand": 1
+          }
+        },
+        {
+          "floor_min": 21,
+          "floor_max": 30,
+          "required_realm": "soul_transformation",
+          "required_layer": 1,
+          "stamina_cost": 12,
+          "weekly_limit": 2,
+          "encounter_key": "domain_vanguard",
+          "boss_encounter_key": "floor_30_boss",
+          "boss_floors": [
+            30
+          ],
+          "permit_flag": null,
+          "rebuild_reputation_threshold": 500,
+          "first_clear_reward": {
+            "item.mat.array_sand": 2,
+            "spirit_stones": 60
+          },
+          "repeat_reward": {
+            "item.mat.array_sand": 1
+          }
+        },
+        {
+          "floor_min": 31,
+          "floor_max": 40,
+          "required_realm": "soul_transformation",
+          "required_layer": 1,
+          "stamina_cost": 12,
+          "weekly_limit": 2,
+          "encounter_key": "domain_veteran",
+          "boss_encounter_key": "floor_40_boss",
+          "boss_floors": [
+            40
+          ],
+          "permit_flag": null,
+          "rebuild_reputation_threshold": 500,
+          "first_clear_reward": {
+            "item.mat.array_sand": 2,
+            "spirit_stones": 60
+          },
+          "repeat_reward": {
+            "item.mat.array_sand": 1
+          }
+        }
+      ]
+    }
+  ]
+}
