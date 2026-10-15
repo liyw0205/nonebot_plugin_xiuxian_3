@@ -8,23 +8,19 @@ from typing import Any
 
 from ..content import ContentBundle, ContentError, bundled_content
 from ..rewards.rules import local_reputation_maximum
+from .social_content import mentor_rules_record, realm_rank
 
 
-MENTOR_INVITATION_TTL_SECONDS = 24 * 60 * 60
-MENTOR_MAX_APPRENTICES = 3
-MENTOR_MASTER_REALM = "foundation"
-MENTOR_MASTER_MIN_LAYER = 4
-MENTOR_APPRENTICE_REALMS = frozenset({"mortal", "qi_sensing", "qi_gathering"})
-MENTOR_APPRENTICE_MAX_QI_GATHERING_LAYER = 6
-_MASTER_REALM_RANKS = {
-    "foundation": 3,
-    "golden_core": 4,
-    "nascent_soul": 5,
-    "soul_transformation": 6,
-    "void_refining": 7,
-    "dao_union": 8,
-    "tribulation": 9,
-}
+_MENTOR_RULES = mentor_rules_record()
+
+MENTOR_INVITATION_TTL_SECONDS = int(_MENTOR_RULES["invitation_ttl_seconds"])
+MENTOR_MAX_APPRENTICES = int(_MENTOR_RULES["max_apprentices"])
+MENTOR_MASTER_REALM = str(_MENTOR_RULES["master_realm"])
+MENTOR_MASTER_MIN_LAYER = int(_MENTOR_RULES["master_min_layer"])
+MENTOR_APPRENTICE_REALMS = frozenset(_MENTOR_RULES["apprentice_realms"])
+MENTOR_APPRENTICE_MAX_QI_GATHERING_LAYER = int(
+    _MENTOR_RULES["apprentice_max_qi_gathering_layer"]
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -112,11 +108,12 @@ def mentor_graduation_definition(content: ContentBundle | None = None) -> Mentor
 
 
 def is_master_eligible(realm_key: str, realm_layer: int) -> bool:
-    rank = _MASTER_REALM_RANKS.get(realm_key, -1)
+    master_rank = realm_rank(MENTOR_MASTER_REALM)
+    rank = realm_rank(realm_key)
     layer = int(realm_layer)
-    if rank < _MASTER_REALM_RANKS[MENTOR_MASTER_REALM] or layer < 1:
+    if rank < master_rank or layer < 1:
         return False
-    return rank > _MASTER_REALM_RANKS[MENTOR_MASTER_REALM] or layer >= MENTOR_MASTER_MIN_LAYER
+    return rank > master_rank or layer >= MENTOR_MASTER_MIN_LAYER
 
 
 def is_apprentice_eligible(stage: str, realm_key: str, realm_layer: int) -> bool:

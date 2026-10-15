@@ -182,7 +182,12 @@
       ],
       "requirements": [],
       "status": "active",
-      "gathering_sources": [{"mode_key": "explore.spring_gather", "reward_pool_key": "reward_pool.exploration.spring_gather"}],
+      "gathering_sources": [
+        {
+          "mode_key": "explore.spring_gather",
+          "reward_pool_key": "reward_pool.exploration.spring_gather"
+        }
+      ],
       "key": "item.food.coarse_spirit_rice"
     },
     {
@@ -204,7 +209,12 @@
       ],
       "requirements": [],
       "status": "active",
-      "gathering_sources": [{"mode_key": "explore.gather_outskirts", "reward_pool_key": "reward_pool.exploration.gather_outskirts"}],
+      "gathering_sources": [
+        {
+          "mode_key": "explore.gather_outskirts",
+          "reward_pool_key": "reward_pool.exploration.gather_outskirts"
+        }
+      ],
       "key": "item.herb.blood_grass"
     },
     {
@@ -228,8 +238,14 @@
       "requirements": [],
       "status": "active",
       "gathering_sources": [
-        {"mode_key": "explore.spring_gather", "reward_pool_key": "reward_pool.exploration.spring_gather"},
-        {"mode_key": "explore.mist_grotto", "reward_pool_key": "reward_pool.exploration.mist_grotto"}
+        {
+          "mode_key": "explore.spring_gather",
+          "reward_pool_key": "reward_pool.exploration.spring_gather"
+        },
+        {
+          "mode_key": "explore.mist_grotto",
+          "reward_pool_key": "reward_pool.exploration.mist_grotto"
+        }
       ],
       "key": "item.herb.spirit_leaf"
     },
@@ -242,7 +258,15 @@
       "instance_mode": "stack",
       "bind_type": "unbound",
       "tradeable": true,
-      "effects": [{"type": "crafting_material", "tags": ["qi", "mist_grotto"]}],
+      "effects": [
+        {
+          "type": "crafting_material",
+          "tags": [
+            "qi",
+            "mist_grotto"
+          ]
+        }
+      ],
       "requirements": [],
       "status": "active",
       "key": "item.material.mist_core"
@@ -282,8 +306,14 @@
       "requirements": [],
       "status": "active",
       "gathering_sources": [
-        {"mode_key": "explore.gather_outskirts", "reward_pool_key": "reward_pool.exploration.gather_outskirts"},
-        {"mode_key": "explore.mist_grotto", "reward_pool_key": "reward_pool.exploration.mist_grotto"}
+        {
+          "mode_key": "explore.gather_outskirts",
+          "reward_pool_key": "reward_pool.exploration.gather_outskirts"
+        },
+        {
+          "mode_key": "explore.mist_grotto",
+          "reward_pool_key": "reward_pool.exploration.mist_grotto"
+        }
       ],
       "key": "item.ore.ironstone"
     },
@@ -307,7 +337,12 @@
       ],
       "requirements": [],
       "status": "active",
-      "gathering_sources": [{"mode_key": "explore.gather_outskirts", "reward_pool_key": "reward_pool.exploration.gather_outskirts"}],
+      "gathering_sources": [
+        {
+          "mode_key": "explore.gather_outskirts",
+          "reward_pool_key": "reward_pool.exploration.gather_outskirts"
+        }
+      ],
       "key": "item.mat.wood"
     },
     {
@@ -331,8 +366,14 @@
       "requirements": [],
       "status": "active",
       "gathering_sources": [
-        {"mode_key": "explore.spring_gather", "reward_pool_key": "reward_pool.exploration.spring_gather"},
-        {"mode_key": "explore.mist_grotto", "reward_pool_key": "reward_pool.exploration.mist_grotto"}
+        {
+          "mode_key": "explore.spring_gather",
+          "reward_pool_key": "reward_pool.exploration.spring_gather"
+        },
+        {
+          "mode_key": "explore.mist_grotto",
+          "reward_pool_key": "reward_pool.exploration.mist_grotto"
+        }
       ],
       "key": "item.mat.array_sand"
     },
@@ -443,6 +484,31 @@
       "key": "item.clue.demon_contract"
     },
     {
+      "name": "深渊残响线索",
+      "desc": "从魔界深渊残响中取得的线索，指向封存于旧誓之中的回声。",
+      "item_type": "clue",
+      "quality": "rare",
+      "stack_limit": 99,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [
+        {
+          "type": "echo_clue",
+          "scope": "demon_abyss"
+        }
+      ],
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "foundation",
+          "min_layer": 1
+        }
+      ],
+      "status": "active",
+      "key": "item.clue.demon_abyss_echo"
+    },
+    {
       "name": "妖界血脉线索",
       "desc": "留有妖族血脉痕迹的线索，可助你探寻自身来历。",
       "item_type": "clue",
@@ -488,8 +554,14 @@
       "requirements": [],
       "status": "active",
       "gathering_sources": [
-        {"mode_key": "explore.cloud_mine", "reward_pool_key": "reward_pool.exploration.cloud_mine"},
-        {"mode_key": "explore.mist_grotto_2", "reward_pool_key": "reward_pool.exploration.mist_grotto_2"}
+        {
+          "mode_key": "explore.cloud_mine",
+          "reward_pool_key": "reward_pool.exploration.cloud_mine"
+        },
+        {
+          "mode_key": "explore.mist_grotto_2",
+          "reward_pool_key": "reward_pool.exploration.mist_grotto_2"
+        }
       ],
       "key": "item.material.cloud_iron"
     },
@@ -502,7 +574,11 @@
       "instance_mode": "stack",
       "bind_type": "character_bound",
       "tradeable": false,
-      "effects": [{"type": "cloud_boat_trial_ticket"}],
+      "effects": [
+        {
+          "type": "cloud_boat_trial_ticket"
+        }
+      ],
       "requirements": [],
       "status": "active",
       "key": "item.ticket.cloud_boat_fragment"
@@ -516,10 +592,19 @@
       "instance_mode": "stack",
       "bind_type": "unbound",
       "tradeable": true,
-      "effects": [{"type": "nascent_soul_material"}],
+      "effects": [
+        {
+          "type": "nascent_soul_material"
+        }
+      ],
       "requirements": [],
       "status": "active",
-      "gathering_sources": [{"mode_key": "explore.demon_threshold", "reward_pool_key": "reward_pool.exploration.demon_threshold"}],
+      "gathering_sources": [
+        {
+          "mode_key": "explore.demon_threshold",
+          "reward_pool_key": "reward_pool.exploration.demon_threshold"
+        }
+      ],
       "key": "item.soul_crystal"
     },
     {
@@ -531,12 +616,22 @@
       "instance_mode": "stack",
       "bind_type": "unbound_24h",
       "tradeable": true,
-      "effects": [{"type": "nascent_soul_alternative_material"}],
+      "effects": [
+        {
+          "type": "nascent_soul_alternative_material"
+        }
+      ],
       "requirements": [],
       "status": "active",
       "gathering_sources": [
-        {"mode_key": "explore.demon_threshold", "reward_pool_key": "reward_pool.exploration.demon_threshold"},
-        {"mode_key": "explore.demon_abyss", "reward_pool_key": "reward_pool.exploration.demon_abyss"}
+        {
+          "mode_key": "explore.demon_threshold",
+          "reward_pool_key": "reward_pool.exploration.demon_threshold"
+        },
+        {
+          "mode_key": "explore.demon_abyss",
+          "reward_pool_key": "reward_pool.exploration.demon_abyss"
+        }
       ],
       "key": "item.demon_core"
     },
@@ -549,10 +644,19 @@
       "instance_mode": "stack",
       "bind_type": "unbound_24h",
       "tradeable": true,
-      "effects": [{"type": "nascent_soul_alternative_material"}],
+      "effects": [
+        {
+          "type": "nascent_soul_alternative_material"
+        }
+      ],
       "requirements": [],
       "status": "active",
-      "gathering_sources": [{"mode_key": "explore.beast_hunt", "reward_pool_key": "reward_pool.exploration.beast_hunt"}],
+      "gathering_sources": [
+        {
+          "mode_key": "explore.beast_hunt",
+          "reward_pool_key": "reward_pool.exploration.beast_hunt"
+        }
+      ],
       "key": "item.beast_blood"
     },
     {
@@ -565,9 +669,21 @@
       "instance_mode": "stack",
       "bind_type": "unbound",
       "tradeable": true,
-      "effects": [{"type": "crafting_material", "tags": ["alchemy"]}],
+      "effects": [
+        {
+          "type": "crafting_material",
+          "tags": [
+            "alchemy"
+          ]
+        }
+      ],
       "requirements": [],
-      "gathering_sources": [{"mode_key": "explore.spring_gather", "reward_pool_key": "reward_pool.exploration.spring_gather"}],
+      "gathering_sources": [
+        {
+          "mode_key": "explore.spring_gather",
+          "reward_pool_key": "reward_pool.exploration.spring_gather"
+        }
+      ],
       "status": "active"
     },
     {
@@ -580,9 +696,21 @@
       "instance_mode": "stack",
       "bind_type": "unbound",
       "tradeable": true,
-      "effects": [{"type": "crafting_material", "tags": ["soul_transformation"]}],
+      "effects": [
+        {
+          "type": "crafting_material",
+          "tags": [
+            "soul_transformation"
+          ]
+        }
+      ],
       "requirements": [],
-      "gathering_sources": [{"mode_key": "explore.ancestral_lake", "reward_pool_key": "reward_pool.exploration.ancestral_lake"}],
+      "gathering_sources": [
+        {
+          "mode_key": "explore.ancestral_lake",
+          "reward_pool_key": "reward_pool.exploration.ancestral_lake"
+        }
+      ],
       "status": "active"
     },
     {
@@ -594,8 +722,19 @@
       "instance_mode": "instance",
       "bind_type": "character_bound_24h",
       "tradeable": false,
-      "effects": [{"type": "temporary_beast_pact", "duration_seconds": 86400}],
-      "requirements": [{"type": "realm", "realm_key": "nascent_soul", "min_layer": 1}],
+      "effects": [
+        {
+          "type": "temporary_beast_pact",
+          "duration_seconds": 86400
+        }
+      ],
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "nascent_soul",
+          "min_layer": 1
+        }
+      ],
       "status": "active",
       "key": "item.contract.beast_pact"
     },
@@ -608,8 +747,19 @@
       "instance_mode": "stack",
       "bind_type": "character_bound",
       "tradeable": false,
-      "effects": [{"type": "breakthrough_material", "target": "soul_transformation"}],
-      "requirements": [{"type": "realm", "realm_key": "nascent_soul", "min_layer": 10}],
+      "effects": [
+        {
+          "type": "breakthrough_material",
+          "target": "soul_transformation"
+        }
+      ],
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "nascent_soul",
+          "min_layer": 10
+        }
+      ],
       "status": "active",
       "key": "item.soul_seed"
     },
@@ -622,7 +772,11 @@
       "instance_mode": "stack",
       "bind_type": "character_bound",
       "tradeable": false,
-      "effects": [{"type": "domain_core"}],
+      "effects": [
+        {
+          "type": "domain_core"
+        }
+      ],
       "requirements": [],
       "status": "active",
       "key": "item.domain_core"
@@ -636,7 +790,12 @@
       "instance_mode": "stack",
       "bind_type": "character_bound",
       "tradeable": false,
-      "effects": [{"type": "domain_core_exchange", "quantity": 20}],
+      "effects": [
+        {
+          "type": "domain_core_exchange",
+          "quantity": 20
+        }
+      ],
       "requirements": [],
       "status": "active",
       "key": "item.domain_core_fragment"
@@ -650,7 +809,12 @@
       "instance_mode": "stack",
       "bind_type": "unbound",
       "tradeable": true,
-      "effects": [{"type": "breakthrough_material", "target": "soul_transformation"}],
+      "effects": [
+        {
+          "type": "breakthrough_material",
+          "target": "soul_transformation"
+        }
+      ],
       "requirements": [],
       "status": "active",
       "key": "item.ancient_fruit"
@@ -664,8 +828,19 @@
       "instance_mode": "stack",
       "bind_type": "unbound_24h",
       "tradeable": true,
-      "effects": [{"type": "breakthrough_material", "target": "void_refining"}],
-      "requirements": [{"type": "realm", "realm_key": "soul_transformation", "min_layer": 1}],
+      "effects": [
+        {
+          "type": "breakthrough_material",
+          "target": "void_refining"
+        }
+      ],
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "soul_transformation",
+          "min_layer": 1
+        }
+      ],
       "status": "active",
       "key": "item.void_crystal"
     },
@@ -678,7 +853,11 @@
       "instance_mode": "stack",
       "bind_type": "unbound",
       "tradeable": true,
-      "effects": [{"type": "void_route_anchor"}],
+      "effects": [
+        {
+          "type": "void_route_anchor"
+        }
+      ],
       "requirements": [],
       "status": "active",
       "key": "item.void_anchor"
@@ -692,7 +871,12 @@
       "instance_mode": "stack",
       "bind_type": "character_bound",
       "tradeable": false,
-      "effects": [{"type": "quest_delivery", "target": "quest.break_void"}],
+      "effects": [
+        {
+          "type": "quest_delivery",
+          "target": "quest.break_void"
+        }
+      ],
       "requirements": [],
       "status": "active",
       "key": "item.void_archive"
@@ -706,8 +890,19 @@
       "instance_mode": "stack",
       "bind_type": "character_bound",
       "tradeable": false,
-      "effects": [{"type": "dao_fruit_progress", "amount": 100}],
-      "requirements": [{"type": "realm", "realm_key": "void_refining", "min_layer": 10}],
+      "effects": [
+        {
+          "type": "dao_fruit_progress",
+          "amount": 100
+        }
+      ],
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "void_refining",
+          "min_layer": 10
+        }
+      ],
       "status": "active",
       "key": "item.dao_fruit_fragment"
     },
@@ -762,8 +957,18 @@
       "instance_mode": "stack",
       "bind_type": "character_bound",
       "tradeable": false,
-      "effects": [{"type": "tribulation_trial_token"}],
-      "requirements": [{"type": "realm", "realm_key": "tribulation", "min_layer": 3}],
+      "effects": [
+        {
+          "type": "tribulation_trial_token"
+        }
+      ],
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "tribulation",
+          "min_layer": 3
+        }
+      ],
       "status": "active",
       "key": "item.tribulation_token"
     },
@@ -776,8 +981,18 @@
       "instance_mode": "instance",
       "bind_type": "character_bound",
       "tradeable": false,
-      "effects": [{"type": "final_battle_entry"}],
-      "requirements": [{"type": "realm", "realm_key": "tribulation", "min_layer": 10}],
+      "effects": [
+        {
+          "type": "final_battle_entry"
+        }
+      ],
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "tribulation",
+          "min_layer": 10
+        }
+      ],
       "status": "active",
       "key": "item.ascension_certificate"
     },
@@ -790,22 +1005,40 @@
       "instance_mode": "stack",
       "bind_type": "character_bound",
       "tradeable": false,
-      "effects": [{"type": "tribulation_debt_reduction", "amount": 5}],
-      "requirements": [{"type": "realm", "realm_key": "tribulation", "min_layer": 1}],
+      "effects": [
+        {
+          "type": "tribulation_debt_reduction",
+          "amount": 5
+        }
+      ],
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "tribulation",
+          "min_layer": 1
+        }
+      ],
       "status": "active",
       "key": "item.tribulation_guard"
     },
     {
       "name": "云灵茶",
       "desc": "饮用后提升下一次修炼获得的状态加成。",
-      "aliases": ["云茶"],
+      "aliases": [
+        "云茶"
+      ],
       "item_type": "food",
       "quality": "rare",
       "stack_limit": 99,
       "instance_mode": "stack",
       "bind_type": "unbound",
       "tradeable": true,
-      "effects": [{"type": "next_cultivation_state_bonus_bp", "value": 500}],
+      "effects": [
+        {
+          "type": "next_cultivation_state_bonus_bp",
+          "value": 500
+        }
+      ],
       "requirements": [],
       "status": "active",
       "key": "item.food.cloud_tea"
@@ -833,7 +1066,12 @@
       "instance_mode": "stack",
       "bind_type": "character_bound",
       "tradeable": false,
-      "effects": [{"type": "route_clue", "scope": "mist_cave"}],
+      "effects": [
+        {
+          "type": "route_clue",
+          "scope": "mist_cave"
+        }
+      ],
       "requirements": [],
       "status": "active",
       "key": "item.clue.mist_cave_route"
