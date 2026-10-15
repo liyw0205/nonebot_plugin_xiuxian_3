@@ -43,6 +43,105 @@
       "cooldown_scope": "pair"
     },
     {
+      "key": "social.party",
+      "name": "队伍规则",
+      "desc": "各类队伍的人数区间、确认时限、分配方式与准入地点。",
+      "status": "active",
+      "aliases": {
+        "party_boundary": "boundary_realm"
+      },
+      "definitions": [
+        {
+          "party_type": "exploration_pair",
+          "min_members": 2,
+          "max_members": 2,
+          "confirmation_ttl_seconds": 300,
+          "distribution_key": "contribution",
+          "required_location": null
+        },
+        {
+          "party_type": "arena_trio",
+          "min_members": 3,
+          "max_members": 3,
+          "confirmation_ttl_seconds": 300,
+          "distribution_key": "arena_rating",
+          "required_location": null
+        },
+        {
+          "party_type": "boundary_realm",
+          "min_members": 2,
+          "max_members": 5,
+          "confirmation_ttl_seconds": 300,
+          "distribution_key": "contribution",
+          "required_location": "cave.boundary_realm"
+        },
+        {
+          "party_type": "demon_realm",
+          "min_members": 2,
+          "max_members": 5,
+          "confirmation_ttl_seconds": 300,
+          "distribution_key": "contribution",
+          "required_location": "demon.fallen_ruins"
+        },
+        {
+          "party_type": "beast_realm",
+          "min_members": 2,
+          "max_members": 5,
+          "confirmation_ttl_seconds": 300,
+          "distribution_key": "contribution",
+          "required_location": "beast.ten_thousand_hills"
+        },
+        {
+          "party_type": "standard_pve",
+          "min_members": 4,
+          "max_members": 5,
+          "confirmation_ttl_seconds": 300,
+          "distribution_key": "contribution",
+          "required_location": null
+        },
+        {
+          "party_type": "secret_realm_boundary",
+          "min_members": 2,
+          "max_members": 5,
+          "confirmation_ttl_seconds": 300,
+          "distribution_key": "contribution",
+          "required_location": "cave.boundary_realm"
+        },
+        {
+          "party_type": "secret_realm_ancient",
+          "min_members": 3,
+          "max_members": 3,
+          "confirmation_ttl_seconds": 300,
+          "distribution_key": "contribution",
+          "required_location": "cave.ancient_domain"
+        },
+        {
+          "party_type": "secret_realm_void_ruins",
+          "min_members": 2,
+          "max_members": 5,
+          "confirmation_ttl_seconds": 300,
+          "distribution_key": "contribution",
+          "required_location": "void.archive_ruins"
+        },
+        {
+          "party_type": "secret_realm_time_fort",
+          "min_members": 2,
+          "max_members": 5,
+          "confirmation_ttl_seconds": 300,
+          "distribution_key": "contribution",
+          "required_location": "void.archive_ruins"
+        },
+        {
+          "party_type": "three_realms_tower_duo",
+          "min_members": 2,
+          "max_members": 2,
+          "confirmation_ttl_seconds": 300,
+          "distribution_key": "tower_duo",
+          "required_location": null
+        }
+      ]
+    },
+    {
       "key": "social.spar",
       "name": "玩家直接切磋",
       "desc": "直接使用双方当前角色快照进行中性场景自动战，只展示回放，不计竞技积分且不改变玩家状态。",

@@ -1,9 +1,10 @@
-"""Pure rules for social party state machines."""
+"""Pure rules for social party state machines (content-backed)."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .social_content import party_aliases, party_definitions
 
 PARTY_TYPE_EXPLORATION_PAIR = "exploration_pair"
 PARTY_TYPE_ARENA_TRIO = "arena_trio"
@@ -18,11 +19,17 @@ PARTY_TYPE_SECRET_REALM_TIME_FORT = "secret_realm_time_fort"
 PARTY_TYPE_THREE_REALMS_TOWER_DUO = "three_realms_tower_duo"
 # Keep the implementation name used by early design notes as an input alias.
 PARTY_TYPE_PARTY_BOUNDARY = "party_boundary"
-PARTY_MAX_MEMBERS = 2
-ARENA_TRIO_MAX_MEMBERS = 3
-BOUNDARY_REALM_MIN_MEMBERS = 2
-BOUNDARY_REALM_MAX_MEMBERS = 5
-PARTY_CONFIRMATION_TTL_SECONDS = 5 * 60
+
+_PARTY_RECORDS = {record["party_type"]: record for record in party_definitions()}
+_PARTY_ALIASES = party_aliases()
+
+PARTY_MAX_MEMBERS = int(_PARTY_RECORDS[PARTY_TYPE_EXPLORATION_PAIR]["max_members"])
+ARENA_TRIO_MAX_MEMBERS = int(_PARTY_RECORDS[PARTY_TYPE_ARENA_TRIO]["max_members"])
+BOUNDARY_REALM_MIN_MEMBERS = int(_PARTY_RECORDS[PARTY_TYPE_BOUNDARY_REALM]["min_members"])
+BOUNDARY_REALM_MAX_MEMBERS = int(_PARTY_RECORDS[PARTY_TYPE_BOUNDARY_REALM]["max_members"])
+PARTY_CONFIRMATION_TTL_SECONDS = int(
+    _PARTY_RECORDS[PARTY_TYPE_EXPLORATION_PAIR]["confirmation_ttl_seconds"]
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,102 +42,46 @@ class PartyDefinition:
     required_location: str | None = None
 
 
-PARTY_DEFINITION = PartyDefinition()
-ARENA_TRIO_DEFINITION = PartyDefinition(
-    party_type=PARTY_TYPE_ARENA_TRIO,
-    min_members=ARENA_TRIO_MAX_MEMBERS,
-    max_members=ARENA_TRIO_MAX_MEMBERS,
-    distribution_key="arena_rating",
+def _definition(record: dict) -> PartyDefinition:
+    return PartyDefinition(
+        party_type=str(record["party_type"]),
+        min_members=int(record["min_members"]),
+        max_members=int(record["max_members"]),
+        confirmation_ttl_seconds=int(record["confirmation_ttl_seconds"]),
+        distribution_key=str(record["distribution_key"]),
+        required_location=record["required_location"],
+    )
+
+
+PARTY_DEFINITION = _definition(_PARTY_RECORDS[PARTY_TYPE_EXPLORATION_PAIR])
+ARENA_TRIO_DEFINITION = _definition(_PARTY_RECORDS[PARTY_TYPE_ARENA_TRIO])
+BOUNDARY_REALM_DEFINITION = _definition(_PARTY_RECORDS[PARTY_TYPE_BOUNDARY_REALM])
+SECRET_REALM_BOUNDARY_DEFINITION = _definition(
+    _PARTY_RECORDS[PARTY_TYPE_SECRET_REALM_BOUNDARY]
 )
-BOUNDARY_REALM_DEFINITION = PartyDefinition(
-    party_type=PARTY_TYPE_BOUNDARY_REALM,
-    min_members=BOUNDARY_REALM_MIN_MEMBERS,
-    max_members=BOUNDARY_REALM_MAX_MEMBERS,
-    required_location="cave.boundary_realm",
-    distribution_key="contribution",
+SECRET_REALM_ANCIENT_DEFINITION = _definition(
+    _PARTY_RECORDS[PARTY_TYPE_SECRET_REALM_ANCIENT]
 )
-SECRET_REALM_BOUNDARY_DEFINITION = PartyDefinition(
-    party_type=PARTY_TYPE_SECRET_REALM_BOUNDARY,
-    min_members=BOUNDARY_REALM_MIN_MEMBERS,
-    max_members=BOUNDARY_REALM_MAX_MEMBERS,
-    required_location="cave.boundary_realm",
-    distribution_key="contribution",
+SECRET_REALM_VOID_RUINS_DEFINITION = _definition(
+    _PARTY_RECORDS[PARTY_TYPE_SECRET_REALM_VOID_RUINS]
 )
-SECRET_REALM_ANCIENT_DEFINITION = PartyDefinition(
-    party_type=PARTY_TYPE_SECRET_REALM_ANCIENT,
-    min_members=3,
-    max_members=3,
-    required_location="cave.ancient_domain",
-    distribution_key="contribution",
+SECRET_REALM_TIME_FORT_DEFINITION = _definition(
+    _PARTY_RECORDS[PARTY_TYPE_SECRET_REALM_TIME_FORT]
 )
-SECRET_REALM_VOID_RUINS_DEFINITION = PartyDefinition(
-    party_type=PARTY_TYPE_SECRET_REALM_VOID_RUINS,
-    min_members=2,
-    max_members=5,
-    required_location="void.archive_ruins",
-    distribution_key="contribution",
-)
-SECRET_REALM_TIME_FORT_DEFINITION = PartyDefinition(
-    party_type=PARTY_TYPE_SECRET_REALM_TIME_FORT,
-    min_members=2,
-    max_members=5,
-    required_location="void.archive_ruins",
-    distribution_key="contribution",
-)
-DEMON_REALM_DEFINITION = PartyDefinition(
-    party_type=PARTY_TYPE_DEMON_REALM,
-    min_members=2,
-    max_members=5,
-    required_location="demon.fallen_ruins",
-    distribution_key="contribution",
-)
-BEAST_REALM_DEFINITION = PartyDefinition(
-    party_type=PARTY_TYPE_BEAST_REALM,
-    min_members=2,
-    max_members=5,
-    required_location="beast.ten_thousand_hills",
-    distribution_key="contribution",
-)
-STANDARD_PVE_DEFINITION = PartyDefinition(
-    party_type=PARTY_TYPE_STANDARD_PVE,
-    min_members=4,
-    max_members=5,
-    required_location=None,
-    distribution_key="contribution",
-)
-THREE_REALMS_TOWER_DUO_DEFINITION = PartyDefinition(
-    party_type=PARTY_TYPE_THREE_REALMS_TOWER_DUO,
-    min_members=2,
-    max_members=2,
-    required_location=None,
-    distribution_key="tower_duo",
+DEMON_REALM_DEFINITION = _definition(_PARTY_RECORDS[PARTY_TYPE_DEMON_REALM])
+BEAST_REALM_DEFINITION = _definition(_PARTY_RECORDS[PARTY_TYPE_BEAST_REALM])
+STANDARD_PVE_DEFINITION = _definition(_PARTY_RECORDS[PARTY_TYPE_STANDARD_PVE])
+THREE_REALMS_TOWER_DUO_DEFINITION = _definition(
+    _PARTY_RECORDS[PARTY_TYPE_THREE_REALMS_TOWER_DUO]
 )
 
 
 def party_definition_for(party_type: str) -> PartyDefinition:
-    if party_type == PARTY_TYPE_ARENA_TRIO:
-        return ARENA_TRIO_DEFINITION
-    if party_type in {PARTY_TYPE_BOUNDARY_REALM, PARTY_TYPE_PARTY_BOUNDARY}:
-        return BOUNDARY_REALM_DEFINITION
-    if party_type == PARTY_TYPE_SECRET_REALM_BOUNDARY:
-        return SECRET_REALM_BOUNDARY_DEFINITION
-    if party_type == PARTY_TYPE_SECRET_REALM_ANCIENT:
-        return SECRET_REALM_ANCIENT_DEFINITION
-    if party_type == PARTY_TYPE_SECRET_REALM_VOID_RUINS:
-        return SECRET_REALM_VOID_RUINS_DEFINITION
-    if party_type == PARTY_TYPE_SECRET_REALM_TIME_FORT:
-        return SECRET_REALM_TIME_FORT_DEFINITION
-    if party_type == PARTY_TYPE_DEMON_REALM:
-        return DEMON_REALM_DEFINITION
-    if party_type == PARTY_TYPE_BEAST_REALM:
-        return BEAST_REALM_DEFINITION
-    if party_type == PARTY_TYPE_STANDARD_PVE:
-        return STANDARD_PVE_DEFINITION
-    if party_type == PARTY_TYPE_THREE_REALMS_TOWER_DUO:
-        return THREE_REALMS_TOWER_DUO_DEFINITION
-    if party_type != PARTY_TYPE_EXPLORATION_PAIR:
+    resolved = _PARTY_ALIASES.get(party_type, party_type)
+    record = _PARTY_RECORDS.get(resolved)
+    if record is None:
         raise ValueError(f"unsupported party type: {party_type}")
-    return PARTY_DEFINITION
+    return _definition(record)
 
 
 __all__ = [
