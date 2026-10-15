@@ -218,6 +218,26 @@ boss 层越段、factions 不符、max_floor 不符、缺字段）；回归 `tes
 `test_tower_snapshot_migration.py` 全绿；`data/内容清单.json` 新增该文件并登记种子迁移
 （`8121ad7f…`→`e504acb5…`，provenance `eaed711`）。未跑全量/压测/部署，未验 QQ 真机。
 
+专用秘境规则内容化已在 `develop` 完成（提交 `327918c`、`4497735`、`7b4aa3c`）：新增
+`data/冒险/秘境专用.json`（kind `secret_realm_instance`，8 条记录）与共享加载器
+`adventures/secret_realm_content.py`，7 套专用秘境规则模块（`ancestral_hall`、`ancient_domain`、
+`heaven_echo`、`dao_origin`、`demon_abyss`、`boundary_rift`、`legacy_manor`）改为从内容派生全部常量。
+记录承载地点、节点（含中文标签与可选节点敌人）、体力、周次/终身次数、过期秒数、准入许可/旗标、
+剧情旗标、图鉴条目、首通/重复奖励、组队类型、门票、能量压制、风险 bp、名称别名，以及遗府的境界/线索/作用域。
+加载器校验记录须 active、name/desc 非空、地点须已存在（允许刻意锁定地点，如 `cave.ancient_domain`）、
+节点非空且 key 唯一、标签非空、体力/次数/过期为正整数、奖励键非空且数量为正、别名非空列表，未知地点抛
+`ContentError`。敌人与奖励键按标识符校验：战斗层把内容记录与生成敌人合成解析（三界塔同样只校验敌人前缀），
+奖励层含非内容命名空间。节点解析保持稳定 key/中文标签/1 基序号三种写法，遗府保留 `LegacyManorDefinition`
+与按实例取用接口，恶魔深渊风险函数仍为代码。审计中发现两处既有悬空引用并如实保留、未新增内容：
+`enemy.ancient_domain_lord` 既不在内容也不在战斗层旧 `ENEMIES` 表，`item.clue.demon_abyss_echo` 不在物品内容中。
+聚焦证据：新增 `test_secret_realm_instance_content.py` 24 passed（8 条记录合同、7 个模块常量与记录一致、
+三种节点别名解析、12 项校验失败用例）；`test_ancient_domain_secret_realm.py`、`test_ancient_domain_open_event.py`、
+`test_heaven_echo_secret_realm.py` 10 passed；`test_dao_origin_secret_realm.py`、`test_demon_abyss_secret_realm.py`、
+`test_legacy_manor.py` 与其余秘境回归全绿。`test_ancestral_hall_secret_realm.py`（3 项）与
+`test_boundary_rift_secret_realm.py`（5 项）的失败经 stash 对照确认为改动前既有失败（战斗/持久化相关），
+非本次内容化引入。`data/内容清单.json` 登记新文件并更新种子迁移规则（`e504acb5…`→`15773fe8…`，
+provenance `0f3b39ba`）。未跑全量/压测/部署，未验 QQ 真机。
+
 本轮有限任务已完成：`chapter.1.stage.3` 雾中守门与 `chapter.2.stage.1` 城镇委托两关的正文、人物/场景、
 可执行目标、来源/奖励/后续引用、失败重试规则及现有战斗/委托、快照、事务、幂等消费者已落地。
 沿用本轮已确认的 `19 passed`、`lastfailed={}` 聚焦证据；不重跑全量、不扩展 travel/world，不重开 M9，
@@ -358,7 +378,7 @@ M9 完成状态及当前收口见第 4 节开头和本节末。M7 的旧范围�
 | 生产、生活、经济：配方 32、生活 28（派遣 6、居所 2、作物 2、委托 5、服务 2、路线 1、公共工程 6、闲置路线 4）、拍卖 1 | 生产/采集闭环有空洞；仅止血草/灵叶作物、两类居所、一条短途运输，服务类型少；高境界委托复用低阶定义。经济资源 8 不覆盖全部玩家可见资源来源矩阵。`recipe` 本身内容多但生产/消费两端未闭合 | `production/rules.py`、`livelihood/rules.py`、`route_rules.py`、`commission_rules.py`、`dispatch_rules.py` 与对应 application/repository | 材料/场所/设施先有合法来源，再补不同用途作物、居所、路线、委托/服务、生产配方和实际消费者；验输入、输出去向、资源闭环、门槛/失败退款 |
 | 灵兽灵骑：灵兽 5、蜕变 1 | 现有只有两兽、一骑、一灵兽具、一鞍具；可执行生态、境界/地点来源不足。铁背鼠 `companion.evolution` 来源尚未发现运行中的事件生产者；不同兽类没有覆盖已支持效果用途 | `companions/rules.py` 与 companion repository，绑定位/喂养/运输/装备消费既有类型白名单 | 先有对应生态地点/事件与可重复公开资格，再补不同功能灵兽、灵骑、具装及蜕变边；每条来源需能真实生成，不以 `activity_event` 文本冒充 |
 | 任务/悬赏/日常：任务 24、悬赏 9、主线 84、故事 1 | 每个开放境界常规悬赏不足 3 条；境界池/目标类型偏窄，当前展示全定义而非持久随机批次。奖励目标快照有基础，但候选集与奖励真实随机/重投语义未闭合。日常首组仅 2 选 2，缺少变体；dispatch 6 中高阶内容少。主线玄天止于金丹，后续线不等同各境界通用冒险 | `adventures/rules.py`、`quests/*`、`daily_quest_rules.py`、`specials/dispatch_rules.py`、`adventures/mainline.py` | 依赖有效材料/敌人/地点/配方；数据先补境界适配、不同目标与结果范围，再扩消费者实现按 realm/准入过滤、持久 offer/刷新批次和奖励快照。只统计真实可产生的进度来源 |
-| 秘境、事件、赛季与特色：秘境 4 common、事件 12、赛季 1、普通塔 1、虚空塔 2、虚空敌人 6、图鉴分类 9/条目 240/解锁 8/里程碑 6 | common 秘境只有 4；7 套专用秘境规则、三界塔分段/门槛/次数/奖励仍硬编码。事件按 key 专用处理，不能仅加事件 JSON 变出新玩法。图鉴总数被 156 个挑战楼层生成项拉高；社交配置 3 条，宗门成本/成员上限/仓库/冷却仍硬编码 | `adventures/secret_realm_rules.py`、`events/*_rules.py`、`specials/tower_rules.py`、`specials/void_spire_rules.py`、`specials/codex_*`、`social/*` | 先补基础地点/敌人/奖池，再按通用算法的数据合同补各专用规则和有差异的节点/阶段；事件仍以既有专用 key 为范围。图鉴引用真实地点/敌人/结算；宗门只内容化现有本地规则 |
+| 秘境、事件、赛季与特色：秘境 4 common、事件 12、赛季 1、普通塔 1、虚空塔 2、虚空敌人 6、图鉴分类 9/条目 240/解锁 8/里程碑 6 | common 秘境只有 4；7 套专用秘境规则与三界塔分段/门槛/次数/奖励已内容化（`data/冒险/秘境专用.json`、`data/特殊/三界塔.json`）。事件按 key 专用处理，不能仅加事件 JSON 变出新玩法。图鉴总数被 156 个挑战楼层生成项拉高；社交配置 3 条，宗门成本/成员上限/仓库/冷却仍硬编码 | `adventures/secret_realm_rules.py`、`events/*_rules.py`、`specials/tower_rules.py`、`specials/void_spire_rules.py`、`specials/codex_*`、`social/*` | 先补基础地点/敌人/奖池，再按通用算法的数据合同补各专用规则和有差异的节点/阶段；事件仍以既有专用 key 为范围。图鉴引用真实地点/敌人/结算；宗门只内容化现有本地规则 |
 | 公开外部边界 | 未消费未来效果/付费权益、真实 QQ 呈现与权限、支付、跨服、远端发布条件不属于静态本地内容补全 | B1 锁定未来玩法；B2 平台账号/权限/设备；B3 支付、跨服身份/资产与投产 | 不以它们阻止本地规则，也不新开支付/跨服工作、不部署、不向真实账号发消息 |
 
 M9 实施时采用的冻结数据依赖顺序（保留作审计依据）：① 境界/道途/稳定 key 与资源、物品目录及世界区域/地点/准入；② 地点通路、可取得材料和基础采集/活动来源；③ 敌人原型、遭遇池、掉落/奖励池与战斗技能引用；④ 装备/功法/构筑来源、生产配方/设施、作物/居所/路线/服务/委托及灵兽来源；⑤ 悬赏/日常/派遣/主线/秘境/事件所需地点、目标和奖励候选；⑥ 塔/图鉴/社交对前述记录的引用与内容化既有规则。形成跨域引用环后按 SCC 成组冻结；当时先完成 JSON 定义再接入消费者。已有 stable key、既有存档/任务快照不得重命名或重算。
