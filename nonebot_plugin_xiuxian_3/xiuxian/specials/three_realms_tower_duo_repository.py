@@ -89,7 +89,7 @@ class ThreeRealmsTowerDuoRepositoryMixin:
         self, platform: str, platform_user_id: str, floor_no: int, operation_id: str
     ) -> ThreeRealmsTowerDuoRunRecord:
         try:
-            definition = floor_definition(floor_no)
+            definition = floor_definition(floor_no, self.content)
         except ValueError as exc:
             raise TowerRequirementError(str(exc)) from exc
         request = {"platform": platform, "platform_user_id": platform_user_id, "floor_no": floor_no, "tower_key": TOWER_KEY}
@@ -152,7 +152,9 @@ class ThreeRealmsTowerDuoRepositoryMixin:
             duo_run_id = f"tower-duo-{uuid4().hex}"
             member_run_ids = [f"{duo_run_id}:member:{row['id']}" for row in members]
             result = {
-                "enemy_key": enemy_key_for(floor_no, self._tower_run_faction_for_player(connection, int(leader["id"]))),
+                "enemy_key": enemy_key_for(
+                    floor_no, self._tower_run_faction_for_player(connection, int(leader["id"])), self.content
+                ),
                 "member_database_ids": [int(row["id"]) for row in members],
                 "member_stable_ids": [str(row["player_id"]) for row in members],
                 "party_type": PARTY_TYPE_THREE_REALMS_TOWER_DUO,
@@ -191,7 +193,16 @@ class ThreeRealmsTowerDuoRepositoryMixin:
                 ).fetchone()
                 first = prior is None
                 first_clear_by_player[str(player["player_id"])] = first
-                reward = reward_for(int(row["floor_no"]), f"{duo_run_id}:{database_id}", first_clear=first) if outcome == "won" else {}
+                reward = (
+                    reward_for(
+                        int(row["floor_no"]),
+                        f"{duo_run_id}:{database_id}",
+                        first_clear=first,
+                        content=self.content,
+                    )
+                    if outcome == "won"
+                    else {}
+                )
                 reward_by_player[str(player["player_id"])] = reward
                 connection.execute(
                     "INSERT INTO three_realms_tower_duo_member_runs(run_id,duo_run_id,player_id,floor_no,first_clear,status,reward_json,created_at,updated_at) VALUES (?,?,?,?,?,?,?, ?, ?)",
