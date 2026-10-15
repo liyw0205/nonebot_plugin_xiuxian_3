@@ -160,6 +160,25 @@ TOML 与本次种子，自定义数据保留。聚焦证据：修前
 18 关，含乘舟、魔界引导、跨日次数与按生产随机契约推导的战斗/掉落）；`test_seed_migration.py` 通过。
 未跑全量/压测/部署，未验 QQ 真机。
 
+虚空档案主线 24 关完整可玩化已在 `develop` 完成（数据提交 `fd4842c`）：`recorder.1–8` 记录者线
+（抵达第一航道、辨字取残片·甲、守卫战守住灵痕、档案遗迹归位星简、取残片·乙/丙与虚空档案本体、合卷之战）、
+`escort.1–8` 护航线（护卷回第一航道、取虚空锚与虚空晶、迎回孤灯、护阵镇潮、借风回舵、共守归途、两跳抵门户）、
+`return.1–8` 归乡线（故土回望、拾回旧梦、问归何处、故关再渡、照见来路、归心化桥、万里同门、归乡见天），
+24 关全部列入内容化校验集合，前链 `recorder.1→…→return.8` 完整、尾关如实留空，每关一条首通状态事件。
+可达性与目标按实际运行时核实：虚空内 `前往` 普通移动可用（写 `travel_sessions`，故 `travel_arrival` 成立），
+门户↔第一航道 1800 秒、第一航道↔档案遗迹 2700 秒；档案遗迹无直达门户边，末两关以两跳抵达门户；
+`进入虚空航道`/`结算虚空航道` 是另一套锚点航行（写 `void_route_sessions`），本弧不作为目标。
+目标只用既有内容：两种探索模式（`explore.void_route` 战斗 45%、`explore.archive_ruins` 战斗 60%，各每日 2 次）
+及其奖池物品；未新增地点、通路、模式、奖池或物品。前置 `event.archive_unlock`（周任务解锁，有效期 7 天）、
+`event.archive_guard.won` 与 `story.mainline.void_archive.time_fort`（时序堡垒首通）以上下文夹具提供，
+真实生产者由既有 `test_void_archive.py`、`test_time_fort_secret_realm.py`、`test_void_ruins_secret_realm.py`
+覆盖；目标本身全部真实结算（普通移动、跨日次数、按生产随机契约推导的探索掉落与战斗胜利），未跳过、未放宽阈值。
+聚焦证据：`test_void_archive_mainline.py` 1 passed in 71.54s（同一 `qq.official` 共享链真实结算 24 关，
+含提前领取被拒、幂等回放、24 条首通事件各 1、三章末关灵石与 codex 奖励）；
+`test_mainline_content.py` + `test_mainline_vertical_slice.py` 16 passed；`test_seed_migration.py` 通过；
+官方 `剧情/主线.json` 新旧 SHA-256（`a97d5a94…` → `48589e5f…`）与 Git provenance 已登记
+`scripts/seed_migrations.json`，迁移测试反向助手只回退本弧 24 关增量。未跑全量/压测/部署，未验 QQ 真机。
+
 本轮有限任务已完成：`chapter.1.stage.3` 雾中守门与 `chapter.2.stage.1` 城镇委托两关的正文、人物/场景、
 可执行目标、来源/奖励/后续引用、失败重试规则及现有战斗/委托、快照、事务、幂等消费者已落地。
 沿用本轮已确认的 `19 passed`、`lastfailed={}` 聚焦证据；不重跑全量、不扩展 travel/world，不重开 M9，

@@ -17,7 +17,8 @@ OLD_SHA = "9fd8d8a3675f4b04f58e3b3c631e8995a8bd2db51467abb64f8a4a66e6156341"
 
 
 def old_official_mainline() -> bytes:
-    # Reverse only the current guard.5-protect.6 content delta; pin the patrol blob.
+    # Reverse only the guard.5-protect.6 and void_archive.recorder.1-return.8 content
+    # deltas; pin the patrol blob.
     text = (ROOT / "data" / MAINLINE).read_text(encoding="utf-8")
     for key in (
         "domain_frontier.guard.5",
@@ -34,6 +35,30 @@ def old_official_mainline() -> bytes:
         "domain_frontier.protect.4",
         "domain_frontier.protect.5",
         "domain_frontier.protect.6",
+        "void_archive.recorder.1",
+        "void_archive.recorder.2",
+        "void_archive.recorder.3",
+        "void_archive.recorder.4",
+        "void_archive.recorder.5",
+        "void_archive.recorder.6",
+        "void_archive.recorder.7",
+        "void_archive.recorder.8",
+        "void_archive.escort.1",
+        "void_archive.escort.2",
+        "void_archive.escort.3",
+        "void_archive.escort.4",
+        "void_archive.escort.5",
+        "void_archive.escort.6",
+        "void_archive.escort.7",
+        "void_archive.escort.8",
+        "void_archive.return.1",
+        "void_archive.return.2",
+        "void_archive.return.3",
+        "void_archive.return.4",
+        "void_archive.return.5",
+        "void_archive.return.6",
+        "void_archive.return.7",
+        "void_archive.return.8",
     ):
         start = text.index(f'      "key": "{key}"')
         end = text.index("\n    },", start)
@@ -50,7 +75,11 @@ def old_official_mainline() -> bytes:
             if pattern.startswith('^      "next_stage_key"'):
                 # Only the closing tail stage omits ahead reference; others must drop one.
                 # Only story-tail stages legitimately omit the ahead reference.
-                tail = key in ("chapter.4.stage.3", "domain_frontier.protect.6")
+                tail = key in (
+                    "chapter.4.stage.3",
+                    "domain_frontier.protect.6",
+                    "void_archive.return.8",
+                )
                 assert count == (0 if tail else 1)
             else:
                 assert count == 1
