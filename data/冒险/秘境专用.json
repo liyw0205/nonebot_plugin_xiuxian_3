@@ -3,6 +3,62 @@
   "kind": "secret_realm_instance",
   "records": [
     {
+      "key": "instance.legacy.demon_abyss_echo",
+      "name": "深渊残响",
+      "desc": "以封存回声与未竟之言为路的深渊残响。",
+      "status": "active",
+      "operation_scope": "legacy_manor.demon_abyss_echo",
+      "location_key": "demon.abyss_gate",
+      "realm_key": "foundation",
+      "realm_layer": 1,
+      "permission": "access.demon_abyss_gate",
+      "clue": "item.clue.demon_abyss_echo",
+      "expiry_seconds": 3600,
+      "story_flag": "story.legacy.demon_abyss_echo",
+      "nodes": [
+        {
+          "key": "echo_threshold",
+          "label": "残响门庭"
+        },
+        {
+          "key": "sealed_resonance",
+          "label": "封存回声"
+        },
+        {
+          "key": "final_whisper",
+          "label": "未竟之言"
+        }
+      ]
+    },
+    {
+      "key": "instance.legacy.demon_reliquary",
+      "name": "魔界遗府",
+      "desc": "以契约档案与旧誓密室为路的魔界遗府。",
+      "status": "active",
+      "operation_scope": "legacy_manor",
+      "location_key": "demon.fallen_ruins",
+      "realm_key": "nascent_soul",
+      "realm_layer": 1,
+      "permission": "access.demon.fallen_ruins",
+      "clue": "item.clue.demon_contract",
+      "expiry_seconds": 3600,
+      "story_flag": "story.legacy.demon_reliquary",
+      "nodes": [
+        {
+          "key": "reliquary_seal",
+          "label": "遗府封印"
+        },
+        {
+          "key": "pact_archive",
+          "label": "契约档案"
+        },
+        {
+          "key": "oath_chamber",
+          "label": "旧誓密室"
+        }
+      ]
+    },
+    {
       "key": "instance.secret_realm.ancestral_hall",
       "name": "祖灵祠",
       "desc": "以祖灵湖血脉为引的祖灵祠堂秘境。",
@@ -87,6 +143,151 @@
         {
           "key": "origin_seal",
           "label": "本源封印"
+        }
+      ]
+    },
+    {
+      "key": "instance.secret_realm.boundary_rift",
+      "name": "界隙秘境",
+      "desc": "以裂隙入口与神魂潮汐为路的界隙秘境。",
+      "status": "active",
+      "location_key": "cave.boundary_realm",
+      "party_type": "secret_realm_boundary",
+      "stamina_cost": 30,
+      "ticket_key": "item.soul_crystal",
+      "ticket_quantity": 1,
+      "weekly_limit": 1,
+      "expiry_seconds": 3600,
+      "first_reward": {
+        "item.soul_crystal": 1
+      },
+      "repeat_reward": {
+        "item.soul_crystal": 1
+      },
+      "nodes": [
+        {
+          "key": "rift_approach",
+          "label": "裂隙入口"
+        },
+        {
+          "key": "shattered_path",
+          "label": "破碎岔路"
+        },
+        {
+          "key": "cross_realm_sentinel",
+          "label": "跨界哨卫",
+          "enemy_key": "enemy.cross_realm_sentinel"
+        },
+        {
+          "key": "soul_current",
+          "label": "神魂潮汐"
+        },
+        {
+          "key": "boundary_watcher",
+          "label": "界隙守望者",
+          "enemy_key": "enemy.boundary_watcher"
+        },
+        {
+          "key": "rift_seal",
+          "label": "裂隙封印"
+        }
+      ]
+    },
+    {
+      "key": "instance.secret_realm.dao_origin",
+      "name": "道源秘境",
+      "desc": "以道源关隘与三界校验印为路的道源秘境。",
+      "status": "active",
+      "location_key": "dao.origin_gate",
+      "permission": "access.dao.origin",
+      "stamina_cost": 60,
+      "quota_limit": 1,
+      "quota_key": "lifetime",
+      "expiry_seconds": 3600,
+      "story_flag": "story.dao_origin",
+      "codex_entry_key": "codex.dao.service_origin",
+      "first_reward": {
+        "story.dao_origin": 1,
+        "codex.dao.service_origin": 1
+      },
+      "repeat_reward": {},
+      "nodes": [
+        {
+          "key": "origin_threshold",
+          "label": "道源关隘"
+        },
+        {
+          "key": "dao_spring",
+          "label": "道源泉眼"
+        },
+        {
+          "key": "three_realm_seal",
+          "label": "三界校验印"
+        },
+        {
+          "key": "service_archive",
+          "label": "服务档案库"
+        },
+        {
+          "key": "fruit_trace",
+          "label": "道果痕迹"
+        },
+        {
+          "key": "witness_platform",
+          "label": "见证台"
+        },
+        {
+          "key": "origin_oath",
+          "label": "道源誓约"
+        },
+        {
+          "key": "new_chapter_gate",
+          "label": "新章门扉"
+        }
+      ]
+    },
+    {
+      "key": "instance.secret_realm.demon_abyss",
+      "name": "魔界深渊秘境",
+      "desc": "以深渊门与污染渗流为路的魔界深渊秘境。",
+      "status": "active",
+      "label": "魔界深渊秘境",
+      "aliases": [
+        "魔界深渊"
+      ],
+      "location_key": "demon.abyss_gate",
+      "required_flag": "access.demon_abyss_gate",
+      "stamina_cost": 20,
+      "quota_limit": 1,
+      "expiry_seconds": 3600,
+      "risk_base_bp": 0,
+      "risk_modifier_bp": 50,
+      "first_reward": {
+        "faction_reputation.demon": 20,
+        "item.clue.demon_abyss_echo": 1,
+        "story.demon_abyss_echo": 1
+      },
+      "repeat_reward": {
+        "item.demon_core": 1
+      },
+      "nodes": [
+        {
+          "key": "abyss_threshold",
+          "label": "深渊门"
+        },
+        {
+          "key": "pollution_seep",
+          "label": "污染渗流"
+        },
+        {
+          "key": "echo_guardian",
+          "label": "残响守卫",
+          "enemy_key": "enemy.demon_abyss_echo_guardian"
+        },
+        {
+          "key": "abyss_heart",
+          "label": "深渊之心",
+          "enemy_key": "enemy.demon_abyss_heart"
         }
       ]
     },

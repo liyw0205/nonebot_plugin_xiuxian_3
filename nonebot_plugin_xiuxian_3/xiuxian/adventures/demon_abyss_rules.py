@@ -1,51 +1,40 @@
-"""Contract for the solo demon-abyss secret realm."""
+"""Contract for the solo demon-abyss secret realm (content-backed)."""
 
 from __future__ import annotations
 
 import hashlib
 
+from .secret_realm_content import node_aliases, secret_realm_record
 
 DEMON_ABYSS_KEY = "instance.secret_realm.demon_abyss"
-DEMON_ABYSS_LABEL = "魔界深渊秘境"
-DEMON_ABYSS_LOCATION = "demon.abyss_gate"
-DEMON_ABYSS_REQUIRED_FLAG = "access.demon_abyss_gate"
-DEMON_ABYSS_STAMINA_COST = 20
-DEMON_ABYSS_QUOTA_LIMIT = 1
-DEMON_ABYSS_EXPIRY_SECONDS = 60 * 60
-DEMON_ABYSS_RISK_BASE_BP = 0
-DEMON_ABYSS_RISK_MODIFIER_BP = 50
 
-DEMON_ABYSS_NODES = (
-    "abyss_threshold",
-    "pollution_seep",
-    "echo_guardian",
-    "abyss_heart",
-)
-DEMON_ABYSS_NODE_ALIASES = {
-    "深渊门": "abyss_threshold",
-    "abyss_threshold": "abyss_threshold",
-    "污染渗流": "pollution_seep",
-    "pollution_seep": "pollution_seep",
-    "残响守卫": "echo_guardian",
-    "echo_guardian": "echo_guardian",
-    "深渊之心": "abyss_heart",
-    "abyss_heart": "abyss_heart",
-}
+_RECORD = secret_realm_record(DEMON_ABYSS_KEY)
+
+DEMON_ABYSS_LABEL = str(_RECORD["label"])
+DEMON_ABYSS_LOCATION = str(_RECORD["location_key"])
+DEMON_ABYSS_REQUIRED_FLAG = str(_RECORD["required_flag"])
+DEMON_ABYSS_STAMINA_COST = int(_RECORD["stamina_cost"])
+DEMON_ABYSS_QUOTA_LIMIT = int(_RECORD["quota_limit"])
+DEMON_ABYSS_EXPIRY_SECONDS = int(_RECORD["expiry_seconds"])
+DEMON_ABYSS_RISK_BASE_BP = int(_RECORD["risk_base_bp"])
+DEMON_ABYSS_RISK_MODIFIER_BP = int(_RECORD["risk_modifier_bp"])
+
+DEMON_ABYSS_NODES = tuple(str(node["key"]) for node in _RECORD["nodes"])
+DEMON_ABYSS_NODE_ALIASES = node_aliases(_RECORD)
 DEMON_ABYSS_REALM_ALIASES = {
     DEMON_ABYSS_KEY: DEMON_ABYSS_KEY,
-    "魔界深渊": DEMON_ABYSS_KEY,
-    "魔界深渊秘境": DEMON_ABYSS_KEY,
+    **{
+        alias: DEMON_ABYSS_KEY
+        for alias in (*_RECORD.get("aliases", ()), DEMON_ABYSS_LABEL)
+    },
 }
 DEMON_ABYSS_ENEMIES = {
-    "echo_guardian": "enemy.demon_abyss_echo_guardian",
-    "abyss_heart": "enemy.demon_abyss_heart",
+    str(node["key"]): str(node["enemy_key"])
+    for node in _RECORD["nodes"]
+    if node.get("enemy_key")
 }
-DEMON_ABYSS_FIRST_REWARD = {
-    "faction_reputation.demon": 20,
-    "item.clue.demon_abyss_echo": 1,
-    "story.demon_abyss_echo": 1,
-}
-DEMON_ABYSS_REPEAT_REWARD = {"item.demon_core": 1}
+DEMON_ABYSS_FIRST_REWARD = dict(_RECORD["first_reward"])
+DEMON_ABYSS_REPEAT_REWARD = dict(_RECORD["repeat_reward"])
 
 
 def resolve_demon_abyss(value: str) -> str | None:

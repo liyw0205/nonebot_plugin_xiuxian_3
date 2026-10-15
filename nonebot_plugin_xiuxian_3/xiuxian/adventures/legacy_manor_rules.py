@@ -1,8 +1,12 @@
-"""Contracts for clue-driven legacy manors."""
+"""Contracts for clue-driven legacy manors (content-backed)."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+
+from .secret_realm_content import secret_realm_records
+
+LEGACY_MANOR_PRIMARY_KEY = "instance.legacy.demon_reliquary"
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,44 +31,37 @@ class LegacyManorDefinition:
         return dict(self.node_labels)
 
 
-_DEMON_RELIQUARY = LegacyManorDefinition(
-    instance_key="instance.legacy.demon_reliquary",
-    operation_scope="legacy_manor",
-    location_key="demon.fallen_ruins",
-    realm_key="nascent_soul",
-    realm_layer=1,
-    permission="access.demon.fallen_ruins",
-    clue="item.clue.demon_contract",
-    expiry_seconds=60 * 60,
-    story_flag="story.legacy.demon_reliquary",
-    node_labels=(
-        ("reliquary_seal", "遗府封印"),
-        ("pact_archive", "契约档案"),
-        ("oath_chamber", "旧誓密室"),
-    ),
-)
+def _definition(record: dict) -> LegacyManorDefinition:
+    return LegacyManorDefinition(
+        instance_key=str(record["key"]),
+        operation_scope=str(record["operation_scope"]),
+        location_key=str(record["location_key"]),
+        realm_key=str(record["realm_key"]),
+        realm_layer=int(record["realm_layer"]),
+        permission=str(record["permission"]),
+        clue=str(record["clue"]),
+        expiry_seconds=int(record["expiry_seconds"]),
+        story_flag=str(record["story_flag"]),
+        node_labels=tuple(
+            (str(node["key"]), str(node["label"])) for node in record["nodes"]
+        ),
+    )
 
-_DEMON_ABYSS_ECHO = LegacyManorDefinition(
-    instance_key="instance.legacy.demon_abyss_echo",
-    operation_scope="legacy_manor.demon_abyss_echo",
-    location_key="demon.abyss_gate",
-    realm_key="foundation",
-    realm_layer=1,
-    permission="access.demon_abyss_gate",
-    clue="item.clue.demon_abyss_echo",
-    expiry_seconds=60 * 60,
-    story_flag="story.legacy.demon_abyss_echo",
-    node_labels=(
-        ("echo_threshold", "残响门庭"),
-        ("sealed_resonance", "封存回声"),
-        ("final_whisper", "未竟之言"),
-    ),
-)
+
+def _manor_records() -> tuple[dict, ...]:
+    return tuple(
+        record
+        for record in secret_realm_records()
+        if str(record.get("operation_scope", "")).startswith("legacy_manor")
+    )
+
 
 LEGACY_MANOR_DEFINITIONS = {
-    _DEMON_RELIQUARY.instance_key: _DEMON_RELIQUARY,
-    _DEMON_ABYSS_ECHO.instance_key: _DEMON_ABYSS_ECHO,
+    definition.instance_key: definition
+    for definition in (_definition(record) for record in _manor_records())
 }
+
+_DEMON_RELIQUARY = LEGACY_MANOR_DEFINITIONS[LEGACY_MANOR_PRIMARY_KEY]
 
 
 def get_legacy_manor_definition(instance_key: str) -> LegacyManorDefinition:
@@ -74,7 +71,9 @@ def get_legacy_manor_definition(instance_key: str) -> LegacyManorDefinition:
         raise ValueError(f"unknown legacy manor: {instance_key}") from exc
 
 
-def resolve_legacy_manor_node(value: str, instance_key: str = _DEMON_RELIQUARY.instance_key) -> str | None:
+def resolve_legacy_manor_node(
+    value: str, instance_key: str = LEGACY_MANOR_PRIMARY_KEY
+) -> str | None:
     definition = get_legacy_manor_definition(instance_key)
     aliases = {key: key for key in definition.nodes}
     aliases.update({label: key for key, label in definition.node_labels})

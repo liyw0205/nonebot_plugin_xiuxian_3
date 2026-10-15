@@ -1,9 +1,10 @@
 """Content-backed contracts for the dedicated secret realms.
 
-Enemy identifiers are validated as non-empty identifiers only: the combat
-layer resolves them by composing content records with generated enemies
-(the same reason the three-realms tower validates an enemy prefix rather
-than concrete enemy keys).
+Enemy and reward identifiers are validated as non-empty identifiers with
+positive amounts only: the combat and reward layers resolve them by
+composing content records with generated enemies and non-content
+namespaces (the same reason the three-realms tower validates an enemy
+prefix rather than concrete enemy keys).
 """
 
 from __future__ import annotations
@@ -24,6 +25,7 @@ _OPTIONAL_STRING_FIELDS = (
     "clue",
     "realm_key",
     "label",
+    "quota_key",
 )
 _OPTIONAL_INT_FIELDS = ("stamina_cost", "weekly_limit", "quota_limit", "expiry_seconds", "realm_layer")
 _OPTIONAL_FLAG_FIELDS = ("energy_suppression", "risk_base_bp", "risk_modifier_bp", "ticket_quantity")
@@ -51,17 +53,9 @@ def _reward_map(value: Any, *, field: str, key: str, bundle: ContentBundle) -> d
     rewards: dict[str, int] = {}
     for reward_key, raw_amount in value.items():
         reward_key = str(reward_key)
-        amount = _positive_int(raw_amount, f"{field}.{reward_key}", key)
-        if reward_key.startswith("item."):
-            try:
-                bundle.require("item", reward_key, include_locked=True)
-            except KeyError as exc:
-                raise ContentError(
-                    f"secret realm {key} {field} references unknown item {reward_key}"
-                ) from exc
-        elif not reward_key.strip():
+        if not reward_key.strip():
             raise ContentError(f"secret realm {key} {field} has an empty reward key")
-        rewards[reward_key] = amount
+        rewards[reward_key] = _positive_int(raw_amount, f"{field}.{reward_key}", key)
     return rewards
 
 
@@ -149,6 +143,17 @@ def _validated(row: dict[str, Any], bundle: ContentBundle) -> dict[str, Any]:
         except KeyError as exc:
             raise ContentError(f"secret realm {key} references unknown ticket {ticket_key}") from exc
         record["ticket_key"] = ticket_key
+
+    aliases = row.get("aliases")
+    if aliases is not None:
+        if not isinstance(aliases, list) or not aliases:
+            raise ContentError(f"secret realm {key} aliases must be a non-empty list")
+        cleaned: list[str] = []
+        for alias in aliases:
+            if not isinstance(alias, str) or not alias.strip():
+                raise ContentError(f"secret realm {key} has an invalid alias")
+            cleaned.append(alias.strip())
+        record["aliases"] = tuple(cleaned)
 
     record["nodes"] = _nodes(row.get("nodes"), key=key, bundle=bundle)
     for field in ("first_reward", "repeat_reward"):

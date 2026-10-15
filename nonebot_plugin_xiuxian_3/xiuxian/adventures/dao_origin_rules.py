@@ -1,46 +1,26 @@
-"""Contract for the dao-origin solo secret realm."""
+"""Contract for the dao-origin solo secret realm (content-backed)."""
 
 from __future__ import annotations
 
+from .secret_realm_content import node_aliases, node_labels, secret_realm_record
 
 DAO_ORIGIN_KEY = "instance.secret_realm.dao_origin"
-DAO_ORIGIN_LOCATION = "dao.origin_gate"
-DAO_ORIGIN_PERMISSION = "access.dao.origin"
-DAO_ORIGIN_STAMINA_COST = 60
-DAO_ORIGIN_QUOTA_KEY = "lifetime"
-DAO_ORIGIN_EXPIRY_SECONDS = 60 * 60
-DAO_ORIGIN_STORY_FLAG = "story.dao_origin"
-DAO_ORIGIN_CODEX = "codex.dao.service_origin"
-DAO_ORIGIN_FIRST_REWARD = {DAO_ORIGIN_STORY_FLAG: 1, DAO_ORIGIN_CODEX: 1}
-DAO_ORIGIN_REPEAT_REWARD: dict[str, int] = {}
 
-DAO_ORIGIN_NODES = (
-    "origin_threshold",
-    "dao_spring",
-    "three_realm_seal",
-    "service_archive",
-    "fruit_trace",
-    "witness_platform",
-    "origin_oath",
-    "new_chapter_gate",
-)
+_RECORD = secret_realm_record(DAO_ORIGIN_KEY)
 
-DAO_ORIGIN_NODE_LABELS = {
-    "origin_threshold": "道源关隘",
-    "dao_spring": "道源泉眼",
-    "three_realm_seal": "三界校验印",
-    "service_archive": "服务档案库",
-    "fruit_trace": "道果痕迹",
-    "witness_platform": "见证台",
-    "origin_oath": "道源誓约",
-    "new_chapter_gate": "新章门扉",
-}
+DAO_ORIGIN_LOCATION = str(_RECORD["location_key"])
+DAO_ORIGIN_PERMISSION = str(_RECORD["permission"])
+DAO_ORIGIN_STAMINA_COST = int(_RECORD["stamina_cost"])
+DAO_ORIGIN_QUOTA_KEY = str(_RECORD["quota_key"])
+DAO_ORIGIN_EXPIRY_SECONDS = int(_RECORD["expiry_seconds"])
+DAO_ORIGIN_STORY_FLAG = str(_RECORD["story_flag"])
+DAO_ORIGIN_CODEX = str(_RECORD["codex_entry_key"])
+DAO_ORIGIN_FIRST_REWARD = dict(_RECORD["first_reward"])
+DAO_ORIGIN_REPEAT_REWARD: dict[str, int] = dict(_RECORD["repeat_reward"])
 
-DAO_ORIGIN_NODE_ALIASES = {
-    **{key: key for key in DAO_ORIGIN_NODES},
-    **{label: key for key, label in DAO_ORIGIN_NODE_LABELS.items()},
-    **{str(index + 1): key for index, key in enumerate(DAO_ORIGIN_NODES)},
-}
+DAO_ORIGIN_NODES = tuple(str(node["key"]) for node in _RECORD["nodes"])
+DAO_ORIGIN_NODE_LABELS = node_labels(_RECORD)
+DAO_ORIGIN_NODE_ALIASES = node_aliases(_RECORD)
 
 
 def resolve_dao_origin_node(value: str) -> str | None:
