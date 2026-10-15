@@ -1,0 +1,41 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "secret_realm_instance",
+  "records": [
+    {
+      "key": "instance.secret_realm.ancestral_hall",
+      "name": "祖灵祠",
+      "desc": "以祖灵湖血脉为引的祖灵祠堂秘境。",
+      "status": "active",
+      "location_key": "beast.ancestral_lake",
+      "enemy_key": "enemy.ancestral_spirit",
+      "stamina_cost": 25,
+      "weekly_limit": 1,
+      "expiry_seconds": 3600,
+      "story_flag": "story.ancestral_hall",
+      "codex_entry_key": "codex.domain.ancestral_hall",
+      "nodes": [
+        {
+          "key": "ancestral_gate",
+          "label": "祖灵门"
+        },
+        {
+          "key": "oath_stones",
+          "label": "誓言石阵"
+        },
+        {
+          "key": "bloodline_corridor",
+          "label": "血脉回廊"
+        },
+        {
+          "key": "ancestral_spirit",
+          "label": "祖灵守灵"
+        },
+        {
+          "key": "founder_altar",
+          "label": "始祖祭坛"
+        }
+      ]
+    }
+  ]
+}
