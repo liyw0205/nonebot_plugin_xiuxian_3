@@ -238,6 +238,23 @@ boss 层越段、factions 不符、max_floor 不符、缺字段）；回归 `tes
 非本次内容化引入。`data/内容清单.json` 登记新文件并更新种子迁移规则（`e504acb5…`→`15773fe8…`，
 provenance `0f3b39ba`）。未跑全量/压测/部署，未验 QQ 真机。
 
+社交规则内容化与悬空引用修复已在 `develop` 完成（提交 `8646f8b`、`b01bd27`、`45800b1`、`83416d4`）：
+补齐缺失的 `item.clue.demon_abyss_echo` 物品记录（同族线索形状，名称沿用既有标签表「深渊残响线索」，
+筑基 L1 与深渊入口一致），使恶魔深渊首通奖励与深渊残响遗府的线索引用可解析；同时更正上一轮关于
+`enemy.ancient_domain_lord` 的误判——该敌人存在于战斗层旧 `ENEMIES` 表且 `enemy_definition()` 可解析，
+此前结论源于 grep 输出被 `head` 截断。
+新增 `data/社交/玩家互动.json` 的 `social.mentor` 与 `social.party` 记录及共享加载器 `social/social_content.py`
+（校验 active、name/desc、正数、境界/地点引用、`party_type` 唯一、min≤max、别名非空）。
+`mentor_rules.py` 的 `MENTOR_*` 常量与 `party_rules.py` 的 11 个队伍定义、人数/时限常量、
+`party_definition_for()` 改为内容派生，值与现值逐一相同，`party_boundary` 别名与未知类型 `ValueError` 语义保留；
+`is_master_eligible()` 不再读止于渡劫的硬编码境界阶表，改取 `data/境界/境界.json` 的 `rank`，既有境界行为不变，
+超出旧表的境界不再被误判为 -1。`partner_rules.py` 经核对已是内容驱动，本轮未改动。
+聚焦证据：新增 `test_social_rules_content.py` 19 passed（师徒/队伍合同与模块常量一致、11 个定义逐字段一致、
+别名与未知类型语义、旧表外境界判定、13 项校验失败用例）；`test_mentor*.py` 5 文件 167 passed、
+`test_party*.py`/`test_cross_realm_party.py`/`test_partner*.py` 4+106+15 passed、
+`test_demon_abyss_echo_legacy.py`/`test_content.py` 39 passed、`test_seed_migration.py` 8 passed
+（`道具/材料.json` 种子规则更新为 `677d37e3…`，provenance `8646f8b`）。未跑全量/压测/部署，未验 QQ 真机。
+
 本轮有限任务已完成：`chapter.1.stage.3` 雾中守门与 `chapter.2.stage.1` 城镇委托两关的正文、人物/场景、
 可执行目标、来源/奖励/后续引用、失败重试规则及现有战斗/委托、快照、事务、幂等消费者已落地。
 沿用本轮已确认的 `19 passed`、`lastfailed={}` 聚焦证据；不重跑全量、不扩展 travel/world，不重开 M9，
