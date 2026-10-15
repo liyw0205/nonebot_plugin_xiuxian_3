@@ -158,6 +158,36 @@ _VERTICAL_SLICE_STAGES = frozenset(
         "void_archive.return.6",
         "void_archive.return.7",
         "void_archive.return.8",
+        "lane.builder.chapter.01",
+        "lane.builder.chapter.02",
+        "lane.builder.chapter.03",
+        "lane.builder.chapter.04",
+        "lane.builder.chapter.05",
+        "lane.builder.chapter.06",
+        "lane.builder.chapter.07",
+        "lane.builder.chapter.08",
+        "lane.builder.chapter.09",
+        "lane.builder.chapter.10",
+        "lane.witness.chapter.01",
+        "lane.witness.chapter.02",
+        "lane.witness.chapter.03",
+        "lane.witness.chapter.04",
+        "lane.witness.chapter.05",
+        "lane.witness.chapter.06",
+        "lane.witness.chapter.07",
+        "lane.witness.chapter.08",
+        "lane.witness.chapter.09",
+        "lane.witness.chapter.10",
+        "lane.traveler.chapter.01",
+        "lane.traveler.chapter.02",
+        "lane.traveler.chapter.03",
+        "lane.traveler.chapter.04",
+        "lane.traveler.chapter.05",
+        "lane.traveler.chapter.06",
+        "lane.traveler.chapter.07",
+        "lane.traveler.chapter.08",
+        "lane.traveler.chapter.09",
+        "lane.traveler.chapter.10",
     }
 )
 
@@ -431,6 +461,16 @@ def mainline_definitions(
                 and not isinstance(item.get("chapter"), bool)
                 and not isinstance(item.get("stage"), bool)
             ]
+            # A lane-based story closes each lane on its own: the tail is the last
+            # stage of the stage's own lane, not of the whole story.
+            lane = row.get("lane")
+            if isinstance(lane, str) and lane.strip():
+                same_lane = [
+                    item for item in same_story
+                    if str(item.get("lane") or "").strip() == lane.strip()
+                ]
+                if same_lane:
+                    same_story = same_lane
             tail = max(same_story, key=lambda item: (item["chapter"], item["stage"]))
             if (chapter, stage) != (tail.get("chapter"), tail.get("stage")):
                 raise ContentError(f"mainline {key} requires next_stage_key")

@@ -179,6 +179,28 @@ TOML 与本次种子，自定义数据保留。聚焦证据：修前
 官方 `剧情/主线.json` 新旧 SHA-256（`a97d5a94…` → `48589e5f…`）与 Git provenance 已登记
 `scripts/seed_migrations.json`，迁移测试反向助手只回退本弧 24 关增量。未跑全量/压测/部署，未验 QQ 真机。
 
+道统新章主线 30 关（三线并行）可玩化已在 `develop` 完成（数据提交 `aae19b2`）：`builder.01–10` 建设者线
+（旧碑校正、补绘魔界商路与妖界灵脉、三界互市、界隙立标与补缀界壁、汇合三源、立约共修、回望代价、以合道六层抵达道源门）、
+`witness.01–10` 见证者线（收录旧誓、听取三界、辨清旧争、见证守卫与互助、核验盟约、保留异议、确认代价、保存全录、把记录交还三界）、
+`traveler.01–10` 远行者线（走访玄天、渡过魔土、寻访妖庭、巡查界隙、抵达档案、重返三界、交接道路、携行消息、拒绝捷径、归来开篇）；
+30 关全部列入内容化校验集合，三线各自成链、三条线尾关如实留空，每关一条首通状态事件与一个 codex flag。
+主线 84 关（玄天 12 + 领域前线 18 + 虚空档案 24 + 道统新章 30）至此全部内容化。
+目标只用既有内容：普通移动 16 关、探索取物 10 关、探索战斗胜利 4 关（魔界堕落遗迹/万兽山/祖灵湖/界隙/虚空航道/档案遗迹/深渊门备材），
+未新增地点、通路、模式、奖池或物品。可达性按运行时核实：魔渊入口只能乘云舟抵达、界隙秘境入边只有魔界战线与虚空门户、
+道源门需合道 L6 + 道果进度 470 + 道果碎片 ×2 且每日 1 次，故 `lane.builder.chapter.10` 的境界由炼虚 L10 对齐为合道 L6
+（对齐真实路线门槛，不放宽世界准入）；`dao_echoes.py` 的资格校验随之改为「本关声明资格须不低于故事入口资格」。
+校验器新增 lane-aware 尾关规则：带 lane 的故事按本线最大 (chapter, stage) 判定尾关，无 lane 的故事保持原故事级行为。
+代码：`dao_echoes_repository.py` 开始路径把本关契约（objectives/retry_message/started_at）冻结进快照，领取路径在目标未完成时
+拒绝并抛 `MainlineObjectivesIncompleteError`，`dao_echoes_use_cases.py` 映射为 `MAINLINE_OBJECTIVES_INCOMPLETE`（重复挑战同样重新校验目标）。
+修复阻塞本弧的根因：探索境界门槛 `exploration/rules.py` 曾用硬编码 rank 表且止于化神，炼虚及以上一律 rank -1，
+使这些修士无法进入任何低于自身境界的探索模式；现改为与主线一致地从 `data/境界/境界.json` 的 `rank` 读取。
+聚焦证据：`test_dao_echoes_mainline.py` 1 passed in 17.13s（同一 `qq.official` 共享链真实结算 30 关，含提前领取被拒、
+幂等回放、30 条首通事件各 1、30 个 codex flag、三线完成、三界主线资格）；`test_dao_echoes.py` 5 passed（含重复挑战重新校验目标）；
+`test_mainline_content.py` + `test_mainline_vertical_slice.py` + `test_mainline.py` + `test_documentation.py` 23 passed；
+探索受影响面 `test_exploration*.py` 5 文件 37 passed；官方 `剧情/主线.json` 新旧 SHA-256（`48589e5f…` → `0f7cd87d…`）
+与 Git provenance 已登记 `scripts/seed_migrations.json`，迁移测试反向助手只回退本弧 30 关增量（含末关境界还原）。
+未跑全量/压测/部署，未验 QQ 真机。
+
 本轮有限任务已完成：`chapter.1.stage.3` 雾中守门与 `chapter.2.stage.1` 城镇委托两关的正文、人物/场景、
 可执行目标、来源/奖励/后续引用、失败重试规则及现有战斗/委托、快照、事务、幂等消费者已落地。
 沿用本轮已确认的 `19 passed`、`lastfailed={}` 聚焦证据；不重跑全量、不扩展 travel/world，不重开 M9，

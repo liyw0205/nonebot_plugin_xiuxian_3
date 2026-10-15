@@ -17,8 +17,8 @@ OLD_SHA = "9fd8d8a3675f4b04f58e3b3c631e8995a8bd2db51467abb64f8a4a66e6156341"
 
 
 def old_official_mainline() -> bytes:
-    # Reverse only the guard.5-protect.6 and void_archive.recorder.1-return.8 content
-    # deltas; pin the patrol blob.
+    # Reverse only the guard.5-protect.6, void_archive.recorder.1-return.8 and
+    # lane.<lane>.chapter.01-10 content deltas; pin the patrol blob.
     text = (ROOT / "data" / MAINLINE).read_text(encoding="utf-8")
     for key in (
         "domain_frontier.guard.5",
@@ -59,9 +59,43 @@ def old_official_mainline() -> bytes:
         "void_archive.return.6",
         "void_archive.return.7",
         "void_archive.return.8",
+        "lane.builder.chapter.01",
+        "lane.builder.chapter.02",
+        "lane.builder.chapter.03",
+        "lane.builder.chapter.04",
+        "lane.builder.chapter.05",
+        "lane.builder.chapter.06",
+        "lane.builder.chapter.07",
+        "lane.builder.chapter.08",
+        "lane.builder.chapter.09",
+        "lane.builder.chapter.10",
+        "lane.witness.chapter.01",
+        "lane.witness.chapter.02",
+        "lane.witness.chapter.03",
+        "lane.witness.chapter.04",
+        "lane.witness.chapter.05",
+        "lane.witness.chapter.06",
+        "lane.witness.chapter.07",
+        "lane.witness.chapter.08",
+        "lane.witness.chapter.09",
+        "lane.witness.chapter.10",
+        "lane.traveler.chapter.01",
+        "lane.traveler.chapter.02",
+        "lane.traveler.chapter.03",
+        "lane.traveler.chapter.04",
+        "lane.traveler.chapter.05",
+        "lane.traveler.chapter.06",
+        "lane.traveler.chapter.07",
+        "lane.traveler.chapter.08",
+        "lane.traveler.chapter.09",
+        "lane.traveler.chapter.10",
     ):
         start = text.index(f'      "key": "{key}"')
-        end = text.index("\n    },", start)
+        try:
+            end = text.index("\n    },", start)
+        except ValueError:
+            # The final record of the file closes without a trailing comma.
+            end = text.index("\n    }\n", start)
         section = text[start:end]
         for pattern in (
             r'^      "body":[^\n]*\n',
@@ -79,10 +113,20 @@ def old_official_mainline() -> bytes:
                     "chapter.4.stage.3",
                     "domain_frontier.protect.6",
                     "void_archive.return.8",
+                    "lane.builder.chapter.10",
+                    "lane.witness.chapter.10",
+                    "lane.traveler.chapter.10",
                 )
                 assert count == (0 if tail else 1)
             else:
                 assert count == 1
+        if key == "lane.builder.chapter.10":
+            section = section.replace(
+                '      "required_realm": "dao_union",\n      "required_layer": 6,\n',
+                '      "required_realm": "void_refining",\n      "required_layer": 10,\n',
+                1,
+            )
+            assert '"dao_union"' not in section
         text = text[:start] + section + text[end:]
     blob = text.encode("utf-8")
     assert hashlib.sha256(blob).hexdigest() == OLD_SHA

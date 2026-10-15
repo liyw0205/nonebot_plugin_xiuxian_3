@@ -24,7 +24,7 @@ from .dao_echoes import (
     dao_echoes_definitions,
     dao_echoes_lane_labels,
 )
-from .mainline import meets_realm
+from .mainline import MainlineObjectivesIncompleteError, meets_realm
 from .dao_echoes_models import DaoEchoesLaneProgress, DaoEchoesStatusRecord
 from ..utils.player import player_integer
 from .mainline_models import MainlineClaimRecord, MainlineStageView, MainlineStartRecord
@@ -240,6 +240,23 @@ class DaoEchoesRepositoryMixin:
                 "realm_layer": player_integer(player, "realm_layer"),
                 "location_key": str(player["location_key"]),
                 "repeat_pending": repeat_pending,
+                # Freeze the stage contract so the claim judges the objectives the
+                # player actually started against, exactly like the linear mainline.
+                "started_at": now_text,
+                "definition": {
+                    "key": definition.key,
+                    "story_key": definition.story_key,
+                    "chapter": definition.chapter,
+                    "stage": definition.stage,
+                    "label": definition.label,
+                    "description": definition.description,
+                    "body": definition.body,
+                    "objectives": [dict(item) for item in definition.objectives],
+                    "actions": [dict(item) for item in definition.actions],
+                    "state_events": list(definition.state_events),
+                    "next_stage_key": definition.next_stage_key,
+                    "retry_message": definition.retry_message,
+                },
             }
             if run is None:
                 connection.execute(
@@ -367,6 +384,16 @@ class DaoEchoesRepositoryMixin:
                 or run_snapshot.get("lane") != definition.lane
             ):
                 raise ValueError("dao echoes snapshot is missing frozen content")
+            frozen_definition = run_snapshot.get("definition")
+            if isinstance(frozen_definition, dict) and frozen_definition.get("objectives"):
+                missing_objectives = self._mainline_missing_objectives(
+                    connection, int(player["id"]), run
+                )
+                if missing_objectives:
+                    raise MainlineObjectivesIncompleteError(
+                        missing_objectives,
+                        str(frozen_definition.get("retry_message") or ""),
+                    )
             reward = {snapshot_codex_flag: 1} if first_clear else {}
             connection.execute(
                 "UPDATE mainline_runs SET status='reward_pending', updated_at=? WHERE id=?",

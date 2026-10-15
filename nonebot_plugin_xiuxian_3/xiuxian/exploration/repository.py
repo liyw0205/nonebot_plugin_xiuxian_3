@@ -332,7 +332,11 @@ class ExplorationRepositoryMixin:
             if str(row["location_key"]) != definition.location_key:
                 raise LocationRequirementError("exploration requires a specific location")
             if not exploration_meets_realm(
-                str(row["realm_key"]), player_integer(row, "realm_layer"), definition.required_realm, definition.required_layer
+                str(row["realm_key"]),
+                player_integer(row, "realm_layer"),
+                definition.required_realm,
+                definition.required_layer,
+                self.content,
             ):
                 raise LocationRequirementError("realm requirement is not met")
             pollution_before = player_integer(row, "pollution")
