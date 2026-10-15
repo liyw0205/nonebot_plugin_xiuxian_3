@@ -43,9 +43,10 @@
   },
   "内容清单.json": {
     "old_sha256": {
-      "8121ad7fa52be7f9129bb39f9408494dc8b9c4f051c03387e763831e12cb0c1d": "eaed7115257db5a67933e8bdf833c003319d940d:data/内容清单.json"
+      "8121ad7fa52be7f9129bb39f9408494dc8b9c4f051c03387e763831e12cb0c1d": "eaed7115257db5a67933e8bdf833c003319d940d:data/内容清单.json",
+      "e504acb578a74a493c9c98ca363fbe1ad8443554843df1ae0c1bbbe2c457ed20": "0f3b39ba9e727db33aa031294d398d705866c881:data/内容清单.json"
     },
-    "new_sha256": "e504acb578a74a493c9c98ca363fbe1ad8443554843df1ae0c1bbbe2c457ed20",
-    "new_commit": "0f3b39ba9e727db33aa031294d398d705866c881"
+    "new_sha256": "15773fe897d4dcbcf2cbfcc21b0c4d4f2148315bd11a697bac87c2140711f536",
+    "new_commit": "327918cf3c268567a9e1faaa789f5310683d52f7"
   }
 }

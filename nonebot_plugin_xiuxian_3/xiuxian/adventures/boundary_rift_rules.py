@@ -1,32 +1,30 @@
-"""Frozen rules for the six-node party secret realm."""
+"""Frozen rules for the six-node party secret realm (content-backed)."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .secret_realm_content import node_aliases, secret_realm_record
 
 BOUNDARY_RIFT_KEY = "instance.secret_realm.boundary_rift"
-BOUNDARY_RIFT_LOCATION = "cave.boundary_realm"
-BOUNDARY_RIFT_PARTY_TYPE = "secret_realm_boundary"
-BOUNDARY_RIFT_NODES = (
-    "rift_approach",
-    "shattered_path",
-    "cross_realm_sentinel",
-    "soul_current",
-    "boundary_watcher",
-    "rift_seal",
-)
+
+_RECORD = secret_realm_record(BOUNDARY_RIFT_KEY)
+
+BOUNDARY_RIFT_LOCATION = str(_RECORD["location_key"])
+BOUNDARY_RIFT_PARTY_TYPE = str(_RECORD["party_type"])
+BOUNDARY_RIFT_NODES = tuple(str(node["key"]) for node in _RECORD["nodes"])
 BOUNDARY_RIFT_ENEMIES = {
-    "cross_realm_sentinel": "enemy.cross_realm_sentinel",
-    "boundary_watcher": "enemy.boundary_watcher",
+    str(node["key"]): str(node["enemy_key"])
+    for node in _RECORD["nodes"]
+    if node.get("enemy_key")
 }
-BOUNDARY_RIFT_STAMINA_COST = 30
-BOUNDARY_RIFT_TICKET = "item.soul_crystal"
-BOUNDARY_RIFT_TICKET_COST = 1
-BOUNDARY_RIFT_WEEKLY_LIMIT = 1
-BOUNDARY_RIFT_EXPIRY_SECONDS = 60 * 60
-BOUNDARY_RIFT_FIRST_REWARD = {"item.soul_crystal": 1}
-BOUNDARY_RIFT_REPEAT_REWARD = {"item.soul_crystal": 1}
+BOUNDARY_RIFT_STAMINA_COST = int(_RECORD["stamina_cost"])
+BOUNDARY_RIFT_TICKET = str(_RECORD["ticket_key"])
+BOUNDARY_RIFT_TICKET_COST = int(_RECORD["ticket_quantity"])
+BOUNDARY_RIFT_WEEKLY_LIMIT = int(_RECORD["weekly_limit"])
+BOUNDARY_RIFT_EXPIRY_SECONDS = int(_RECORD["expiry_seconds"])
+BOUNDARY_RIFT_FIRST_REWARD = dict(_RECORD["first_reward"])
+BOUNDARY_RIFT_REPEAT_REWARD = dict(_RECORD["repeat_reward"])
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,29 +34,16 @@ class BoundaryRiftNode:
     enemy_key: str | None = None
 
 
-BOUNDARY_RIFT_NODE_DEFINITIONS = (
-    BoundaryRiftNode("rift_approach", "裂隙入口"),
-    BoundaryRiftNode("shattered_path", "破碎岔路"),
-    BoundaryRiftNode("cross_realm_sentinel", "跨界哨卫", BOUNDARY_RIFT_ENEMIES["cross_realm_sentinel"]),
-    BoundaryRiftNode("soul_current", "神魂潮汐"),
-    BoundaryRiftNode("boundary_watcher", "界隙守望者", BOUNDARY_RIFT_ENEMIES["boundary_watcher"]),
-    BoundaryRiftNode("rift_seal", "裂隙封印"),
+BOUNDARY_RIFT_NODE_DEFINITIONS = tuple(
+    BoundaryRiftNode(
+        str(node["key"]),
+        str(node["label"]),
+        str(node["enemy_key"]) if node.get("enemy_key") else None,
+    )
+    for node in _RECORD["nodes"]
 )
 
-BOUNDARY_RIFT_ALIASES = {
-    "rift_approach": "rift_approach",
-    "裂隙入口": "rift_approach",
-    "shattered_path": "shattered_path",
-    "破碎岔路": "shattered_path",
-    "cross_realm_sentinel": "cross_realm_sentinel",
-    "跨界哨卫": "cross_realm_sentinel",
-    "soul_current": "soul_current",
-    "神魂潮汐": "soul_current",
-    "boundary_watcher": "boundary_watcher",
-    "界隙守望者": "boundary_watcher",
-    "rift_seal": "rift_seal",
-    "裂隙封印": "rift_seal",
-}
+BOUNDARY_RIFT_ALIASES = node_aliases(_RECORD)
 
 
 def resolve_boundary_rift_node(value: str) -> str | None:
