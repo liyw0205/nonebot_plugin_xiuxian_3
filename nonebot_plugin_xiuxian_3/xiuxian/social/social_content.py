@@ -12,6 +12,7 @@ PARTY_KEY = "social.party"
 SECT_KEY = "social.sect"
 SECT_ALLIANCE_KEY = "social.sect_alliance"
 SECT_BEACON_KEY = "social.sect_beacon"
+SECT_EXCHANGE_KEY = "social.sect_exchange"
 
 
 def _bundle(content: ContentBundle | None) -> ContentBundle:
@@ -187,6 +188,122 @@ def sect_beacon_record(content: ContentBundle | None = None) -> dict[str, Any]:
     }
 
 
+def _item_key(bundle: ContentBundle, value: Any, key: str, field: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ContentError(f"{key} {field} is invalid")
+    try:
+        bundle.require("item", value, include_locked=True)
+    except KeyError as exc:
+        raise ContentError(f"{key} {field} references unknown item {value}") from exc
+    return value
+
+
+def sect_exchange_record(content: ContentBundle | None = None) -> dict[str, Any]:
+    bundle = _bundle(content)
+    row = _record(bundle, SECT_EXCHANGE_KEY)
+    daily_cap = _positive(row.get("daily_cap"), "daily_cap", SECT_EXCHANGE_KEY)
+
+    raw_items = row.get("donation_items")
+    if not isinstance(raw_items, list) or not raw_items:
+        raise ContentError(f"{SECT_EXCHANGE_KEY} donation_items must be a non-empty list")
+    donation_items = tuple(
+        _item_key(bundle, item, SECT_EXCHANGE_KEY, "donation_items") for item in raw_items
+    )
+
+    raw_aliases = row.get("donation_aliases")
+    if not isinstance(raw_aliases, dict) or not raw_aliases:
+        raise ContentError(
+            f"{SECT_EXCHANGE_KEY} donation_aliases must be a non-empty object"
+        )
+    donation_aliases: dict[str, str] = {}
+    for label, item_key in raw_aliases.items():
+        if not isinstance(label, str) or not label.strip():
+            raise ContentError(f"{SECT_EXCHANGE_KEY} has an invalid donation alias")
+        if item_key not in donation_items:
+            raise ContentError(
+                f"{SECT_EXCHANGE_KEY} donation alias {label} maps outside donation_items"
+            )
+        donation_aliases[label] = item_key
+
+    raw_recipes = row.get("supply_recipes")
+    if not isinstance(raw_recipes, dict) or not raw_recipes:
+        raise ContentError(f"{SECT_EXCHANGE_KEY} supply_recipes must be a non-empty object")
+    supply_recipes: dict[str, tuple[dict[str, int], int]] = {}
+    for recipe_key, recipe in raw_recipes.items():
+        if not isinstance(recipe_key, str) or not recipe_key.strip():
+            raise ContentError(f"{SECT_EXCHANGE_KEY} has an invalid supply recipe key")
+        if not isinstance(recipe, dict):
+            raise ContentError(f"{SECT_EXCHANGE_KEY} recipe {recipe_key} must be an object")
+        materials = recipe.get("materials")
+        if not isinstance(materials, dict) or not materials:
+            raise ContentError(
+                f"{SECT_EXCHANGE_KEY} recipe {recipe_key} materials must be a non-empty object"
+            )
+        parsed_materials: dict[str, int] = {}
+        for material_key, quantity in materials.items():
+            parsed_materials[
+                _item_key(bundle, material_key, SECT_EXCHANGE_KEY, f"recipe {recipe_key}")
+            ] = _positive(quantity, f"recipe {recipe_key} material quantity", SECT_EXCHANGE_KEY)
+        supply_recipes[recipe_key] = (
+            parsed_materials,
+            _positive(recipe.get("contribution"), f"recipe {recipe_key} contribution", SECT_EXCHANGE_KEY),
+        )
+
+    raw_offers = row.get("offers")
+    if not isinstance(raw_offers, list) or not raw_offers:
+        raise ContentError(f"{SECT_EXCHANGE_KEY} offers must be a non-empty list")
+    offers: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for index, offer in enumerate(raw_offers):
+        if not isinstance(offer, dict):
+            raise ContentError(f"{SECT_EXCHANGE_KEY} offer {index} must be an object")
+        offer_key = offer.get("key")
+        if not isinstance(offer_key, str) or not offer_key.strip() or offer_key in seen:
+            raise ContentError(
+                f"{SECT_EXCHANGE_KEY} offer {index} has an invalid or duplicate key"
+            )
+        seen.add(offer_key)
+        label = offer.get("label")
+        if not isinstance(label, str) or not label.strip():
+            raise ContentError(f"{SECT_EXCHANGE_KEY} offer {offer_key} requires a label")
+        offers.append(
+            {
+                "key": offer_key,
+                "label": label,
+                "contribution_cost": _positive(
+                    offer.get("contribution_cost"), f"offer {offer_key} cost", SECT_EXCHANGE_KEY
+                ),
+                "item_key": _item_key(bundle, offer.get("item_key"), SECT_EXCHANGE_KEY, f"offer {offer_key}"),
+                "quantity": _positive(
+                    offer.get("quantity"), f"offer {offer_key} quantity", SECT_EXCHANGE_KEY
+                ),
+            }
+        )
+
+    raw_exchange_aliases = row.get("aliases")
+    if not isinstance(raw_exchange_aliases, dict) or not raw_exchange_aliases:
+        raise ContentError(f"{SECT_EXCHANGE_KEY} aliases must be a non-empty object")
+    exchange_aliases: dict[str, str] = {}
+    for alias, offer_key in raw_exchange_aliases.items():
+        if not isinstance(alias, str) or not alias.strip():
+            raise ContentError(f"{SECT_EXCHANGE_KEY} has an invalid alias")
+        if offer_key not in seen:
+            raise ContentError(
+                f"{SECT_EXCHANGE_KEY} alias {alias} references unknown offer {offer_key}"
+            )
+        exchange_aliases[alias] = offer_key
+
+    return {
+        "key": SECT_EXCHANGE_KEY,
+        "daily_cap": daily_cap,
+        "donation_items": donation_items,
+        "donation_aliases": donation_aliases,
+        "supply_recipes": supply_recipes,
+        "offers": tuple(offers),
+        "aliases": exchange_aliases,
+    }
+
+
 def sect_rules_record(content: ContentBundle | None = None) -> dict[str, Any]:
     bundle = _bundle(content)
     row = _record(bundle, SECT_KEY)
@@ -235,5 +352,6 @@ __all__ = [
     "realm_rank",
     "sect_alliance_record",
     "sect_beacon_record",
+    "sect_exchange_record",
     "sect_rules_record",
 ]

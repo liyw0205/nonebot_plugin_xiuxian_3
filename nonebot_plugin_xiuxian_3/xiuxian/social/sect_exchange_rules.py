@@ -1,28 +1,19 @@
-"""Rules for the sect warehouse exchange slice."""
+"""Rules for the sect warehouse exchange slice (content-backed)."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .social_content import sect_exchange_record
 
-SECT_EXCHANGE_DAILY_CAP = 5
-SECT_DONATION_ITEMS = frozenset({
-    "item.herb.spirit_leaf", "item.herb.blood_grass",
-    "item.mat.array_sand", "item.material.cloud_iron",
-})
-SECT_DONATION_ALIASES = {
-    "灵叶": "item.herb.spirit_leaf", "止血草": "item.herb.blood_grass",
-    "阵砂": "item.mat.array_sand", "云铁": "item.material.cloud_iron",
-}
+_EXCHANGE = sect_exchange_record()
+
+SECT_EXCHANGE_DAILY_CAP = int(_EXCHANGE["daily_cap"])
+SECT_DONATION_ITEMS = frozenset(_EXCHANGE["donation_items"])
+SECT_DONATION_ALIASES = dict(_EXCHANGE["donation_aliases"])
 SECT_SUPPLY_RECIPES = {
-    "sect.exchange.foundation_guard": (
-        {"item.herb.spirit_leaf": 2, "item.mat.array_sand": 1, "item.herb.blood_grass": 1},
-        100,
-    ),
-    "sect.exchange.golden_core_guard": (
-        {"item.herb.spirit_leaf": 3, "item.material.cloud_iron": 1, "item.herb.blood_grass": 2},
-        200,
-    ),
+    recipe_key: (dict(materials), contribution)
+    for recipe_key, (materials, contribution) in _EXCHANGE["supply_recipes"].items()
 }
 
 
@@ -36,48 +27,17 @@ class SectExchangeOffer:
 
 
 SECT_EXCHANGE_OFFERS: dict[str, SectExchangeOffer] = {
-    "sect.exchange.foundation_guard": SectExchangeOffer(
-        key="sect.exchange.foundation_guard",
-        label="筑基护脉丹",
-        contribution_cost=30,
-        item_key="item.pill.foundation_guard",
-        quantity=1,
-    ),
-    "sect.exchange.cloud_iron": SectExchangeOffer(
-        key="sect.exchange.cloud_iron",
-        label="云铁",
-        contribution_cost=20,
-        item_key="item.material.cloud_iron",
-        quantity=2,
-    ),
-    "sect.exchange.golden_core_guard": SectExchangeOffer(
-        key="sect.exchange.golden_core_guard",
-        label="金丹护脉丹",
-        contribution_cost=50,
-        item_key="item.pill.golden_core_guard",
-        quantity=1,
-    ),
-    "sect.exchange.array_sand": SectExchangeOffer(
-        key="sect.exchange.array_sand",
-        label="阵砂",
-        contribution_cost=10,
-        item_key="item.mat.array_sand",
-        quantity=5,
-    ),
+    offer["key"]: SectExchangeOffer(
+        key=offer["key"],
+        label=offer["label"],
+        contribution_cost=offer["contribution_cost"],
+        item_key=offer["item_key"],
+        quantity=offer["quantity"],
+    )
+    for offer in _EXCHANGE["offers"]
 }
 
-SECT_EXCHANGE_ALIASES = {
-    "筑基护脉丹": "sect.exchange.foundation_guard",
-    "筑基保护丹": "sect.exchange.foundation_guard",
-    "sect.exchange.foundation_guard": "sect.exchange.foundation_guard",
-    "云铁": "sect.exchange.cloud_iron",
-    "sect.exchange.cloud_iron": "sect.exchange.cloud_iron",
-    "金丹护脉丹": "sect.exchange.golden_core_guard",
-    "金丹保护丹": "sect.exchange.golden_core_guard",
-    "sect.exchange.golden_core_guard": "sect.exchange.golden_core_guard",
-    "阵砂": "sect.exchange.array_sand",
-    "sect.exchange.array_sand": "sect.exchange.array_sand",
-}
+SECT_EXCHANGE_ALIASES = dict(_EXCHANGE["aliases"])
 
 
 def resolve_sect_exchange_offer(value: str) -> SectExchangeOffer | None:
