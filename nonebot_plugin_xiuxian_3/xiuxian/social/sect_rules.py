@@ -6,12 +6,15 @@ from dataclasses import dataclass
 from enum import StrEnum
 import re
 
+from .social_content import sect_rules_record
 
-SECT_CREATE_COST = 1_000
-SECT_MAX_MEMBERS = 20
-SECT_WAREHOUSE_CAPACITY = 50
-SECT_APPLICATION_TTL_SECONDS = 24 * 60 * 60
-SECT_JOIN_COOLDOWN_SECONDS = 24 * 60 * 60
+_SECT_RULES = sect_rules_record()
+
+SECT_CREATE_COST = int(_SECT_RULES["create_cost"])
+SECT_MAX_MEMBERS = int(_SECT_RULES["max_members"])
+SECT_WAREHOUSE_CAPACITY = int(_SECT_RULES["warehouse_capacity"])
+SECT_APPLICATION_TTL_SECONDS = int(_SECT_RULES["application_ttl_seconds"])
+SECT_JOIN_COOLDOWN_SECONDS = int(_SECT_RULES["join_cooldown_seconds"])
 
 
 class SectRole(StrEnum):
