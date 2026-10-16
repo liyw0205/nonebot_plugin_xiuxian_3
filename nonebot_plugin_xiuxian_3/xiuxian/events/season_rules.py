@@ -8,28 +8,16 @@ import hashlib
 from .rules import FINAL_HEAVEN_SEASON_DAYS, FINAL_HEAVEN_SEASON_KEY, final_heaven_season_window
 
 
-FINAL_HEAVEN_CLAIM_DAYS = 7
-FINAL_HEAVEN_RANKED_PLACES = 10
-FINAL_HEAVEN_CHAPTER_ENTITLEMENT = "chapter.final_heaven"
+from .season_content import season_record
+
+_FINAL_HEAVEN_RECORD = season_record(FINAL_HEAVEN_SEASON_KEY)
+
+FINAL_HEAVEN_CLAIM_DAYS = int(_FINAL_HEAVEN_RECORD["claim_days"])
+FINAL_HEAVEN_RANKED_PLACES = int(_FINAL_HEAVEN_RECORD["rank_limit"])
+FINAL_HEAVEN_CHAPTER_ENTITLEMENT = str(_FINAL_HEAVEN_RECORD["chapter_entitlement"])
 FINAL_HEAVEN_BOARDS = {
-    "ascension": {
-        "label": "飞升榜",
-        "title_key": "title.season.final_heaven.ascension",
-        "title_label": "凌霄先登",
-        "score": 1000,
-    },
-    "dao": {
-        "label": "留界道统榜",
-        "title_key": "title.season.final_heaven.dao",
-        "title_label": "留界道统",
-        "score": 800,
-    },
-    "cooperation": {
-        "label": "协作终局战榜",
-        "title_key": "title.season.final_heaven.cooperation",
-        "title_label": "同道共济",
-        "score": 50,
-    },
+    board_key: dict(board)
+    for board_key, board in _FINAL_HEAVEN_RECORD["boards"].items()
 }
 
 

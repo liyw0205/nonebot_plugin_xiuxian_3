@@ -12,23 +12,107 @@
       "claim_days": 7,
       "rank_limit": 50,
       "score_sources": {
-        "domain_contribution": {"multiplier": 1},
-        "sect_contribution": {"multiplier": 2},
-        "soul_transformation_production": {"multiplier": 5, "recipe_key_prefix": "recipe.domain.", "snapshot_realm_key": "soul_transformation"}
+        "domain_contribution": {
+          "multiplier": 1
+        },
+        "sect_contribution": {
+          "multiplier": 2
+        },
+        "soul_transformation_production": {
+          "multiplier": 5,
+          "recipe_key_prefix": "recipe.domain.",
+          "snapshot_realm_key": "soul_transformation"
+        }
       },
-      "ranking": {"score_order": "desc", "achieved_at_order": "asc", "identity_tiebreak": "player_id_asc"},
+      "ranking": {
+        "score_order": "desc",
+        "achieved_at_order": "asc",
+        "identity_tiebreak": "player_id_asc"
+      },
       "rank_rewards": [
-        {"min_rank": 1, "max_rank": 1, "reward_key": "reward.season.domain_war.rank_1"},
-        {"min_rank": 2, "max_rank": 2, "reward_key": "reward.season.domain_war.rank_2"},
-        {"min_rank": 3, "max_rank": 3, "reward_key": "reward.season.domain_war.rank_3"},
-        {"min_rank": 4, "max_rank": 10, "reward_key": "reward.season.domain_war.rank_4_10"},
-        {"min_rank": 11, "max_rank": 50, "reward_key": "reward.season.domain_war.rank_11_50"}
+        {
+          "min_rank": 1,
+          "max_rank": 1,
+          "reward_key": "reward.season.domain_war.rank_1"
+        },
+        {
+          "min_rank": 2,
+          "max_rank": 2,
+          "reward_key": "reward.season.domain_war.rank_2"
+        },
+        {
+          "min_rank": 3,
+          "max_rank": 3,
+          "reward_key": "reward.season.domain_war.rank_3"
+        },
+        {
+          "min_rank": 4,
+          "max_rank": 10,
+          "reward_key": "reward.season.domain_war.rank_4_10"
+        },
+        {
+          "min_rank": 11,
+          "max_rank": 50,
+          "reward_key": "reward.season.domain_war.rank_11_50"
+        }
       ],
       "redemption": {
         "fragment_item_key": "item.domain_core_fragment",
         "fragment_quantity": 20,
         "reward_item_key": "item.domain_core",
         "reward_quantity": 1
+      }
+    },
+    {
+      "key": "season.final_heaven",
+      "name": "终局天榜赛季",
+      "desc": "飞升与留界修士以飞升、留界道统与协作终局战功争夺终局天榜。",
+      "status": "active",
+      "anchor": "2025-01-01T00:00:00+00:00",
+      "duration_days": 35,
+      "claim_days": 7,
+      "rank_limit": 10,
+      "chapter_entitlement": "chapter.final_heaven",
+      "boards": {
+        "ascension": {
+          "label": "飞升榜",
+          "title_key": "title.season.final_heaven.ascension",
+          "title_label": "凌霄先登",
+          "score": 1000
+        },
+        "dao": {
+          "label": "留界道统榜",
+          "title_key": "title.season.final_heaven.dao",
+          "title_label": "留界道统",
+          "score": 800
+        },
+        "cooperation": {
+          "label": "协作终局战榜",
+          "title_key": "title.season.final_heaven.cooperation",
+          "title_label": "同道共济",
+          "score": 50
+        }
+      }
+    },
+    {
+      "key": "season.three_realms",
+      "name": "三界赛季",
+      "desc": "三界修士以阵营功勋、多人副本贡献与宗门贡献争夺三界榜单。",
+      "status": "active",
+      "anchor": "2025-01-01T00:00:00+00:00",
+      "duration_days": 28,
+      "claim_days": 7,
+      "rank_limit": 100,
+      "boards": {
+        "faction_merit": {
+          "label": "阵营功勋榜"
+        },
+        "party_contribution": {
+          "label": "多人副本贡献榜"
+        },
+        "sect_contribution": {
+          "label": "宗门贡献榜"
+        }
       }
     }
   ]
