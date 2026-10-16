@@ -10,6 +10,8 @@ KIND = "social_interaction"
 MENTOR_KEY = "social.mentor"
 PARTY_KEY = "social.party"
 SECT_KEY = "social.sect"
+SECT_ALLIANCE_KEY = "social.sect_alliance"
+SECT_BEACON_KEY = "social.sect_beacon"
 
 
 def _bundle(content: ContentBundle | None) -> ContentBundle:
@@ -142,6 +144,49 @@ def party_definitions(content: ContentBundle | None = None) -> tuple[dict[str, A
     return tuple(records)
 
 
+def _positive_fields(key: str, row: dict[str, Any], fields: tuple[str, ...]) -> dict[str, int]:
+    return {field: _positive(row.get(field), field, key) for field in fields}
+
+
+def sect_alliance_record(content: ContentBundle | None = None) -> dict[str, Any]:
+    bundle = _bundle(content)
+    row = _record(bundle, SECT_ALLIANCE_KEY)
+    return {
+        "key": SECT_ALLIANCE_KEY,
+        **_positive_fields(
+            SECT_ALLIANCE_KEY,
+            row,
+            (
+                "min_sect_level",
+                "confirmation_seconds",
+                "duration_seconds",
+                "research_weekly_cap",
+                "breach_fee",
+                "cooldown_seconds",
+            ),
+        ),
+    }
+
+
+def sect_beacon_record(content: ContentBundle | None = None) -> dict[str, Any]:
+    bundle = _bundle(content)
+    row = _record(bundle, SECT_BEACON_KEY)
+    return {
+        "key": SECT_BEACON_KEY,
+        **_positive_fields(
+            SECT_BEACON_KEY,
+            row,
+            (
+                "anchor_cost",
+                "sand_cost",
+                "build_seconds",
+                "maintenance_anchor_cost",
+                "route_discount",
+            ),
+        ),
+    }
+
+
 def sect_rules_record(content: ContentBundle | None = None) -> dict[str, Any]:
     bundle = _bundle(content)
     row = _record(bundle, SECT_KEY)
@@ -188,5 +233,7 @@ __all__ = [
     "party_aliases",
     "party_definitions",
     "realm_rank",
+    "sect_alliance_record",
+    "sect_beacon_record",
     "sect_rules_record",
 ]
