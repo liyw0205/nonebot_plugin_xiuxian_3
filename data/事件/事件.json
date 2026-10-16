@@ -121,7 +121,13 @@
           "reward_key": "reward.event.beast_trade"
         }
       },
-      "key": "event.beast_trade"
+      "key": "event.beast_trade",
+      "action_aliases": {
+        "贸易": "trade",
+        "跨界贸易": "trade",
+        "妖血": "blood",
+        "提交妖血": "blood"
+      }
     },
     {
       "name": "界隙裂痕",
@@ -168,7 +174,12 @@
           "reward_key": "reward.event.boundary_rift"
         }
       },
-      "key": "event.boundary_rift"
+      "key": "event.boundary_rift",
+      "action_aliases": {
+        "路线": "route",
+        "首领": "boss",
+        "完成": "complete"
+      }
     },
     {
       "name": "远古洞天开门",
@@ -200,7 +211,11 @@
           "reward_key": "reward.event.ancient_domain_open"
         }
       },
-      "key": "event.ancient_domain_open"
+      "key": "event.ancient_domain_open",
+      "action_aliases": {
+        "完成": "complete",
+        "远古洞天": "complete"
+      }
     },
     {
       "name": "心魔试炼",

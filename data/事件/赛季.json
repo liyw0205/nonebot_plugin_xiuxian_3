@@ -114,6 +114,54 @@
           "label": "宗门贡献榜"
         }
       }
+    },
+    {
+      "key": "season.void_frontier",
+      "name": "虚空前线赛季",
+      "desc": "虚空修士以航线完成、风暴救援、跨服胜利与联盟契约争夺虚空前线榜。",
+      "status": "active",
+      "anchor": "2025-01-01T00:00:00+00:00",
+      "duration_days": 28,
+      "claim_days": 7,
+      "rank_limit": 100,
+      "weekly_cap": 5,
+      "weekly_reward": {
+        "void_merit": 20,
+        "alliance_points": 10
+      },
+      "score_values": {
+        "route_completed": 30,
+        "storm_rescue": 50,
+        "cross_server_victory": 100,
+        "alliance_contract": 20
+      },
+      "rank_rewards": [
+        {
+          "rank": 1,
+          "reward": {
+            "item.void_crystal": 5,
+            "void_merit": 100
+          }
+        },
+        {
+          "rank": 2,
+          "reward": {
+            "item.void_crystal": 3,
+            "void_merit": 60
+          }
+        },
+        {
+          "rank": 3,
+          "reward": {
+            "item.void_crystal": 2,
+            "void_merit": 40
+          }
+        }
+      ],
+      "default_rank_reward": {
+        "item.void_crystal": 1,
+        "void_merit": 20
+      }
     }
   ]
 }
