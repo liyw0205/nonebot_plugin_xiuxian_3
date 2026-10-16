@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any
 
 from ..content import ContentBundle, ContentError, bundled_content
@@ -13,6 +14,7 @@ SECT_KEY = "social.sect"
 SECT_ALLIANCE_KEY = "social.sect_alliance"
 SECT_BEACON_KEY = "social.sect_beacon"
 SECT_EXCHANGE_KEY = "social.sect_exchange"
+SECT_WAR_KEY = "social.sect_war"
 
 
 def _bundle(content: ContentBundle | None) -> ContentBundle:
@@ -304,6 +306,57 @@ def sect_exchange_record(content: ContentBundle | None = None) -> dict[str, Any]
     }
 
 
+def _anchor_datetime(value: Any, key: str) -> Any:
+    if not isinstance(value, str):
+        raise ContentError(f"{key} anchor is invalid")
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError as exc:
+        raise ContentError(f"{key} anchor is invalid") from exc
+    if parsed.tzinfo is None:
+        raise ContentError(f"{key} anchor must be timezone-aware")
+    return parsed.astimezone(timezone.utc)
+
+
+def sect_war_record(content: ContentBundle | None = None) -> dict[str, Any]:
+    bundle = _bundle(content)
+    row = _record(bundle, SECT_WAR_KEY)
+    war_key = row.get("war_key")
+    if not isinstance(war_key, str) or not war_key.strip():
+        raise ContentError(f"{SECT_WAR_KEY} war_key is invalid")
+    action_values = row.get("action_values")
+    if not isinstance(action_values, dict) or not action_values:
+        raise ContentError(f"{SECT_WAR_KEY} action_values must be a non-empty object")
+    parsed_actions: dict[str, int] = {}
+    for action_key, score in action_values.items():
+        if not isinstance(action_key, str) or not action_key.strip():
+            raise ContentError(f"{SECT_WAR_KEY} has an invalid action key")
+        parsed_actions[action_key] = _positive(
+            score, f"action_values.{action_key}", SECT_WAR_KEY
+        )
+    return {
+        "key": SECT_WAR_KEY,
+        "war_key": war_key,
+        "anchor": _anchor_datetime(row.get("anchor"), SECT_WAR_KEY),
+        "action_values": parsed_actions,
+        **_positive_fields(
+            SECT_WAR_KEY,
+            row,
+            (
+                "rounds_per_week",
+                "duration_minutes",
+                "registration_fee",
+                "max_participants",
+                "min_level",
+                "member_threshold",
+                "sect_reward",
+                "member_reward",
+                "claim_hours",
+            ),
+        ),
+    }
+
+
 def sect_rules_record(content: ContentBundle | None = None) -> dict[str, Any]:
     bundle = _bundle(content)
     row = _record(bundle, SECT_KEY)
@@ -354,4 +407,5 @@ __all__ = [
     "sect_beacon_record",
     "sect_exchange_record",
     "sect_rules_record",
+    "sect_war_record",
 ]

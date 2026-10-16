@@ -255,6 +255,29 @@
       }
     },
     {
+      "key": "social.sect_war",
+      "name": "宗门战规则",
+      "desc": "宗门战的周轮次、报名费、参战人数、等级门槛、奖励与动作分值。",
+      "status": "active",
+      "war_key": "sect_war",
+      "anchor": "2025-01-06T00:00:00+00:00",
+      "rounds_per_week": 2,
+      "duration_minutes": 30,
+      "registration_fee": 2000,
+      "max_participants": 10,
+      "min_level": 4,
+      "member_threshold": 20,
+      "sect_reward": 100,
+      "member_reward": 30,
+      "claim_hours": 24,
+      "action_values": {
+        "占点": 10,
+        "击败": 5,
+        "运输": 15,
+        "维修": 15
+      }
+    },
+    {
       "key": "social.spar",
       "name": "玩家直接切磋",
       "desc": "直接使用双方当前角色快照进行中性场景自动战，只展示回放，不计竞技积分且不改变玩家状态。",
