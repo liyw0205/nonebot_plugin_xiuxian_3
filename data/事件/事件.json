@@ -76,7 +76,12 @@
           "reward_key": "reward.event.demon_invasion"
         }
       },
-      "key": "event.demon_invasion"
+      "key": "event.demon_invasion",
+      "action_aliases": {
+        "战斗": "battle",
+        "运输": "transport",
+        "维修": "maintenance"
+      }
     },
     {
       "name": "妖界贸易",
@@ -136,17 +141,26 @@
           "route": {
             "source": "settled_boundary_party_battle",
             "quantity": 20,
-            "party_types": ["boundary_realm", "party_boundary"]
+            "party_types": [
+              "boundary_realm",
+              "party_boundary"
+            ]
           },
           "boss": {
             "source": "settled_boundary_party_battle",
             "quantity": 30,
-            "party_types": ["boundary_realm", "party_boundary"]
+            "party_types": [
+              "boundary_realm",
+              "party_boundary"
+            ]
           },
           "complete": {
             "source": "settled_boundary_party_battle",
             "quantity": 50,
-            "party_types": ["boundary_realm", "party_boundary"]
+            "party_types": [
+              "boundary_realm",
+              "party_boundary"
+            ]
           }
         },
         "claim": {
@@ -192,8 +206,15 @@
       "name": "心魔试炼",
       "desc": "突破受挫后心魔乘隙而起，修士须在限期内直面它、净化心神或寻求化解。",
       "status": "open",
-      "trigger": {"operation": "progression.breakthrough_nascent_soul", "result": "failed"},
-      "choices": ["heart_demon.face", "heart_demon.purify", "heart_demon.bargain"],
+      "trigger": {
+        "operation": "progression.breakthrough_nascent_soul",
+        "result": "failed"
+      },
+      "choices": [
+        "heart_demon.face",
+        "heart_demon.purify",
+        "heart_demon.bargain"
+      ],
       "timeout_seconds": 86400,
       "key": "event.heart_demon_trial"
     },
@@ -237,7 +258,13 @@
       "desc": "领域裂痕附近战事渐起，各方修士集结守望，稳住动荡的天地边界。",
       "status": "active",
       "location_key": "xuantian.domain_front",
-      "requirements": [{"type": "realm", "realm_key": "soul_transformation", "min_layer": 1}],
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "soul_transformation",
+          "min_layer": 1
+        }
+      ],
       "schedule": {
         "activity_hours": 4,
         "anchor_hour": 0,
@@ -266,7 +293,13 @@
       "desc": "虚空乱流骤然增强，航行者需在风暴平息前守住航路。",
       "status": "open",
       "duration_seconds": 7200,
-      "requirements": [{"type": "realm", "realm_key": "void_refining", "min_layer": 1}],
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "void_refining",
+          "min_layer": 1
+        }
+      ],
       "random_pool": "void.route.storm",
       "key": "event.void_storm"
     },
@@ -274,8 +307,18 @@
       "name": "道源任务",
       "desc": "合道修士受托守护边界、建设道场并传承所学，以此积累飞升道果。",
       "status": "open",
-      "requirements": [{"type": "realm", "realm_key": "dao_union", "min_layer": 1}],
-      "task_keys": ["task.dao_origin.guard", "task.dao_origin.build", "task.dao_origin.teach"],
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "dao_union",
+          "min_layer": 1
+        }
+      ],
+      "task_keys": [
+        "task.dao_origin.guard",
+        "task.dao_origin.build",
+        "task.dao_origin.teach"
+      ],
       "random_pool": "dao.origin",
       "key": "event.dao_origin"
     },
@@ -283,8 +326,18 @@
       "name": "天劫试炼台",
       "desc": "渡劫修士在此依次磨炼身心、守望三界并作出最终抉择。",
       "status": "open",
-      "requirements": [{"type": "realm", "realm_key": "tribulation", "min_layer": 3}],
-      "trial_order": ["trial.body_and_mind", "trial.three_realms", "trial.dao_choice"],
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "tribulation",
+          "min_layer": 3
+        }
+      ],
+      "trial_order": [
+        "trial.body_and_mind",
+        "trial.three_realms",
+        "trial.dao_choice"
+      ],
       "duration_seconds": 1800,
       "trials": [
         {
@@ -299,7 +352,9 @@
           "debt_delta": 10,
           "cooldown_seconds": 86400,
           "random_pool": "battle.enemy.tribulation_heaven",
-          "reward_items": {"item.dao_fruit_fragment": 1},
+          "reward_items": {
+            "item.dao_fruit_fragment": 1
+          },
           "choice": null
         },
         {
@@ -330,7 +385,10 @@
           "cooldown_seconds": 259200,
           "random_pool": "battle.enemy.tribulation_heaven",
           "reward_items": {},
-          "choice": {"minimum_progress": 280, "match_path_fruit": true}
+          "choice": {
+            "minimum_progress": 280,
+            "match_path_fruit": true
+          }
         }
       ],
       "key": "event.heaven_tribulation"
@@ -344,9 +402,18 @@
         "claim_window_seconds": 86400,
         "completion_threshold": 3,
         "selection": [
-          {"group": "cultivation_exploration", "count": 2},
-          {"group": "daily_life", "count": 2},
-          {"group": "other", "count": 3}
+          {
+            "group": "cultivation_exploration",
+            "count": 2
+          },
+          {
+            "group": "daily_life",
+            "count": 2
+          },
+          {
+            "group": "other",
+            "count": 3
+          }
         ],
         "reward_key": "reward.daily_task_claim"
       },
