@@ -285,6 +285,18 @@ provenance `0f3b39ba`）。未跑全量/压测/部署，未验 QQ 真机。
 `test_sect_exchange.py` 7 passed、`test_sect_war.py`/`test_sect_war_federation.py` 3 passed。
 未跑全量/压测/部署，未验 QQ 真机。
 
+跨界事件指令与虚空前线赛季内容化已在 `develop` 完成（提交 `0de04d3`、`9033570`）：`data/事件/事件.json` 为
+`event.beast_trade`/`event.boundary_rift`/`event.ancient_domain_open` 追加 `action_aliases`，`cross_realm_rules.py`
+新增 `cross_realm_action_values()` 并校验动作值属于该事件自身的 `public_event.contributions`；`data/事件/赛季.json`
+新增 `season.void_frontier`（28 天/领取 7 天/周上限 5/周奖励/名额 100/四项分值/三档排名奖励/默认奖励），
+`season_content.py` 把 `boards` 放宽为可选并新增 `weekly_cap`/`weekly_reward`/`score_values`/`rank_rewards`/
+`default_rank_reward` 校验（`_score_map()`/`_rank_rewards()`），`void_frontier_rules.py` 常量与 `reward_for_rank()`
+改为内容派生。映射、分值、奖励与赛季窗口（2026-10-15 属 `season.void_frontier:20261007`）均保持原值。
+聚焦证据：新增 `test_cross_realm_void_frontier_content.py` 15 passed（三张指令表与记录一致且动作值属于该事件贡献键、
+赛季记录与模块常量/分值表/周奖励一致、`reward_for_rank()` 四档与返回独立副本、窗口 id 与天数不变、11 项校验失败用例）；
+回归 `test_cross_realm_events.py`/`test_cross_realm_event_snapshot_integrity.py` 29 passed、`test_void_frontier.py` 10 passed。
+未跑全量/压测/部署，未验 QQ 真机。
+
 本轮有限任务已完成：`chapter.1.stage.3` 雾中守门与 `chapter.2.stage.1` 城镇委托两关的正文、人物/场景、
 可执行目标、来源/奖励/后续引用、失败重试规则及现有战斗/委托、快照、事务、幂等消费者已落地。
 沿用本轮已确认的 `19 passed`、`lastfailed={}` 聚焦证据；不重跑全量、不扩展 travel/world，不重开 M9，
