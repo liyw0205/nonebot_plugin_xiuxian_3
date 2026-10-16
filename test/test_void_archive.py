@@ -10,7 +10,7 @@ from tempfile import TemporaryDirectory
 
 import pytest
 
-from combat_fixtures import BALANCED_QUALIFICATION
+from combat_fixtures import BALANCED_QUALIFICATION, equip_damage_weapon
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 from nonebot_plugin_xiuxian_3.xiuxian.content import ContentBundle, ContentError
@@ -40,18 +40,24 @@ def _past_route(runtime) -> None:
         )
 
 
-async def _prepare(runtime, adapter: str, user: str) -> None:
+async def _prepare(runtime, adapter: str, user: str, *, realm_layer: int = 3) -> None:
     assert (await _dispatch(runtime, _ctx(adapter, user, f"create-{user}"), "开始修仙")).ok
     with sqlite3.connect(runtime.settings.database_path) as db:
         db.execute(
-            "UPDATE players SET stage='cultivator', realm_key='void_refining', realm_layer=1, location_key='void.portal', stamina=200, stamina_max=200, energy=100, spirit_stones=1000, inventory_json=?, qualification_json=? WHERE platform=? AND platform_user_id=?",
+            "UPDATE players SET stage='cultivator', realm_key='void_refining', realm_layer=?, location_key='void.portal', stamina=200, stamina_max=200, energy=100, spirit_stones=1000, inventory_json=?, qualification_json=? WHERE platform=? AND platform_user_id=?",
             (
+                realm_layer,
                 json.dumps({"item.void_anchor": 30, "item.void_crystal": 20}),
                 json.dumps(BALANCED_QUALIFICATION),
                 adapter,
                 user,
             ),
         )
+        db.execute(
+            "UPDATE players SET max_hp=10000, initiative=100 WHERE platform=? AND platform_user_id=?",
+            (adapter, user),
+        )
+    equip_damage_weapon(runtime, adapter, user, 5000)
 
 
 async def _settle_route(runtime, adapter: str, user: str, route: str, operation: str) -> None:

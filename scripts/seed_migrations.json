@@ -45,10 +45,11 @@
   "内容清单.json": {
     "old_sha256": {
       "8121ad7fa52be7f9129bb39f9408494dc8b9c4f051c03387e763831e12cb0c1d": "eaed7115257db5a67933e8bdf833c003319d940d:data/内容清单.json",
-      "e504acb578a74a493c9c98ca363fbe1ad8443554843df1ae0c1bbbe2c457ed20": "0f3b39ba9e727db33aa031294d398d705866c881:data/内容清单.json"
+      "e504acb578a74a493c9c98ca363fbe1ad8443554843df1ae0c1bbbe2c457ed20": "0f3b39ba9e727db33aa031294d398d705866c881:data/内容清单.json",
+      "15773fe897d4dcbcf2cbfcc21b0c4d4f2148315bd11a697bac87c2140711f536": "327918cf3c268567a9e1faaa789f5310683d52f7:data/内容清单.json"
     },
-    "new_sha256": "15773fe897d4dcbcf2cbfcc21b0c4d4f2148315bd11a697bac87c2140711f536",
-    "new_commit": "327918cf3c268567a9e1faaa789f5310683d52f7"
+    "new_sha256": "9b0998cfc1536675f2000bb09c902c4dfab96bd7f8b9b1a57b45564f36d3d8a2",
+    "new_commit": "8ccde33234cbefa5b89e12253f647d4430d9391a"
   },
   "地图/地点.json": {
     "old_sha256": {
@@ -59,10 +60,11 @@
   },
   "地图/区域.json": {
     "old_sha256": {
-      "cac9bb63828923b1faa1433b3a75e216efdcc037170461d805091761b1dbc2e2": "44be52139804523570ec1f2588b8f9bdf568c8a0:data/地图/区域.json"
+      "cac9bb63828923b1faa1433b3a75e216efdcc037170461d805091761b1dbc2e2": "44be52139804523570ec1f2588b8f9bdf568c8a0:data/地图/区域.json",
+      "bb9075bd954d7f1da6ce60d9eb3ef35adfc56e89ba3252682ac8845e751f1370": "e71e52e2e6040365fa1ed57b15ca97c8583fe57c:data/地图/区域.json"
     },
-    "new_sha256": "bb9075bd954d7f1da6ce60d9eb3ef35adfc56e89ba3252682ac8845e751f1370",
-    "new_commit": "e71e52e2e6040365fa1ed57b15ca97c8583fe57c"
+    "new_sha256": "5ed8cdcef6474eab4a533a581f0b7ba46761a493956569a769e5eec01cd1fa90",
+    "new_commit": "8ccde33234cbefa5b89e12253f647d4430d9391a"
   },
   "特殊/虚空塔.json": {
     "old_sha256": {

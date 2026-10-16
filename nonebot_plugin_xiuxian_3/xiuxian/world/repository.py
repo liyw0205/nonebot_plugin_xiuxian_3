@@ -54,10 +54,6 @@ class WorldRepositoryMixin:
             VoidTravelBusyError,
         )
 
-        try:
-            definition = void_route_definition(route_key)
-        except KeyError as exc:
-            raise VoidRouteLockedError("void route is closed") from exc
         operation_name = "world.enter_void_route"
         request_payload = {"platform": platform, "platform_user_id": platform_user_id, "route_key": route_key}
         request_hash = self._request_hash(operation_name, request_payload)
@@ -86,6 +82,10 @@ class WorldRepositoryMixin:
                     storm_roll_bp=int(payload["storm_roll_bp"]),
                     already_completed=True,
                 )
+            try:
+                definition = void_route_definition(route_key, self.content)
+            except KeyError as exc:
+                raise VoidRouteLockedError("void route is closed") from exc
             row = self._require_player(connection, platform, platform_user_id)
             realm_key = str(row["realm_key"])
             realm_layer = player_integer(row, "realm_layer")

@@ -143,12 +143,117 @@ def validate_world_content(bundle: ContentBundle) -> dict[str, int]:
     uncovered = location_keys - covered
     if uncovered:
         raise ContentError(f"locations are not assigned to a region: {sorted(uncovered)}")
+    _validate_cloud_routes(bundle)
+    _validate_void_routes(bundle)
     return {
         "locations": len(locations),
         "regions": len(regions),
         "connections": len(edges),
         "covered_locations": len(covered),
     }
+
+
+def _validate_cloud_routes(bundle: ContentBundle) -> None:
+    rows = bundle.list("world_cloud_route", include_locked=True)
+    destinations: set[str] = set()
+    selectors: dict[str, str] = {}
+    expected = {
+        "key", "name", "desc", "status", "aliases", "command_name", "destination",
+        "duration_seconds", "stamina", "spirit_stone", "source_locations", "realm_key",
+        "realm_layer", "pass_key", "pass_quantity", "required_quest",
+    }
+    for row in rows:
+        key = _record_key(row, "cloud route")
+        _stable_key(key, f"cloud route {key} key")
+        _only_record_fields(row, expected, f"cloud route {key}")
+        for field in ("name", "desc", "command_name", "destination", "realm_key"):
+            _non_empty_string(row.get(field), f"cloud route {key} requires {field}")
+        _status(row, key, "cloud route")
+        aliases = row.get("aliases")
+        if not isinstance(aliases, list) or any(
+            not isinstance(alias, str) or not alias.strip() or alias != alias.strip() for alias in aliases
+        ):
+            raise ContentError(f"cloud route {key} aliases must be non-empty strings")
+        for selector in (key, row["name"], row["command_name"], *aliases):
+            owner = selectors.get(selector)
+            if owner is not None and owner != key:
+                raise ContentError(f"cloud route selector {selector!r} is ambiguous between {owner} and {key}")
+            selectors[selector] = key
+        destination = str(row["destination"])
+        if destination in destinations:
+            raise ContentError(f"duplicate cloud route destination {destination}")
+        destinations.add(destination)
+        if not bundle.has("location", destination, include_locked=True):
+            raise ContentError(f"cloud route {key} references unknown destination {destination}")
+        sources = row.get("source_locations")
+        if not isinstance(sources, list) or not sources or any(
+            not isinstance(source, str) or not source for source in sources
+        ) or len(set(sources)) != len(sources):
+            raise ContentError(f"cloud route {key} source_locations must be a non-empty unique list")
+        for source in sources:
+            if source == destination or not bundle.has("location", source, include_locked=True):
+                raise ContentError(f"cloud route {key} references invalid source {source!r}")
+        if not bundle.has("realm", str(row["realm_key"]), include_locked=False):
+            raise ContentError(f"cloud route {key} references unknown or inactive realm {row['realm_key']}")
+        _positive_int(row.get("realm_layer"), f"cloud route {key} realm_layer")
+        _positive_int(row.get("duration_seconds"), f"cloud route {key} duration_seconds")
+        _positive_int(row.get("stamina"), f"cloud route {key} stamina")
+        _non_negative_int(row.get("spirit_stone"), f"cloud route {key} spirit_stone")
+        pass_key = row.get("pass_key")
+        pass_quantity = row.get("pass_quantity")
+        if pass_key is None:
+            if pass_quantity != 0:
+                raise ContentError(f"cloud route {key} pass_quantity requires pass_key")
+        else:
+            _non_empty_string(pass_key, f"cloud route {key} pass_key")
+            if not bundle.has("item", pass_key, include_locked=True):
+                raise ContentError(f"cloud route {key} references unknown item {pass_key}")
+            _positive_int(pass_quantity, f"cloud route {key} pass_quantity")
+        quest_key = row.get("required_quest")
+        if quest_key is not None and not (
+            isinstance(quest_key, str)
+            and (bundle.has("quest", quest_key, include_locked=True) or bundle.has("guide", quest_key, include_locked=True))
+        ):
+            raise ContentError(f"cloud route {key} references unknown quest {quest_key!r}")
+
+
+def _validate_void_routes(bundle: ContentBundle) -> None:
+    rows = bundle.list("world_void_route", include_locked=True)
+    selectors: dict[str, str] = {}
+    expected = {
+        "key", "name", "desc", "status", "aliases", "duration_seconds", "stamina", "anchor_cost", "random_pool",
+    }
+    for row in rows:
+        key = _record_key(row, "void route")
+        _stable_key(key, f"void route {key} key")
+        _only_record_fields(row, expected, f"void route {key}")
+        for field in ("name", "desc", "random_pool"):
+            _non_empty_string(row.get(field), f"void route {key} requires {field}")
+        _status(row, key, "void route")
+        if not key.startswith("void."):
+            raise ContentError(f"void route {key} must use the void location namespace")
+        aliases = row.get("aliases")
+        if not isinstance(aliases, list) or any(
+            not isinstance(alias, str) or not alias.strip() or alias != alias.strip() for alias in aliases
+        ):
+            raise ContentError(f"void route {key} aliases must be non-empty strings")
+        for selector in (key, row["name"], *aliases):
+            owner = selectors.get(selector)
+            if owner is not None and owner != key:
+                raise ContentError(f"void route selector {selector!r} is ambiguous between {owner} and {key}")
+            selectors[selector] = key
+        for field in ("duration_seconds", "stamina", "anchor_cost"):
+            _positive_int(row.get(field), f"void route {key} {field}")
+        _stable_key(str(row["random_pool"]), f"void route {key} random_pool")
+
+
+def _only_record_fields(row: dict[str, Any], allowed: set[str], context: str) -> None:
+    unknown = set(row) - allowed
+    missing = allowed - set(row)
+    if unknown:
+        raise ContentError(f"{context} has unsupported fields: {sorted(unknown)}")
+    if missing:
+        raise ContentError(f"{context} is missing fields: {sorted(missing)}")
 
 
 def _record_key(row: dict[str, Any], kind: str) -> str:
