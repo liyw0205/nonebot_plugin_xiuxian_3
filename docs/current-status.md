@@ -218,14 +218,17 @@ boss 层越段、factions 不符、max_floor 不符、缺字段）；回归 `tes
 `test_tower_snapshot_migration.py` 全绿；`data/内容清单.json` 新增该文件并登记种子迁移
 （`8121ad7f…`→`e504acb5…`，provenance `eaed711`）。未跑全量/压测/部署，未验 QQ 真机。
 
-虚空塔全 1–90 层内容化已在当前 `develop` 工作树完成实现，待本目标的提交、CI 与 `main` 合并验收：
+虚空塔全 1–90 层内容化目标已完成并合入 `main`：实现提交 `aad6754`、官方种子迁移
+`4651b35`，合并提交 `83848c6`。`develop` CI `38857853568` 与 `main` CI `38858424607`
+均已通过（Python 3.11/3.12 quality、install-smoke；release job 按条件跳过）：
 `data/特殊/虚空塔.json` 现在以 6 个连续段（1–15 风暴、16–30 回响、31–45 碑铭、46–60 见证、
 61–75 道源、76–90 登临）承载全部准入境界/名望、体力、UTC 周额度、敌人范围、首领层、首通/首领/练习奖励、
 路线图鉴、故事图鉴和展示称号。`void_spire_rules.py` 对 1–90 统一做严格字段、引用、连续覆盖、敌人范围与首领对应、
 奖励类型、图鉴和称号校验；`floor_definition`、周额度、奖励、故事/称号与路线图鉴查询均从段内容读取。
 仓库入场准入和预览继续保留原 1–30/31–60/61–90 行为，历史 operation、战斗/领奖快照、失败退款和跨适配器
-回放不改；路线图鉴使用内容中的稳定键而非运行时拼接。聚焦合同测试 `test_void_spire_content.py` 11 passed，
-既有 `test_void_spire.py` 19 passed；未跑全量/压测/部署，未验 QQ 真机。
+回放不改；路线图鉴使用内容中的稳定键而非运行时拼接。聚焦合同测试 `test_void_spire_content.py` 18 passed，
+既有 `test_void_spire.py` 19 passed；迁移/安装回归 `test_seed_migration.py` 8 passed，文档回归 29 passed；
+未跑全量/压测/部署，未验 QQ 真机。
 
 专用秘境规则内容化已在 `develop` 完成（提交 `327918c`、`4497735`、`7b4aa3c`）：新增
 `data/冒险/秘境专用.json`（kind `secret_realm_instance`，8 条记录）与共享加载器
