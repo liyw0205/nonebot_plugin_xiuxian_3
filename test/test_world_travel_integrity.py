@@ -39,8 +39,8 @@ async def _prepare(runtime, adapter: str, user: str) -> None:
     assert sought.ok
     with sqlite3.connect(runtime.settings.database_path) as connection:
         connection.execute(
-            "UPDATE players SET stage='cultivator', realm_key='foundation', realm_layer=1, "
-            "location_key='xuantian.new_town', stamina=30, stamina_max=30, spirit_stones=100, "
+            "UPDATE players SET stage='cultivator', realm_key='qi_gathering', realm_layer=4, "
+            "location_key='xuantian.spirit_field', stamina=30, stamina_max=30, spirit_stones=100, "
             "inventory_json=? WHERE platform=? AND platform_user_id=?",
             (json.dumps({"item.cave_pass_basic": 1}), adapter, user),
         )
