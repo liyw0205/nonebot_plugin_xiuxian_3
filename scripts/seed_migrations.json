@@ -49,5 +49,12 @@
     },
     "new_sha256": "15773fe897d4dcbcf2cbfcc21b0c4d4f2148315bd11a697bac87c2140711f536",
     "new_commit": "327918cf3c268567a9e1faaa789f5310683d52f7"
+  },
+  "特殊/虚空塔.json": {
+    "old_sha256": {
+      "5eaa4ae2623cefddca2a5201be8f5f9e02a85e4dd7e972c2c49d8273e76c2fce": "58dbbb370cc5d0b8f74dfd07775ab8c01d07132a:data/特殊/虚空塔.json"
+    },
+    "new_sha256": "e3b645ca251da414b049c6b0cb7f720fb986011ffc5d1fbe357bf65252b46b8c",
+    "new_commit": "aad675430cb6472148dd07bfa4b6949a5795226d"
   }
 }
