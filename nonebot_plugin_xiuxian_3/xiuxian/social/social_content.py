@@ -9,6 +9,7 @@ from ..content import ContentBundle, ContentError, bundled_content
 KIND = "social_interaction"
 MENTOR_KEY = "social.mentor"
 PARTY_KEY = "social.party"
+SECT_KEY = "social.sect"
 
 
 def _bundle(content: ContentBundle | None) -> ContentBundle:
@@ -141,6 +142,25 @@ def party_definitions(content: ContentBundle | None = None) -> tuple[dict[str, A
     return tuple(records)
 
 
+def sect_rules_record(content: ContentBundle | None = None) -> dict[str, Any]:
+    bundle = _bundle(content)
+    row = _record(bundle, SECT_KEY)
+    return {
+        "key": SECT_KEY,
+        "create_cost": _positive(row.get("create_cost"), "create_cost", SECT_KEY),
+        "max_members": _positive(row.get("max_members"), "max_members", SECT_KEY),
+        "warehouse_capacity": _positive(
+            row.get("warehouse_capacity"), "warehouse_capacity", SECT_KEY
+        ),
+        "application_ttl_seconds": _positive(
+            row.get("application_ttl_seconds"), "application_ttl_seconds", SECT_KEY
+        ),
+        "join_cooldown_seconds": _positive(
+            row.get("join_cooldown_seconds"), "join_cooldown_seconds", SECT_KEY
+        ),
+    }
+
+
 def party_aliases(content: ContentBundle | None = None) -> dict[str, str]:
     bundle = _bundle(content)
     row = _record(bundle, PARTY_KEY)
@@ -168,4 +188,5 @@ __all__ = [
     "party_aliases",
     "party_definitions",
     "realm_rank",
+    "sect_rules_record",
 ]

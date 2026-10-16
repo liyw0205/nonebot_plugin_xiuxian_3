@@ -142,6 +142,17 @@
       ]
     },
     {
+      "key": "social.sect",
+      "name": "宗门规则",
+      "desc": "宗门的创建成本、成员上限、仓库容量与申请/加入时限。",
+      "status": "active",
+      "create_cost": 1000,
+      "max_members": 20,
+      "warehouse_capacity": 50,
+      "application_ttl_seconds": 86400,
+      "join_cooldown_seconds": 86400
+    },
+    {
       "key": "social.spar",
       "name": "玩家直接切磋",
       "desc": "直接使用双方当前角色快照进行中性场景自动战，只展示回放，不计竞技积分且不改变玩家状态。",

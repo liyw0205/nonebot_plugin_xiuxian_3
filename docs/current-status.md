@@ -255,6 +255,21 @@ provenance `0f3b39ba`）。未跑全量/压测/部署，未验 QQ 真机。
 `test_demon_abyss_echo_legacy.py`/`test_content.py` 39 passed、`test_seed_migration.py` 8 passed
 （`道具/材料.json` 种子规则更新为 `677d37e3…`，provenance `8646f8b`）。未跑全量/压测/部署，未验 QQ 真机。
 
+事件/赛季与宗门规则内容化已在 `develop` 完成（提交 `c8bcbae`、`c32948a`、`9294d18`）：
+`data/事件/赛季.json` 新增 `season.three_realms`（28 天/领取 7 天/名额 100/三榜单标签）与 `season.final_heaven`
+（35 天/领取 7 天/名额 10/三榜单含标题键与分数/章节权益 `chapter.final_heaven`），新增 `events/season_content.py`
+校验状态、名称/描述、正数天数与名额、带时区锚点、非空且唯一且带标签的榜单；`three_realms_rules.py`、`rules.py`、
+`season_rules.py` 的天数/领取/名额/锚点/榜单/章节权益改为内容派生，值与现值逐一相同，赛季窗口 id 与边界不变。
+`event.demon_invasion` 新增 `action_aliases`，`demon_rules.py` 的 `DEMON_ACTION_VALUES` 改为内容派生并校验
+动作键属于该事件自身的 `public_event.contributions`（不再另设硬编码动作集合），映射与公共事件配置哈希不变。
+`data/社交/玩家互动.json` 新增 `social.sect`，`social_content.py` 增加 `sect_rules_record()`，`sect_rules.py` 的
+创建成本/成员上限/仓库容量/申请与加入时限改为内容派生（角色、名称正则与校验保持代码）。
+聚焦证据：新增 `test_event_sect_content.py` 19 passed（两条赛季合同与模块常量一致、榜单逐字段一致、窗口 id 与
+天数一致、动作映射一致且属于该事件贡献键、宗门数值与 `SECT_*` 一致、13 项校验失败用例）；回归
+`test_final_heaven_season.py`/`test_three_realms_arena.py` 21 passed、`test_demon_event.py`/`test_events.py`
+8 passed、`test_sect_exchange.py`/`test_sect_alliance_beacon.py`/`test_social.py` 16 passed。
+未跑全量/压测/部署，未验 QQ 真机。
+
 本轮有限任务已完成：`chapter.1.stage.3` 雾中守门与 `chapter.2.stage.1` 城镇委托两关的正文、人物/场景、
 可执行目标、来源/奖励/后续引用、失败重试规则及现有战斗/委托、快照、事务、幂等消费者已落地。
 沿用本轮已确认的 `19 passed`、`lastfailed={}` 聚焦证据；不重跑全量、不扩展 travel/world，不重开 M9，

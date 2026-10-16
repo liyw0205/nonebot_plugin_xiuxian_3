@@ -6,16 +6,17 @@ from __future__ import annotations
 import hashlib
 from datetime import datetime, timedelta, timezone
 
+from .season_content import THREE_REALMS_SEASON_KEY, season_record
 
-SEASON_KEY = "season.three_realms"
-SEASON_DAYS = 28
-CLAIM_DAYS = 7
-SEASON_ANCHOR = datetime(2025, 1, 1, tzinfo=timezone.utc)
-RANKED_PLACES = 100
+_RECORD = season_record(THREE_REALMS_SEASON_KEY)
+
+SEASON_KEY = THREE_REALMS_SEASON_KEY
+SEASON_DAYS = int(_RECORD["duration_days"])
+CLAIM_DAYS = int(_RECORD["claim_days"])
+SEASON_ANCHOR = _RECORD["anchor"]
+RANKED_PLACES = int(_RECORD["rank_limit"])
 BOARDS = {
-    "faction_merit": {"label": "阵营功勋榜"},
-    "party_contribution": {"label": "多人副本贡献榜"},
-    "sect_contribution": {"label": "宗门贡献榜"},
+    board_key: dict(board) for board_key, board in _RECORD["boards"].items()
 }
 
 
