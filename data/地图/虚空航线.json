@@ -1,0 +1,50 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "world_void_route",
+  "records": [
+    {
+      "key": "void.first_route",
+      "name": "虚空第一航道",
+      "desc": "通往虚空第一航道的锚点航行。",
+      "status": "open",
+      "aliases": ["第一航道"],
+      "duration_seconds": 1800,
+      "stamina": 35,
+      "anchor_cost": 3,
+      "random_pool": "void.route.void.first_route"
+    },
+    {
+      "key": "void.archive_ruins",
+      "name": "虚空档案遗迹",
+      "desc": "通往虚空档案遗迹的锚点航行。",
+      "status": "open",
+      "aliases": ["档案遗迹"],
+      "duration_seconds": 2700,
+      "stamina": 40,
+      "anchor_cost": 4,
+      "random_pool": "void.route.void.archive_ruins"
+    },
+    {
+      "key": "void.sect_fortress",
+      "name": "虚空堡垒",
+      "desc": "通往虚空堡垒的锚点航行。",
+      "status": "open",
+      "aliases": [],
+      "duration_seconds": 1800,
+      "stamina": 20,
+      "anchor_cost": 2,
+      "random_pool": "void.route.void.sect_fortress"
+    },
+    {
+      "key": "void.void_market",
+      "name": "虚空集市",
+      "desc": "通往虚空集市的锚点航行。",
+      "status": "open",
+      "aliases": [],
+      "duration_seconds": 1800,
+      "stamina": 10,
+      "anchor_cost": 2,
+      "random_pool": "void.route.void_market"
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "world_cloud_route",
+  "records": [
+    {
+      "key": "route.cloud_to_mist2",
+      "name": "云舟·洞天二层",
+      "desc": "由云城或云舟渡口前往雾隐洞天二层的专用航线。",
+      "status": "open",
+      "aliases": ["洞天二层", "云舟洞天二层"],
+      "command_name": "洞天二层",
+      "destination": "cave.mist_grotto_2",
+      "duration_seconds": 300,
+      "stamina": 8,
+      "spirit_stone": 500,
+      "source_locations": ["xuantian.cloud_city", "xuantian.floating_boat"],
+      "realm_key": "golden_core",
+      "realm_layer": 1,
+      "pass_key": "item.cave_pass_advanced",
+      "pass_quantity": 1,
+      "required_quest": null
+    },
+    {
+      "key": "route.cloud_to_abyss_intro",
+      "name": "云舟·魔界引导",
+      "desc": "由云城或云舟渡口前往魔界深渊门的专用航线。",
+      "status": "open",
+      "aliases": ["魔界引导", "云舟魔界引导"],
+      "command_name": "魔界引导",
+      "destination": "demon.abyss_gate",
+      "duration_seconds": 300,
+      "stamina": 10,
+      "spirit_stone": 500,
+      "source_locations": ["xuantian.cloud_city", "xuantian.floating_boat"],
+      "realm_key": "foundation",
+      "realm_layer": 1,
+      "pass_key": null,
+      "pass_quantity": 0,
+      "required_quest": null
+    },
+    {
+      "key": "route.cloud_return",
+      "name": "云舟·返回云城",
+      "desc": "从雾隐洞天二层或魔界深渊门返回玄天云城的专用航线。",
+      "status": "open",
+      "aliases": ["返回云城", "云城"],
+      "command_name": "返回云城",
+      "destination": "xuantian.cloud_city",
+      "duration_seconds": 180,
+      "stamina": 3,
+      "spirit_stone": 200,
+      "source_locations": ["cave.mist_grotto_2", "demon.abyss_gate"],
+      "realm_key": "foundation",
+      "realm_layer": 1,
+      "pass_key": null,
+      "pass_quantity": 0,
+      "required_quest": null
+    }
+  ]
+}
