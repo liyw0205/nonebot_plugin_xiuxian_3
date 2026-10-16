@@ -45,10 +45,11 @@ from ..repository import (
 from .rules import (
     destination_definition,
     destination_location_is_open,
+    meets_realm,
     resolve_destination,
 )
-from .cloud_rules import cloud_route_definition, resolve_cloud_route
-from .void_rules import resolve_void_route, void_route_definition
+from .cloud_rules import cloud_route_for_destination, resolve_cloud_route
+from .void_rules import resolve_void_route
 
 
 ITEM_LABELS = {
@@ -112,59 +113,128 @@ class WorldApplication:
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, retryable=True)
         definition = destination_definition(destination, self.repository.content, source=record.source)
-        missing_labels = tuple(
-            item.replace("qi_gathering", "聚气")
-            .replace("qi_sensing", "感气")
-            .replace("foundation", "筑基")
-            .replace("golden_core", "金丹")
-            .replace("nascent_soul", "元婴")
-            .replace("soul_transformation", "化神")
-            .replace("void_refining", "炼虚")
-            .replace("dao_union", "合道")
-            .replace("ascension_ready", "飞升候选")
-            .replace("remained_in_world", "留界")
-            .replace("当前状态", "当前终局状态")
-            for item in record.missing
-        )
+        travel_content = self.repository.content or bundled_content()
+        destination_cloud_route = cloud_route_for_destination(destination, travel_content)
+        ordinary_route_available = definition.route_available
+        cloud_route = destination_cloud_route if not ordinary_route_available else None
+        if cloud_route is not None:
+            missing_cloud: list[str] = []
+            if record.source not in cloud_route.source_locations:
+                missing_cloud.append("云舟登船地点")
+            if not meets_realm(
+                record.player.realm_key,
+                record.player.realm_layer,
+                cloud_route.required_realm,
+                cloud_route.required_layer,
+            ):
+                missing_cloud.append("境界要求")
+            if cloud_route.pass_key and inventory_amount(record.player.inventory, cloud_route.pass_key) < cloud_route.pass_quantity:
+                missing_cloud.append("通行物品")
+            if cloud_route.required_quest and not await self.repository.cloud_route_quest_completed(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                quest_key=cloud_route.required_quest,
+            ):
+                missing_cloud.append("任务权限")
+            if record.player.stamina < cloud_route.stamina_cost:
+                missing_cloud.append("体力")
+            if record.player.spirit_stones < cloud_route.currency_cost:
+                missing_cloud.append("灵石")
+            missing_labels = tuple(missing_cloud)
+        else:
+            missing_labels = tuple(
+                item.replace("qi_gathering", "聚气")
+                .replace("qi_sensing", "感气")
+                .replace("foundation", "筑基")
+                .replace("golden_core", "金丹")
+                .replace("nascent_soul", "元婴")
+                .replace("soul_transformation", "化神")
+                .replace("void_refining", "炼虚")
+                .replace("dao_union", "合道")
+                .replace("ascension_ready", "飞升候选")
+                .replace("remained_in_world", "留界")
+                .replace("当前状态", "当前终局状态")
+                for item in record.missing
+            )
         missing = "、".join(missing_labels) if missing_labels else "无"
-        pass_label = ITEM_LABELS.get(record.pass_key or "", "通行物品")
-        pass_summary = (
-            f"{pass_label} ×{record.pass_quantity}"
-            if record.pass_key
-            else "无" if definition.route_available else "无可行路线"
-        )
-        duration_summary = (
-            f"{definition.duration_seconds // 60} 分钟"
-            if definition.route_available
-            else "无可行路线"
-        )
-        stamina_summary = str(definition.stamina_cost) if definition.route_available else "无可行路线"
-        currency_summary = str(definition.currency_cost) if definition.route_available else "无可行路线"
-        route_summary = (
-            f"**{self._display_name(record.player)}**可以查看这条路线。"
-            if definition.route_available
-            else f"**{self._display_name(record.player)}**当前位置没有通往此地的路线。"
+        if cloud_route is not None:
+            cloud_pass_label = ITEM_LABELS.get(cloud_route.pass_key or "", "通行物品")
+            pass_summary = (
+                f"{cloud_pass_label} ×{cloud_route.pass_quantity}"
+                if cloud_route.pass_key
+                else "无"
+            )
+            duration_summary = f"{cloud_route.duration_seconds // 60} 分钟（云舟）"
+            stamina_summary = f"{cloud_route.stamina_cost}（云舟）"
+            currency_summary = f"{cloud_route.currency_cost}（云舟）"
+            source_labels = "、".join(
+                travel_content.label("location", key, fallback=key)
+                for key in cloud_route.source_locations
+            )
+            route_summary = (
+                f"**{self._display_name(record.player)}**不能通过普通移动抵达此地；请使用云舟专用航线。"
+            )
+            next_action = (
+                f"发送 `登上云舟 {cloud_route.command_name}` 开始航程。"
+                if not missing_labels
+                else "满足显示的云舟条件后再开始航程。"
+            )
+        else:
+            pass_label = ITEM_LABELS.get(record.pass_key or "", "通行物品")
+            pass_summary = (
+                f"{pass_label} ×{record.pass_quantity}"
+                if record.pass_key
+                else "无" if ordinary_route_available else "无可行路线"
+            )
+            duration_summary = (
+                f"{definition.duration_seconds // 60} 分钟"
+                if ordinary_route_available
+                else "无可行路线"
+            )
+            stamina_summary = str(definition.stamina_cost) if ordinary_route_available else "无可行路线"
+            currency_summary = str(definition.currency_cost) if ordinary_route_available else "无可行路线"
+            route_summary = (
+                f"**{self._display_name(record.player)}**可以查看这条路线。"
+                if ordinary_route_available
+                else f"**{self._display_name(record.player)}**当前位置没有通往此地的路线。"
+            )
+            next_action = (
+                f"发送 `前往 {definition.label}` 开始移动。"
+                if record.ready
+                else "满足条件后才可创建移动会话。"
+            )
+        source_summary = (
+            f"- **云舟起航地点**：{source_labels}\n"
+            if cloud_route is not None
+            else ""
         )
         message = (
             f"## {definition.label} · 移动预览\n\n"
             f"{route_summary}\n\n"
+            f"{source_summary}"
             f"- **预计耗时**：{duration_summary}\n"
             f"- **体力消耗**：{stamina_summary}\n"
             f"- **灵石消耗**：{currency_summary}\n"
             f"- **通行物品**：{pass_summary}\n"
             f"- **当前缺少**：{missing}\n\n"
-            f"> {'发送 `前往 ' + definition.label + '` 开始移动。' if record.ready else '满足条件后才可创建移动会话。'}"
+            f"> {next_action}"
         )
         return CommandResult(True, "TRAVEL_PREVIEW", message, context.request_id, data={
             "destination": destination,
-            "ready": record.ready,
-            "route_available": definition.route_available,
-            "missing": record.missing,
-            "duration_seconds": definition.duration_seconds if definition.route_available else None,
-            "stamina_cost": definition.stamina_cost if definition.route_available else None,
-            "currency_cost": definition.currency_cost if definition.route_available else None,
-            "pass_key": record.pass_key,
-            "pass_quantity": record.pass_quantity,
+            "ready": record.ready if cloud_route is None else False,
+            "route_available": ordinary_route_available,
+            "missing": missing_labels,
+            "duration_seconds": definition.duration_seconds if ordinary_route_available else None,
+            "stamina_cost": definition.stamina_cost if ordinary_route_available else None,
+            "currency_cost": definition.currency_cost if ordinary_route_available else None,
+            "pass_key": record.pass_key if ordinary_route_available else None,
+            "pass_quantity": record.pass_quantity if ordinary_route_available else 0,
+            "travel_mode": "cloud_boat" if cloud_route is not None else "ordinary",
+            "dedicated_route_key": cloud_route.key if cloud_route is not None else None,
+            "dedicated_route_ready": bool(cloud_route is not None and not missing_labels),
+            "dedicated_route_duration_seconds": cloud_route.duration_seconds if cloud_route is not None else None,
+            "dedicated_route_stamina_cost": cloud_route.stamina_cost if cloud_route is not None else None,
+            "dedicated_route_currency_cost": cloud_route.currency_cost if cloud_route is not None else None,
             "required_dao_fruit_progress": definition.required_dao_fruit_progress,
             "daily_start_limit": definition.daily_start_limit,
             "required_endgame_status": definition.required_endgame_status,
@@ -359,8 +429,16 @@ class WorldApplication:
 
     async def board_cloud_boat(self, context: CommandContext) -> CommandResult:
         if len(context.command_args) != 1:
-            return CommandResult(False, "INVALID_CLOUD_ROUTE", "请指定云舟航线：洞天二层、魔界引导或返回云城。", context.request_id)
-        route_key = resolve_cloud_route(context.command_args[0])
+            content = self.repository.content or bundled_content()
+            route_hints = "、".join(
+                str(row["command_name"])
+                for row in content.list("world_cloud_route", include_locked=False)
+            )
+            message = f"请指定云舟航线：{route_hints}。" if route_hints else "当前没有开放的云舟航线。"
+            return CommandResult(False, "INVALID_CLOUD_ROUTE", message, context.request_id)
+        route_key = resolve_cloud_route(
+            context.command_args[0], self.repository.content, include_locked=True
+        )
         if route_key is None:
             return CommandResult(False, "CLOUD_ROUTE_LOCKED", "暂时没有这条云舟航线。", context.request_id)
         operation_id = self._operation_id(context, "world.board_cloud_boat")
@@ -391,12 +469,24 @@ class WorldApplication:
             return CommandResult(False, "OPERATION_CONFLICT", "此事已有安排，请重新起意。", context.request_id, operation_id)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
-        definition = cloud_route_definition(record.route_key)
+        travel_content = self.repository.content or bundled_content()
+        route_row = travel_content.get("world_cloud_route", record.route_key, include_locked=True)
+        route_label = (
+            str(route_row["name"])
+            if route_row is not None
+            and route_row.get("status") in {"active", "open"}
+            and isinstance(route_row.get("name"), str)
+            else travel_content.label("location", record.destination, fallback=record.route_key)
+        )
+        duration_seconds = max(
+            0,
+            int((datetime.fromisoformat(record.ends_at) - datetime.fromisoformat(record.starts_at)).total_seconds()),
+        )
         pass_label = ITEM_LABELS.get(record.pass_key or "", "通行物品")
         return CommandResult(
             True,
             "CLOUD_BOAT_STARTED",
-            f"## {definition.label}已起航\n\n- **耗时**：{definition.duration_seconds // 60} 分钟\n- **体力**：-{record.stamina_cost}\n- **灵石**：-{record.currency_cost}\n- **凭证**：{pass_label} ×{record.pass_quantity if record.pass_key else 0}\n\n> 抵达后发送 `结算云舟`。航路与费用已经定下，重复请求不会重复扣费。",
+            f"## {route_label}已起航\n\n- **耗时**：{duration_seconds // 60} 分钟\n- **体力**：-{record.stamina_cost}\n- **灵石**：-{record.currency_cost}\n- **凭证**：{pass_label} ×{record.pass_quantity if record.pass_key else 0}\n\n> 抵达后发送 `结算云舟`。航路与费用已经定下，重复请求不会重复扣费。",
             context.request_id,
             operation_id,
             data={"session_id": record.session_id, "route_key": record.route_key, "destination": record.destination, "status": record.status, "ends_at": record.ends_at, "idempotent_replay": record.already_completed},
@@ -420,11 +510,12 @@ class WorldApplication:
             return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
-        definition = cloud_route_definition(record.route_key)
+        travel_content = self.repository.content or bundled_content()
+        destination_label = travel_content.label("location", record.destination, fallback=record.destination)
         return CommandResult(
             True,
             "CLOUD_BOAT_ARRIVED",
-            f"## 已抵达{definition.destination}\n\n航线已写入位置状态，凭证只扣除一次，重复结算不会重复移动。",
+            f"## 已抵达{destination_label}\n\n航线已写入位置状态，凭证只扣除一次，重复结算不会重复移动。",
             context.request_id,
             operation_id,
             data={"session_id": record.session_id, "route_key": record.route_key, "destination": record.destination, "status": record.status, "arrived": record.arrived, "idempotent_replay": record.already_completed},
@@ -553,8 +644,20 @@ class WorldApplication:
 
     async def enter_void_route(self, context: CommandContext) -> CommandResult:
         if len(context.command_args) != 1:
-            return CommandResult(False, "INVALID_VOID_ROUTE", "请使用 `进入虚空航道 第一航道`。", context.request_id)
-        route_key = resolve_void_route(context.command_args[0])
+            content = self.repository.content or bundled_content()
+            route_hints = "、".join(
+                str(row["aliases"][0] if row["aliases"] else row["name"])
+                for row in content.list("world_void_route", include_locked=False)
+            )
+            message = (
+                f"请指定虚空航道：{route_hints}。"
+                if route_hints
+                else "当前没有开放的虚空航道。"
+            )
+            return CommandResult(False, "INVALID_VOID_ROUTE", message, context.request_id)
+        route_key = resolve_void_route(
+            context.command_args[0], self.repository.content, include_locked=True
+        )
         if route_key is None:
             return CommandResult(False, "VOID_ROUTE_LOCKED", "暂时没有这条虚空航道。", context.request_id)
         operation_id = self._operation_id(context, "world.enter_void_route")
@@ -586,8 +689,16 @@ class WorldApplication:
             return CommandResult(False, "OPERATION_CONFLICT", "此事已有安排，请重新起意。", context.request_id, operation_id)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
-        definition = void_route_definition(record.route_key)
-        return CommandResult(True, "VOID_ROUTE_STARTED", f"## 已进入{definition.label}\n\n- **虚空锚**：-{record.anchor_cost}\n- **体力**：{record.player.stamina}/{record.player.stamina_max}\n- **预计抵达**：{record.ends_at}\n\n> 抵达后发送 `结算虚空航道`。", context.request_id, operation_id, data={"session_id": record.session_id, "route_key": record.route_key, "anchor_cost": record.anchor_cost, "stamina_cost": record.stamina_cost, "space_resistance_bp": record.space_resistance_bp, "storm_roll_bp": record.storm_roll_bp, "ends_at": record.ends_at, "idempotent_replay": record.already_completed})
+        travel_content = self.repository.content or bundled_content()
+        route_row = travel_content.get("world_void_route", record.route_key, include_locked=True)
+        route_label = (
+            str(route_row["name"])
+            if route_row is not None
+            and route_row.get("status") in {"active", "open"}
+            and isinstance(route_row.get("name"), str)
+            else record.route_key
+        )
+        return CommandResult(True, "VOID_ROUTE_STARTED", f"## 已进入{route_label}\n\n- **虚空锚**：-{record.anchor_cost}\n- **体力**：{record.player.stamina}/{record.player.stamina_max}\n- **预计抵达**：{record.ends_at}\n\n> 抵达后发送 `结算虚空航道`。", context.request_id, operation_id, data={"session_id": record.session_id, "route_key": record.route_key, "anchor_cost": record.anchor_cost, "stamina_cost": record.stamina_cost, "space_resistance_bp": record.space_resistance_bp, "storm_roll_bp": record.storm_roll_bp, "ends_at": record.ends_at, "idempotent_replay": record.already_completed})
 
     async def settle_void_route(self, context: CommandContext) -> CommandResult:
         if context.command_args:

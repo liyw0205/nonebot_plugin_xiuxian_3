@@ -49,7 +49,6 @@
         {"from": "xuantian.cloud_mine", "to": "xuantian.cloud_city", "duration_seconds": 180, "stamina": 8, "spirit_stone": 0},
         {"from": "xuantian.cloud_city", "to": "xuantian.floating_boat", "duration_seconds": 60, "stamina": 0, "spirit_stone": 500},
         {"from": "xuantian.floating_boat", "to": "xuantian.cloud_city", "duration_seconds": 180, "stamina": 8, "spirit_stone": 0},
-        {"from": "xuantian.floating_boat", "to": "cave.mist_grotto_2", "duration_seconds": 180, "stamina": 8, "spirit_stone": 0, "item_key": "item.cave_pass_advanced", "item_quantity": 1},
         {"from": "cave.mist_grotto_2", "to": "xuantian.floating_boat", "duration_seconds": 60, "stamina": 0, "spirit_stone": 500}
       ]
     },
@@ -63,10 +62,8 @@
       "connections": [
         {"from": "xuantian.spirit_field", "to": "cave.mist_grotto", "duration_seconds": 120, "stamina": 5, "spirit_stone": 10, "item_key": "item.cave_pass_basic", "item_quantity": 1},
         {"from": "cave.mist_grotto", "to": "xuantian.spirit_field", "duration_seconds": 90, "stamina": 4, "spirit_stone": 0},
-        {"from": "cave.mist_grotto", "to": "cave.mist_grotto_2", "duration_seconds": 180, "stamina": 8, "spirit_stone": 0, "item_key": "item.cave_pass_advanced", "item_quantity": 1},
         {"from": "cave.mist_grotto_2", "to": "cave.mist_grotto", "duration_seconds": 120, "stamina": 5, "spirit_stone": 10, "item_key": "item.cave_pass_basic", "item_quantity": 1},
-        {"from": "cave.mist_grotto_2", "to": "cave.ancient_domain", "duration_seconds": 0, "stamina": 0, "spirit_stone": 0},
-        {"from": "cave.ancient_domain", "to": "cave.mist_grotto_2", "duration_seconds": 180, "stamina": 8, "spirit_stone": 0, "item_key": "item.cave_pass_advanced", "item_quantity": 1}
+        {"from": "cave.mist_grotto_2", "to": "cave.ancient_domain", "duration_seconds": 0, "stamina": 0, "spirit_stone": 0}
       ]
     },
     {
@@ -77,7 +74,6 @@
       "status": "open",
       "location_keys": ["demon.abyss_gate", "demon.fallen_ruins", "demon.abyss_market", "demon.abyss_depths"],
       "connections": [
-        {"from": "xuantian.floating_boat", "to": "demon.abyss_gate", "duration_seconds": 120, "stamina": 10, "spirit_stone": 0},
         {"from": "demon.abyss_gate", "to": "xuantian.floating_boat", "duration_seconds": 60, "stamina": 0, "spirit_stone": 500},
         {"from": "demon.abyss_gate", "to": "demon.fallen_ruins", "duration_seconds": 480, "stamina": 20, "spirit_stone": 0},
         {"from": "demon.fallen_ruins", "to": "demon.abyss_gate", "duration_seconds": 120, "stamina": 10, "spirit_stone": 0},

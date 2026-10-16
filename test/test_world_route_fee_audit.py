@@ -51,6 +51,7 @@ _LEGACY_TARGET_FEES = {
     "xuantian.spirit_field": (90, 4, 0, None, 0, 0),
     "xuantian.war_front": (300, 15, 0, None, 0, 0),
 }
+_NO_ORDINARY_INCOMING_DESTINATIONS = {"cave.mist_grotto_2"}
 
 
 def _documents() -> tuple[dict, dict]:
@@ -76,7 +77,7 @@ def test_every_incoming_route_preserves_legacy_target_cost_and_pass() -> None:
         for edge in region["connections"]:
             incoming.setdefault(edge["to"], []).append(edge)
 
-    assert set(incoming) == set(_LEGACY_TARGET_FEES)
+    assert set(incoming) == set(_LEGACY_TARGET_FEES) - _NO_ORDINARY_INCOMING_DESTINATIONS
     for target, edges in incoming.items():
         actual = {
             (
@@ -90,6 +91,8 @@ def test_every_incoming_route_preserves_legacy_target_cost_and_pass() -> None:
             for edge in edges
         }
         assert actual == {_LEGACY_TARGET_FEES[target]}, target
+
+    assert not incoming.keys() & _NO_ORDINARY_INCOMING_DESTINATIONS
 
 
 def test_shared_gates_and_special_entry_edges_are_complete() -> None:

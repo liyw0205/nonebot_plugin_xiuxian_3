@@ -376,7 +376,7 @@ def test_ascension_path_is_reached_by_final_battle_without_a_second_certificate(
                     )
                 frozen_preview = await runtime.dispatch(context(f"frozen-preview-{adapter}"), "移动预览 近郊")
                 assert frozen_preview.data["ready"] is False
-                assert "当前状态" in frozen_preview.data["missing"]
+                assert frozen_preview.data["missing"] == ("当前终局状态",)
                 frozen_start = await runtime.dispatch(context(f"frozen-start-{adapter}"), "前往 近郊")
                 assert frozen_start.code == "LOCATION_LOCKED"
             await runtime.close()

@@ -21,6 +21,7 @@ ADVANCED_CAVE_PASS = "item.cave_pass_advanced"
 class CloudRouteDefinition:
     key: str
     label: str
+    command_name: str
     destination: str
     duration_seconds: int
     stamina_cost: int
@@ -53,46 +54,49 @@ class WorldIntroDefinition:
     required_read_component: str | None = None
 
 
-CLOUD_ROUTES = {
-    "route.cloud_to_mist2": CloudRouteDefinition(
-        "route.cloud_to_mist2", "云舟·洞天二层", "cave.mist_grotto_2", 5 * 60, 8, 500,
-        ("xuantian.cloud_city", "xuantian.floating_boat"), "golden_core", pass_key=ADVANCED_CAVE_PASS, pass_quantity=1,
-    ),
-    "route.cloud_to_abyss_intro": CloudRouteDefinition(
-        "route.cloud_to_abyss_intro", "云舟·魔界引导", "demon.abyss_gate", 5 * 60, 10, 500,
-        ("xuantian.cloud_city", "xuantian.floating_boat"), "foundation",
-    ),
-    "route.cloud_return": CloudRouteDefinition(
-        "route.cloud_return", "云舟·返回云城", "xuantian.cloud_city", 3 * 60, 3, 200,
-        ("cave.mist_grotto_2", "demon.abyss_gate"), "foundation",
-    ),
-}
-
-ROUTE_ALIASES = {
-    "洞天二层": "route.cloud_to_mist2",
-    "云舟洞天二层": "route.cloud_to_mist2",
-    "route.cloud_to_mist2": "route.cloud_to_mist2",
-    "魔界引导": "route.cloud_to_abyss_intro",
-    "云舟魔界引导": "route.cloud_to_abyss_intro",
-    "route.cloud_to_abyss_intro": "route.cloud_to_abyss_intro",
-    "返回云城": "route.cloud_return",
-    "云城": "route.cloud_return",
-    "route.cloud_return": "route.cloud_return",
-}
-
-
-def resolve_cloud_route(value: str) -> str | None:
+def resolve_cloud_route(
+    value: str, content: ContentBundle | None = None, *, include_locked: bool = False
+) -> str | None:
     normalized = value.strip()
-    if normalized in CLOUD_ROUTES:
-        return normalized
-    return ROUTE_ALIASES.get(normalized)
+    bundle = content or bundled_content()
+    for row in bundle.list("world_cloud_route", include_locked=include_locked):
+        if normalized in {row["key"], row["name"], row["command_name"], *row["aliases"]}:
+            return str(row["key"])
+    return None
 
 
-def cloud_route_definition(route_key: str) -> CloudRouteDefinition:
-    try:
-        return CLOUD_ROUTES[route_key]
-    except KeyError as exc:
-        raise ValueError(f"unsupported cloud route: {route_key}") from exc
+def cloud_route_definition(
+    route_key: str, content: ContentBundle | None = None
+) -> CloudRouteDefinition:
+    bundle = content or bundled_content()
+    row = bundle.get("world_cloud_route", route_key, include_locked=False)
+    if row is None:
+        raise ValueError(f"unsupported cloud route: {route_key}")
+    return CloudRouteDefinition(
+        key=route_key,
+        label=str(row["name"]),
+        command_name=str(row["command_name"]),
+        destination=str(row["destination"]),
+        duration_seconds=int(row["duration_seconds"]),
+        stamina_cost=int(row["stamina"]),
+        currency_cost=int(row["spirit_stone"]),
+        source_locations=tuple(str(value) for value in row["source_locations"]),
+        required_realm=str(row["realm_key"]),
+        required_layer=int(row["realm_layer"]),
+        pass_key=str(row["pass_key"]) if row["pass_key"] is not None else None,
+        pass_quantity=int(row["pass_quantity"]),
+        required_quest=str(row["required_quest"]) if row["required_quest"] is not None else None,
+    )
+
+
+def cloud_route_for_destination(
+    destination: str, content: ContentBundle | None = None
+) -> CloudRouteDefinition | None:
+    bundle = content or bundled_content()
+    for row in bundle.list("world_cloud_route", include_locked=False):
+        if row.get("destination") == destination:
+            return cloud_route_definition(str(row["key"]), bundle)
+    return None
 
 
 def _positive_int(value: Any, field: str, key: str) -> int:
@@ -211,12 +215,12 @@ def world_intro_definition(
             raw_route_key, "introduction.arrival_route_key", key, prefix="route."
         )
         route_row = bundle.get("route", route_key)
+        if route_row is None:
+            route_row = bundle.get("world_cloud_route", route_key)
         if route_row is not None:
             route_destination = route_row.get("destination") or route_row.get("destination_key")
             if not isinstance(route_destination, str) or not route_destination.strip():
                 raise ContentError(f"route {route_key} requires destination")
-        elif route_key in CLOUD_ROUTES:
-            route_destination = CLOUD_ROUTES[route_key].destination
         else:
             raise ContentError(f"world intro {key} references unknown route: {route_key}")
         if route_destination != location_key:
@@ -252,12 +256,12 @@ __all__ = [
     "BEAST_INTRO_FLAG",
     "BEAST_INTRO_QUEST",
     "ARRAY_HALL_INVITE_FLAG",
-    "CLOUD_ROUTES",
     "DEMON_INTRO_FLAG",
     "DEMON_INTRO_QUEST",
     "CloudRouteDefinition",
     "WorldIntroDefinition",
     "cloud_route_definition",
+    "cloud_route_for_destination",
     "resolve_cloud_route",
     "world_intro_definition",
 ]

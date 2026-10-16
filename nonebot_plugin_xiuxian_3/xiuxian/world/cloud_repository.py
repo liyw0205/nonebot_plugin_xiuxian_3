@@ -33,7 +33,6 @@ from .cloud_models import (
 )
 from .cloud_rules import (
     BEAST_INTRO_QUEST,
-    CLOUD_ROUTES,
     DEMON_INTRO_QUEST,
     cloud_route_definition,
     world_intro_definition,
@@ -49,6 +48,23 @@ class CloudRepositoryMixin:
     Keeping these methods separate prevents route-specific state from growing
     the generic travel repository.
     """
+
+    async def cloud_route_quest_completed(
+        self, *, platform: str, platform_user_id: str, quest_key: str
+    ) -> bool:
+        await self.initialize()
+        return await asyncio.to_thread(
+            self._cloud_route_quest_completed_once, platform, platform_user_id, quest_key
+        )
+
+    def _cloud_route_quest_completed_once(
+        self, platform: str, platform_user_id: str, quest_key: str
+    ) -> bool:
+        with self._connect() as connection:
+            player = self._require_player(
+                connection, platform, platform_user_id, writable=False
+            )
+            return self._cloud_quest_completed(connection, int(player["id"]), quest_key)
 
     async def board_cloud_boat(
         self, *, platform: str, platform_user_id: str, route_key: str, operation_id: str
@@ -72,10 +88,6 @@ class CloudRepositoryMixin:
             ResourceInsufficientError,
         )
 
-        try:
-            definition = cloud_route_definition(route_key)
-        except ValueError as exc:
-            raise CloudRouteLockedError("cloud route is closed") from exc
         operation_name = "world.board_cloud_boat"
         request_hash = self._request_hash(
             operation_name,
@@ -91,6 +103,10 @@ class CloudRepositoryMixin:
                 self._validate_cloud_start_replay(connection, replay, operation_id, int(player["id"]))
                 return self._cloud_start_from_payload(replay, replay=True)
 
+            try:
+                definition = cloud_route_definition(route_key, self.content)
+            except ValueError as exc:
+                raise CloudRouteLockedError("cloud route is closed") from exc
             player = self._require_player(connection, platform, platform_user_id)
             player_id = int(player["id"])
             source = str(player["location_key"])
