@@ -6,20 +6,24 @@ from __future__ import annotations
 import hashlib
 from datetime import datetime, timedelta, timezone
 
-SEASON_KEY = "season.void_frontier"
-SEASON_DAYS = 28
-CLAIM_DAYS = 7
-WEEKLY_CAP = 5
-WEEKLY_REWARD = {"void_merit": 20, "alliance_points": 10}
-RANKED_PLACES = 100
-SEASON_ANCHOR = datetime(2025, 1, 1, tzinfo=timezone.utc)
+from .season_content import VOID_FRONTIER_SEASON_KEY, season_record
 
-SCORE_VALUES = {
-    "route_completed": 30,
-    "storm_rescue": 50,
-    "cross_server_victory": 100,
-    "alliance_contract": 20,
+_RECORD = season_record(VOID_FRONTIER_SEASON_KEY)
+
+SEASON_KEY = VOID_FRONTIER_SEASON_KEY
+SEASON_DAYS = int(_RECORD["duration_days"])
+CLAIM_DAYS = int(_RECORD["claim_days"])
+WEEKLY_CAP = int(_RECORD["weekly_cap"])
+WEEKLY_REWARD = dict(_RECORD["weekly_reward"])
+RANKED_PLACES = int(_RECORD["rank_limit"])
+SEASON_ANCHOR = _RECORD["anchor"]
+
+SCORE_VALUES = dict(_RECORD["score_values"])
+
+_RANK_REWARDS = {
+    entry["rank"]: dict(entry["reward"]) for entry in _RECORD["rank_rewards"]
 }
+_DEFAULT_RANK_REWARD = dict(_RECORD["default_rank_reward"])
 
 
 def season_window(now: datetime) -> tuple[str, datetime, datetime]:
@@ -60,13 +64,7 @@ def anonymous_label(scope: str, entity_id: str | int) -> str:
 
 
 def reward_for_rank(rank: int) -> dict[str, int]:
-    if rank == 1:
-        return {"item.void_crystal": 5, "void_merit": 100}
-    if rank == 2:
-        return {"item.void_crystal": 3, "void_merit": 60}
-    if rank == 3:
-        return {"item.void_crystal": 2, "void_merit": 40}
-    return {"item.void_crystal": 1, "void_merit": 20}
+    return dict(_RANK_REWARDS.get(rank, _DEFAULT_RANK_REWARD))
 
 
 __all__ = [
