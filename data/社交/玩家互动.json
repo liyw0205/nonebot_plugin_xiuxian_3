@@ -153,6 +153,131 @@
       "join_cooldown_seconds": 86400
     },
     {
+      "key": "social.sect_alliance",
+      "name": "宗门结盟规则",
+      "desc": "宗门结盟的等级门槛、确认与持续时限、研究周上限、违约费与冷却。",
+      "status": "active",
+      "min_sect_level": 5,
+      "confirmation_seconds": 86400,
+      "duration_seconds": 604800,
+      "research_weekly_cap": 3,
+      "breach_fee": 10000,
+      "cooldown_seconds": 86400
+    },
+    {
+      "key": "social.sect_beacon",
+      "name": "虚空信标规则",
+      "desc": "宗门虚空信标的建造与维护成本、建造时限与航线折扣。",
+      "status": "active",
+      "anchor_cost": 10,
+      "sand_cost": 30,
+      "build_seconds": 86400,
+      "maintenance_anchor_cost": 2,
+      "route_discount": 1
+    },
+    {
+      "key": "social.sect_exchange",
+      "name": "宗门兑换规则",
+      "desc": "宗门仓库的可捐献物品、供给配方与贡献兑换项。",
+      "status": "active",
+      "daily_cap": 5,
+      "donation_items": [
+        "item.herb.spirit_leaf",
+        "item.herb.blood_grass",
+        "item.mat.array_sand",
+        "item.material.cloud_iron"
+      ],
+      "donation_aliases": {
+        "灵叶": "item.herb.spirit_leaf",
+        "止血草": "item.herb.blood_grass",
+        "阵砂": "item.mat.array_sand",
+        "云铁": "item.material.cloud_iron"
+      },
+      "supply_recipes": {
+        "sect.exchange.foundation_guard": {
+          "materials": {
+            "item.herb.spirit_leaf": 2,
+            "item.mat.array_sand": 1,
+            "item.herb.blood_grass": 1
+          },
+          "contribution": 100
+        },
+        "sect.exchange.golden_core_guard": {
+          "materials": {
+            "item.herb.spirit_leaf": 3,
+            "item.material.cloud_iron": 1,
+            "item.herb.blood_grass": 2
+          },
+          "contribution": 200
+        }
+      },
+      "offers": [
+        {
+          "key": "sect.exchange.foundation_guard",
+          "label": "筑基护脉丹",
+          "contribution_cost": 30,
+          "item_key": "item.pill.foundation_guard",
+          "quantity": 1
+        },
+        {
+          "key": "sect.exchange.cloud_iron",
+          "label": "云铁",
+          "contribution_cost": 20,
+          "item_key": "item.material.cloud_iron",
+          "quantity": 2
+        },
+        {
+          "key": "sect.exchange.golden_core_guard",
+          "label": "金丹护脉丹",
+          "contribution_cost": 50,
+          "item_key": "item.pill.golden_core_guard",
+          "quantity": 1
+        },
+        {
+          "key": "sect.exchange.array_sand",
+          "label": "阵砂",
+          "contribution_cost": 10,
+          "item_key": "item.mat.array_sand",
+          "quantity": 5
+        }
+      ],
+      "aliases": {
+        "筑基护脉丹": "sect.exchange.foundation_guard",
+        "筑基保护丹": "sect.exchange.foundation_guard",
+        "sect.exchange.foundation_guard": "sect.exchange.foundation_guard",
+        "云铁": "sect.exchange.cloud_iron",
+        "sect.exchange.cloud_iron": "sect.exchange.cloud_iron",
+        "金丹护脉丹": "sect.exchange.golden_core_guard",
+        "金丹保护丹": "sect.exchange.golden_core_guard",
+        "sect.exchange.golden_core_guard": "sect.exchange.golden_core_guard",
+        "阵砂": "sect.exchange.array_sand",
+        "sect.exchange.array_sand": "sect.exchange.array_sand"
+      }
+    },
+    {
+      "key": "social.sect_war",
+      "name": "宗门战规则",
+      "desc": "宗门战的周轮次、报名费、参战人数、等级门槛、奖励与动作分值。",
+      "status": "active",
+      "war_key": "sect_war",
+      "anchor": "2025-01-06T00:00:00+00:00",
+      "rounds_per_week": 2,
+      "duration_minutes": 30,
+      "registration_fee": 2000,
+      "max_participants": 10,
+      "min_level": 4,
+      "member_threshold": 20,
+      "sect_reward": 100,
+      "member_reward": 30,
+      "claim_hours": 24,
+      "action_values": {
+        "占点": 10,
+        "击败": 5,
+        "运输": 15,
+        "维修": 15
+      }
+    },
+    {
       "key": "social.spar",
       "name": "玩家直接切磋",
       "desc": "直接使用双方当前角色快照进行中性场景自动战，只展示回放，不计竞技积分且不改变玩家状态。",

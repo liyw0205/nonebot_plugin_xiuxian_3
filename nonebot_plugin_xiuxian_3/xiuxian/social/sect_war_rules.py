@@ -4,18 +4,22 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
+from .social_content import sect_war_record
 
-SECT_WAR_KEY = "sect_war"
-SECT_WAR_ANCHOR = datetime(2025, 1, 6, tzinfo=timezone.utc)
-SECT_WAR_ROUNDS_PER_WEEK = 2
-SECT_WAR_DURATION_MINUTES = 30
-SECT_WAR_REGISTRATION_FEE = 2_000
-SECT_WAR_MAX_PARTICIPANTS = 10
-SECT_WAR_MIN_LEVEL = 4
-SECT_WAR_MEMBER_THRESHOLD = 20
-SECT_WAR_SECT_REWARD = 100
-SECT_WAR_MEMBER_REWARD = 30
-SECT_WAR_CLAIM_HOURS = 24
+_WAR = sect_war_record()
+
+SECT_WAR_KEY = str(_WAR["war_key"])
+SECT_WAR_ANCHOR = _WAR["anchor"]
+SECT_WAR_ROUNDS_PER_WEEK = int(_WAR["rounds_per_week"])
+SECT_WAR_DURATION_MINUTES = int(_WAR["duration_minutes"])
+SECT_WAR_REGISTRATION_FEE = int(_WAR["registration_fee"])
+SECT_WAR_MAX_PARTICIPANTS = int(_WAR["max_participants"])
+SECT_WAR_MIN_LEVEL = int(_WAR["min_level"])
+SECT_WAR_MEMBER_THRESHOLD = int(_WAR["member_threshold"])
+SECT_WAR_SECT_REWARD = int(_WAR["sect_reward"])
+SECT_WAR_MEMBER_REWARD = int(_WAR["member_reward"])
+SECT_WAR_CLAIM_HOURS = int(_WAR["claim_hours"])
+SECT_WAR_ACTION_VALUES = dict(_WAR["action_values"])
 
 
 def _week_start(value: datetime) -> datetime:
@@ -58,10 +62,9 @@ def contribution_value(action_key: str, source_quantity: int) -> int:
 
     if source_quantity <= 0:
         return 0
-    values = {"占点": 10, "击败": 5, "运输": 15, "维修": 15}
-    if action_key not in values:
+    if action_key not in SECT_WAR_ACTION_VALUES:
         raise ValueError("invalid sect-war action")
-    return values[action_key]
+    return SECT_WAR_ACTION_VALUES[action_key]
 
 
 __all__ = [
@@ -73,6 +76,7 @@ __all__ = [
     "SECT_WAR_MAX_PARTICIPANTS",
     "SECT_WAR_MIN_LEVEL",
     "SECT_WAR_REGISTRATION_FEE",
+    "SECT_WAR_ACTION_VALUES",
     "SECT_WAR_SECT_REWARD",
     "contribution_value",
     "sect_war_round_for_id",

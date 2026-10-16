@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
-VOID_BEACON_ANCHOR_COST = 10
-VOID_BEACON_SAND_COST = 30
-VOID_BEACON_BUILD_SECONDS = 24 * 60 * 60
-VOID_BEACON_MAINTENANCE_ANCHOR_COST = 2
-VOID_BEACON_ROUTE_DISCOUNT = 1
+from .social_content import sect_beacon_record
+
+_BEACON = sect_beacon_record()
+
+VOID_BEACON_ANCHOR_COST = int(_BEACON["anchor_cost"])
+VOID_BEACON_SAND_COST = int(_BEACON["sand_cost"])
+VOID_BEACON_BUILD_SECONDS = int(_BEACON["build_seconds"])
+VOID_BEACON_MAINTENANCE_ANCHOR_COST = int(_BEACON["maintenance_anchor_cost"])
+VOID_BEACON_ROUTE_DISCOUNT = int(_BEACON["route_discount"])
 
 
 __all__ = [

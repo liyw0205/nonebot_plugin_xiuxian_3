@@ -4,13 +4,16 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from .social_content import sect_alliance_record
 
-ALLIANCE_MIN_SECT_LEVEL = 5
-ALLIANCE_CONFIRMATION_SECONDS = 24 * 60 * 60
-ALLIANCE_DURATION_SECONDS = 7 * 24 * 60 * 60
-ALLIANCE_RESEARCH_WEEKLY_CAP = 3
-ALLIANCE_BREACH_FEE = 10_000
-SECT_ALLIANCE_COOLDOWN_SECONDS = 24 * 60 * 60
+_ALLIANCE = sect_alliance_record()
+
+ALLIANCE_MIN_SECT_LEVEL = int(_ALLIANCE["min_sect_level"])
+ALLIANCE_CONFIRMATION_SECONDS = int(_ALLIANCE["confirmation_seconds"])
+ALLIANCE_DURATION_SECONDS = int(_ALLIANCE["duration_seconds"])
+ALLIANCE_RESEARCH_WEEKLY_CAP = int(_ALLIANCE["research_weekly_cap"])
+ALLIANCE_BREACH_FEE = int(_ALLIANCE["breach_fee"])
+SECT_ALLIANCE_COOLDOWN_SECONDS = int(_ALLIANCE["cooldown_seconds"])
 
 
 def alliance_week_id(now: datetime) -> str:

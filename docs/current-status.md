@@ -270,6 +270,21 @@ provenance `0f3b39ba`）。未跑全量/压测/部署，未验 QQ 真机。
 8 passed、`test_sect_exchange.py`/`test_sect_alliance_beacon.py`/`test_social.py` 16 passed。
 未跑全量/压测/部署，未验 QQ 真机。
 
+宗门子系统规则内容化已在 `develop` 完成（提交 `0ab6cb3`、`ccdc80b`、`2538646`）：`data/社交/玩家互动.json` 新增
+`social.sect_alliance`（等级门槛 5/确认 24h/持续 7 天/研究周上限 3/违约费 10000/冷却 24h）、`social.sect_beacon`
+（锚成本 10/阵砂 30/建造 24h/维护 2/航线折扣 1）、`social.sect_exchange`（日上限 5/4 项捐献物品与中文别名/2 条供给配方
+含材料与贡献 100/200/4 个兑换项含标签成本物品数量/10 条输入别名）与 `social.sect_war`（war_key、锚点 2025-01-06Z、
+每周 2 轮、30 分钟、报名费 2000、参战 10 人、等级 4、成员门槛 20、宗门奖励 100、成员奖励 30、领取 24h、动作分值表）。
+`social_content.py` 新增 `sect_alliance_record()`/`sect_beacon_record()`/`sect_exchange_record()`/`sect_war_record()`
+与 `_positive_fields()`/`_item_key()`/`_anchor_datetime()` 助手，校验物品引用存在、offer key 唯一、别名指向有效目标、
+材料数量为正、锚点带时区、动作分值为正。四个规则模块的常量与表（含 `SECT_EXCHANGE_OFFERS`/`SECT_SUPPLY_RECIPES`/
+`SECT_DONATION_*`/`SECT_EXCHANGE_ALIASES`/`SECT_WAR_ACTION_VALUES`）改为内容派生，`contribution_value()` 不再内联硬编码分值表，
+`resolve_sect_exchange_offer()`、`alliance_week_id()`、轮次窗口与 `SectExchangeOffer` 保持不变。
+聚焦证据：新增 `test_sect_subsystems_content.py` 28 passed（四子系统记录与模块常量/表逐字段一致、兑换解析与动作分值行为不变、
+轮次窗口 id 与边界不变、21 项校验失败用例与缺记录用例）；回归 `test_sect_alliance_beacon.py` 2 passed、
+`test_sect_exchange.py` 7 passed、`test_sect_war.py`/`test_sect_war_federation.py` 3 passed。
+未跑全量/压测/部署，未验 QQ 真机。
+
 本轮有限任务已完成：`chapter.1.stage.3` 雾中守门与 `chapter.2.stage.1` 城镇委托两关的正文、人物/场景、
 可执行目标、来源/奖励/后续引用、失败重试规则及现有战斗/委托、快照、事务、幂等消费者已落地。
 沿用本轮已确认的 `19 passed`、`lastfailed={}` 聚焦证据；不重跑全量、不扩展 travel/world，不重开 M9，
