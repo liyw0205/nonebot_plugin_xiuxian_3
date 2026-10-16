@@ -50,6 +50,20 @@
     "new_sha256": "15773fe897d4dcbcf2cbfcc21b0c4d4f2148315bd11a697bac87c2140711f536",
     "new_commit": "327918cf3c268567a9e1faaa789f5310683d52f7"
   },
+  "地图/地点.json": {
+    "old_sha256": {
+      "d2e8dcde2bc4fd9daa0bde5ba3ce2b024ffcf9aabf52b9a3732d27bec2694efa": "44be52139804523570ec1f2588b8f9bdf568c8a0:data/地图/地点.json"
+    },
+    "new_sha256": "206a98cbe488ef5130cc6dcec124de19667c7b233a2d0e79416894a52a1f7d43",
+    "new_commit": "e71e52e2e6040365fa1ed57b15ca97c8583fe57c"
+  },
+  "地图/区域.json": {
+    "old_sha256": {
+      "cac9bb63828923b1faa1433b3a75e216efdcc037170461d805091761b1dbc2e2": "44be52139804523570ec1f2588b8f9bdf568c8a0:data/地图/区域.json"
+    },
+    "new_sha256": "bb9075bd954d7f1da6ce60d9eb3ef35adfc56e89ba3252682ac8845e751f1370",
+    "new_commit": "e71e52e2e6040365fa1ed57b15ca97c8583fe57c"
+  },
   "特殊/虚空塔.json": {
     "old_sha256": {
       "5eaa4ae2623cefddca2a5201be8f5f9e02a85e4dd7e972c2c49d8273e76c2fce": "58dbbb370cc5d0b8f74dfd07775ab8c01d07132a:data/特殊/虚空塔.json"

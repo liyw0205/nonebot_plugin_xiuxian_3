@@ -96,17 +96,35 @@ def test_material_source_validation_uses_supplied_content_bundle(tmp_path: Path)
         validate_material_content(ContentBundle.load(root))
 
 
-def test_map_consumer_reads_current_location_data(tmp_path: Path) -> None:
+def test_map_consumer_reads_current_directed_route_data(tmp_path: Path) -> None:
     root = _copy(tmp_path)
-    _edit(
-        root,
-        "地图/地点.json",
-        "xuantian.outskirts",
-        travel={"duration_seconds": 77, "stamina": 9, "spirit_stone": 3},
+    path = root / "地图/区域.json"
+    document = json.loads(path.read_text(encoding="utf-8"))
+    region = next(row for row in document["records"] if row["key"] == "region.xuantian.qingshi")
+    route = next(
+        edge for edge in region["connections"]
+        if edge["from"] == "xuantian.new_town" and edge["to"] == "xuantian.outskirts"
     )
+    route.update(duration_seconds=77, stamina=9, spirit_stone=3)
+    path.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     bundle = ContentBundle.load(root)
     assert resolve_destination("玄天近郊", bundle) == "xuantian.outskirts"
-    definition = destination_definition("xuantian.outskirts", bundle)
+    definition = destination_definition("xuantian.outskirts", bundle, source="xuantian.new_town")
     assert (definition.duration_seconds, definition.stamina_cost, definition.currency_cost) == (77, 9, 3)
     assert resolve_destination("百草坡", bundle) == "xuantian.herb_vale"
     assert destination_definition("xuantian.herb_vale", bundle).label == "百草坡"
+
+
+def test_map_alias_resolution_does_not_keep_removed_python_aliases(tmp_path: Path) -> None:
+    root = _copy(tmp_path)
+    path = root / "地图/地点.json"
+    document = json.loads(path.read_text(encoding="utf-8"))
+    location = next(row for row in document["records"] if row["key"] == "xuantian.outskirts")
+    location["name"] = "玄天郊外"
+    location["aliases"] = [alias for alias in location.get("aliases", []) if alias != "玄天近郊"]
+    path.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    bundle = ContentBundle.load(root)
+
+    assert resolve_destination("玄天近郊", bundle) is None
+    assert resolve_destination("xuantian.outskirts", bundle) == "xuantian.outskirts"
+    assert resolve_destination("xuantian.unknown", bundle) is None

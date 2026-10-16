@@ -352,6 +352,10 @@ class LocationRequirementError(RuntimeError):
     """The player does not satisfy a destination's realm or quest gate."""
 
 
+class TravelRouteNotFoundError(RuntimeError):
+    """No current directed map edge connects the player's source to the destination."""
+
+
 class VoidQuestMissingError(RuntimeError):
     """The player has not earned the void refining permit."""
 

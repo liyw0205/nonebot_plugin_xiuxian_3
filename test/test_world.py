@@ -16,13 +16,13 @@ def _context(user_id: str, request_id: str, *, operation_id: str = "") -> Comman
     return CommandContext(adapter="web", user_id=user_id, request_id=request_id, operation_id=operation_id)
 
 
-def _foundation_player(runtime, user_id: str) -> None:
+def _cave_ready_player(runtime, user_id: str) -> None:
     with sqlite3.connect(runtime.settings.database_path) as connection:
         connection.execute(
             """
             UPDATE players
-            SET stage = 'cultivator', realm_key = 'foundation', realm_layer = 1,
-                location_key = 'xuantian.new_town', stamina = 30, stamina_max = 30,
+            SET stage = 'cultivator', realm_key = 'qi_gathering', realm_layer = 4,
+                location_key = 'xuantian.spirit_field', stamina = 30, stamina_max = 30,
                 spirit_stones = 100, inventory_json = ?
             WHERE platform_user_id = ?
             """,
@@ -37,7 +37,7 @@ def test_cave_travel_locks_costs_and_settles_idempotently() -> None:
             user = "cave-traveller"
             await runtime.dispatch(_context(user, "create"), "开始修仙")
             await runtime.dispatch(_context(user, "seek"), "寻仙问道")
-            _foundation_player(runtime, user)
+            _cave_ready_player(runtime, user)
 
             preview = await runtime.dispatch(_context(user, "preview"), "移动预览 雾隐洞天")
             assert preview.code == "TRAVEL_PREVIEW"
@@ -58,7 +58,7 @@ def test_cave_travel_locks_costs_and_settles_idempotently() -> None:
                 ).fetchone()
                 assert row[0:2] == (25, 90)
                 assert json.loads(row[2]) == {}
-                assert row[3] == "xuantian.new_town"
+                assert row[3] == "xuantian.spirit_field"
                 set_travel_end_at(
                     connection,
                     started.data["session_id"],
@@ -137,7 +137,7 @@ def test_cave_travel_is_mutually_exclusive_with_cultivation() -> None:
             user = "cave-busy"
             await runtime.dispatch(_context(user, "create"), "开始修仙")
             await runtime.dispatch(_context(user, "seek"), "寻仙问道")
-            _foundation_player(runtime, user)
+            _cave_ready_player(runtime, user)
             with sqlite3.connect(runtime.settings.database_path) as connection:
                 player_id = connection.execute(
                     "SELECT id FROM players WHERE platform_user_id = ?", (user,)

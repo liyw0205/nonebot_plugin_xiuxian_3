@@ -3,6 +3,7 @@
   "records": [
     {
       "name": "青石镇",
+      "aliases": ["新手城"],
       "desc": "依山而建的安宁小镇，商铺、药铺与修行者的旅舍都聚于此。",
       "world": "玄天界",
       "status": "open",
@@ -12,11 +13,6 @@
           "stage": "new_user"
         }
       ],
-      "travel": {
-        "duration_seconds": 0,
-        "stamina": 0,
-        "spirit_stone": 0
-      },
       "environment": {
         "training_bp": 10000
       },
@@ -34,6 +30,7 @@
     },
     {
       "name": "玄天近郊",
+      "aliases": ["近郊"],
       "desc": "青石镇外的山野地带，草木与小兽常见，也是初入仙途者历练之处。",
       "world": "玄天界",
       "status": "open",
@@ -43,11 +40,6 @@
           "stage": "mortal"
         }
       ],
-      "travel": {
-        "duration_seconds": 30,
-        "stamina": 2,
-        "spirit_stone": 0
-      },
       "environment": {
         "risk": "low"
       },
@@ -62,6 +54,7 @@
     },
     {
       "name": "玄天宗山门",
+      "aliases": ["宗门山门"],
       "desc": "玄天宗弟子往来之地，山门之后是宗门传承与修行洞府。",
       "world": "玄天界",
       "status": "open",
@@ -80,11 +73,6 @@
           ]
         }
       ],
-      "travel": {
-        "duration_seconds": 60,
-        "stamina": 3,
-        "spirit_stone": 0
-      },
       "environment": {
         "training_bp": 10500
       },
@@ -111,11 +99,6 @@
           "quest_key": "guide.gather_blood_grass"
         }
       ],
-      "travel": {
-        "duration_seconds": 90,
-        "stamina": 4,
-        "spirit_stone": 0
-      },
       "environment": {
         "training_bp": 11500
       },
@@ -129,6 +112,7 @@
     },
     {
       "name": "雾隐洞天一层",
+      "aliases": ["雾隐洞天", "雾隐洞天·一层"],
       "desc": "薄雾笼罩的洞天入口，石径蜿蜒，偶有灵草与守洞妖兽出没。",
       "world": "洞天",
       "status": "open",
@@ -144,13 +128,6 @@
           "quantity": 1
         }
       ],
-      "travel": {
-        "duration_seconds": 120,
-        "stamina": 5,
-        "spirit_stone": 10,
-        "item_key": "item.cave_pass_basic",
-        "item_quantity": 1
-      },
       "environment": {
         "risk": "medium"
       },
@@ -163,6 +140,7 @@
     },
     {
       "name": "魔渊入口",
+      "aliases": ["魔界深渊门", "深渊门"],
       "desc": "通向魔界深处的险峻关隘，四周魔气翻涌，寻常修士难以久留。",
       "world": "魔界",
       "status": "open",
@@ -173,10 +151,6 @@
           "min_layer": 1
         }
       ],
-      "travel": {
-        "duration_seconds": 120,
-        "stamina": 10
-      },
       "environment": {
         "risk": "high"
       },
@@ -187,6 +161,7 @@
     },
     {
       "name": "万兽山入口",
+      "aliases": ["妖界万兽山", "万兽山"],
       "desc": "妖界群山的门户，山风中夹着兽鸣与草木清香。",
       "world": "妖界",
       "status": "open",
@@ -197,15 +172,13 @@
           "min_layer": 1
         },
         {
-          "type": "faction_reputation",
-          "faction": "beast",
-          "min": 200
+          "type": "any_of",
+          "conditions": [
+            {"type": "faction_reputation", "faction": "beast", "min": 200},
+            {"type": "intro_flag", "value": "access.beast_ten_thousand_hills"}
+          ]
         }
       ],
-      "travel": {
-        "duration_seconds": 300,
-        "stamina": 12
-      },
       "environment": {
         "risk": "medium",
         "non_beast_penalty_bp": -1000
@@ -220,6 +193,7 @@
     },
     {
       "name": "魔渊集市",
+      "aliases": ["魔界魔渊集市", "契约集市"],
       "desc": "建在魔渊边缘的交易之地，各方修士在此交换稀有材料与消息。",
       "world": "魔界",
       "status": "open",
@@ -235,11 +209,6 @@
           "min": 200
         }
       ],
-      "travel": {
-        "duration_seconds": 300,
-        "stamina": 12,
-        "spirit_stone": 500
-      },
       "environment": {
         "risk": "high",
         "non_demon_penalty_bp": -1000
@@ -254,6 +223,7 @@
     },
     {
       "name": "三界贸易口",
+      "aliases": ["妖界三界贸易口", "三界互市", "贸易口"],
       "desc": "连接三界商路的渡口，行商与使者常在此核验货物、交换物资。",
       "world": "妖界",
       "status": "open",
@@ -269,11 +239,6 @@
           "min": 200
         }
       ],
-      "travel": {
-        "duration_seconds": 180,
-        "stamina": 8,
-        "spirit_stone": 0
-      },
       "environment": {
         "risk": "low",
         "non_beast_penalty_bp": -500
@@ -286,6 +251,7 @@
     },
     {
       "name": "玄天界·云城",
+      "aliases": ["云城"],
       "desc": "浮云环绕的玄天城池，高阶修士与远道而来的访客在此汇聚。",
       "world": "玄天界",
       "status": "open",
@@ -296,10 +262,6 @@
           "min_layer": 1
         }
       ],
-      "travel": {
-        "duration_seconds": 180,
-        "stamina": 8
-      },
       "environment": {
         "training_bp": 11000
       },
@@ -321,6 +283,7 @@
     },
     {
       "name": "玄天阵堂",
+      "aliases": ["阵堂"],
       "desc": "玄天宗研习阵法之地，殿内阵纹流转，守护着往来弟子。",
       "world": "玄天界",
       "status": "open",
@@ -331,10 +294,6 @@
           "min_layer": 1
         }
       ],
-      "travel": {
-        "duration_seconds": 0,
-        "stamina": 0
-      },
       "environment": {
         "training_bp": 10500
       },
@@ -372,17 +331,19 @@
     },
     {
       "name": "领域前线",
+      "aliases": ["玄天领域前线"],
       "desc": "天地裂痕附近的交锋之地，各方修士在此守望疆界、抵御异动。",
       "world": "玄天界",
       "status": "active",
       "local_reputation_maximum": 1000,
       "codex_entry_key": "codex.place.domain_front",
-      "requirements": [{"type": "realm", "realm_key": "soul_transformation", "min_layer": 1}, "domain_selected"],
+      "requirements": [{"type": "realm", "realm_key": "soul_transformation", "min_layer": 1}, {"type": "selected_domain"}],
       "actions": ["event.domain_front", "progression.recover_domain_crack"],
       "key": "xuantian.domain_front"
     },
     {
       "name": "虚空门户",
+      "aliases": ["虚空门"],
       "desc": "通往无垠虚空的古老门户，门后道路莫测，须凭实力与机缘踏入。",
       "world": "虚空",
       "status": "open",
@@ -396,7 +357,7 @@
       "world": "虚空",
       "status": "open",
       "requirements": [{"type": "realm", "realm_key": "void_refining", "min_layer": 1}],
-      "travel": {"duration_seconds": 1800, "stamina": 35, "anchor_min": 1, "anchor_max": 3},
+      "travel": {"anchor_min": 1, "anchor_max": 3},
       "actions": ["world.enter_void_route", "explore.void_route", "event.void_storm"],
       "key": "void.first_route"
     },
@@ -406,7 +367,7 @@
       "world": "虚空",
       "status": "open",
       "requirements": [{"type": "realm", "realm_key": "void_refining", "min_layer": 1}],
-      "travel": {"duration_seconds": 2700, "stamina": 40, "anchor_min": 2, "anchor_max": 4},
+      "travel": {"anchor_min": 2, "anchor_max": 4},
       "actions": ["world.enter_void_route", "explore.archive_ruins"],
       "key": "void.archive_ruins"
     },
@@ -416,7 +377,6 @@
       "world": "虚空",
       "status": "open",
       "requirements": [{"type": "realm", "realm_key": "void_refining", "min_layer": 1}],
-      "travel": {"duration_seconds": 1800, "stamina": 30, "item_key": "item.void_crystal", "item_quantity": 1},
       "actions": ["world.enter_void_route", "explore.time_garden"],
       "key": "cave.time_garden"
     },
@@ -427,6 +387,7 @@
       "status": "active",
       "requirements": [{"type": "realm", "realm_key": "nascent_soul", "min_layer": 1}],
       "actions": ["event.demon_invasion"],
+      "aliases": ["魔界战场", "玄天魔界战场"],
       "key": "xuantian.war_front"
     },
     {
@@ -434,16 +395,21 @@
       "desc": "天地边界裂隙交错之处，队伍可在此迎战界隙守望者。",
       "world": "界隙",
       "status": "active",
+      "requirements": [
+        {"type": "realm", "realm_key": "nascent_soul", "min_layer": 1},
+        {"type": "intro_flag", "value": "story.mainline.three_realms"}
+      ],
       "actions": ["event.boundary_rift"],
+      "aliases": ["界隙", "边界秘境"],
       "key": "cave.boundary_realm"
     },
     {
       "name": "云舟渡口",
+      "aliases": ["云舟"],
       "desc": "云舟停泊于此，往来修士可循着航路前往洞天深处。",
       "world": "玄天界",
       "status": "open",
       "requirements": [{"type": "realm", "realm_key": "foundation", "min_layer": 1}],
-      "travel": {"duration_seconds": 60, "stamina": 0, "spirit_stone": 500},
       "environment": {"training_bp": 11000},
       "local_reputation_maximum": 1000,
       "actions": ["explore.cloud_boat_trial", "instance.secret_realm.cloud_boat"],
@@ -459,7 +425,6 @@
         {"type": "realm", "realm_key": "golden_core", "min_layer": 1},
         {"type": "item", "item_key": "item.cave_pass_advanced", "quantity": 1}
       ],
-      "travel": {"duration_seconds": 180, "stamina": 8, "item_key": "item.cave_pass_advanced", "item_quantity": 1},
       "environment": {"risk": "high"},
       "actions": ["explore.mist_grotto_2", "instance.secret_realm.mist_depth_2"],
       "key": "cave.mist_grotto_2"
@@ -470,7 +435,6 @@
       "world": "玄天界",
       "status": "open",
       "requirements": [{"type": "stage_min", "stage": "mortal"}],
-      "travel": {"duration_seconds": 60, "stamina": 3, "spirit_stone": 0},
       "environment": {"risk": "low", "gather_pool_key": "gather.xuantian.herb_vale"},
       "actions": ["explore.gather_herb_vale"],
       "codex_entry_key": "codex.place.herb_vale",
@@ -482,7 +446,6 @@
       "world": "玄天界",
       "status": "open",
       "requirements": [{"type": "realm", "realm_key": "qi_sensing", "min_layer": 1}],
-      "travel": {"duration_seconds": 90, "stamina": 4, "spirit_stone": 0},
       "environment": {"risk": "low", "gather_pool_key": "gather.xuantian.ironwood", "encounter_pool_key": "encounter.xuantian.ironwood"},
       "actions": ["explore.gather_ironwood", "explore.trial_ironwood"],
       "codex_entry_key": "codex.place.ironwood_grove",
@@ -494,7 +457,6 @@
       "world": "玄天界",
       "status": "open",
       "requirements": [{"type": "realm", "realm_key": "qi_gathering", "min_layer": 1}],
-      "travel": {"duration_seconds": 120, "stamina": 5, "spirit_stone": 0},
       "environment": {"risk": "medium", "gather_pool_key": "gather.xuantian.basalt_pass", "encounter_pool_key": "encounter.xuantian.basalt_pass"},
       "actions": ["explore.gather_basalt_pass", "explore.trial_basalt_pass"],
       "codex_entry_key": "codex.place.basalt_pass",
@@ -502,11 +464,11 @@
     },
     {
       "name": "云铁矿区",
+      "aliases": ["云矿"],
       "desc": "云城外沿的浅层矿带，许可与工具齐备者可采集云铁及伴生矿材。",
       "world": "玄天界",
       "status": "open",
       "requirements": [{"type": "realm", "realm_key": "foundation", "min_layer": 1}],
-      "travel": {"duration_seconds": 120, "stamina": 6, "spirit_stone": 0},
       "environment": {"risk": "medium", "gather_pool_key": "gather.cloud_mine", "encounter_pool_key": "encounter.cloud_mine"},
       "actions": ["explore.cloud_mine"],
       "codex_entry_key": "codex.place.cloud_mine",
@@ -514,11 +476,11 @@
     },
     {
       "name": "堕落遗迹",
+      "aliases": ["魔界堕落遗迹"],
       "desc": "深渊边境的旧战遗址，魔气已散去一部分，仍有残存守卫巡行。",
       "world": "魔界",
       "status": "open",
       "requirements": [{"type": "realm", "realm_key": "nascent_soul", "min_layer": 1}, {"type": "intro_flag", "value": "access.demon_abyss_gate"}],
-      "travel": {"duration_seconds": 480, "stamina": 20, "spirit_stone": 0},
       "environment": {"risk": "high", "gather_pool_key": "gather.demon.fallen_ruins", "encounter_pool_key": "encounter.demon.fallen_ruins"},
       "actions": ["explore.demon_abyss"],
       "codex_entry_key": "codex.place.fallen_ruins",
@@ -529,8 +491,11 @@
       "desc": "合道修士循档案遗迹抵达的终局门户，需携道果碎片开启当日一次的试炼。",
       "world": "终局",
       "status": "open",
-      "requirements": [{"type": "realm", "realm_key": "dao_union", "min_layer": 6}, {"type": "item", "item_key": "item.dao_fruit_fragment", "quantity": 2}],
-      "travel": {"duration_seconds": 3600, "stamina": 20, "spirit_stone": 0},
+      "requirements": [
+        {"type": "realm", "realm_key": "dao_union", "min_layer": 6},
+        {"type": "item", "item_key": "item.dao_fruit_fragment", "quantity": 2},
+        {"type": "dao_fruit_progress", "minimum": 470}
+      ],
       "environment": {"risk": "high"},
       "actions": ["progression.trial.dao_origin"],
       "codex_entry_key": "codex.place.dao_origin_gate",
@@ -542,7 +507,6 @@
       "world": "终局",
       "status": "open",
       "requirements": [{"type": "realm", "realm_key": "tribulation", "min_layer": 3}, {"type": "item", "item_key": "item.tribulation_token", "quantity": 1}],
-      "travel": {"duration_seconds": 1800, "stamina": 0, "spirit_stone": 0},
       "environment": {"risk": "extreme"},
       "actions": ["progression.tribulation_trial"],
       "codex_entry_key": "codex.place.sky_terrace",
@@ -554,7 +518,6 @@
       "world": "终局",
       "status": "active",
       "requirements": [{"type": "endgame_status", "value": "ascension_ready"}],
-      "travel": {"duration_seconds": 5400, "stamina": 0, "spirit_stone": 0},
       "environment": {"risk": "none"},
       "actions": ["ascension.choose_ending"],
       "codex_entry_key": "codex.place.heaven_path",
@@ -566,7 +529,6 @@
       "world": "终局",
       "status": "active",
       "requirements": [{"type": "endgame_status", "value": "remained_in_world"}],
-      "travel": {"duration_seconds": 1800, "stamina": 10, "spirit_stone": 0},
       "environment": {"risk": "none"},
       "actions": ["ascension.remain_in_world"],
       "codex_entry_key": "codex.place.left_world_hall",

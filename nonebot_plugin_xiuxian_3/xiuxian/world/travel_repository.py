@@ -14,6 +14,7 @@ from uuid import uuid4
 
 from ...contracts import PlayerView, serialize_datetime
 from ..config import XiuxianSettings
+from ..content import bundled_content
 from ..player.models import (
     CultivationRecord,
     IntroRecord,
@@ -73,10 +74,9 @@ from ..world.void_rules import (
 from ..progression.repository import ProgressionRepositoryMixin
 from ..progression.endgame_repository import EndgameRepositoryMixin
 from ..world.rules import (
-    beast_hills_entry_allowed,
     destination_definition,
     destination_location_is_open,
-    meets_realm,
+    unmet_travel_requirements,
 )
 from ..specials.codex_projection import record_location_discovery
 from ..exploration.models import ExplorationSettlementRecord, ExplorationStartRecord
@@ -374,6 +374,43 @@ class TravelRepositoryMixin:
         if payload["pass_consumed"] != result["pass_consumed"]:
             raise OperationResultMalformedError("travel settlement pass result differs from session")
 
+    @classmethod
+    def _travel_requirement_state_in(
+        cls, connection: sqlite3.Connection, row: sqlite3.Row, now: datetime
+    ) -> dict[str, Any]:
+        intro = cls._json_object(row["intro_json"], {})
+        flags = intro.get("flags", [])
+        intro_flags = {item for item in flags if isinstance(item, str)} if isinstance(flags, list) else set()
+        completed = connection.execute(
+            "SELECT quest_key FROM quest_progress WHERE player_id=? AND status IN ('completed', 'claimed')",
+            (row["id"],),
+        ).fetchall()
+        mentor_invitation = connection.execute(
+            "SELECT 1 FROM mentor_relations WHERE apprentice_id=? AND "
+            "(status='active' OR (status='invited' AND expires_at>?)) LIMIT 1",
+            (row["id"], serialize_datetime(now)),
+        ).fetchone() is not None
+        return {
+            "realm_key": str(row["realm_key"]),
+            "realm_layer": player_integer(row, "realm_layer"),
+            "stage": str(row["stage"]),
+            "intro_flags": intro_flags,
+            "inventory": player_inventory(row),
+            "faction_reputation": player_reputation(row),
+            "completed_quests": {str(item["quest_key"]) for item in completed},
+            "mentor_invitation": mentor_invitation,
+            "endgame_status": str(row["endgame_status"] or "none"),
+            "domain_key": str(row["domain_key"]) if row["domain_key"] else None,
+            "dao_fruit_progress": player_integer(row, "dao_fruit_progress"),
+        }
+
+    def _travel_requirement_state(
+        self, platform: str, platform_user_id: str, now: datetime
+    ) -> dict[str, Any]:
+        with self._connect() as connection:
+            row = self._require_player(connection, platform, platform_user_id, writable=False)
+            return self._travel_requirement_state_in(connection, row, now)
+
     async def preview_travel(
         self,
         *,
@@ -385,57 +422,38 @@ class TravelRepositoryMixin:
         player = await self.get_player(platform=platform, platform_user_id=platform_user_id)
         if player is None:
             raise PlayerNotFoundError("player does not exist")
-        definition = destination_definition(destination, self.content)
+        now = self._now()
+        travel_content = self.content or bundled_content()
+        definition = destination_definition(destination, travel_content, source=player.location_key)
+        requirement_state = await asyncio.to_thread(
+            self._travel_requirement_state, platform, platform_user_id, now
+        )
         missing: list[str] = []
-        if not destination_location_is_open(destination, self.content):
+        if not destination_location_is_open(destination, travel_content):
             missing.append("此地尚未开放")
+        if not definition.route_available:
+            missing.append("来源地点")
+        elif not definition.region_open:
+            missing.append("区域尚未开放")
         if destination in {"cave.mist_grotto_2", "demon.abyss_gate"}:
             missing.append("云舟航线")
-        if not meets_realm(player.realm_key, player.realm_layer, definition.required_realm, definition.required_layer):
-            required = f"{definition.required_realm} L{definition.required_layer}"
-            missing.append(f"境界要求（{required}）")
-        if definition.requires_selected_domain and not player.domain_key:
-            missing.append("已选择领域")
-        if definition.required_faction and definition.required_faction_reputation:
-            current_reputation = int(player.faction_reputation.get(definition.required_faction, 0))
-            has_beast_hills_access = destination == "beast.ten_thousand_hills" and beast_hills_entry_allowed(
-                current_reputation, player.intro_flags
-            )
-            if current_reputation < definition.required_faction_reputation and not has_beast_hills_access:
-                faction_label = {"demon": "魔界", "beast": "妖界"}.get(
-                    definition.required_faction, definition.required_faction
-                )
-                missing.append(
-                    f"{faction_label}声望（需要 {definition.required_faction_reputation}，当前 {current_reputation}）"
-                )
+        missing.extend(unmet_travel_requirements(definition.requirements, requirement_state))
         if destination == "xuantian.war_front":
             from ..events.demon_rules import DEMON_EVENT_KEY
             from ..events.public_event_rules import public_event_is_open
 
-            if not public_event_is_open(DEMON_EVENT_KEY, self._now(), self.content):
+            if not public_event_is_open(DEMON_EVENT_KEY, now, self.content):
                 missing.append("活动窗口")
-        if definition.source_locations and player.location_key not in definition.source_locations:
-            missing.append("来源地点")
-        if definition.required_intro_flag and definition.required_intro_flag not in set(player.intro_flags):
-            missing.append("任务权限")
-        if player.dao_fruit_progress < definition.required_dao_fruit_progress:
-            missing.append("道果进度")
         if player.stamina < definition.stamina_cost:
             missing.append("体力")
         if player.spirit_stones < definition.currency_cost:
             missing.append("灵石")
         pass_key = definition.pass_key
         pass_quantity = definition.pass_quantity
-        if player.location_key in definition.pass_exempt_source_locations:
-            pass_key = None
-            pass_quantity = 0
-        if pass_key and inventory_amount(player.inventory, pass_key) < pass_quantity:
+        if pass_key and inventory_amount(player.inventory, pass_key) < pass_quantity and "通行物品" not in missing:
             missing.append("通行物品")
         endgame_status = player.endgame_status or "none"
-        if definition.required_endgame_status:
-            if endgame_status != definition.required_endgame_status:
-                missing.append("终局状态")
-        elif endgame_status in {"ascension_ready", "ascended", "remained_in_world"}:
+        if not definition.required_endgame_status and endgame_status in {"ascension_ready", "ascended", "remained_in_world"}:
             missing.append("当前状态")
         if definition.daily_start_limit:
             starts_today = await asyncio.to_thread(
@@ -443,7 +461,7 @@ class TravelRepositoryMixin:
                 platform,
                 platform_user_id,
                 destination,
-                self._now(),
+                now,
             )
             if starts_today >= definition.daily_start_limit:
                 missing.append("今日访问次数")
@@ -516,7 +534,6 @@ class TravelRepositoryMixin:
         raise RepositoryBusyError("database remained locked") from last_error
 
     def _start_travel_once(self, platform: str, platform_user_id: str, destination: str, operation_id: str) -> TravelStartRecord:
-        definition = destination_definition(destination, self.content)
         operation_name = "world.start_travel"
         request_payload = {
             "platform": platform,
@@ -548,57 +565,48 @@ class TravelRepositoryMixin:
                 )
                 return self._travel_start_from_payload(payload, replay=True)
 
+            travel_content = self.content or bundled_content()
             row = self._require_player(connection, platform, platform_user_id, writable=False)
-            if not destination_location_is_open(destination, self.content):
+            if not destination_location_is_open(destination, travel_content):
                 raise LocationRequirementError("destination is not open")
+            current = str(row["location_key"])
+            definition = destination_definition(destination, travel_content, source=current)
+            if not definition.route_available:
+                raise TravelRouteNotFoundError("no directed map route connects source to destination")
+            if not definition.region_open:
+                raise LocationRequirementError("destination region is not open")
             if destination == "xuantian.war_front":
                 from ..events.demon_rules import DEMON_EVENT_KEY
                 from ..events.public_event_rules import public_event_is_open
 
-                if not public_event_is_open(DEMON_EVENT_KEY, now, self.content):
+                if not public_event_is_open(DEMON_EVENT_KEY, now, travel_content):
                     raise EventNotActiveError("demon invasion war front is closed")
             if destination in {"cave.mist_grotto_2", "demon.abyss_gate"}:
                 raise LocationRequirementError("this destination can only be reached by a cloud boat")
             endgame_status = str(row["endgame_status"] or "none")
-            if definition.required_endgame_status:
-                if endgame_status != definition.required_endgame_status:
-                    raise LocationRequirementError("endgame status is not ready for this destination")
-            elif endgame_status in {"ascension_ready", "ascended", "remained_in_world"}:
+            if not definition.required_endgame_status and endgame_status in {"ascension_ready", "ascended", "remained_in_world"}:
                 raise PlayerStageConflictError("endgame state has frozen ordinary travel")
             if row["stage"] not in {STAGE_MORTAL, "seeker", "cultivator"}:
                 raise PlayerStageConflictError("player is not ready for travel")
             weakness_until = row["weakness_until"]
             if weakness_until and now < datetime.fromisoformat(str(weakness_until)):
                 raise WeaknessActiveError("breakthrough weakness blocks travel")
-            current = str(row["location_key"])
-            if definition.source_locations and current not in definition.source_locations:
-                raise LocationRequirementError("source location is not valid")
-            if definition.required_intro_flag:
-                intro = self._json_object(row["intro_json"], {})
-                has_flag = definition.required_intro_flag in {str(item) for item in intro.get("flags", [])}
-                if not has_flag and destination == "cave.boundary_realm":
-                    progress = connection.execute(
-                        "SELECT status FROM quest_progress WHERE player_id=? AND quest_key=?",
-                        (row["id"], "story.mainline.three_realms"),
-                    ).fetchone()
-                    has_flag = progress is not None and str(progress["status"]) in {"completed", "claimed"}
-                if not has_flag:
-                    raise LocationRequirementError("destination quest permission is missing")
-            if not meets_realm(str(row["realm_key"]), player_integer(row, "realm_layer"), definition.required_realm, definition.required_layer):
-                raise LocationRequirementError("realm requirement is not met")
-            if definition.requires_selected_domain and not row["domain_key"]:
-                raise LocationRequirementError("a selected domain is required")
-            reputation = player_reputation(row)
-            current_reputation = reputation.get(definition.required_faction or "", 0)
-            if definition.required_faction and current_reputation < definition.required_faction_reputation:
-                intro = self._json_object(row["intro_json"], {})
-                has_beast_hills_access = destination == "beast.ten_thousand_hills" and beast_hills_entry_allowed(
-                    current_reputation, intro.get("flags", [])
+            requirement_state = self._travel_requirement_state_in(connection, row, now)
+            current_reputation = int(
+                requirement_state["faction_reputation"].get(definition.required_faction or "", 0)
+            )
+            unmet = unmet_travel_requirements(definition.requirements, requirement_state)
+            if unmet:
+                faction_label = {"demon": "魔界声望", "beast": "妖界声望"}.get(
+                    definition.required_faction or "", ""
                 )
-                if not has_beast_hills_access:
+                if (
+                    definition.required_faction
+                    and current_reputation < definition.required_faction_reputation
+                    and any(faction_label and faction_label in missing for missing in unmet)
+                ):
                     raise FactionReputationInsufficientError("destination faction reputation is insufficient")
-            if player_integer(row, "dao_fruit_progress") < definition.required_dao_fruit_progress:
-                raise LocationRequirementError("dao fruit progress is insufficient")
+                raise LocationRequirementError("travel requirements are not met: " + ", ".join(unmet))
 
             player_id = int(row["id"])
             active = connection.execute(
@@ -660,9 +668,6 @@ class TravelRepositoryMixin:
             inventory = player_inventory(row)
             pass_key = definition.pass_key
             pass_quantity = definition.pass_quantity
-            if current in definition.pass_exempt_source_locations:
-                pass_key = None
-                pass_quantity = 0
             if stamina < definition.stamina_cost:
                 raise ResourceInsufficientError("stamina is insufficient")
             if stones < definition.currency_cost:
