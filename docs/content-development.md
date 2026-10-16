@@ -381,17 +381,19 @@ Unit of Work 与 operation ledger、回放/恢复及 QQ/OneBot 消息降级必�
 
 三界塔历史方案 v0.3 定义 1–20 层，v0.4 新增 21–40 层；这些编号只作文档对照，各层实际采用的内容和规则在入场时冻结。内容调整不得改变旧层记录、旧随机结果或旧 operation 哈希。公开命令为 `三界塔`、`挑战三界塔 <1-40>`、`领取三界塔奖励`；双人命令为 `创建三界塔双人队伍`、`挑战三界塔双人 <1-40>`、`领取三界塔双人奖励`。双人挑战使用独立 `three_realms_tower_duo` 队伍、运行表和成员奖励表。
 
-#### 5.4.8 `tower.void_spire` 首个开放切片（历史）
+#### 5.4.8 `tower.void_spire` 单人 1–90 层
 
-虚空塔设计总高 90 层，本切片只开放单人 1–30 层；31–60 层属于下一阶段，61–90 层在完整合同定义前保持关闭。命令为 `虚空塔`、`挑战虚空塔 <1-30>` 和 `领取虚空塔奖励`。进入条件为炼虚境一层，或 `player_reputations.local_json.local.void_supply >= 600`；每次扣 20 体力，每角色每 UTC 周最多 2 次，失败计次，战斗启动失败才退款并标记 `aborted`。前一层首通奖励领取后才解锁下一层，活动状态使用独立 `void_spire_runs` 和 `void_spire_reward_claims` 表，不能复用雾隐塔记录。
+虚空塔设计总高 90 层，当前六个内容段完整定义并开放单人 1–90 层：1–15 风暴、16–30 回响、31–45 碑铭、46–60 见证、61–75 道源、76–90 登临。命令为 `虚空塔`、`挑战虚空塔 <1-90>` 和 `领取虚空塔奖励`。每个段的境界/名望准入、体力、周额度、敌人与奖励由 `data/特殊/虚空塔.json` 冻结，前一层首通奖励领取后才解锁下一层，活动状态使用独立 `void_spire_runs` 和 `void_spire_reward_claims` 表，不能复用雾隐塔记录。
 
 1–15 层冻结 `route_key=storm`，16–30 层冻结 `route_key=echo`，15/30 层为路线首领。首通奖励为灵石 120、阵砂 3，路线首领额外给 `local.void_supply +30`；重复挑战只可能给阵砂 0–1，不发普通战斗奖励。战斗敌人键、路线、奖励、图鉴、实际规则参数和 operation 均写入运行快照；恢复与回放直接读取该快照，不另设内容版本文件。图鉴键为 `codex.void.route_spire_storm`、`codex.void.route_spire_echo` 和 `codex.challenge.void_spire.floor_<N>`。
 
-验收至少覆盖 QQ 官方与 OneBot V11：门槛替代路径、31 层拒绝、锁层、首通/练习、周限、失败与启动补偿、operation/reward 幂等、路线首领快照、图鉴记录及普通战斗奖励隔离。OneBot 输出必须移除 Markdown 语法、蓝字和按键；QQ 可继续使用这些能力。该切片完成后再进入 31–60 层合同，不得把 31–90 层标为已开放。
+每个段记录必须显式提供楼层范围、境界/名望准入、体力、周额度、路线号/键、路线图鉴键、敌人范围、首领层、首通/首领/练习奖励、故事图鉴和展示称号。加载器拒绝缺失或未知字段、非连续楼层、未知境界/敌人/物品/图鉴/称号、无效奖励、重复路线、敌人范围断档，以及未对应 `_boss` 敌人范围终点的首领层；规则和仓库不再维护同一套楼层常量。
 
-#### 5.4.9 `tower.void_spire` 31–60 层合同
+验收覆盖 QQ 官方与 OneBot V11：各段门槛、锁层、首通/练习、独立周限、失败与启动补偿、operation/reward 幂等、路线首领快照、图鉴记录及普通战斗奖励隔离。OneBot 输出必须移除 Markdown 语法、蓝字和按键；QQ 可继续使用这些能力。
 
-31–60 层沿用单人虚空塔命令和逐层首通领奖解锁，不修改 1–30 层的历史记录、随机结果及 operation 哈希。31–45 层冻结碑铭路线 `route_key=inscription`，46–60 层冻结见证路线 `route_key=witness`，45/60 层为路线首领；61–90 层继续关闭。入场需合道 L1，或独立道统服务名望 `player_reputations.local_json['local.dao_service'] >= 700`；通用服务信誉 `service_reputation` 上限为 100，不能冒充道统服务名望。每次仍扣 20 体力，31–60 层合计每 UTC 周最多 1 次，与 1–30 层每周 2 次额度分开；失败计次，战斗启动故障退款并释放本段额度。
+#### 5.4.9 `tower.void_spire` 31–60 层与高层段合同
+
+31–60 层沿用单人虚空塔命令和逐层首通领奖解锁，不修改 1–30 层的历史记录、随机结果及 operation 哈希。31–45 层冻结碑铭路线 `route_key=inscription`，46–60 层冻结见证路线 `route_key=witness`，45/60 层为路线首领；61–75 层和 76–90 层分别冻结道源与登临路线，75/90 层为路线首领。入场需合道 L1，或独立道统服务名望 `player_reputations.local_json['local.dao_service'] >= 700`；通用服务信誉 `service_reputation` 上限为 100，不能冒充道统服务名望。每次仍扣 20 体力，31–60 层合计每 UTC 周最多 1 次，与 1–30 层每周 2 次额度分开；61–90 层每段每 UTC 周 1 次、每次 30 体力；失败计次，战斗启动故障退款并释放本段额度。
 
 31–60 层首通不发灵石、阵砂、道果、功勋或终局装备：领奖时发现本层 `codex.challenge.void_spire.floor_<N>` 和路线 `codex.void.route_spire_<route>`；45/60 层分别追加 `codex.story.void_spire.inscription` 和 `codex.story.void_spire.witness`。60 层首胜产生 `specials.void_spire.floor.60` 来源，授予只用于展示的 `title.void_spire.witness`；练习无奖励。入场冻结敌人、路线、空资产奖励及实际内容、规则参数；各层运行按自己的冻结快照恢复，不按高低层另设模块版本。扩表迁移须保留既有领奖记录、活动中会话及外键；按重启、重放、并发、QQ 官方和 OneBot V11 逐项验收。`dispatch.dao_service` 道统服务派遣为正式名望来源：合道 L1 或通用服务信誉 80 可接取，8 小时、每天 2 次、6 体力/4 精力，成功独立名望 +8、信誉 +4、服务图鉴和故事线索；部分成功独立名望 +4，失败不发奖。名望上限 1000，达到 700 可替代高层境界准入；派遣自身不得产出终局资产。
 
@@ -400,6 +402,8 @@ Unit of Work 与 operation ledger、回放/恢复及 QQ/OneBot 消息降级必�
 每层首通奖励固定为灵石 60、阵砂 2，并在领取事务发现 `codex.challenge.three_realms.floor_N`。练习奖励由 run ID 的 BLAKE2b 摘要稳定决定为阵砂 0 或 1；不发灵石、修为、神魂晶、突破物、声望或普通战斗掉落。第 30 层额外发现 `codex.story.three_realms.reconstruction_<faction>`，第 40 层额外发现 `codex.story.three_realms.domain_<faction>`；故事图鉴使用战斗开始时冻结的三界阵营，不接受命令参数覆盖。第 40 层首通胜利事件授予展示称号 `title.three_realms_tower.domain_guardian`，来源为 `specials.three_realms_tower.floor.40`，称号只用于展示。
 
 阵营首领固定在 10/20/30/40 层。v0.4 稳定敌人键为 `enemy.three_realms_tower.<faction>.domain_vanguard`（21–29 层）、`enemy.three_realms_tower.<faction>.floor_30_boss`、`enemy.three_realms_tower.<faction>.domain_veteran`（31–39 层）和 `enemy.three_realms_tower.<faction>.floor_40_boss`；`<faction>` 仅为 `xuantian`、`demon`、`beast`。敌人、阵营/盟约、三界名望、污染、血脉稳定、奖励及实际规则参数均进入塔局与战斗快照。双人塔要求两名已确认成员，分别扣体力、计周限和首通，普通队伍奖励保持为空；失败不发奖，启动故障双方全额退款，成员独立 operation 领奖。首通、失败、启动补偿、每层周限、待领奖互斥、双适配器路由、operation 重放及资产隔离由 QQ 官方和 OneBot V11 模拟适配器专项验收。
+
+61–90 层沿用同一逐层解锁、自动战、领奖、operation 和快照语义：61–75 层为道源路线，首通奖励灵石 180/虚空晶体 2，75 层追加道统服务名望 50 与虚空锚 1、故事图鉴和“道源登塔者”；76–90 层为登临路线，首通奖励灵石 240/虚空晶体 3，90 层追加道统服务名望 80 与虚空锚 2、故事图鉴和“虚空登临者”。两段均要求渡劫 L1 或道统服务名望 700，每段每周 1 次；练习奖励读取对应内容段，普通战斗掉落保持关闭。
 
 ### 5.5 适配器、Web 和内容发布
 

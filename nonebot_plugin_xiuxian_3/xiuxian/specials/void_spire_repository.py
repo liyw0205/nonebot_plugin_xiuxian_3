@@ -35,16 +35,12 @@ from ..utils.player import (
 from .codex_projection import record_codex_discovery, record_material_discoveries
 from .void_spire_models import VoidSpirePreviewRecord, VoidSpireRewardRecord, VoidSpireRunRecord
 from .void_spire_rules import (
-    DAO_SERVICE_REPUTATION_KEY,
-    DAO_SERVICE_REPUTATION_REQUIRED,
-    LOWER_ROUTE_END,
     MAX_FLOOR,
-    SUPPLY_REPUTATION_KEY,
-    SUPPLY_REPUTATION_REQUIRED,
     TOWER_KEY,
     floor_definition,
     quota_floor_range,
     reward_for,
+    route_codex_for_floor,
     story_codex_for_floor,
     week_start,
 )
@@ -67,6 +63,7 @@ class VoidSpireRepositoryMixin:
                 ).fetchone()[0]
             )
             next_floor = min(highest + 1, MAX_FLOOR)
+            next_definition = floor_definition(max(next_floor, 1), self.content)
             quota_start, quota_end = quota_floor_range(next_floor, self.content)
             active = connection.execute(
                 "SELECT floor_no,status FROM void_spire_runs "
@@ -80,19 +77,22 @@ class VoidSpireRepositoryMixin:
                     (player["id"], TOWER_KEY, quota_start, quota_end, week_start(now)),
                 ).fetchone()[0]
             )
-            reputation = self._void_spire_supply_reputation(connection, int(player["id"]))
             return VoidSpirePreviewRecord(
                 player=self._row_to_player(player),
                 highest_floor=highest,
                 next_floor=next_floor,
                 active_floor=int(active["floor_no"]) if active else None,
                 active_status=str(active["status"]) if active else None,
-                stamina_cost=floor_definition(max(next_floor, 1), self.content).stamina_cost,
-                weekly_limit=floor_definition(max(next_floor, 1), self.content).weekly_limit,
+                stamina_cost=next_definition.stamina_cost,
+                weekly_limit=next_definition.weekly_limit,
                 weekly_used=weekly_used,
-                supply_reputation=reputation,
+                # Keep both established preview fields stable; admission for a
+                # challenge itself comes from the selected content segment.
+                supply_reputation=self._void_spire_local_reputation(
+                    connection, int(player["id"]), "local.void_supply"
+                ),
                 dao_service_reputation=self._void_spire_local_reputation(
-                    connection, int(player["id"]), DAO_SERVICE_REPUTATION_KEY
+                    connection, int(player["id"]), "local.dao_service"
                 ),
             )
 
@@ -169,9 +169,8 @@ class VoidSpireRepositoryMixin:
                 return self._void_spire_run_from_row(run, replay_player, replay=True)
 
             player = self._require_player(connection, platform, platform_user_id)
-            upper_floor = floor_no > LOWER_ROUTE_END
-            reputation_key = DAO_SERVICE_REPUTATION_KEY if upper_floor else SUPPLY_REPUTATION_KEY
-            required_reputation = DAO_SERVICE_REPUTATION_REQUIRED if upper_floor else SUPPLY_REPUTATION_REQUIRED
+            reputation_key = definition.reputation_key
+            required_reputation = definition.reputation_required
             reputation = self._void_spire_local_reputation(connection, int(player["id"]), reputation_key)
             if not self._meets_realm_values(
                 str(player["realm_key"]), player_integer(player, "realm_layer"), definition.required_realm, definition.required_layer
@@ -390,7 +389,7 @@ class VoidSpireRepositoryMixin:
             discoveries: list[str] = []
             if bool(run["first_clear"]):
                 discoveries = [
-                    f"codex.void.route_spire_{run['route_key']}",
+                    route_codex_for_floor(int(run["floor_no"]), self.content),
                     f"codex.challenge.void_spire.floor_{run['floor_no']}",
                 ]
                 story = story_codex_for_floor(int(run["floor_no"]), self.content)
@@ -454,10 +453,6 @@ class VoidSpireRepositoryMixin:
                 "UPDATE void_spire_runs SET status='aborted',result_json=?,updated_at=? WHERE id=?",
                 (json.dumps({"reason": "battle_start_failed"}, sort_keys=True), now_text, run["id"]),
             )
-
-    @staticmethod
-    def _void_spire_supply_reputation(connection: sqlite3.Connection, player_id: int) -> int:
-        return VoidSpireRepositoryMixin._void_spire_local_reputation(connection, player_id, SUPPLY_REPUTATION_KEY)
 
     @staticmethod
     def _void_spire_local_reputation(connection: sqlite3.Connection, player_id: int, key: str) -> int:
