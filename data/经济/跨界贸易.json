@@ -1,0 +1,97 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "cross_realm_trade",
+  "records": [
+    {
+      "key": "trade.defaults",
+      "name": "跨界贸易规则",
+      "desc": "固定跨界贸易的周上限、绑定时长、单阵营声望门槛与默认值。",
+      "status": "active",
+      "weekly_limit": 5,
+      "binding_seconds": 86400,
+      "required_reputation": 200
+    },
+    {
+      "key": "trade.xuantian_to_demon",
+      "name": "云铁兑换魔核",
+      "desc": "在魔渊集市以云铁与灵石兑换魔核，兑换后绑定二十四小时。",
+      "status": "active",
+      "label": "云铁兑换魔核",
+      "aliases": [
+        "trade.xuantian_to_demon",
+        "xuantian_to_demon",
+        "云铁兑换魔核",
+        "云铁换魔核",
+        "玄天到魔界",
+        "玄天界到魔界",
+        "魔界贸易"
+      ],
+      "location_key": "demon.abyss_market",
+      "input_items": {
+        "item.material.cloud_iron": 10
+      },
+      "currency_cost": 200,
+      "output_items": {
+        "item.demon_core": 1
+      },
+      "required_faction": "demon",
+      "required_reputation": 200
+    },
+    {
+      "key": "trade.xuantian_to_beast",
+      "name": "灵叶兑换妖血",
+      "desc": "在万兽山以灵叶与灵石兑换妖血，兑换后绑定二十四小时。",
+      "status": "active",
+      "label": "灵叶兑换妖血",
+      "aliases": [
+        "trade.xuantian_to_beast",
+        "xuantian_to_beast",
+        "灵叶兑换妖血",
+        "灵叶换妖血",
+        "玄天到妖界",
+        "妖界贸易"
+      ],
+      "location_key": "beast.ten_thousand_hills",
+      "input_items": {
+        "item.herb.spirit_leaf": 10
+      },
+      "currency_cost": 200,
+      "output_items": {
+        "item.beast_blood": 1
+      },
+      "required_faction": "beast",
+      "required_reputation": 200
+    },
+    {
+      "key": "trade.three_realms",
+      "name": "三界贸易口兑换神魂晶",
+      "desc": "在三界贸易口以魔核与妖血兑换神魂晶，须同时具备魔界与妖界声望。",
+      "status": "active",
+      "label": "三界贸易口兑换神魂晶",
+      "aliases": [
+        "trade.three_realms",
+        "three_realms",
+        "三界贸易",
+        "三界贸易口",
+        "三界互市",
+        "魔核妖血换神魂晶"
+      ],
+      "location_key": "beast.three_realms_trade_port",
+      "input_items": {
+        "item.demon_core": 2,
+        "item.beast_blood": 2
+      },
+      "currency_cost": 0,
+      "output_items": {
+        "item.soul_crystal": 1
+      },
+      "weekly_limit": 3,
+      "required_faction": "beast",
+      "required_reputation": 200,
+      "required_reputations": {
+        "demon": 200,
+        "beast": 200
+      }
+    }
+  ]
+}
