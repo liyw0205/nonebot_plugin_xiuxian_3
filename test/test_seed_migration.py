@@ -320,3 +320,52 @@ def test_secret_realm_seed_migrates_and_custom_variants_are_preserved(host: Path
     assert custom_result.returncode == 0, custom_result.stdout + custom_result.stderr
     assert (host / "data" / SECRET_REALM_FILE).read_bytes() == custom
     preserved(host)
+
+
+MANIFEST_FILE = Path("内容清单.json")
+TRADE_FILE = Path("经济/跨界贸易.json")
+
+
+def old_official_manifest() -> bytes:
+    # The manifest before the cross-realm trade file was registered: remove
+    # only that entry from the current manifest.
+    document = json.loads((ROOT / "data" / MANIFEST_FILE).read_text(encoding="utf-8"))
+    document["files"] = [
+        entry for entry in document["files"] if entry != "经济/跨界贸易.json"
+    ]
+    blob = (json.dumps(document, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+    rule = json.loads((ROOT / "scripts/seed_migrations.json").read_text(encoding="utf-8"))[
+        MANIFEST_FILE.as_posix()
+    ]
+    assert hashlib.sha256(blob).hexdigest() in rule["old_sha256"], (
+        "the reversed manifest must equal the registered old official manifest seed"
+    )
+    return blob
+
+
+def test_manifest_seed_migrates_when_the_trade_file_is_registered(host: Path) -> None:
+    # An old official manifest without the trade file must migrate, and the
+    # new data file must be installed alongside it (it does not exist yet).
+    old = old_official_manifest()
+    (host / "data" / MANIFEST_FILE).write_bytes(old)
+    # The host fixture copies the full data tree; an old host predating the
+    # trade slice would not have the new file, so remove it explicitly.
+    (host / "data" / TRADE_FILE).unlink()
+    result = deploy(host)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "matchers=1 handlers=1" in result.stdout
+    assert (host / "data" / MANIFEST_FILE).read_bytes() == (
+        ROOT / "data" / MANIFEST_FILE
+    ).read_bytes()
+    assert (host / "data" / TRADE_FILE).read_bytes() == (
+        ROOT / "data" / TRADE_FILE
+    ).read_bytes()
+    backup_root = host / ".xiuxian3/backups"
+    backups = list(backup_root.glob("deploy-*"))
+    assert len(backups) == 1
+    assert (backups[0] / "data" / MANIFEST_FILE).read_bytes() == old
+    preserved(host)
+    repeated = deploy(host)
+    assert repeated.returncode == 0, repeated.stdout + repeated.stderr
+    assert "种子更新 0 个" in repeated.stdout
+    preserved(host)
