@@ -43,6 +43,8 @@ from .void_ruins_rules import (
     VOID_RUINS_MIN_MEMBERS,
     VOID_RUINS_NODES,
     VOID_RUINS_PARTY_TYPE,
+    VOID_RUINS_REALM,
+    VOID_RUINS_REALM_LAYER,
     VOID_RUINS_REPEAT_REWARD,
     VOID_RUINS_ROUTE_PERMISSION,
     VOID_RUINS_STAMINA_COST,
@@ -183,7 +185,7 @@ class VoidRuinsRepositoryMixin:
                 player_id = int(row["id"])
                 if (
                     str(row["location_key"]) != VOID_RUINS_LOCATION
-                    or not realm_at_least(str(row["realm_key"]), player_integer(row, "realm_layer"), "void_refining", 1, self.content)
+                    or not realm_at_least(str(row["realm_key"]), player_integer(row, "realm_layer"), VOID_RUINS_REALM, VOID_RUINS_REALM_LAYER, self.content)
                 ):
                     raise VoidRuinsRequirementError("a member lacks void-refining realm or archive location")
                 if self._has_active_long_action(connection, player_id):

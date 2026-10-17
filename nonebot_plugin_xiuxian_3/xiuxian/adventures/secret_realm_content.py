@@ -27,7 +27,18 @@ _OPTIONAL_STRING_FIELDS = (
     "label",
     "quota_key",
 )
-_OPTIONAL_INT_FIELDS = ("stamina_cost", "weekly_limit", "quota_limit", "expiry_seconds", "realm_layer")
+_OPTIONAL_INT_FIELDS = (
+    "stamina_cost",
+    "weekly_limit",
+    "quota_limit",
+    "expiry_seconds",
+    "realm_layer",
+    "min_members",
+    "max_members",
+    "anchor_lock",
+    "storm_interval_rounds",
+    "storm_damage_bp",
+)
 _OPTIONAL_FLAG_FIELDS = ("energy_suppression", "risk_base_bp", "risk_modifier_bp", "ticket_quantity")
 
 
@@ -67,7 +78,7 @@ def _nodes(value: Any, *, key: str, bundle: ContentBundle) -> tuple[dict[str, An
     for index, node in enumerate(value):
         if not isinstance(node, dict):
             raise ContentError(f"secret realm {key} node {index} must be an object")
-        unknown = set(node) - {"key", "label", "enemy_key"}
+        unknown = set(node) - {"key", "label", "enemy_key", "unstable_enemy_key"}
         if unknown or "key" not in node or "label" not in node:
             raise ContentError(f"secret realm {key} node {index} has missing or unknown fields")
         node_key = node["key"]
@@ -83,6 +94,11 @@ def _nodes(value: Any, *, key: str, bundle: ContentBundle) -> tuple[dict[str, An
             if not isinstance(enemy_key, str) or not enemy_key.strip():
                 raise ContentError(f"secret realm {key} node {index} has an invalid enemy")
             normalized["enemy_key"] = enemy_key
+        unstable_enemy_key = node.get("unstable_enemy_key")
+        if unstable_enemy_key is not None:
+            if not isinstance(unstable_enemy_key, str) or not unstable_enemy_key.strip():
+                raise ContentError(f"secret realm {key} node {index} has an invalid unstable enemy")
+            normalized["unstable_enemy_key"] = unstable_enemy_key
         nodes.append(normalized)
     return tuple(nodes)
 
@@ -161,6 +177,38 @@ def _validated(row: dict[str, Any], bundle: ContentBundle) -> dict[str, Any]:
         if value is None:
             continue
         record[field] = _reward_map(value, field=field, key=key, bundle=bundle)
+
+    min_members = record.get("min_members")
+    max_members = record.get("max_members")
+    if (min_members is None) != (max_members is None):
+        raise ContentError(f"secret realm {key} member bounds must be declared together")
+    if min_members is not None and max_members < min_members:
+        raise ContentError(f"secret realm {key} max_members is below min_members")
+    if (record.get("realm_key") is None) != (record.get("realm_layer") is None):
+        raise ContentError(f"secret realm {key} realm gate must be declared together")
+    if "realm_key" in record:
+        try:
+            bundle.require("realm", record["realm_key"], include_locked=False)
+        except KeyError as exc:
+            raise ContentError(
+                f"secret realm {key} references unknown realm {record['realm_key']}"
+            ) from exc
+    if "permission" in record and not record["permission"].strip():
+        raise ContentError(f"secret realm {key} has an invalid permission")
+    storm_interval = record.get("storm_interval_rounds")
+    storm_damage = record.get("storm_damage_bp")
+    if (storm_interval is None) != (storm_damage is None):
+        raise ContentError(f"secret realm {key} storm contract must be declared together")
+    for index, node in enumerate(record["nodes"]):
+        unstable = node.get("unstable_enemy_key")
+        if unstable is None:
+            if "unstable_enemy_key" in node:
+                raise ContentError(f"secret realm {key} node {index} has an invalid unstable enemy")
+            continue
+        if "enemy_key" not in node:
+            raise ContentError(
+                f"secret realm {key} node {index} declares an unstable enemy without a base enemy"
+            )
     return record
 
 

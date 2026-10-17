@@ -1,56 +1,45 @@
-"""Contract for the void-ruins party secret realm."""
+"""Contract for the void-ruins party secret realm (content-backed)."""
 
 from __future__ import annotations
 
+from .secret_realm_content import node_aliases, node_labels, secret_realm_record
 
 VOID_RUINS_KEY = "instance.secret_realm.void_ruins"
-VOID_RUINS_LOCATION = "void.archive_ruins"
-VOID_RUINS_PARTY_TYPE = "secret_realm_void_ruins"
-VOID_RUINS_STAMINA_COST = 50
-VOID_RUINS_ANCHOR_LOCK = 1
-VOID_RUINS_MIN_MEMBERS = 2
-VOID_RUINS_MAX_MEMBERS = 5
-VOID_RUINS_WEEKLY_LIMIT = 1
-VOID_RUINS_EXPIRY_SECONDS = 60 * 60
-VOID_RUINS_ROUTE_PERMISSION = "access.void.time_fort"
-VOID_RUINS_CODEX = "codex.void.route_ruins"
-VOID_RUINS_REPEAT_REWARD = {"item.void_crystal": 1}
 
-VOID_RUINS_NODES = (
-    "ruins_entrance",
-    "fractured_beacon",
-    "void_corridor",
-    "rift_sentinel",
-    "archive_fringe",
-    "unstable_storm",
-    "anchor_field",
-    "archive_keeper",
-    "route_tablet",
-    "exit_gate",
+_RECORD = secret_realm_record(VOID_RUINS_KEY)
+
+VOID_RUINS_LOCATION = str(_RECORD["location_key"])
+VOID_RUINS_PARTY_TYPE = str(_RECORD["party_type"])
+VOID_RUINS_STAMINA_COST = int(_RECORD["stamina_cost"])
+VOID_RUINS_ANCHOR_LOCK = int(_RECORD["anchor_lock"])
+VOID_RUINS_MIN_MEMBERS = int(_RECORD["min_members"])
+VOID_RUINS_MAX_MEMBERS = int(_RECORD["max_members"])
+VOID_RUINS_WEEKLY_LIMIT = int(_RECORD["weekly_limit"])
+VOID_RUINS_EXPIRY_SECONDS = int(_RECORD["expiry_seconds"])
+VOID_RUINS_ROUTE_PERMISSION = str(_RECORD["permission"])
+VOID_RUINS_CODEX = str(_RECORD["codex_entry_key"])
+VOID_RUINS_REPEAT_REWARD = dict(_RECORD["repeat_reward"])
+
+VOID_RUINS_NODES = tuple(str(node["key"]) for node in _RECORD["nodes"])
+
+VOID_RUINS_NODE_LABELS = node_labels(_RECORD)
+VOID_RUINS_NODE_ALIASES = node_aliases(_RECORD)
+
+VOID_RUINS_ENEMIES = {
+    (str(node["key"]), False): str(node["enemy_key"])
+    for node in _RECORD["nodes"]
+    if node.get("enemy_key")
+}
+VOID_RUINS_ENEMIES.update(
+    {
+        (str(node["key"]), True): str(node["unstable_enemy_key"])
+        for node in _RECORD["nodes"]
+        if node.get("unstable_enemy_key")
+    }
 )
 
-VOID_RUINS_NODE_LABELS = {
-    "ruins_entrance": "遗迹入口",
-    "fractured_beacon": "破碎信标",
-    "void_corridor": "虚空回廊",
-    "rift_sentinel": "裂隙哨卫",
-    "archive_fringe": "档案外围",
-    "unstable_storm": "虚空风暴",
-    "anchor_field": "锚点原野",
-    "archive_keeper": "档案守卫",
-    "route_tablet": "航道石碑",
-    "exit_gate": "归航之门",
-}
-VOID_RUINS_NODE_ALIASES = {
-    **{key: key for key in VOID_RUINS_NODES},
-    **{label: key for key, label in VOID_RUINS_NODE_LABELS.items()},
-}
-VOID_RUINS_ENEMIES = {
-    ("rift_sentinel", False): "enemy.void_ruins_sentinel",
-    ("rift_sentinel", True): "enemy.void_ruins_sentinel_unstable",
-    ("archive_keeper", False): "enemy.void_ruins_keeper",
-    ("archive_keeper", True): "enemy.void_ruins_keeper_unstable",
-}
+VOID_RUINS_REALM = str(_RECORD["realm_key"])
+VOID_RUINS_REALM_LAYER = int(_RECORD["realm_layer"])
 
 
 def resolve_void_ruins_node(value: str) -> str | None:
@@ -69,6 +58,8 @@ __all__ = [
     "VOID_RUINS_NODES",
     "VOID_RUINS_NODE_LABELS",
     "VOID_RUINS_PARTY_TYPE",
+    "VOID_RUINS_REALM",
+    "VOID_RUINS_REALM_LAYER",
     "VOID_RUINS_REPEAT_REWARD",
     "VOID_RUINS_ROUTE_PERMISSION",
     "VOID_RUINS_STAMINA_COST",
