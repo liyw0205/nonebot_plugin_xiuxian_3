@@ -1,17 +1,14 @@
-"""Rules for the first fixed cross-realm trade slice."""
+"""Rules for the fixed cross-realm trade slice (content-backed)."""
 
 from __future__ import annotations
-
 
 from dataclasses import dataclass
 from datetime import timedelta
 
-
-WEEKLY_LIMIT = 5
-BINDING_SECONDS = 24 * 60 * 60
-TRADE_LOCATION = "demon.abyss_market"
-BEAST_TRADE_LOCATION = "beast.ten_thousand_hills"
-THREE_REALMS_TRADE_LOCATION = "beast.three_realms_trade_port"
+from .cross_realm_trade_content import (
+    cross_realm_trade_alias_map,
+    cross_realm_trade_definitions,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,65 +19,41 @@ class CrossRealmTradeDefinition:
     input_items: dict[str, int]
     currency_cost: int
     output_items: dict[str, int]
-    weekly_limit: int = WEEKLY_LIMIT
-    binding_seconds: int = BINDING_SECONDS
-    required_faction: str = "demon"
-    required_reputation: int = 200
+    weekly_limit: int
+    binding_seconds: int
+    required_faction: str
+    required_reputation: int
     required_reputations: dict[str, int] | None = None
 
 
 TRADE_DEFINITIONS = {
-    "trade.xuantian_to_demon": CrossRealmTradeDefinition(
-        key="trade.xuantian_to_demon",
-        label="云铁兑换魔核",
-        location_key=TRADE_LOCATION,
-        input_items={"item.material.cloud_iron": 10},
-        currency_cost=200,
-        output_items={"item.demon_core": 1},
-    ),
-    "trade.xuantian_to_beast": CrossRealmTradeDefinition(
-        key="trade.xuantian_to_beast",
-        label="灵叶兑换妖血",
-        location_key=BEAST_TRADE_LOCATION,
-        input_items={"item.herb.spirit_leaf": 10},
-        currency_cost=200,
-        output_items={"item.beast_blood": 1},
-        required_faction="beast",
-    ),
-    "trade.three_realms": CrossRealmTradeDefinition(
-        key="trade.three_realms",
-        label="三界贸易口兑换神魂晶",
-        location_key=THREE_REALMS_TRADE_LOCATION,
-        input_items={"item.demon_core": 2, "item.beast_blood": 2},
-        currency_cost=0,
-        output_items={"item.soul_crystal": 1},
-        weekly_limit=3,
-        required_faction="beast",
-        required_reputations={"demon": 200, "beast": 200},
-    ),
+    record["key"]: CrossRealmTradeDefinition(
+        key=record["key"],
+        label=record["label"],
+        location_key=record["location_key"],
+        input_items=dict(record["input_items"]),
+        currency_cost=record["currency_cost"],
+        output_items=dict(record["output_items"]),
+        weekly_limit=record["weekly_limit"],
+        binding_seconds=record["binding_seconds"],
+        required_faction=record["required_faction"],
+        required_reputation=record["required_reputation"],
+        required_reputations=dict(record["required_reputations"])
+        if record.get("required_reputations")
+        else None,
+    )
+    for record in cross_realm_trade_definitions()
 }
 
-TRADE_ALIASES = {
-    "trade.xuantian_to_demon": "trade.xuantian_to_demon",
-    "xuantian_to_demon": "trade.xuantian_to_demon",
-    "云铁兑换魔核": "trade.xuantian_to_demon",
-    "云铁换魔核": "trade.xuantian_to_demon",
-    "玄天到魔界": "trade.xuantian_to_demon",
-    "玄天界到魔界": "trade.xuantian_to_demon",
-    "魔界贸易": "trade.xuantian_to_demon",
-    "trade.xuantian_to_beast": "trade.xuantian_to_beast",
-    "xuantian_to_beast": "trade.xuantian_to_beast",
-    "灵叶兑换妖血": "trade.xuantian_to_beast",
-    "灵叶换妖血": "trade.xuantian_to_beast",
-    "玄天到妖界": "trade.xuantian_to_beast",
-    "妖界贸易": "trade.xuantian_to_beast",
-    "trade.three_realms": "trade.three_realms",
-    "three_realms": "trade.three_realms",
-    "三界贸易": "trade.three_realms",
-    "三界贸易口": "trade.three_realms",
-    "三界互市": "trade.three_realms",
-    "魔核妖血换神魂晶": "trade.three_realms",
-}
+TRADE_LOCATION = TRADE_DEFINITIONS["trade.xuantian_to_demon"].location_key
+BEAST_TRADE_LOCATION = TRADE_DEFINITIONS["trade.xuantian_to_beast"].location_key
+THREE_REALMS_TRADE_LOCATION = TRADE_DEFINITIONS["trade.three_realms"].location_key
+
+_EXPLORATION_PAIR = TRADE_DEFINITIONS["trade.xuantian_to_demon"]
+WEEKLY_LIMIT = _EXPLORATION_PAIR.weekly_limit
+BINDING_SECONDS = _EXPLORATION_PAIR.binding_seconds
+
+TRADE_ALIASES = cross_realm_trade_alias_map()
 
 
 def resolve_trade(value: str) -> str | None:
