@@ -250,6 +250,26 @@ boss 层越段、factions 不符、max_floor 不符、缺字段）；回归 `tes
 非本次内容化引入。`data/内容清单.json` 登记新文件并更新种子迁移规则（`e504acb5…`→`15773fe8…`，
 provenance `0f3b39ba`）。未跑全量/压测/部署，未验 QQ 真机。
 
+时序堡垒与虚空遗迹两套组队专用秘境内容化已在 `develop` 完成（数据提交 `7a9d47a`、种子迁移 `b04edcb`）：
+`data/冒险/秘境专用.json` 扩至 10 条记录，`instance.secret_realm.time_fort`（地点 `void.archive_ruins`、
+组队 `secret_realm_time_fort`、境界门 `void_refining` L1、2–5 人、体力 40、周限 1、过期 3600 秒、
+许可 `access.void.time_fort`、剧情旗标 `story.mainline.void_archive.time_fort`、首/重奖励阵砂 2/1、
+风暴间隔 3 回合伤害 500 bp、守时者敌人、6 节点中文标签）与 `instance.secret_realm.void_ruins`
+（体力 50、锚点锁 1、许可与图鉴 `codex.void.route_ruins`、重复奖励虚空晶、10 节点、
+裂隙哨卫/档案守卫的稳定与不稳定敌人变体）全部常量改为内容派生，值与原硬编码逐一相同；
+`time_fort_rules.py`/`void_ruins_rules.py` 经共享加载器读记录并导出原名称，两个仓库的境界门槛
+改用内容境界键（不再内联 `"void_refining", 1`），快照内联 `time_storm` 数值同步改由常量填充；
+`combat/party_repository.py`、`secret_realm_use_cases.py` 等消费者不改导入。加载器新增
+成员边界（成对声明、min≤max）、境界门（成对声明、开放境界引用）、风暴数值（成对声明）与
+节点 `unstable_enemy_key`（须伴随基础敌人、字符串非空、未知节点字段拒绝）校验，均抛 `ContentError`。
+官方 `秘境专用.json` 新旧 SHA-256（`7f02246e…`→`5af42df1…`）与 Git provenance 已登记
+`scripts/seed_migrations.json`，迁移测试新增反向助手（旧 8 记录 blob 升级、重复升级幂等、
+有效自定义变体保留），`test_seed_migration.py` 9 passed。聚焦证据：
+`test_secret_realm_instance_content.py` 37 passed（新增两记录合同与 11 项校验失败用例）、
+`test_time_fort_secret_realm.py`+`test_void_ruins_secret_realm.py` 8 passed
+（混合适配器路线/风暴/重启/奖励与原子准入回归）、`test_secret_realm_intro.py`+
+`test_secret_realm_upper.py`+`test_party_combat.py` 10 passed。未跑全量/压测/部署，未验 QQ 真机。
+
 社交规则内容化与悬空引用修复已在 `develop` 完成（提交 `8646f8b`、`b01bd27`、`45800b1`、`83416d4`）：
 补齐缺失的 `item.clue.demon_abyss_echo` 物品记录（同族线索形状，名称沿用既有标签表「深渊残响线索」，
 筑基 L1 与深渊入口一致），使恶魔深渊首通奖励与深渊残响遗府的线索引用可解析；同时更正上一轮关于
