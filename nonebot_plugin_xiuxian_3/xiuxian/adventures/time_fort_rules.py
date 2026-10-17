@@ -1,47 +1,35 @@
-"""Contract for the time-fort party secret realm."""
+"""Contract for the time-fort party secret realm (content-backed)."""
 
 from __future__ import annotations
 
+from .secret_realm_content import node_aliases, node_labels, secret_realm_record
 
 TIME_FORT_KEY = "instance.secret_realm.time_fort"
-TIME_FORT_LOCATION = "void.archive_ruins"
-TIME_FORT_PARTY_TYPE = "secret_realm_time_fort"
-TIME_FORT_STAMINA_COST = 40
-TIME_FORT_MIN_MEMBERS = 2
-TIME_FORT_MAX_MEMBERS = 5
-TIME_FORT_WEEKLY_LIMIT = 1
-TIME_FORT_EXPIRY_SECONDS = 60 * 60
-TIME_FORT_OPEN = True
-TIME_FORT_PERMISSION = "access.void.time_fort"
-TIME_FORT_STORY_FLAG = "story.mainline.void_archive.time_fort"
-TIME_FORT_FIRST_REWARD = {"item.mat.array_sand": 2}
-TIME_FORT_REPEAT_REWARD = {"item.mat.array_sand": 1}
-TIME_FORT_STORM_INTERVAL = 3
-TIME_FORT_STORM_DAMAGE_BP = 500
-TIME_FORT_ENEMY = "enemy.time_fort_keeper"
 
-TIME_FORT_NODES = (
-    "fort_gate",
-    "clock_gallery",
-    "time_storm",
-    "broken_hourglass",
-    "time_keeper",
-    "chronicle_exit",
-)
+_RECORD = secret_realm_record(TIME_FORT_KEY)
 
-TIME_FORT_NODE_LABELS = {
-    "fort_gate": "堡垒门庭",
-    "clock_gallery": "星时回廊",
-    "time_storm": "时间风暴",
-    "broken_hourglass": "残破沙漏",
-    "time_keeper": "守时者",
-    "chronicle_exit": "编年出口",
-}
+TIME_FORT_LOCATION = str(_RECORD["location_key"])
+TIME_FORT_PARTY_TYPE = str(_RECORD["party_type"])
+TIME_FORT_STAMINA_COST = int(_RECORD["stamina_cost"])
+TIME_FORT_MIN_MEMBERS = int(_RECORD["min_members"])
+TIME_FORT_MAX_MEMBERS = int(_RECORD["max_members"])
+TIME_FORT_WEEKLY_LIMIT = int(_RECORD["weekly_limit"])
+TIME_FORT_EXPIRY_SECONDS = int(_RECORD["expiry_seconds"])
+TIME_FORT_PERMISSION = str(_RECORD["permission"])
+TIME_FORT_STORY_FLAG = str(_RECORD["story_flag"])
+TIME_FORT_FIRST_REWARD = dict(_RECORD["first_reward"])
+TIME_FORT_REPEAT_REWARD = dict(_RECORD["repeat_reward"])
+TIME_FORT_STORM_INTERVAL = int(_RECORD["storm_interval_rounds"])
+TIME_FORT_STORM_DAMAGE_BP = int(_RECORD["storm_damage_bp"])
+TIME_FORT_ENEMY = str(_RECORD["enemy_key"])
 
-TIME_FORT_NODE_ALIASES = {
-    **{key: key for key in TIME_FORT_NODES},
-    **{label: key for key, label in TIME_FORT_NODE_LABELS.items()},
-}
+TIME_FORT_NODES = tuple(str(node["key"]) for node in _RECORD["nodes"])
+
+TIME_FORT_NODE_LABELS = node_labels(_RECORD)
+TIME_FORT_NODE_ALIASES = node_aliases(_RECORD)
+
+TIME_FORT_REALM = str(_RECORD["realm_key"])
+TIME_FORT_REALM_LAYER = int(_RECORD["realm_layer"])
 
 
 def resolve_time_fort_node(value: str) -> str | None:
@@ -58,9 +46,10 @@ __all__ = [
     "TIME_FORT_MIN_MEMBERS",
     "TIME_FORT_NODE_LABELS",
     "TIME_FORT_NODES",
-    "TIME_FORT_OPEN",
     "TIME_FORT_PARTY_TYPE",
     "TIME_FORT_PERMISSION",
+    "TIME_FORT_REALM",
+    "TIME_FORT_REALM_LAYER",
     "TIME_FORT_REPEAT_REWARD",
     "TIME_FORT_STAMINA_COST",
     "TIME_FORT_STORM_DAMAGE_BP",

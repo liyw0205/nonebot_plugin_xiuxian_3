@@ -35,8 +35,12 @@ from .time_fort_rules import (
     TIME_FORT_NODES,
     TIME_FORT_PARTY_TYPE,
     TIME_FORT_PERMISSION,
+    TIME_FORT_REALM,
+    TIME_FORT_REALM_LAYER,
     TIME_FORT_REPEAT_REWARD,
     TIME_FORT_STAMINA_COST,
+    TIME_FORT_STORM_DAMAGE_BP,
+    TIME_FORT_STORM_INTERVAL,
     TIME_FORT_STORY_FLAG,
     TIME_FORT_WEEKLY_LIMIT,
 )
@@ -162,7 +166,7 @@ class TimeFortRepositoryMixin:
                 player_state = player_combat_values(row)
                 if (
                     str(row["location_key"]) != TIME_FORT_LOCATION
-                    or not realm_at_least(str(row["realm_key"]), player_integer(row, "realm_layer"), "void_refining", 1, self.content)
+                    or not realm_at_least(str(row["realm_key"]), player_integer(row, "realm_layer"), TIME_FORT_REALM, TIME_FORT_REALM_LAYER, self.content)
                     or TIME_FORT_PERMISSION not in set(player_state["intro_flags"])
                 ):
                     raise TimeFortRequirementError("a member lacks time-fort permission or archive location")
@@ -194,7 +198,7 @@ class TimeFortRepositoryMixin:
                 "location_key": TIME_FORT_LOCATION, "node_keys": list(TIME_FORT_NODES), "current_node": TIME_FORT_NODES[0],
                 "members": [{"database_id": item["database_id"], "player_id": item["player_id"], "role": item["role"]} for item in combat_snapshots],
                 "member_combat_snapshots": combat_snapshots, "first_clear_by_player": {str(key): value for key, value in first_clear.items()},
-                "entry_cost": {"leader_stamina": TIME_FORT_STAMINA_COST}, "time_storm": {"interval_rounds": 3, "damage_bp": 500},
+                "entry_cost": {"leader_stamina": TIME_FORT_STAMINA_COST}, "time_storm": {"interval_rounds": TIME_FORT_STORM_INTERVAL, "damage_bp": TIME_FORT_STORM_DAMAGE_BP},
             }
             try:
                 change_player_state(

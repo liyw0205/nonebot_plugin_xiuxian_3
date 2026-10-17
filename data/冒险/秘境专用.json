@@ -312,6 +312,134 @@
           "label": "旁线之门"
         }
       ]
+    },
+    {
+      "key": "instance.secret_realm.void_ruins",
+      "name": "虚空遗迹",
+      "desc": "以破碎信标与档案守卫为路的虚空遗迹秘境。",
+      "status": "active",
+      "label": "虚空遗迹秘境",
+      "aliases": [
+        "虚空遗迹秘境"
+      ],
+      "location_key": "void.archive_ruins",
+      "party_type": "secret_realm_void_ruins",
+      "realm_key": "void_refining",
+      "realm_layer": 1,
+      "min_members": 2,
+      "max_members": 5,
+      "stamina_cost": 50,
+      "anchor_lock": 1,
+      "weekly_limit": 1,
+      "expiry_seconds": 3600,
+      "permission": "access.void.time_fort",
+      "codex_entry_key": "codex.void.route_ruins",
+      "repeat_reward": {
+        "item.void_crystal": 1
+      },
+      "nodes": [
+        {
+          "key": "ruins_entrance",
+          "label": "遗迹入口"
+        },
+        {
+          "key": "fractured_beacon",
+          "label": "破碎信标"
+        },
+        {
+          "key": "void_corridor",
+          "label": "虚空回廊"
+        },
+        {
+          "key": "rift_sentinel",
+          "label": "裂隙哨卫",
+          "enemy_key": "enemy.void_ruins_sentinel",
+          "unstable_enemy_key": "enemy.void_ruins_sentinel_unstable"
+        },
+        {
+          "key": "archive_fringe",
+          "label": "档案外围"
+        },
+        {
+          "key": "unstable_storm",
+          "label": "虚空风暴"
+        },
+        {
+          "key": "anchor_field",
+          "label": "锚点原野"
+        },
+        {
+          "key": "archive_keeper",
+          "label": "档案守卫",
+          "enemy_key": "enemy.void_ruins_keeper",
+          "unstable_enemy_key": "enemy.void_ruins_keeper_unstable"
+        },
+        {
+          "key": "route_tablet",
+          "label": "航道石碑"
+        },
+        {
+          "key": "exit_gate",
+          "label": "归航之门"
+        }
+      ]
+    },
+    {
+      "key": "instance.secret_realm.time_fort",
+      "name": "时序堡垒",
+      "desc": "以星时回廊与时间风暴为路的时序堡垒秘境。",
+      "status": "active",
+      "label": "时序堡垒秘境",
+      "aliases": [
+        "时序堡垒秘境"
+      ],
+      "location_key": "void.archive_ruins",
+      "party_type": "secret_realm_time_fort",
+      "realm_key": "void_refining",
+      "realm_layer": 1,
+      "min_members": 2,
+      "max_members": 5,
+      "stamina_cost": 40,
+      "weekly_limit": 1,
+      "expiry_seconds": 3600,
+      "permission": "access.void.time_fort",
+      "story_flag": "story.mainline.void_archive.time_fort",
+      "first_reward": {
+        "item.mat.array_sand": 2
+      },
+      "repeat_reward": {
+        "item.mat.array_sand": 1
+      },
+      "storm_interval_rounds": 3,
+      "storm_damage_bp": 500,
+      "enemy_key": "enemy.time_fort_keeper",
+      "nodes": [
+        {
+          "key": "fort_gate",
+          "label": "堡垒门庭"
+        },
+        {
+          "key": "clock_gallery",
+          "label": "星时回廊"
+        },
+        {
+          "key": "time_storm",
+          "label": "时间风暴"
+        },
+        {
+          "key": "broken_hourglass",
+          "label": "残破沙漏"
+        },
+        {
+          "key": "time_keeper",
+          "label": "守时者",
+          "enemy_key": "enemy.time_fort_keeper"
+        },
+        {
+          "key": "chronicle_exit",
+          "label": "编年出口"
+        }
+      ]
     }
   ]
 }

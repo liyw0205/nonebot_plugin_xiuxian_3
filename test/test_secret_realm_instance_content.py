@@ -14,6 +14,8 @@ from nonebot_plugin_xiuxian_3.xiuxian.adventures import (
     demon_abyss_rules,
     heaven_echo_rules,
     legacy_manor_rules,
+    time_fort_rules,
+    void_ruins_rules,
 )
 from nonebot_plugin_xiuxian_3.xiuxian.adventures.secret_realm_content import (
     KIND,
@@ -36,6 +38,8 @@ INSTANCE_KEYS = (
     "instance.secret_realm.dao_origin",
     "instance.secret_realm.demon_abyss",
     "instance.secret_realm.heaven_echo",
+    "instance.secret_realm.time_fort",
+    "instance.secret_realm.void_ruins",
 )
 
 
@@ -203,6 +207,58 @@ def test_legacy_manors_match_the_shipped_contract() -> None:
         legacy_manor_rules.get_legacy_manor_definition("instance.legacy.nope")
 
 
+def test_time_fort_record_matches_the_shipped_contract() -> None:
+    record = secret_realm_record(time_fort_rules.TIME_FORT_KEY)
+    assert record["location_key"] == time_fort_rules.TIME_FORT_LOCATION == "void.archive_ruins"
+    assert record["party_type"] == time_fort_rules.TIME_FORT_PARTY_TYPE == "secret_realm_time_fort"
+    assert record["realm_key"] == time_fort_rules.TIME_FORT_REALM == "void_refining"
+    assert record["realm_layer"] == time_fort_rules.TIME_FORT_REALM_LAYER == 1
+    assert record["min_members"] == time_fort_rules.TIME_FORT_MIN_MEMBERS == 2
+    assert record["max_members"] == time_fort_rules.TIME_FORT_MAX_MEMBERS == 5
+    assert record["stamina_cost"] == time_fort_rules.TIME_FORT_STAMINA_COST == 40
+    assert record["weekly_limit"] == time_fort_rules.TIME_FORT_WEEKLY_LIMIT == 1
+    assert record["expiry_seconds"] == time_fort_rules.TIME_FORT_EXPIRY_SECONDS == 3600
+    assert record["permission"] == time_fort_rules.TIME_FORT_PERMISSION == "access.void.time_fort"
+    assert record["story_flag"] == time_fort_rules.TIME_FORT_STORY_FLAG == "story.mainline.void_archive.time_fort"
+    assert record["storm_interval_rounds"] == time_fort_rules.TIME_FORT_STORM_INTERVAL == 3
+    assert record["storm_damage_bp"] == time_fort_rules.TIME_FORT_STORM_DAMAGE_BP == 500
+    assert record["enemy_key"] == time_fort_rules.TIME_FORT_ENEMY == "enemy.time_fort_keeper"
+    assert record["first_reward"] == time_fort_rules.TIME_FORT_FIRST_REWARD == {"item.mat.array_sand": 2}
+    assert record["repeat_reward"] == time_fort_rules.TIME_FORT_REPEAT_REWARD == {"item.mat.array_sand": 1}
+    assert tuple(node["key"] for node in record["nodes"]) == time_fort_rules.TIME_FORT_NODES
+    assert node_labels(record) == time_fort_rules.TIME_FORT_NODE_LABELS
+    assert time_fort_rules.resolve_time_fort_node("堡垒门庭") == "fort_gate"
+    assert time_fort_rules.resolve_time_fort_node("5") == "time_keeper"
+
+
+def test_void_ruins_record_matches_the_shipped_contract() -> None:
+    record = secret_realm_record(void_ruins_rules.VOID_RUINS_KEY)
+    assert record["location_key"] == void_ruins_rules.VOID_RUINS_LOCATION == "void.archive_ruins"
+    assert record["party_type"] == void_ruins_rules.VOID_RUINS_PARTY_TYPE == "secret_realm_void_ruins"
+    assert record["realm_key"] == void_ruins_rules.VOID_RUINS_REALM == "void_refining"
+    assert record["realm_layer"] == void_ruins_rules.VOID_RUINS_REALM_LAYER == 1
+    assert record["min_members"] == void_ruins_rules.VOID_RUINS_MIN_MEMBERS == 2
+    assert record["max_members"] == void_ruins_rules.VOID_RUINS_MAX_MEMBERS == 5
+    assert record["stamina_cost"] == void_ruins_rules.VOID_RUINS_STAMINA_COST == 50
+    assert record["anchor_lock"] == void_ruins_rules.VOID_RUINS_ANCHOR_LOCK == 1
+    assert record["weekly_limit"] == void_ruins_rules.VOID_RUINS_WEEKLY_LIMIT == 1
+    assert record["expiry_seconds"] == void_ruins_rules.VOID_RUINS_EXPIRY_SECONDS == 3600
+    assert record["permission"] == void_ruins_rules.VOID_RUINS_ROUTE_PERMISSION == "access.void.time_fort"
+    assert record["codex_entry_key"] == void_ruins_rules.VOID_RUINS_CODEX == "codex.void.route_ruins"
+    assert record["repeat_reward"] == void_ruins_rules.VOID_RUINS_REPEAT_REWARD == {"item.void_crystal": 1}
+    assert "first_reward" not in record, "the void-ruins first bonus is flag+codex, not an asset map"
+    assert tuple(node["key"] for node in record["nodes"]) == void_ruins_rules.VOID_RUINS_NODES
+    assert node_labels(record) == void_ruins_rules.VOID_RUINS_NODE_LABELS
+    assert void_ruins_rules.VOID_RUINS_ENEMIES == {
+        ("rift_sentinel", False): "enemy.void_ruins_sentinel",
+        ("rift_sentinel", True): "enemy.void_ruins_sentinel_unstable",
+        ("archive_keeper", False): "enemy.void_ruins_keeper",
+        ("archive_keeper", True): "enemy.void_ruins_keeper_unstable",
+    }
+    assert void_ruins_rules.resolve_void_ruins_node("裂隙哨卫") == "rift_sentinel"
+    assert void_ruins_rules.resolve_void_ruins_node("10") == "exit_gate"
+
+
 def test_node_aliases_resolve_key_label_and_ordinal() -> None:
     for record in secret_realm_records():
         aliases = node_aliases(record)
@@ -227,6 +283,38 @@ def test_node_aliases_resolve_key_label_and_ordinal() -> None:
         (lambda record: record.update({"first_reward": {"": 1}}), "empty reward key"),
         (lambda record: record.update({"first_reward": {"item.x": 0}}), "positive integer"),
         (lambda record: record.update({"aliases": []}), "non-empty list"),
+        (lambda record: record.update({"min_members": 3}), "member bounds must be declared together"),
+        (
+            lambda record: record.update({"min_members": 6, "max_members": 5}),
+            "max_members is below min_members",
+        ),
+        (lambda record: record.update({"min_members": 0, "max_members": 5}), "positive integer"),
+        (lambda record: record.update({"realm_key": "void_refining"}), "realm gate must be declared together"),
+        (lambda record: record.update({"realm_layer": 1}), "realm gate must be declared together"),
+        (
+            lambda record: record.update({"realm_key": "not_a_realm", "realm_layer": 1}),
+            "references unknown realm",
+        ),
+        (
+            lambda record: record.update({"storm_interval_rounds": 3}),
+            "storm contract must be declared together",
+        ),
+        (
+            lambda record: record.update({"storm_damage_bp": 500}),
+            "storm contract must be declared together",
+        ),
+        (
+            lambda record: record["nodes"][0].update({"unstable_enemy_key": "enemy.x"}),
+            "without a base enemy",
+        ),
+        (
+            lambda record: record["nodes"][0].update({"unstable_enemy_key": "  "}),
+            "invalid unstable enemy",
+        ),
+        (
+            lambda record: record["nodes"][0].update({"enemy_key": "enemy.x", "unstable_enemy_key": "enemy.y", "extra": 1}),
+            "missing or unknown fields",
+        ),
     ],
 )
 def test_secret_realm_rejects_invalid_contract(tmp_path: Path, mutate, message: str) -> None:
