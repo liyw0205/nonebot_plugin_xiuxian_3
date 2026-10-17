@@ -270,6 +270,22 @@ provenance `0f3b39ba`）。未跑全量/压测/部署，未验 QQ 真机。
 （混合适配器路线/风暴/重启/奖励与原子准入回归）、`test_secret_realm_intro.py`+
 `test_secret_realm_upper.py`+`test_party_combat.py` 10 passed。未跑全量/压测/部署，未验 QQ 真机。
 
+固定跨界贸易内容化已在 `develop` 完成（数据提交 `952314f`、清单种子迁移 `a152cea`）：
+新增 `data/经济/跨界贸易.json`（kind `cross_realm_trade`，4 条记录），`economy/cross_realm_trade_rules.py`
+的 3 条固定贸易（`trade.xuantian_to_demon` 云铁×10+200 灵石→魔核×1、`trade.xuantian_to_beast`
+灵叶×10+200 灵石→妖血×1、`trade.three_realms` 魔核×2+妖血×2→神魂晶×1 双声望 200/周限 3）、
+周上限 5、绑定 24 小时、三个贸易地点与全部中文别名改为内容派生，值与原硬编码表逐一相同，
+别名映射逐键相等，`resolve_trade`/`trade_definition`/`week_start` 语义不变，未知贸易仍抛 `ValueError`。
+新增共享加载器 `economy/cross_realm_trade_content.py`：`trade.defaults` 承载共享周限/绑定/声望默认值，
+逐贸易校验 status、name/desc/label 非空、地点存在（允许锁定地点）、物品引用存在、货币成本非负、
+物品数量为正、周限/绑定正数、阵营 ∈ {demon,beast,xuantian}、key 唯一、别名非空且无跨贸易冲突，
+非法均抛 `ContentError`；刻意锁定的贸易从运行集合排除而非报错。`data/内容清单.json` 登记新文件，
+其新旧 SHA-256（`9b0998cf…`→`3c83811…`）与 Git provenance 已登记 `scripts/seed_migrations.json`，
+迁移测试新增清单反向助手（旧清单+无贸易文件宿主升级、重复升级幂等），`test_seed_migration.py` 10 passed。
+聚焦证据：新增 `test_cross_realm_trade_content.py` 21 passed（默认值/三贸易合同/别名映射逐键相等、
+未知贸易 ValueError、18 项校验失败用例、锁定排除）；回归 `test_cross_realm_trade.py` 4 passed、
+`test_auction_rules.py`+`test_economy_commission.py` 123 passed。未跑全量/压测/部署，未验 QQ 真机。
+
 社交规则内容化与悬空引用修复已在 `develop` 完成（提交 `8646f8b`、`b01bd27`、`45800b1`、`83416d4`）：
 补齐缺失的 `item.clue.demon_abyss_echo` 物品记录（同族线索形状，名称沿用既有标签表「深渊残响线索」，
 筑基 L1 与深渊入口一致），使恶魔深渊首通奖励与深渊残响遗府的线索引用可解析；同时更正上一轮关于
