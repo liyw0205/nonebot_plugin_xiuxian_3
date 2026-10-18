@@ -331,7 +331,10 @@ def old_official_manifest() -> bytes:
     # only that entry from the current manifest.
     document = json.loads((ROOT / "data" / MANIFEST_FILE).read_text(encoding="utf-8"))
     document["files"] = [
-        entry for entry in document["files"] if entry != "经济/跨界贸易.json"
+        entry
+        for entry in document["files"]
+        if entry
+        not in {"经济/跨界贸易.json", "生产/设施.json", "生产/终局配方.json"}
     ]
     blob = (json.dumps(document, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
     rule = json.loads((ROOT / "scripts/seed_migrations.json").read_text(encoding="utf-8"))[
@@ -351,6 +354,8 @@ def test_manifest_seed_migrates_when_the_trade_file_is_registered(host: Path) ->
     # The host fixture copies the full data tree; an old host predating the
     # trade slice would not have the new file, so remove it explicitly.
     (host / "data" / TRADE_FILE).unlink()
+    (host / "data" / "生产/设施.json").unlink()
+    (host / "data" / "生产/终局配方.json").unlink()
     result = deploy(host)
     assert result.returncode == 0, result.stdout + result.stderr
     assert "matchers=1 handlers=1" in result.stdout
