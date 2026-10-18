@@ -1,28 +1,42 @@
-"""Rules for the first cross-realm player quest."""
+"""Rules for the first cross-realm player quest (content-backed)."""
 
 from __future__ import annotations
 
+from ..content import ContentBundle, bundled_content
+from .cross_realm_quest_content import quest_record
+
 DEMON_MAINLINE = "quest.demon_main_1"
-DEMON_MAINLINE_EXPLORATION = "explore.demon_abyss"
-DEMON_MAINLINE_EXPLORATION_TARGET = 2
-DEMON_MAINLINE_REQUIRED_REPUTATION = 200
-DEMON_MAINLINE_ACCESS_FLAG = "access.demon.fallen_ruins"
+
+_RECORD = quest_record(DEMON_MAINLINE)
+
+DEMON_MAINLINE_EXPLORATION = str(_RECORD["exploration_mode"])
+DEMON_MAINLINE_EXPLORATION_TARGET = int(_RECORD["exploration_target"])
+DEMON_MAINLINE_REQUIRED_REPUTATION = int(_RECORD["required_reputation"])
+DEMON_MAINLINE_ACCESS_FLAG = str(_RECORD["access_flag"])
+DEMON_MAINLINE_REQUIRED_REALM = str(_RECORD["required_realm"])
+DEMON_MAINLINE_REQUIRED_LAYER = int(_RECORD["required_layer"])
 
 
-def demon_mainline_realm_ready(realm_key: str, layer: int) -> bool:
-    ranks = {
-        "mortal": 0,
-        "qi_sensing": 1,
-        "qi_gathering": 2,
-        "foundation": 3,
-        "golden_core": 4,
-        "nascent_soul": 5,
-        "soul_transformation": 6,
-        "void_refining": 7,
-        "dao_union": 8,
-        "tribulation": 9,
-    }
-    return (ranks.get(realm_key, -1), int(layer)) >= (ranks["nascent_soul"], 1)
+def realm_rank(realm_key: str, content: ContentBundle | None = None) -> int:
+    """Rank of an open realm, read from the realm content instead of a table."""
+
+    bundle = content if content is not None else bundled_content()
+    try:
+        row = bundle.require("realm", realm_key, include_locked=False)
+    except KeyError:
+        return -1
+    rank = row.get("rank")
+    if isinstance(rank, bool) or not isinstance(rank, int):
+        raise ValueError(f"realm {realm_key} has no integer rank")
+    return int(rank)
+
+
+def demon_mainline_realm_ready(
+    realm_key: str, layer: int, content: ContentBundle | None = None
+) -> bool:
+    master_rank = realm_rank(DEMON_MAINLINE_REQUIRED_REALM, content)
+    rank = realm_rank(realm_key, content)
+    return (rank, int(layer)) >= (master_rank, DEMON_MAINLINE_REQUIRED_LAYER)
 
 
 __all__ = [
@@ -30,6 +44,9 @@ __all__ = [
     "DEMON_MAINLINE_ACCESS_FLAG",
     "DEMON_MAINLINE_EXPLORATION",
     "DEMON_MAINLINE_EXPLORATION_TARGET",
+    "DEMON_MAINLINE_REQUIRED_LAYER",
+    "DEMON_MAINLINE_REQUIRED_REALM",
     "DEMON_MAINLINE_REQUIRED_REPUTATION",
     "demon_mainline_realm_ready",
+    "realm_rank",
 ]
