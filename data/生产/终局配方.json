@@ -1,0 +1,77 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "endgame_recipe",
+  "records": [
+    {
+      "key": "endgame.defaults",
+      "name": "终局配方规则",
+      "desc": "个人终局配方的成功阈值与道果进度上限。",
+      "status": "active",
+      "success_threshold_bp": 8000,
+      "dao_fruit_progress_cap": 1300,
+      "ascension_certificate_key": "item.ascension_certificate"
+    },
+    {
+      "key": "recipe.dao.fruit_fragment",
+      "name": "道果碎片加工",
+      "desc": "以道果碎片与灵魂晶加工道果进度。",
+      "status": "active",
+      "label": "道果碎片加工",
+      "duration_seconds": 1200,
+      "inputs": {
+        "item.dao_fruit_fragment": 10,
+        "item.soul_crystal": 5
+      },
+      "output_progress": 100,
+      "required_realm": "dao_union",
+      "required_endgame_statuses": [
+        "dao_union",
+        "tribulation"
+      ],
+      "aliases": [
+        "道果碎片加工"
+      ]
+    },
+    {
+      "key": "recipe.tribulation.guard",
+      "name": "天劫保护阵",
+      "desc": "以天劫令与领域核心炼制天劫护身阵。",
+      "status": "active",
+      "label": "天劫保护阵",
+      "duration_seconds": 1800,
+      "inputs": {
+        "item.tribulation_token": 1,
+        "item.domain_core": 3
+      },
+      "output_item": "item.tribulation_guard",
+      "required_realm": "tribulation",
+      "required_endgame_statuses": [
+        "tribulation"
+      ],
+      "aliases": [
+        "天劫保护阵"
+      ]
+    },
+    {
+      "key": "recipe.ascension.certificate",
+      "name": "飞升凭证",
+      "desc": "以世界功勋换取飞升凭证，须于飞升台炼成。",
+      "status": "active",
+      "label": "飞升凭证",
+      "duration_seconds": 600,
+      "inputs": {},
+      "output_item": "item.ascension_certificate",
+      "world_merit_cost": 1000,
+      "required_progress": 800,
+      "required_ascension_merit": 1000,
+      "required_realm": "tribulation",
+      "required_endgame_statuses": [
+        "tribulation"
+      ],
+      "required_location": "tribulation.sky_terrace",
+      "aliases": [
+        "飞升凭证"
+      ]
+    }
+  ]
+}

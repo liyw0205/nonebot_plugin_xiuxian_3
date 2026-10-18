@@ -1,0 +1,103 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "production_facility",
+  "records": [
+    {
+      "key": "facility.defaults",
+      "name": "洞天设施规则",
+      "desc": "雾隐洞天设施槽位的地点、维护费与工期加成。",
+      "status": "active",
+      "location_key": "cave.mist_grotto_2",
+      "maintenance_fee": 100,
+      "duration_bonus_bp": 1000
+    },
+    {
+      "key": "facility.mist_field.1",
+      "name": "灵田1",
+      "desc": "雾隐洞天的第一块灵田，可种植作物。",
+      "status": "active",
+      "label": "灵田1",
+      "facility_kind": "field",
+      "slot_index": 1,
+      "aliases": [
+        "灵田1",
+        "灵田"
+      ]
+    },
+    {
+      "key": "facility.mist_field.2",
+      "name": "灵田2",
+      "desc": "雾隐洞天的第二块灵田，可种植作物。",
+      "status": "active",
+      "label": "灵田2",
+      "facility_kind": "field",
+      "slot_index": 2,
+      "aliases": [
+        "灵田2"
+      ]
+    },
+    {
+      "key": "facility.mist_field.3",
+      "name": "灵田3",
+      "desc": "雾隐洞天的第三块灵田，可种植作物。",
+      "status": "active",
+      "label": "灵田3",
+      "facility_kind": "field",
+      "slot_index": 3,
+      "aliases": [
+        "灵田3"
+      ]
+    },
+    {
+      "key": "facility.mist_field.4",
+      "name": "灵田4",
+      "desc": "雾隐洞天的第四块灵田，可种植作物。",
+      "status": "active",
+      "label": "灵田4",
+      "facility_kind": "field",
+      "slot_index": 4,
+      "aliases": [
+        "灵田4"
+      ]
+    },
+    {
+      "key": "facility.alchemy_room.1",
+      "name": "炼丹房",
+      "desc": "雾隐洞天的炼丹房，供炼丹配方使用。",
+      "status": "active",
+      "label": "炼丹房",
+      "facility_kind": "alchemy",
+      "slot_index": 1,
+      "aliases": [
+        "炼丹房",
+        "炼丹"
+      ]
+    },
+    {
+      "key": "facility.artifice_table.1",
+      "name": "炼器台",
+      "desc": "雾隐洞天的炼器台，供炼器配方使用。",
+      "status": "active",
+      "label": "炼器台",
+      "facility_kind": "artifice",
+      "slot_index": 1,
+      "aliases": [
+        "炼器台",
+        "炼器"
+      ]
+    },
+    {
+      "key": "facility.array_base.1",
+      "name": "阵基",
+      "desc": "雾隐洞天的阵基，供阵法配方使用。",
+      "status": "active",
+      "label": "阵基",
+      "facility_kind": "array",
+      "slot_index": 1,
+      "aliases": [
+        "阵基",
+        "布阵"
+      ]
+    }
+  ]
+}
