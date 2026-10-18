@@ -306,6 +306,24 @@ key 唯一、别名无跨记录冲突，非法均抛 `ContentError`。`facility_
 `MAINLINE_OBJECTIVES_INCOMPLETE`，源自 `aae19b2` 目标门先于该测试更新），与本次改动无关。
 未跑全量/压测/部署，未验 QQ 真机。
 
+魔界主线任务内容化已在 `develop` 完成（数据提交 `30a756f`、清单种子迁移 `bd2305e`）：
+新增 `data/任务/跨界任务.json`（kind `cross_realm_quest`，2 条记录：`cross_realm_quest.defaults`
+承载阵营白名单 {demon,beast,xuantian}；`quest.demon_main_1` 承载标签「魔界主线」、证据模式
+`explore.demon_abyss` 目标 2、魔界声望 200、元婴 L1 门槛、授予旗标 `access.demon.fallen_ruins`
+与中文别名）。新增共享加载器 `quests/cross_realm_quest_content.py`：逐记录校验 status、
+name/desc/label 非空、探索模式引用须为开放模式（锁定模式与未知模式分别报错）、境界引用须开放、
+阵营属于白名单、数值为正、key 唯一、`access.` 命名空间、别名无跨记录冲突，非法均抛 `ContentError`。
+`quests/cross_realm_rules.py` 改为导入期内容派生并导出原名称；`demon_mainline_realm_ready` 不再读
+止于渡劫的硬编码境界阶表，改取 `data/境界/境界.json` 的 `rank`（表外境界不再误判 -1，未知境界 -
+1 拒绝）；领取仓库把内容束传入境界门，快照内联的 `required_realm`/`required_layer` 同步改由
+常量填充。全部值与原硬编码逐一相同，导出名、领取 operation、快照与幂等回放语义不变。
+`data/内容清单.json` 登记新文件，其新旧 SHA-256（`d41820dc…`→`5a8eba45…`）与 Git provenance 已登记
+`scripts/seed_migrations.json`，迁移反向助手同步移除跨界任务文件（旧清单宿主升级、重复升级幂等），
+`test_seed_migration.py` 10 passed。聚焦证据：新增 `test_cross_realm_quest_content.py` 20 passed
+（合同与常量一致、境界门行为、16 项校验失败用例、未知任务拒绝）；回归 `test_demon_mainline.py`+
+`test_repository_boundaries.py` 5 passed。`test_high_realm_quests.py` 3 项失败经 stash 对照确认为
+改动前既有失败，与本次改动无关。未跑全量/压测/部署，未验 QQ 真机。
+
 社交规则内容化与悬空引用修复已在 `develop` 完成（提交 `8646f8b`、`b01bd27`、`45800b1`、`83416d4`）：
 补齐缺失的 `item.clue.demon_abyss_echo` 物品记录（同族线索形状，名称沿用既有标签表「深渊残响线索」，
 筑基 L1 与深渊入口一致），使恶魔深渊首通奖励与深渊残响遗府的线索引用可解析；同时更正上一轮关于
