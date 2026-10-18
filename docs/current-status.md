@@ -286,6 +286,26 @@ provenance `0f3b39ba`）。未跑全量/压测/部署，未验 QQ 真机。
 未知贸易 ValueError、18 项校验失败用例、锁定排除）；回归 `test_cross_realm_trade.py` 4 passed、
 `test_auction_rules.py`+`test_economy_commission.py` 123 passed。未跑全量/压测/部署，未验 QQ 真机。
 
+洞天设施与终局配方内容化已在 `develop` 完成（数据提交 `ad57c8f`、清单种子迁移 `72bd47f`）：
+新增 `data/生产/设施.json`（kind `production_facility`，8 条记录：`facility.defaults` 承载地点
+`cave.mist_grotto_2`、维护费 100、工期加成 1000 bp；7 个槽位——灵田 1–4、炼丹房、炼器台、阵基——
+含 kind、槽位序号与全部中文别名）与 `data/生产/终局配方.json`（kind `endgame_recipe`，4 条记录：
+`endgame.defaults` 承载成功阈值 8000 bp、道果进度上限 1300 与飞升凭证物品键；3 条终局配方——
+道果碎片加工、天劫保护阵、飞升凭证——含时长、输入、产出物品/进度、世界功勋、进度/功勋/境界/
+终局状态门与地点门）。新增共享加载器 `production/content_rules.py`：逐记录校验 status、name/desc/label
+非空、物品/地点/境界引用存在、数值为正、设施 kind ∈ {field,alchemy,artifice,array}、终局状态白名单、
+key 唯一、别名无跨记录冲突，非法均抛 `ContentError`。`facility_rules.py` 与 `endgame_rules.py`
+改为导入期内容派生并导出原名称，槽位顺序保持既有 field→alchemy→artifice→array 排列，
+`resolve_facility`/`facility_for_kind`/`endgame_recipe`/`resolve_endgame_recipe`/`recipe_roll_bp`
+语义不变，未知设施仍抛 `ValueError`。`data/内容清单.json` 登记两个新文件，其新旧 SHA-256
+（`3c83811…`→`d41820d…`）与 Git provenance 已登记 `scripts/seed_migrations.json`，迁移测试
+反向助手同步移除两个新生产文件（旧清单宿主升级、重复升级幂等），`test_seed_migration.py` 10 passed。
+聚焦证据：新增 `test_production_content_rules.py` 24 passed（默认值/7 槽位/3 配方合同与别名逐键相等、
+未知设施 ValueError、20 项校验失败用例）；回归 `test_production.py`（设施认领/维护/订单槽位生命周期）
+8 passed。`test_endgame_producers.py` 1 项失败经 stash 对照确认为改动前既有失败（道源主线目标门
+`MAINLINE_OBJECTIVES_INCOMPLETE`，源自 `aae19b2` 目标门先于该测试更新），与本次改动无关。
+未跑全量/压测/部署，未验 QQ 真机。
+
 社交规则内容化与悬空引用修复已在 `develop` 完成（提交 `8646f8b`、`b01bd27`、`45800b1`、`83416d4`）：
 补齐缺失的 `item.clue.demon_abyss_echo` 物品记录（同族线索形状，名称沿用既有标签表「深渊残响线索」，
 筑基 L1 与深渊入口一致），使恶魔深渊首通奖励与深渊残响遗府的线索引用可解析；同时更正上一轮关于

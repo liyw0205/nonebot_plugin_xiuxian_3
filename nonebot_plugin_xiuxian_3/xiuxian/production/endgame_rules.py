@@ -1,15 +1,17 @@
-"""Definitions for personal endgame recipes."""
+"""Definitions for personal endgame recipes (content-backed)."""
 
 from __future__ import annotations
-
 
 from dataclasses import dataclass
 from hashlib import blake2b
 
+from .content_rules import endgame_defaults, endgame_records
 
-SUCCESS_THRESHOLD_BP = 8_000
-DAO_FRUIT_PROGRESS_CAP = 1_300
-ASCENSION_CERTIFICATE_KEY = "item.ascension_certificate"
+_ENDGAME_DEFAULTS = endgame_defaults()
+
+SUCCESS_THRESHOLD_BP = int(_ENDGAME_DEFAULTS["success_threshold_bp"])
+DAO_FRUIT_PROGRESS_CAP = int(_ENDGAME_DEFAULTS["dao_fruit_progress_cap"])
+ASCENSION_CERTIFICATE_KEY = str(_ENDGAME_DEFAULTS["ascension_certificate_key"])
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,42 +29,33 @@ class EndgameRecipeDefinition:
     required_location: str = "dao.origin_gate"
 
 
+def _definition(record: dict) -> EndgameRecipeDefinition:
+    return EndgameRecipeDefinition(
+        key=str(record["key"]),
+        duration_seconds=int(record["duration_seconds"]),
+        inputs=dict(record["inputs"]),
+        output_item=record.get("output_item"),
+        output_progress=int(record.get("output_progress", 0)),
+        world_merit_cost=int(record.get("world_merit_cost", 0)),
+        required_progress=int(record.get("required_progress", 0)),
+        required_ascension_merit=int(record.get("required_ascension_merit", 0)),
+        required_realm=str(record["required_realm"]),
+        required_endgame_statuses=tuple(record.get("required_endgame_statuses", ())),
+        required_location=str(record.get("required_location", "dao.origin_gate")),
+    )
+
+
 ENDGAME_RECIPES = {
-    "recipe.dao.fruit_fragment": EndgameRecipeDefinition(
-        key="recipe.dao.fruit_fragment",
-        duration_seconds=20 * 60,
-        inputs={"item.dao_fruit_fragment": 10, "item.soul_crystal": 5},
-        output_progress=100,
-        required_realm="dao_union",
-        required_endgame_statuses=("dao_union", "tribulation"),
-    ),
-    "recipe.tribulation.guard": EndgameRecipeDefinition(
-        key="recipe.tribulation.guard",
-        duration_seconds=30 * 60,
-        inputs={"item.tribulation_token": 1, "item.domain_core": 3},
-        output_item="item.tribulation_guard",
-        required_realm="tribulation",
-        required_endgame_statuses=("tribulation",),
-    ),
-    "recipe.ascension.certificate": EndgameRecipeDefinition(
-        key="recipe.ascension.certificate",
-        duration_seconds=10 * 60,
-        inputs={},
-        output_item=ASCENSION_CERTIFICATE_KEY,
-        world_merit_cost=1_000,
-        required_progress=800,
-        required_ascension_merit=1_000,
-        required_realm="tribulation",
-        required_endgame_statuses=("tribulation",),
-        required_location="tribulation.sky_terrace",
-    ),
+    str(record["key"]): _definition(record) for record in endgame_records()
 }
 
 RECIPE_ALIASES = {
-    **{key: key for key in ENDGAME_RECIPES},
-    "道果碎片加工": "recipe.dao.fruit_fragment",
-    "天劫保护阵": "recipe.tribulation.guard",
-    "飞升凭证": "recipe.ascension.certificate",
+    **{str(record["key"]): str(record["key"]) for record in endgame_records()},
+    **{
+        alias: str(record["key"])
+        for record in endgame_records()
+        for alias in record["aliases"]
+    },
 }
 
 

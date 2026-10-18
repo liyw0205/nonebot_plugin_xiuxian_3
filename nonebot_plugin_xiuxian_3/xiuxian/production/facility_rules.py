@@ -1,13 +1,16 @@
-"""Rules and stable keys for the cave facility slots."""
+"""Rules and stable keys for the cave facility slots (content-backed)."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .content_rules import facility_defaults, facility_records
 
-FACILITY_LOCATION = "cave.mist_grotto_2"
-FACILITY_MAINTENANCE_FEE = 100
-FACILITY_DURATION_BONUS_BP = 1000
+_FACILITY_DEFAULTS = facility_defaults()
+
+FACILITY_LOCATION = str(_FACILITY_DEFAULTS["location_key"])
+FACILITY_MAINTENANCE_FEE = int(_FACILITY_DEFAULTS["maintenance_fee"])
+FACILITY_DURATION_BONUS_BP = int(_FACILITY_DEFAULTS["duration_bonus_bp"])
 
 
 @dataclass(frozen=True, slots=True)
@@ -19,23 +22,25 @@ class FacilityDefinition:
     location_key: str = FACILITY_LOCATION
 
 
-FACILITY_DEFINITIONS: tuple[FacilityDefinition, ...] = (
-    *(FacilityDefinition(f"facility.mist_field.{index}", f"灵田{index}", "field", index) for index in range(1, 5)),
-    FacilityDefinition("facility.alchemy_room.1", "炼丹房", "alchemy", 1),
-    FacilityDefinition("facility.artifice_table.1", "炼器台", "artifice", 1),
-    FacilityDefinition("facility.array_base.1", "阵基", "array", 1),
+def _definition(record: dict) -> FacilityDefinition:
+    return FacilityDefinition(
+        slot_key=str(record["key"]),
+        name=str(record["name"]),
+        facility_kind=str(record["facility_kind"]),
+        slot_index=int(record["slot_index"]),
+        location_key=str(record["location_key"]),
+    )
+
+
+FACILITY_DEFINITIONS: tuple[FacilityDefinition, ...] = tuple(
+    _definition(record) for record in facility_records()
 )
 
 FACILITY_BY_KEY = {item.slot_key: item for item in FACILITY_DEFINITIONS}
 FACILITY_ALIASES = {
-    **{f"灵田{index}": f"facility.mist_field.{index}" for index in range(1, 5)},
-    "灵田": "facility.mist_field.1",
-    "炼丹房": "facility.alchemy_room.1",
-    "炼丹": "facility.alchemy_room.1",
-    "炼器台": "facility.artifice_table.1",
-    "炼器": "facility.artifice_table.1",
-    "阵基": "facility.array_base.1",
-    "布阵": "facility.array_base.1",
+    alias: str(record["key"])
+    for record in facility_records()
+    for alias in record["aliases"]
 }
 
 
