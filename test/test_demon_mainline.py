@@ -9,7 +9,10 @@ from tempfile import TemporaryDirectory
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
+from combat_fixtures import BALANCED_QUALIFICATION, equip_damage_weapon
 from travel_fixtures import set_travel_end_at
+
+FIXTURE_MAX_HP = 2_000
 
 
 def _context(adapter: str, user: str, request: str, operation: str = "") -> CommandContext:
@@ -38,11 +41,13 @@ async def _player(runtime, adapter: str, user: str, *, flag: bool = True) -> Non
             UPDATE players
             SET stage='cultivator', realm_key='nascent_soul', realm_layer=1,
                 location_key='demon.abyss_gate', stamina=100, stamina_max=100,
-                energy=100, energy_max=100, max_hp=600,
+                energy=100, energy_max=100, max_hp=2000,
+                qualification_json=?,
                 faction_reputation_json=?, intro_json=?
             WHERE platform=? AND platform_user_id=?
             """,
             (
+                json.dumps(BALANCED_QUALIFICATION),
                 json.dumps({"demon": 200}),
                 json.dumps({"flags": flags}),
                 adapter,
@@ -75,6 +80,7 @@ def test_demon_mainline_requires_server_evidence_and_unlocks_both_adapters() -> 
                 runtime = create_runtime(data_dir=Path(data_dir) / adapter)
                 user = f"demon-mainline-{adapter}"
                 await _player(runtime, adapter, user)
+                equip_damage_weapon(runtime, adapter, user, 50_000)
 
                 with sqlite3.connect(runtime.settings.database_path) as connection:
                     connection.execute(
@@ -148,8 +154,16 @@ def test_demon_mainline_requires_server_evidence_and_unlocks_both_adapters() -> 
                         if source["key"] == "permanent"
                     )
                     assert player_stats == stat_snapshot["combat_stats"]
-                    assert permanent_source["value"]["max_hp"] == 600
-                    assert battle_snapshot["player"]["stats"]["attack"] == 10 + qualification["body"] // 2
+                    assert permanent_source["value"]["max_hp"] == FIXTURE_MAX_HP
+                    equipment_source = next(
+                        source for source in stat_snapshot["source_refs"]
+                        if source["key"] == "equipment"
+                    )
+                    assert battle_snapshot["player"]["stats"]["attack"] == (
+                        10
+                        + qualification["body"] // 2
+                        + int(equipment_source["effect"]["attack"])
+                    )
                     assert battle_snapshot["player"]["cross_realm_penalty_bp"] == 1000
 
                 claim = await runtime.adapters.dispatch(
