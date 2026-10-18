@@ -19,6 +19,8 @@ from .cross_realm_rules import (
     DEMON_MAINLINE_ACCESS_FLAG,
     DEMON_MAINLINE_EXPLORATION,
     DEMON_MAINLINE_EXPLORATION_TARGET,
+    DEMON_MAINLINE_REQUIRED_LAYER,
+    DEMON_MAINLINE_REQUIRED_REALM,
     DEMON_MAINLINE_REQUIRED_REPUTATION,
     demon_mainline_realm_ready,
 )
@@ -67,7 +69,7 @@ class DemonQuestRepositoryMixin:
             ).fetchone()
             if existing is not None and str(existing["status"]) in {"completed", "claimed"}:
                 raise QuestAlreadyCompletedError("demon mainline is already claimed")
-            if not demon_mainline_realm_ready(str(player["realm_key"]), player_integer(player, "realm_layer")):
+            if not demon_mainline_realm_ready(str(player["realm_key"]), player_integer(player, "realm_layer"), self.content):
                 raise QuestRequirementError("demon mainline requires nascent soul L1")
 
             demon_reputation = player_reputation(player).get("demon", 0)
@@ -80,8 +82,8 @@ class DemonQuestRepositoryMixin:
             evidence = evidence[:DEMON_MAINLINE_EXPLORATION_TARGET]
             snapshot: dict[str, object] = {
                 "quest_key": DEMON_MAINLINE,
-                "required_realm": "nascent_soul",
-                "required_layer": 1,
+                "required_realm": DEMON_MAINLINE_REQUIRED_REALM,
+                "required_layer": DEMON_MAINLINE_REQUIRED_LAYER,
                 "required_reputation": DEMON_MAINLINE_REQUIRED_REPUTATION,
                 "exploration_mode": DEMON_MAINLINE_EXPLORATION,
                 "exploration_target": DEMON_MAINLINE_EXPLORATION_TARGET,
