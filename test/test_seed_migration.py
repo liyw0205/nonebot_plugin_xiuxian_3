@@ -336,6 +336,7 @@ def old_official_manifest() -> bytes:
         if entry
         not in {
             "经济/跨界贸易.json",
+            "经济/贸易许可.json",
             "生产/设施.json",
             "生产/终局配方.json",
             "任务/跨界任务.json",
@@ -360,6 +361,7 @@ def test_manifest_seed_migrates_when_the_trade_file_is_registered(host: Path) ->
     # The host fixture copies the full data tree; an old host predating the
     # trade slice would not have the new file, so remove it explicitly.
     (host / "data" / TRADE_FILE).unlink()
+    (host / "data" / "经济/贸易许可.json").unlink()
     (host / "data" / "生产/设施.json").unlink()
     (host / "data" / "生产/终局配方.json").unlink()
     (host / "data" / "任务/跨界任务.json").unlink()
