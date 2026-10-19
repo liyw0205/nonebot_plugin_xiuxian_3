@@ -1,13 +1,10 @@
-"""Stable rules for demon and beast trade permits."""
+"""Stable rules for demon and beast trade permits (content-backed)."""
 
 from __future__ import annotations
 
-
 from dataclasses import dataclass
 
-
-PERMIT_DURATION_SECONDS = 7 * 24 * 60 * 60
-PERMIT_COST = 500
+from .trade_permit_content import permit_records
 
 
 @dataclass(frozen=True, slots=True)
@@ -17,26 +14,37 @@ class TradePermitDefinition:
     faction_key: str
     required_quest: str
     reputation_required: int = 80
-    cost: int = PERMIT_COST
-    duration_seconds: int = PERMIT_DURATION_SECONDS
+    cost: int = 500
+    duration_seconds: int = 7 * 24 * 60 * 60
+
+
+def _definition(record: dict) -> TradePermitDefinition:
+    return TradePermitDefinition(
+        key=str(record["key"]),
+        label=str(record["label"]),
+        faction_key=str(record["faction"]),
+        required_quest=str(record["required_quest_flag"]),
+        reputation_required=int(record["required_reputation"]),
+        cost=int(record["cost"]),
+        duration_seconds=int(record["duration_seconds"]),
+    )
 
 
 TRADE_PERMITS = {
-    "permit.demon_trade": TradePermitDefinition(
-        "permit.demon_trade", "魔界贸易许可", "demon", "quest.demon_intro"
-    ),
-    "permit.beast_trade": TradePermitDefinition(
-        "permit.beast_trade", "妖界贸易许可", "beast", "quest.beast_intro"
-    ),
+    str(record["key"]): _definition(record) for record in permit_records()
 }
 
+PERMIT_COST = min(definition.cost for definition in TRADE_PERMITS.values())
+PERMIT_DURATION_SECONDS = max(
+    definition.duration_seconds for definition in TRADE_PERMITS.values()
+)
+
 ALIASES = {
-    "魔界": "permit.demon_trade",
-    "魔界贸易": "permit.demon_trade",
-    "魔界贸易许可": "permit.demon_trade",
-    "妖界": "permit.beast_trade",
-    "妖界贸易": "permit.beast_trade",
-    "妖界贸易许可": "permit.beast_trade",
+    **{
+        alias: str(record["key"])
+        for record in permit_records()
+        for alias in record["aliases"]
+    },
     **{key: key for key in TRADE_PERMITS},
 }
 

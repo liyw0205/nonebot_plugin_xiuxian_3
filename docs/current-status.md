@@ -306,6 +306,21 @@ key 唯一、别名无跨记录冲突，非法均抛 `ContentError`。`facility_
 `MAINLINE_OBJECTIVES_INCOMPLETE`，源自 `aae19b2` 目标门先于该测试更新），与本次改动无关。
 未跑全量/压测/部署，未验 QQ 真机。
 
+跨界贸易许可内容化已在 `develop` 完成（数据提交 `7b4ae3c`、清单种子迁移 `1c83dbd`）：
+新增 `data/经济/贸易许可.json`（kind `trade_permit`，3 条记录：`trade_permit.defaults` 承载
+阵营白名单 {demon,beast,xuantian}；`permit.demon_trade`/`permit.beast_trade` 承载标签、阵营、
+引路旗标 `quest.demon_intro`/`quest.beast_intro`、声望门槛 80、售价 500 灵石、七日时效与全部
+中文别名）。新增共享加载器 `livelihood/trade_permit_content.py`：逐记录校验 status、
+name/desc/label 非空、阵营属于白名单、旗标须在 `quest.` 命名空间、经济数值为正、key 唯一、
+别名无跨记录冲突，非法均抛 `ContentError`。`livelihood/trade_permit_rules.py` 改为导入期内容
+派生并导出原名称（TRADE_PERMITS/ALIASES/resolve_trade_permit 等），全部值与原硬编码表逐一相同，
+未知许可仍抛 `ValueError`，签发 operation、快照与幂等回放语义不变。`data/内容清单.json` 登记新
+文件，其新旧 SHA-256（`bbeb2104…`→`927b9ef1…`）与 Git provenance 已登记
+`scripts/seed_migrations.json`，迁移反向助手同步移除贸易许可文件（旧清单宿主升级、重复升级幂等），
+`test_seed_migration.py` 10 passed。聚焦证据：新增 `test_trade_permit_content.py` 18 passed
+（合同与常量一致、别名逐键相等、未知许可 ValueError、14 项校验失败用例与加载期重复键拒绝）；
+回归 `test_trade_permit_dispatch.py` 3 passed。未跑全量/压测/部署，未验 QQ 真机。
+
 竞技场家族内容化已在 `develop` 完成（数据提交 `dbb563f`、清单种子迁移 `0a6e71d`）：
 新增 `data/特殊/竞技场.json`（kind `arena_rule`，4 条记录：`arena.defaults` 承载段位带
 500/1000/1500 与阵营清单 {xuantian,demon,beast}；`arena.spar` 承载个人竞技快照 7 天/30 分钟、

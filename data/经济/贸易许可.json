@@ -1,0 +1,51 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "trade_permit",
+  "records": [
+    {
+      "key": "trade_permit.defaults",
+      "name": "跨界贸易许可规则",
+      "desc": "魔界与妖界贸易许可的共享契约：阵营清单。",
+      "status": "active",
+      "factions": [
+        "demon",
+        "beast",
+        "xuantian"
+      ]
+    },
+    {
+      "key": "permit.demon_trade",
+      "name": "魔界贸易许可",
+      "desc": "持魔界引路凭证与足够声望后，购买七日魔界贸易资格。",
+      "status": "active",
+      "label": "魔界贸易许可",
+      "aliases": [
+        "魔界",
+        "魔界贸易",
+        "魔界贸易许可"
+      ],
+      "faction": "demon",
+      "required_quest_flag": "quest.demon_intro",
+      "required_reputation": 80,
+      "cost": 500,
+      "duration_seconds": 604800
+    },
+    {
+      "key": "permit.beast_trade",
+      "name": "妖界贸易许可",
+      "desc": "持妖界引路凭证与足够声望后，购买七日妖界贸易资格。",
+      "status": "active",
+      "label": "妖界贸易许可",
+      "aliases": [
+        "妖界",
+        "妖界贸易",
+        "妖界贸易许可"
+      ],
+      "faction": "beast",
+      "required_quest_flag": "quest.beast_intro",
+      "required_reputation": 80,
+      "cost": 500,
+      "duration_seconds": 604800
+    }
+  ]
+}
