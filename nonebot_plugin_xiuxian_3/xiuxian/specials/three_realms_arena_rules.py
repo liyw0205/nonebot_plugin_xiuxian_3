@@ -18,12 +18,15 @@ from ..utils.player import (
     player_object,
     player_combat_values,
 )
+from .arena_content import three_realms_record
 
-THREE_REALMS_ARENA_MODE_KEY = "arena.three_realms"
-THREE_REALMS_ARENA_MIN_REALM = "nascent_soul"
-THREE_REALMS_ARENA_MIN_LAYER = 1
-THREE_REALMS_ARENA_PERMIT_KEY = "item.permit.three_realms_arena"
-THREE_REALMS = ("xuantian", "demon", "beast")
+_THREE_REALMS = three_realms_record()
+
+THREE_REALMS_ARENA_MODE_KEY = str(_THREE_REALMS["mode_key"])
+THREE_REALMS_ARENA_MIN_REALM = str(_THREE_REALMS["required_realm"])
+THREE_REALMS_ARENA_MIN_LAYER = int(_THREE_REALMS["required_layer"])
+THREE_REALMS_ARENA_PERMIT_KEY = str(_THREE_REALMS["permit_key"])
+THREE_REALMS = tuple(str(faction) for faction in _THREE_REALMS["factions"])
 
 
 def intro_flags(player: Mapping[str, Any]) -> set[str]:

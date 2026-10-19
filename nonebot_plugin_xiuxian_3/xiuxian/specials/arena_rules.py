@@ -1,38 +1,39 @@
-"""Pure, rules for the first asynchronous arena mode."""
+"""Rules for the first asynchronous arena mode (content-backed)."""
 
 from __future__ import annotations
-
 
 from datetime import timedelta
 from typing import Mapping
 
 from ..combat.spectator_rules import battle_roll_bp, simulate_spectator_match
+from .arena_content import arena_defaults, spar_record
 from .three_realms_arena_rules import THREE_REALMS_ARENA_MODE_KEY
 
-ARENA_MODE_KEY = "arena.spar"
-ARENA_RANK_MODE_KEY = "arena.rank"
-ARENA_PRACTICE_MODE_KEY = "arena.practice"
-SNAPSHOT_VALID_DAYS = 7
-SNAPSHOT_MATCH_DELAY_SECONDS = 30 * 60
-DAILY_CHALLENGE_LIMIT = 5
-WEEKLY_RANK_LIMIT = 20
-DAILY_PRACTICE_LIMIT = 3
-DAILY_COUNTED_OPPONENT_LIMIT = 2
-MAX_ROUNDS = 15
-WIN_RATING_DELTA = 25
-LOSS_RATING_DELTA = -10
-DRAW_RATING_DELTA = 5
+_SPAR = spar_record()
+_DEFAULTS = arena_defaults()
+
+ARENA_MODE_KEY = str(_SPAR["mode_key"])
+ARENA_RANK_MODE_KEY = str(_SPAR["rank_mode_key"])
+ARENA_PRACTICE_MODE_KEY = str(_SPAR["practice_mode_key"])
+SNAPSHOT_VALID_DAYS = int(_SPAR["snapshot_valid_days"])
+SNAPSHOT_MATCH_DELAY_SECONDS = int(_SPAR["match_delay_seconds"])
+DAILY_CHALLENGE_LIMIT = int(_SPAR["daily_challenge_limit"])
+WEEKLY_RANK_LIMIT = int(_SPAR["weekly_rank_limit"])
+DAILY_PRACTICE_LIMIT = int(_SPAR["daily_practice_limit"])
+DAILY_COUNTED_OPPONENT_LIMIT = int(_SPAR["daily_counted_opponent_limit"])
+MAX_ROUNDS = int(_SPAR["max_rounds"])
+WIN_RATING_DELTA = int(_SPAR["win_rating_delta"])
+LOSS_RATING_DELTA = int(_SPAR["loss_rating_delta"])
+DRAW_RATING_DELTA = int(_SPAR["draw_rating_delta"])
+RATING_BANDS = tuple(int(band) for band in _DEFAULTS["rating_bands"])
 
 
 def rating_band(rating: int) -> int:
     value = max(0, int(rating))
-    if value < 500:
-        return 0
-    if value < 1_000:
-        return 1
-    if value < 1_500:
-        return 2
-    return 3
+    for band, threshold in enumerate(RATING_BANDS):
+        if value < threshold:
+            return band
+    return len(RATING_BANDS)
 
 
 def compatible_rating(challenger_rating: int, defender_rating: int) -> bool:
@@ -111,6 +112,7 @@ __all__ = [
     "DAILY_COUNTED_OPPONENT_LIMIT",
     "DAILY_PRACTICE_LIMIT",
     "MAX_ROUNDS",
+    "RATING_BANDS",
     "SNAPSHOT_MATCH_DELAY_SECONDS",
     "SNAPSHOT_VALID_DAYS",
     "WEEKLY_RANK_LIMIT",

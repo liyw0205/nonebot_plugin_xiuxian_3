@@ -1,20 +1,23 @@
-"""Pure rules for the first asynchronous team arena mode."""
+"""Rules for the first asynchronous team arena mode (content-backed)."""
 
 from __future__ import annotations
 
 from typing import Mapping, Sequence
 
 from ..stats.rules import frozen_combat_stats
+from .arena_content import team_record
 from .arena_rules import MAX_ROUNDS, battle_roll_bp, rating_band
 
-TEAM_ARENA_MODE_KEY = "arena.team"
-MIN_TEAM_SIZE = 2
-MAX_TEAM_SIZE = 3
-TEAM_SNAPSHOT_VALID_DAYS = 7
-TEAM_SNAPSHOT_MATCH_DELAY_SECONDS = 30 * 60
-TEAM_DAILY_CHALLENGE_LIMIT = 3
-TEAM_WIN_RATING_DELTA = 20
-TEAM_LOSS_RATING_DELTA = -8
+_TEAM = team_record()
+
+TEAM_ARENA_MODE_KEY = str(_TEAM["mode_key"])
+MIN_TEAM_SIZE = int(_TEAM["min_team_size"])
+MAX_TEAM_SIZE = int(_TEAM["max_team_size"])
+TEAM_SNAPSHOT_VALID_DAYS = int(_TEAM["snapshot_valid_days"])
+TEAM_SNAPSHOT_MATCH_DELAY_SECONDS = int(_TEAM["match_delay_seconds"])
+TEAM_DAILY_CHALLENGE_LIMIT = int(_TEAM["daily_challenge_limit"])
+TEAM_WIN_RATING_DELTA = int(_TEAM["win_rating_delta"])
+TEAM_LOSS_RATING_DELTA = int(_TEAM["loss_rating_delta"])
 
 
 def team_rating(members: Sequence[Mapping[str, object]]) -> int:
