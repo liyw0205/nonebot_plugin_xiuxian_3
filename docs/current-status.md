@@ -306,6 +306,24 @@ key 唯一、别名无跨记录冲突，非法均抛 `ContentError`。`facility_
 `MAINLINE_OBJECTIVES_INCOMPLETE`，源自 `aae19b2` 目标门先于该测试更新），与本次改动无关。
 未跑全量/压测/部署，未验 QQ 真机。
 
+竞技场家族内容化已在 `develop` 完成（数据提交 `dbb563f`、清单种子迁移 `0a6e71d`）：
+新增 `data/特殊/竞技场.json`（kind `arena_rule`，4 条记录：`arena.defaults` 承载段位带
+500/1000/1500 与阵营清单 {xuantian,demon,beast}；`arena.spar` 承载个人竞技快照 7 天/30 分钟、
+每日挑战 5、周段位 20、每日练习 3、计费对手 2、15 回合、积分 25/-10/5；`arena.team` 承载组队
+2–3 人、快照 7 天/30 分钟、每日 3、积分 20/-8；`arena.three_realms` 承载元婴 L1 准入、许可
+标识符与三阵营）。新增共享加载器 `specials/arena_content.py`：逐记录校验 status、name/desc、
+正数数值、积分增量为整数、段位带严格递增、队伍规模 min≤max、境界引用开放、阵营白名单与
+mode key 唯一，非法均抛 `ContentError`。`arena_rules.py`/`team_arena_rules.py`/
+`three_realms_arena_rules.py` 改为导入期内容派生并导出原名称，`rating_band` 改走内容段位带，
+许可键按标识符校验（运行时不作物品解析）。全部值与原硬编码表逐一相同，段位判定、积分语义、
+模式次数上限、组队模拟与回放行为不变。`data/内容清单.json` 登记新文件，其新旧 SHA-256
+（`5a8eba45…`→`bbeb2104…`）与 Git provenance 已登记 `scripts/seed_migrations.json`，迁移反向
+助手同步移除竞技场文件（旧清单宿主升级、重复升级幂等），`test_seed_migration.py` 10 passed。
+聚焦证据：新增 `test_arena_content.py` 27 passed（三记录合同与常量一致、段位边界、积分语义、
+模式上限、20 项校验失败用例）；回归 `test_arena.py`+`test_team_arena.py`+
+`test_three_realms_arena.py` 9 passed、`test_arena_migration.py`+`test_arena_projection.py`+
+`test_arena_recovery.py`+`test_arena_stats.py` 12 passed。未跑全量/压测/部署，未验 QQ 真机。
+
 魔界主线任务内容化已在 `develop` 完成（数据提交 `30a756f`、清单种子迁移 `bd2305e`）：
 新增 `data/任务/跨界任务.json`（kind `cross_realm_quest`，2 条记录：`cross_realm_quest.defaults`
 承载阵营白名单 {demon,beast,xuantian}；`quest.demon_main_1` 承载标签「魔界主线」、证据模式

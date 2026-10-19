@@ -1,0 +1,70 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "arena_rule",
+  "records": [
+    {
+      "key": "arena.defaults",
+      "name": "竞技场规则",
+      "desc": "三类竞技玩法的共享契约：阵营清单与段位带边界。",
+      "status": "active",
+      "rating_bands": [
+        500,
+        1000,
+        1500
+      ],
+      "factions": [
+        "xuantian",
+        "demon",
+        "beast"
+      ]
+    },
+    {
+      "key": "arena.spar",
+      "name": "个人竞技",
+      "desc": "切磋、段位与练习三类个人竞技的快照、次数与积分契约。",
+      "status": "active",
+      "mode_key": "arena.spar",
+      "rank_mode_key": "arena.rank",
+      "practice_mode_key": "arena.practice",
+      "snapshot_valid_days": 7,
+      "match_delay_seconds": 1800,
+      "daily_challenge_limit": 5,
+      "weekly_rank_limit": 20,
+      "daily_practice_limit": 3,
+      "daily_counted_opponent_limit": 2,
+      "max_rounds": 15,
+      "win_rating_delta": 25,
+      "loss_rating_delta": -10,
+      "draw_rating_delta": 5
+    },
+    {
+      "key": "arena.team",
+      "name": "组队竞技",
+      "desc": "异步组队竞技的队伍规模、快照与积分契约。",
+      "status": "active",
+      "mode_key": "arena.team",
+      "snapshot_valid_days": 7,
+      "match_delay_seconds": 1800,
+      "daily_challenge_limit": 3,
+      "min_team_size": 2,
+      "max_team_size": 3,
+      "win_rating_delta": 20,
+      "loss_rating_delta": -8
+    },
+    {
+      "key": "arena.three_realms",
+      "name": "三界竞技",
+      "desc": "三界临时竞技的准入境界、许可与阵营契约。",
+      "status": "active",
+      "mode_key": "arena.three_realms",
+      "required_realm": "nascent_soul",
+      "required_layer": 1,
+      "permit_key": "item.permit.three_realms_arena",
+      "factions": [
+        "xuantian",
+        "demon",
+        "beast"
+      ]
+    }
+  ]
+}
