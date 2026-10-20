@@ -90,6 +90,7 @@ from ..exploration.rules import (
     CLOUD_BOAT_STORM_PAY_COST,
     CLOUD_BOAT_STORM_WAIT_SECONDS,
     cloud_boat_storm_roll_bp,
+    exploration_definitions_by_location,
     exploration_discovery_weight_bp,
     has_cloud_mine_access,
     battle_roll_bp,
@@ -120,6 +121,7 @@ from ..adventures.mainline import (
     mainline_stage_status,
     resolve_mainline,
 )
+from ..content import bundled_content
 from ..adventures.rules import bounty_definition, DEFINITIONS as BOUNTY_DEFINITIONS, meets_realm as bounty_meets_realm, reward_map
 from ..routine.models import (
     AchievementClaimRecord,
@@ -271,6 +273,34 @@ class ExplorationRepositoryMixin:
         ):
             raise RewardContentError(f"{label} operation does not match its record")
         return self._strict_exploration_object(operation["result_json"], f"{label} operation result")
+
+    async def list_exploration_modes(
+        self, *, platform: str, platform_user_id: str
+    ) -> tuple[str, tuple[Any, ...]]:
+        """Return the player's current location and the open modes served there.
+
+        Read-only presentation helper: the modes are filtered to the player's
+        location so `开始探索` without arguments and the help page can list
+        what is actually available.
+        """
+
+        await self.initialize()
+        content = self.content or bundled_content()
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT location_key, realm_key FROM players WHERE platform = ? AND platform_user_id = ?",
+                (platform, platform_user_id),
+            ).fetchone()
+        if row is None:
+            raise PlayerNotFoundError("player does not exist")
+        location_key = str(row["location_key"] or "")
+        modes = tuple(
+            definition
+            for definition in exploration_definitions_by_location(content)
+            .get(location_key, {})
+            .values()
+        )
+        return location_key, modes
 
     async def start_exploration(
         self,

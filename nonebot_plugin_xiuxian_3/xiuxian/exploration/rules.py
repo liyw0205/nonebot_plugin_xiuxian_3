@@ -160,6 +160,22 @@ def exploration_definition(mode_key: str, content: ContentBundle | None = None) 
         raise ValueError(f"unsupported exploration mode: {mode_key}") from exc
 
 
+def exploration_definitions_by_location(
+    content: ContentBundle | None = None,
+) -> dict[str, dict[str, ExplorationDefinition]]:
+    """Group open exploration modes by their location key.
+
+    Presentation helper for `开始探索` without arguments and the help page:
+    only open modes are returned, grouped so a caller can list what is
+    served at the player's current location.
+    """
+
+    grouped: dict[str, dict[str, ExplorationDefinition]] = {}
+    for definition in _definitions(content).values():
+        grouped.setdefault(definition.location_key, {})[definition.key] = definition
+    return grouped
+
+
 def exploration_enemy_key(mode_key: str, content: ContentBundle | None = None) -> str | None:
     bundle = _content(content)
     row = bundle.get("exploration_mode", mode_key, include_locked=False)
