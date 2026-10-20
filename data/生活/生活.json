@@ -211,6 +211,196 @@
       "status": "active"
     },
     {
+      "name": "雾隐洞天巡护",
+      "desc": "为雾隐洞天一层巡逻护径，收获阵砂与镇中声望。",
+      "aliases": ["洞天巡护", "巡护"],
+      "duration_seconds": 1200,
+      "daily_limit": 3,
+      "cost": {"stamina": 4},
+      "risk_pool": "dispatch.foundation.patrol",
+      "requirements": {"stage": "mortal", "realm": {"key": "foundation", "min_layer": 1}},
+      "risk": {"weights": {"success": 7200, "partial": 1900, "failed": 900}},
+      "failure_refunds": {"stamina": 2},
+      "rewards": {
+        "success": {"item.mat.array_sand": {"quantity_range": [1, 2]}, "spirit_stones": 60, "local.xuantian.new_town": 4},
+        "partial": {"spirit_stones": 30, "local.xuantian.new_town": 1}
+      },
+      "key": "dispatch.foundation.patrol",
+      "record_type": "dispatch",
+      "status": "active"
+    },
+    {
+      "name": "云城商队护送",
+      "desc": "护送商队自青石镇前往云城，沿途积攒灵叶与云城人情。",
+      "aliases": ["护送商队", "商队护送"],
+      "duration_seconds": 1800,
+      "daily_limit": 3,
+      "cost": {"stamina": 5},
+      "risk_pool": "dispatch.foundation.escort",
+      "requirements": {"stage": "mortal", "realm": {"key": "foundation", "min_layer": 1}},
+      "risk": {"weights": {"success": 7000, "delayed": 1200, "partial": 1300, "failed": 500}},
+      "failure_refunds": {"stamina": 2},
+      "rewards": {
+        "success": {"item.herb.spirit_leaf": {"quantity_range": [2, 3]}, "spirit_stones": 70, "local.xuantian.cloud_city": 4},
+        "partial": {"item.herb.spirit_leaf": {"quantity_range": [1, 1]}, "spirit_stones": 35}
+      },
+      "key": "dispatch.foundation.escort",
+      "record_type": "dispatch",
+      "status": "active"
+    },
+    {
+      "name": "云铁矿区勘测",
+      "desc": "替云城商会勘测云铁矿区新脉，带回矿石与信任。",
+      "aliases": ["矿区勘测", "勘测"],
+      "duration_seconds": 1800,
+      "daily_limit": 2,
+      "cost": {"stamina": 6, "energy": 2},
+      "risk_pool": "dispatch.golden_core.vein_survey",
+      "requirements": {"stage": "mortal", "realm": {"key": "golden_core", "min_layer": 1}},
+      "risk": {"weights": {"success": 7000, "partial": 2000, "failed": 1000}},
+      "failure_refunds": {"stamina": 3, "energy": 1},
+      "rewards": {
+        "success": {"item.material.cloud_iron": {"quantity_range": [1, 2]}, "spirit_stones": 90, "local.xuantian.cloud_city": 5},
+        "partial": {"spirit_stones": 45, "local.xuantian.cloud_city": 2}
+      },
+      "key": "dispatch.golden_core.vein_survey",
+      "record_type": "dispatch",
+      "status": "active"
+    },
+    {
+      "name": "丹材押运",
+      "desc": "为云城丹坊押运灵魂晶等贵重丹材，赏金丰厚。",
+      "aliases": ["押运丹材", "丹材护送"],
+      "duration_seconds": 2400,
+      "daily_limit": 2,
+      "cost": {"stamina": 6, "energy": 2},
+      "risk_pool": "dispatch.golden_core.pill_run",
+      "requirements": {"stage": "mortal", "realm": {"key": "golden_core", "min_layer": 1}},
+      "risk": {"weights": {"success": 6800, "delayed": 1400, "partial": 1300, "failed": 500}},
+      "failure_refunds": {"stamina": 3, "energy": 1},
+      "rewards": {
+        "success": {"item.soul_crystal": {"quantity_range": [1, 2]}, "spirit_stones": 100},
+        "partial": {"item.soul_crystal": {"quantity_range": [1, 1]}, "spirit_stones": 50}
+      },
+      "key": "dispatch.golden_core.pill_run",
+      "record_type": "dispatch",
+      "status": "active"
+    },
+    {
+      "name": "堕落遗迹哨探",
+      "desc": "在堕落遗迹外围哨探魔物动向，换取魔核与集市信用。",
+      "aliases": ["遗迹哨探", "哨探"],
+      "duration_seconds": 2400,
+      "daily_limit": 2,
+      "cost": {"stamina": 7, "energy": 3},
+      "risk_pool": "dispatch.nascent.ruins_watch",
+      "requirements": {"stage": "mortal", "realm": {"key": "nascent_soul", "min_layer": 1}},
+      "risk": {"weights": {"success": 6800, "partial": 2100, "failed": 1100}},
+      "failure_refunds": {"stamina": 3, "energy": 1},
+      "rewards": {
+        "success": {"item.demon_core": {"quantity_range": [1, 2]}, "spirit_stones": 130, "local.demon.abyss_market": 5},
+        "partial": {"spirit_stones": 65, "local.demon.abyss_market": 2}
+      },
+      "key": "dispatch.nascent.ruins_watch",
+      "record_type": "dispatch",
+      "status": "active"
+    },
+    {
+      "name": "万兽山兽群清点",
+      "desc": "替万兽山管事清点外围兽群，带回兽血样本与贸易口人情。",
+      "aliases": ["兽群清点", "清点兽群"],
+      "duration_seconds": 2400,
+      "daily_limit": 2,
+      "cost": {"stamina": 7, "energy": 3},
+      "risk_pool": "dispatch.nascent.beast_census",
+      "requirements": {"stage": "mortal", "realm": {"key": "nascent_soul", "min_layer": 1}},
+      "risk": {"weights": {"success": 6800, "delayed": 1200, "partial": 1400, "failed": 600}},
+      "failure_refunds": {"stamina": 3, "energy": 1},
+      "rewards": {
+        "success": {"item.beast_blood": {"quantity_range": [1, 2]}, "spirit_stones": 140, "local.beast.three_realms_trade_port": 5},
+        "partial": {"item.beast_blood": {"quantity_range": [1, 1]}, "spirit_stones": 70}
+      },
+      "key": "dispatch.nascent.beast_census",
+      "record_type": "dispatch",
+      "status": "active"
+    },
+    {
+      "name": "领域前线文书接力",
+      "desc": "在领域前线各哨位间接力运送军报，磨砺阵砂与前线声望。",
+      "aliases": ["文书接力", "接力军报"],
+      "duration_seconds": 3600,
+      "daily_limit": 2,
+      "cost": {"stamina": 8, "energy": 4},
+      "risk_pool": "dispatch.soul.domain_relay",
+      "requirements": {"stage": "mortal", "realm": {"key": "soul_transformation", "min_layer": 1}},
+      "risk": {"weights": {"success": 6600, "partial": 2200, "failed": 1200}},
+      "failure_refunds": {"stamina": 4, "energy": 2},
+      "rewards": {
+        "success": {"item.mat.array_sand": {"quantity_range": [2, 3]}, "spirit_stones": 180, "local.xuantian.domain_front": 6},
+        "partial": {"item.mat.array_sand": {"quantity_range": [1, 1]}, "spirit_stones": 90}
+      },
+      "key": "dispatch.soul.domain_relay",
+      "record_type": "dispatch",
+      "status": "active"
+    },
+    {
+      "name": "魔渊集市货单核对",
+      "desc": "替魔渊集市行商核对货单账目，换取魔核与集市声望。",
+      "aliases": ["货单核对", "核对货单"],
+      "duration_seconds": 3600,
+      "daily_limit": 2,
+      "cost": {"stamina": 8, "energy": 4},
+      "risk_pool": "dispatch.soul.abyss_manifest",
+      "requirements": {"stage": "mortal", "realm": {"key": "soul_transformation", "min_layer": 1}},
+      "risk": {"weights": {"success": 6600, "delayed": 1200, "partial": 1500, "failed": 700}},
+      "failure_refunds": {"stamina": 4, "energy": 2},
+      "rewards": {
+        "success": {"item.demon_core": {"quantity_range": [2, 3]}, "spirit_stones": 200, "local.demon.abyss_market": 6},
+        "partial": {"item.demon_core": {"quantity_range": [1, 1]}, "spirit_stones": 100}
+      },
+      "key": "dispatch.soul.abyss_manifest",
+      "record_type": "dispatch",
+      "status": "active"
+    },
+    {
+      "name": "时序福地花畦打理",
+      "desc": "受守园人之托打理时序福地花畦，采得时痕草与谢资。",
+      "aliases": ["打理花畦", "花畦打理"],
+      "duration_seconds": 3600,
+      "daily_limit": 2,
+      "cost": {"stamina": 9, "energy": 4},
+      "risk_pool": "dispatch.void.garden_tending",
+      "requirements": {"stage": "mortal", "realm": {"key": "void_refining", "min_layer": 1}},
+      "risk": {"weights": {"success": 6500, "partial": 2300, "failed": 1200}},
+      "failure_refunds": {"stamina": 4, "energy": 2},
+      "rewards": {
+        "success": {"item.herb.time_trace": {"quantity_range": [1, 2]}, "spirit_stones": 240},
+        "partial": {"spirit_stones": 120}
+      },
+      "key": "dispatch.void.garden_tending",
+      "record_type": "dispatch",
+      "status": "active"
+    },
+    {
+      "name": "虚空航道信使",
+      "desc": "为虚空航道两侧营地说信，酬以灵魂晶与贸易口信誉。",
+      "aliases": ["航道信使", "虚空信使"],
+      "duration_seconds": 3600,
+      "daily_limit": 2,
+      "cost": {"stamina": 9, "energy": 5},
+      "risk_pool": "dispatch.void.route_courier",
+      "requirements": {"stage": "mortal", "realm": {"key": "void_refining", "min_layer": 1}},
+      "risk": {"weights": {"success": 6500, "delayed": 1300, "partial": 1500, "failed": 700}},
+      "failure_refunds": {"stamina": 4, "energy": 2},
+      "rewards": {
+        "success": {"item.soul_crystal": {"quantity_range": [2, 3]}, "spirit_stones": 260, "local.beast.three_realms_trade_port": 6},
+        "partial": {"item.soul_crystal": {"quantity_range": [1, 1]}, "spirit_stones": 130}
+      },
+      "key": "dispatch.void.route_courier",
+      "record_type": "dispatch",
+      "status": "active"
+    },
+    {
       "name": "青石镇客房",
       "desc": "镇中简洁安稳的落脚处，可供歇息、存放少量行李并打理一方小田。",
       "aliases": ["客房", "小屋"],
