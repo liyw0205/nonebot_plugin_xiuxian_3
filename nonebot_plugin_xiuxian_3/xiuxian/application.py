@@ -242,10 +242,13 @@ class XiuxianApplication:
             return CommandResult(True, "HELP_OVERVIEW", _HELP_OVERVIEW, context.request_id)
         if len(context.command_args) == 1 and context.command_args[0] in _HELP_PAGES:
             category = context.command_args[0]
+            body = _HELP_PAGES[category]
+            if category == "探索":
+                body += "\n\n" + self._exploration_mode_lines()
             return CommandResult(
                 True,
                 "HELP_CATEGORY",
-                _HELP_PAGES[category] + "\n\n" + command_link("返回修仙指南", "修仙帮助"),
+                body + "\n\n" + command_link("返回修仙指南", "修仙帮助"),
                 context.request_id,
                 data={"category": category},
             )
@@ -255,6 +258,37 @@ class XiuxianApplication:
             _HELP_OVERVIEW,
             context.request_id,
         )
+
+    def _exploration_mode_lines(self) -> str:
+        """List open exploration modes grouped by location for the help page.
+
+        Rendering is best-effort: a content failure must never block the
+        help command, so any error falls back to the static page body.
+        """
+
+        try:
+            from .exploration.rules import exploration_definitions_by_location
+            from .player.rules import LOCATION_LABELS
+
+            grouped = exploration_definitions_by_location(self.content)
+            if not grouped:
+                return ""
+            lines: list[str] = ["**当前开放探索**"]
+            for location_key in sorted(grouped):
+                location_label = LOCATION_LABELS.get(location_key, location_key)
+                for definition in grouped[location_key].values():
+                    realm_text = (
+                        f"{definition.required_realm}·L{definition.required_layer}"
+                        if definition.required_realm
+                        else "凡人"
+                    )
+                    lines.append(
+                        f"- {definition.label}（{location_label}，{realm_text}，"
+                        f"每日{definition.daily_limit}次）"
+                    )
+            return "\n".join(lines)
+        except Exception:
+            return ""
 
     async def _invoke(
         self,

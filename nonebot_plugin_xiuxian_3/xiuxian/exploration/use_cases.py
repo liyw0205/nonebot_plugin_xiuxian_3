@@ -70,10 +70,37 @@ class ExplorationApplication:
     async def start_exploration(self, context: CommandContext) -> CommandResult:
         mode_key = self._mode(context.command_args)
         if mode_key is None:
+            try:
+                location_key, modes = await self.repository.list_exploration_modes(
+                    platform=context.adapter,
+                    platform_user_id=context.user_id,
+                )
+            except PlayerNotFoundError:
+                return CommandResult(
+                    False,
+                    "PLAYER_NOT_FOUND",
+                    "还没有角色，请先发送 `开始修仙`。",
+                    context.request_id,
+                )
+            if modes:
+                listing = "\n".join(
+                    f"- **{definition.label}**（{self._location_text(definition.location_key)}，"
+                    f"{definition.required_realm or '凡人'}）"
+                    for definition in modes
+                )
+                message = (
+                    f"当前所在地可探索：\n\n{listing}\n\n"
+                    "请发送 `开始探索 探索名称` 选定其中一项。"
+                )
+            else:
+                message = (
+                    f"{self._location_text(location_key)}暂无开放的探索模式，"
+                    "可先用 `我的状态` 查看所在地，或前往其他地点。"
+                )
             return CommandResult(
                 False,
                 "INVALID_EXPLORATION_MODE",
-                "请发送 `开始探索 探索名称`，名称可从当前已开放的探索模式中选择。",
+                message,
                 context.request_id,
             )
         operation_id = self._operation_id(context, "exploration.start")
