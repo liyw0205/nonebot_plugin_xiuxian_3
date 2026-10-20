@@ -794,6 +794,32 @@
       "combat_profile": {"random_pool_key": "battle.enemy.dao_gatekeeper", "reward": {"spirit_stones": 250}, "drop_pool_key": "reward_pool.enemy.dao_origin"},
       "key": "enemy.dao_gatekeeper",
       "status": "active"
+    },
+    {
+      "name": "时园时光残影",
+      "desc": "时序福地里旧日游人的残影，行动带着迟缓而固执的节拍。",
+      "location_key": "cave.time_garden",
+      "requirements": [{"type": "realm", "realm_key": "void_refining", "min_layer": 1}],
+      "stats": {"hp": 1600, "attack": 120, "initiative": 25, "agility": 24},
+      "skills": ["enemy_skill.blade_wave"],
+      "behavior": {"can_critical": true, "can_escape": false},
+      "reward_refs": [],
+      "combat_profile": {"random_pool_key": "battle.enemy.time_garden_echo", "reward": {"spirit_stones": 95}, "drop_pool_key": "reward_pool.enemy.void"},
+      "key": "enemy.time_garden_echo",
+      "status": "active"
+    },
+    {
+      "name": "时园守园人",
+      "desc": "守护时序福地花畦的沉默守园人，不容来客惊扰此地光阴。",
+      "location_key": "cave.time_garden",
+      "requirements": [{"type": "realm", "realm_key": "void_refining", "min_layer": 1}],
+      "stats": {"hp": 1720, "attack": 128, "initiative": 20, "agility": 16},
+      "skills": ["enemy_skill.blade_wave"],
+      "behavior": {"can_critical": true, "can_escape": false},
+      "reward_refs": [],
+      "combat_profile": {"random_pool_key": "battle.enemy.time_garden_keeper", "reward": {"spirit_stones": 105}, "drop_pool_key": "reward_pool.enemy.void"},
+      "key": "enemy.time_garden_keeper",
+      "status": "active"
     }
   ],
   "schema": "xiuxian.content"

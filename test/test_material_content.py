@@ -24,6 +24,7 @@ MATERIALS = {
     RICE, "item.herb.blood_grass", "item.herb.spirit_leaf", "item.ore.ironstone",
     "item.mat.wood", "item.mat.array_sand", "item.spirit_water", "item.material.cloud_iron",
     "item.soul_crystal", "item.demon_core", "item.beast_blood", "item.ancestral_blood",
+    "item.herb.time_trace",
 }
 
 
@@ -46,10 +47,10 @@ def test_declared_material_sources_close_actual_reward_and_recipe_references():
     bundle = ContentBundle.load(DATA)
     summary = validate_material_content(bundle)
     assert {row["key"] for row in bundle.list("item") if "gathering_sources" in row} == MATERIALS
-    assert summary["materials"] == 12
-    assert summary["gathering_sources"] == 17
-    assert summary["modes"] == 9
-    assert summary["recipe_consumers"] == 29
+    assert summary["materials"] == 13
+    assert summary["gathering_sources"] == 18
+    assert summary["modes"] == 10
+    assert summary["recipe_consumers"] == 30
 
 
 @pytest.mark.parametrize("sources, message", [

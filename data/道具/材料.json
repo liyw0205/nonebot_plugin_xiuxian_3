@@ -218,6 +218,33 @@
       "key": "item.herb.blood_grass"
     },
     {
+      "name": "时痕草",
+      "desc": "只在时序福地生长的灵草，叶脉间流转着迟缓的时光痕迹。",
+      "item_type": "herb",
+      "quality": "rare",
+      "stack_limit": 99,
+      "instance_mode": "stack",
+      "bind_type": "unbound",
+      "tradeable": true,
+      "effects": [
+        {
+          "type": "crafting_material",
+          "tags": [
+            "temporal"
+          ]
+        }
+      ],
+      "requirements": [],
+      "status": "active",
+      "gathering_sources": [
+        {
+          "mode_key": "explore.time_garden",
+          "reward_pool_key": "reward_pool.exploration.time_garden"
+        }
+      ],
+      "key": "item.herb.time_trace"
+    },
+    {
       "name": "灵叶",
       "desc": "蕴含少许灵气的叶片，常被用作修炼类丹药的辅材。",
       "item_type": "herb",

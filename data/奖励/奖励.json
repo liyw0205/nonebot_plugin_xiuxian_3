@@ -1545,6 +1545,18 @@
       "status": "active"
     },
     {
+      "name": "时序福地所得",
+      "desc": "采撷结果在时痕草、灵石与虚空晶之间变化。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 5, "rewards": {"item.herb.time_trace": 1, "spirit_stones": 260}},
+        {"weight": 3, "rewards": {"item.herb.time_trace": 2, "spirit_stones": 220}},
+        {"weight": 2, "rewards": {"item.void_crystal": 1, "spirit_stones": 300}}
+      ],
+      "key": "reward_pool.exploration.time_garden",
+      "status": "active"
+    },
+    {
       "name": "早期野兽掉落",
       "desc": "林地与近郊常见野兽的材料掉落池。",
       "pool_type": "weighted",
