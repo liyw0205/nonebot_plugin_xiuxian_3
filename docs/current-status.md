@@ -364,6 +364,25 @@ mode key 唯一，非法均抛 `ContentError`。`arena_rules.py`/`team_arena_rul
 均为种子迁移体系建立后新增的官方文件，按既有先例不设迁移规则。未跑全量/压测/部署，
 未验 QQ 真机。
 
+中高阶派遣内容化已在 `develop` 完成（数据提交随收口推送）：`data/生活/生活.json`
+派遣由 6 条增至 16 条，为 foundation/golden_core/nascent_soul/soul_transformation/
+void_refining 各补 2 条——雾隐洞天巡护（阵砂×1–2+灵石 60+镇声望）、云城商队护送
+（灵叶×2–3+灵石 70+云城声望）、云铁矿区勘测（云铁×1–2+灵石 90+云城声望）、
+丹材押运（灵魂晶×1–2+灵石 100）、堕落遗迹哨探（魔核×1–2+灵石 130+集市声望）、
+万兽山兽群清点（兽血×1–2+灵石 140+贸易口声望）、领域前线文书接力（阵砂×2–3+
+灵石 180+前线声望）、魔渊集市货单核对（魔核×2–3+灵石 200+集市声望）、
+时序福地花畦打理（时痕草×1–2+灵石 240）、虚空航道信使（灵魂晶×2–3+灵石 260+
+贸易口声望）。每条含 duration（1200–3600 秒）、daily_limit 2–3、体力/精力成本
+（4→9 随境界递增）、realm+min_layer 门槛、risk weights（总和恒 10000，高阶加险）、
+success/partial 奖励与 failure_refunds ⊆ cost。全部奖励物品均为来源闭合材料
+（gathering_sources 或 source.item.void_materials 登记），local.* 声望键均可被
+`local_reputation_maximum` 解析。加载器校验全通过；未知派遣与别名冲突 ValueError
+语义保留。聚焦证据：新增 `test_dispatch_rules_content.py` 5 passed（十记录加载、
+每境界 ×2 覆盖、奖励来源闭合、合同现值钉住、6 项拒绝用例）；`test_dispatch.py`
+闭合表钉值扩展 6→16、`test_dispatch_reserved_inventory.py`+`test_trade_permit_dispatch.py`
++`test_idle.py`+`test_dispatch_content.py` 全绿。`生活/生活.json` 无既有迁移规则，
+按先例不新增。未跑全量/压测/部署，未验 QQ 真机。
+
 魔界主线任务内容化已在 `develop` 完成（数据提交 `30a756f`、清单种子迁移 `bd2305e`）：
 新增 `data/任务/跨界任务.json`（kind `cross_realm_quest`，2 条记录：`cross_realm_quest.defaults`
 承载阵营白名单 {demon,beast,xuantian}；`quest.demon_main_1` 承载标签「魔界主线」、证据模式
