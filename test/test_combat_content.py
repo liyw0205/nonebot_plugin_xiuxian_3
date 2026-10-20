@@ -67,12 +67,12 @@ def _edit(root: Path, relative: str, key: str, **changes: object) -> None:
 def test_combat_content_closes_current_enemy_and_encounter_data() -> None:
     summary = validate_combat_content(ContentBundle.load(DATA))
 
-    expected_consumed_encounters = 12 if (DATA / "探索/模式.json").exists() else 0
+    expected_consumed_encounters = 13 if (DATA / "探索/模式.json").exists() else 0
     assert summary == {
-        "enemies": 55,
-        "enemy_profiles": 33,
-        "encounters": 14,
-        "candidates": 27,
+        "enemies": 57,
+        "enemy_profiles": 35,
+        "encounters": 15,
+        "candidates": 29,
         "drop_pools": 6,
         "consumed_encounters": expected_consumed_encounters,
         "enemy_skills": 11,

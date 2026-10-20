@@ -410,6 +410,25 @@
       "access_any": [{"type": "item", "item_key": "item.tribulation_token", "quantity": 1}],
       "status": "locked",
       "lock_reason": "天劫回音由专用渡劫 application 结算，避免与通用探索重复发奖。"
+    },
+    {
+      "key": "explore.time_garden",
+      "name": "时序福地采撷",
+      "desc": "在时序福地采撷时痕草，时光残影可能应声而现。",
+      "aliases": ["时序福地采撷", "时序福地探索"],
+      "location_key": "cave.time_garden",
+      "required_realm": "void_refining",
+      "required_layer": 1,
+      "duration_seconds": 900,
+      "stamina_cost": 25,
+      "energy_cost": 3,
+      "daily_limit": 2,
+      "random_pool": "void.time_garden",
+      "reward_pool_key": "reward_pool.exploration.time_garden",
+      "battle_chance_bp": 5000,
+      "enemy_pool_key": "encounter.void.time_garden",
+      "access_any": [],
+      "status": "open"
     }
   ]
 }

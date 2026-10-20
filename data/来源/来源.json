@@ -77,11 +77,12 @@
     {
       "key": "source.item.void_materials",
       "name": "虚空材料来源",
-      "desc": "虚空航道、档案遗迹及其遭遇提供锚、晶体和档案碎片。",
-      "asset_keys": ["item.void_anchor", "item.void_crystal", "item.void_archive", "item.archive_fragment.alpha", "item.archive_fragment.beta", "item.archive_fragment.gamma"],
+      "desc": "虚空航道、档案遗迹、时序福地及其遭遇提供锚、晶体、时痕草和档案碎片。",
+      "asset_keys": ["item.void_anchor", "item.void_crystal", "item.void_archive", "item.archive_fragment.alpha", "item.archive_fragment.beta", "item.archive_fragment.gamma", "item.herb.time_trace"],
       "channels": [
         {"operation": "exploration.settle", "reference": "reward_pool.exploration.void_route"},
         {"operation": "exploration.settle", "reference": "reward_pool.exploration.void_archive"},
+        {"operation": "exploration.settle", "reference": "reward_pool.exploration.time_garden"},
         {"operation": "battle.claim", "reference": "reward_pool.enemy.void"}
       ],
       "status": "active"
