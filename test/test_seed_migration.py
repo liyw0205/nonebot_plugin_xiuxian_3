@@ -290,6 +290,59 @@ def old_official_secret_realms() -> bytes:
     return blob
 
 
+MATERIAL_FILE = Path("道具/材料.json")
+
+
+def old_official_materials() -> bytes:
+    # The deployed blob before the time-garden slice: reverse only the
+    # time_trace item additions (the new record and its gathering_sources).
+    document = json.loads((ROOT / "data" / MATERIAL_FILE).read_text(encoding="utf-8"))
+    document["records"] = [
+        record
+        for record in document["records"]
+        if record["key"] != "item.herb.time_trace"
+    ]
+    blob = (json.dumps(document, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+    rule = json.loads((ROOT / "scripts/seed_migrations.json").read_text(encoding="utf-8"))[
+        MATERIAL_FILE.as_posix()
+    ]
+    assert hashlib.sha256(blob).hexdigest() in rule["old_sha256"], (
+        "the reversed blob must equal the registered old official material seed"
+    )
+    return blob
+
+
+def test_material_seed_migrates_and_custom_variants_are_preserved(host: Path) -> None:
+    old = old_official_materials()
+    (host / "data" / MATERIAL_FILE).write_bytes(old)
+    result = deploy(host)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "matchers=1 handlers=1" in result.stdout
+    assert (host / "data" / MATERIAL_FILE).read_bytes() == (
+        ROOT / "data" / MATERIAL_FILE
+    ).read_bytes()
+    backup_root = host / ".xiuxian3/backups"
+    backups = list(backup_root.glob("deploy-*"))
+    assert len(backups) == 1
+    assert (backups[0] / "data" / MATERIAL_FILE).read_bytes() == old
+    preserved(host)
+    repeated = deploy(host)
+    assert repeated.returncode == 0, repeated.stdout + repeated.stderr
+    assert "种子更新 0 个" in repeated.stdout
+    preserved(host)
+
+    # A customized variant that is NOT the registered old official blob must
+    # stay preserved as a custom/unknown seed, never silently overwritten.
+    custom_document = json.loads((ROOT / "data" / MATERIAL_FILE).read_text(encoding="utf-8"))
+    custom_document["records"][0]["desc"] = "自定义描述"
+    custom = (json.dumps(custom_document, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+    (host / "data" / MATERIAL_FILE).write_bytes(custom)
+    custom_result = deploy(host)
+    assert custom_result.returncode == 0, custom_result.stdout + custom_result.stderr
+    assert (host / "data" / MATERIAL_FILE).read_bytes() == custom
+    preserved(host)
+
+
 def test_secret_realm_seed_migrates_and_custom_variants_are_preserved(host: Path) -> None:
     old = old_official_secret_realms()
     (host / "data" / SECRET_REALM_FILE).write_bytes(old)

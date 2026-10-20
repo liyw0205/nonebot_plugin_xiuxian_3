@@ -339,6 +339,31 @@ mode key 唯一，非法均抛 `ContentError`。`arena_rules.py`/`team_arena_rul
 `test_three_realms_arena.py` 9 passed、`test_arena_migration.py`+`test_arena_projection.py`+
 `test_arena_recovery.py`+`test_arena_stats.py` 12 passed。未跑全量/压测/部署，未验 QQ 真机。
 
+时序福地探索闭环已在 `develop` 完成（功能提交 `d059905`、材料种子迁移记账随收口提交）：
+`cave.time_garden`（时序福地）此前为开放可达地点但 actions 许诺的 `explore.time_garden`
+不存在；本切片补齐全链路——探索模式（炼虚 L1、900 秒、体力 25 + 精力 3、每日 2 次、
+遭遇概率 5000bp）、地点绑定敌人 `enemy.time_garden_echo`（时园时光残影）与
+`enemy.time_garden_keeper`（时园守园人，炼虚层属性，掉落走 `reward_pool.enemy.void`）、
+遭遇池 `encounter.void.time_garden`（60/40）、加权奖励池
+`reward_pool.exploration.time_garden`（时痕草+灵石，稀有虚空晶）、新材料
+`item.herb.time_trace`（时痕草，含 `gathering_sources` 边）、生产消费者
+`recipe.void.time_refine`（时露调和：时痕草×2+虚空晶×1→虚空能量晶×1，失败退 1+1）、
+`source.item.void_materials` 登记 asset_keys 与 exploration.settle 通道完成来源闭合。
+材料矩阵由 12 材料/17 来源/9 模式/29 消费者增至 13/18/10/30，`validate_material_content`
+通过。战斗层敌人须与探索地点绑定（`enemy.void_route_echo` 等绑定他处不可复用），
+故新增两条地点绑定敌人而非复用。聚焦证据：新增 `test_time_garden_content.py`
+8 passed（模式/物品/奖励池/遭遇池合同、来源闭合、地点 actions 无悬空引用、坏变体拒绝）、
+`test_time_garden_gameplay.py` 2 passed（真实命令链：战斗胜利结算、和平结算、
+幂等回放、每日上限、境界门与地点门拒绝）、`test_combat_content.py` 计数钉值更新
+（敌人 55→57、profiles 33→35、遭遇池 14→15、候选 27→29、消费遭遇 12→13）、
+`test_material_content.py` 矩阵钉值更新、`test_documentation.py` 2 passed；
+受影响回归 `test_exploration.py` 1 项失败经 stash 对照确认为改动前既有失败。
+`道具/材料.json` 新旧 SHA-256（`677d37e3…`→`a4afe7f5…`）与 Git provenance 已登记
+`scripts/seed_migrations.json`，迁移反向助手移除 time_trace 记录（旧宿主升级、
+重复升级幂等、自定义保留）。其余 6 个变更数据文件（遭遇池/敌人/奖励/模式/来源/配方）
+均为种子迁移体系建立后新增的官方文件，按既有先例不设迁移规则。未跑全量/压测/部署，
+未验 QQ 真机。
+
 魔界主线任务内容化已在 `develop` 完成（数据提交 `30a756f`、清单种子迁移 `bd2305e`）：
 新增 `data/任务/跨界任务.json`（kind `cross_realm_quest`，2 条记录：`cross_realm_quest.defaults`
 承载阵营白名单 {demon,beast,xuantian}；`quest.demon_main_1` 承载标签「魔界主线」、证据模式

@@ -16,10 +16,11 @@
   "道具/材料.json": {
     "old_sha256": {
       "a1d03eb055fe89b1a240e695589b40edaf1407202a0d5c5f09d722b6131d217e": "579c3ab277d90eafd9d267693be89e678b533282:data/道具/材料.json",
-      "eaa2173340385e322c8f4f54339871869d9b42c0bf3b0009a3cbd5ac1f3a2a55": "eaed7115257db5a67933e8bdf833c003319d940d:data/道具/材料.json"
+      "eaa2173340385e322c8f4f54339871869d9b42c0bf3b0009a3cbd5ac1f3a2a55": "eaed7115257db5a67933e8bdf833c003319d940d:data/道具/材料.json",
+      "677d37e35c44a4459738f2387b12f44ec1d762d184e3d3dc69e88347a12e7350": "c6005eed015ffd9262ff465a7809bd97120f6c02:data/道具/材料.json"
     },
-    "new_sha256": "677d37e35c44a4459738f2387b12f44ec1d762d184e3d3dc69e88347a12e7350",
-    "new_commit": "8646f8b40bed49fcf7ca9022b4587b17f2a3252d"
+    "new_sha256": "a4afe7f516d5cffbec44d429bf080cfae2cde3a9fbfd90dd7280aa2a9874557c",
+    "new_commit": "d059905cea0a6a777f8a122394823076f59bed40"
   },
   "剧情/主线.json": {
     "old_sha256": {
