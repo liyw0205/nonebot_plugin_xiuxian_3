@@ -343,6 +343,65 @@ def test_material_seed_migrates_and_custom_variants_are_preserved(host: Path) ->
     preserved(host)
 
 
+LOCATION_FILE = Path("地图/地点.json")
+
+
+def old_official_locations() -> bytes:
+    # The deployed blob before the place-codex wiring: strip only the 17
+    # codex_entry_key properties this slice added (the 16 pre-existing keys
+    # and their properties stay untouched).
+    added_keys = (
+        "abyss_depths", "abyss_gate", "ancestral_lake", "ancient_domain",
+        "archive_ruins", "array_hall", "boundary_realm", "dao_service",
+        "first_route", "floating_boat", "mist_grotto", "mist_grotto_2",
+        "sect_gate", "time_garden", "trade_port", "void_portal", "war_front",
+    )
+    text = (ROOT / "data" / LOCATION_FILE).read_text(encoding="utf-8")
+    for tail in added_keys:
+        pattern = f',\n      "codex_entry_key": "codex.place.{tail}"'
+        assert pattern in text, tail
+        text = text.replace(pattern, "", 1)
+    blob = text.encode("utf-8")
+    rule = json.loads((ROOT / "scripts/seed_migrations.json").read_text(encoding="utf-8"))[
+        LOCATION_FILE.as_posix()
+    ]
+    assert hashlib.sha256(blob).hexdigest() in rule["old_sha256"], (
+        "the reversed blob must equal the registered old official location seed"
+    )
+    return blob
+
+
+def test_location_seed_migrates_and_custom_variants_are_preserved(host: Path) -> None:
+    old = old_official_locations()
+    (host / "data" / LOCATION_FILE).write_bytes(old)
+    result = deploy(host)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "matchers=1 handlers=1" in result.stdout
+    assert (host / "data" / LOCATION_FILE).read_bytes() == (
+        ROOT / "data" / LOCATION_FILE
+    ).read_bytes()
+    backup_root = host / ".xiuxian3/backups"
+    backups = list(backup_root.glob("deploy-*"))
+    assert len(backups) == 1
+    assert (backups[0] / "data" / LOCATION_FILE).read_bytes() == old
+    preserved(host)
+    repeated = deploy(host)
+    assert repeated.returncode == 0, repeated.stdout + repeated.stderr
+    assert "种子更新 0 个" in repeated.stdout
+    preserved(host)
+
+    # A customized variant that is NOT the registered old official blob must
+    # stay preserved as a custom/unknown seed, never silently overwritten.
+    custom_document = json.loads((ROOT / "data" / LOCATION_FILE).read_text(encoding="utf-8"))
+    custom_document["records"][0]["desc"] = "自定义描述"
+    custom = (json.dumps(custom_document, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+    (host / "data" / LOCATION_FILE).write_bytes(custom)
+    custom_result = deploy(host)
+    assert custom_result.returncode == 0, custom_result.stdout + custom_result.stderr
+    assert (host / "data" / LOCATION_FILE).read_bytes() == custom
+    preserved(host)
+
+
 def test_secret_realm_seed_migrates_and_custom_variants_are_preserved(host: Path) -> None:
     old = old_official_secret_realms()
     (host / "data" / SECRET_REALM_FILE).write_bytes(old)

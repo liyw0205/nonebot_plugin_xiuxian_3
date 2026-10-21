@@ -59,10 +59,11 @@
   },
   "地图/地点.json": {
     "old_sha256": {
-      "d2e8dcde2bc4fd9daa0bde5ba3ce2b024ffcf9aabf52b9a3732d27bec2694efa": "44be52139804523570ec1f2588b8f9bdf568c8a0:data/地图/地点.json"
+      "d2e8dcde2bc4fd9daa0bde5ba3ce2b024ffcf9aabf52b9a3732d27bec2694efa": "44be52139804523570ec1f2588b8f9bdf568c8a0:data/地图/地点.json",
+      "206a98cbe488ef5130cc6dcec124de19667c7b233a2d0e79416894a52a1f7d43": "38133f2007e7cbf0bf69425517724c57c9668e58:data/地图/地点.json"
     },
-    "new_sha256": "206a98cbe488ef5130cc6dcec124de19667c7b233a2d0e79416894a52a1f7d43",
-    "new_commit": "e71e52e2e6040365fa1ed57b15ca97c8583fe57c"
+    "new_sha256": "b775aa8bdd369b60efa638f944312593e2fbe4d588d73f0199ae5902ba1c0e4f",
+    "new_commit": "2ea700721f9772dd0c8adfd13b67db0140a61805"
   },
   "地图/区域.json": {
     "old_sha256": {
