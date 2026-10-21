@@ -1744,6 +1744,126 @@
       "desc": "完成留界结局后记录道统归处。",
       "category": "place",
       "status": "active"
+    },
+    {
+      "key": "codex.place.sect_gate",
+      "name": "宗门山门",
+      "desc": "玄天界各大宗门的山门所在，入门修行由此开始。",
+      "category": "place",
+      "status": "active"
+    },
+    {
+      "key": "codex.place.mist_grotto",
+      "name": "雾隐洞天·一层",
+      "desc": "雾气缭绕的洞天一层，守卫与雾灵游荡其间。",
+      "category": "place",
+      "status": "active"
+    },
+    {
+      "key": "codex.place.abyss_gate",
+      "name": "魔渊入口",
+      "desc": "通往魔界深渊的门扉，污染与机缘并存。",
+      "category": "place",
+      "status": "active"
+    },
+    {
+      "key": "codex.place.trade_port",
+      "name": "三界贸易口",
+      "desc": "三界行商往来的贸易口，货单与信誉即通货。",
+      "category": "place",
+      "status": "active"
+    },
+    {
+      "key": "codex.place.dao_service",
+      "name": "道统服役所",
+      "desc": "道统接纳帮办的服役所，修缮灵脉以积信誉。",
+      "category": "place",
+      "status": "active"
+    },
+    {
+      "key": "codex.place.array_hall",
+      "name": "阵堂",
+      "desc": "研习阵法的殿堂，阵纹与阵基陈列其间。",
+      "category": "place",
+      "status": "active"
+    },
+    {
+      "key": "codex.place.ancient_domain",
+      "name": "远古洞天",
+      "desc": "封印古藏与太初灵园所在的远古洞天。",
+      "category": "place",
+      "status": "active"
+    },
+    {
+      "key": "codex.place.abyss_depths",
+      "name": "魔渊深处",
+      "desc": "魔渊最深处，污染渗流与深渊造物盘踞。",
+      "category": "place",
+      "status": "active"
+    },
+    {
+      "key": "codex.place.ancestral_lake",
+      "name": "祖灵湖",
+      "desc": "祖灵血与湖畔灵影守护的祖地湖泊。",
+      "category": "place",
+      "status": "active"
+    },
+    {
+      "key": "codex.place.void_portal",
+      "name": "虚空门户",
+      "desc": "进出虚空航道与三界边域的门户。",
+      "category": "place",
+      "status": "active"
+    },
+    {
+      "key": "codex.place.first_route",
+      "name": "第一航道",
+      "desc": "虚空航道的首段航路，规则回声在此回荡。",
+      "category": "place",
+      "status": "active"
+    },
+    {
+      "key": "codex.place.archive_ruins",
+      "name": "档案遗迹",
+      "desc": "收藏旧日记忆碎片的虚空遗迹。",
+      "category": "place",
+      "status": "active"
+    },
+    {
+      "key": "codex.place.time_garden",
+      "name": "时序福地",
+      "desc": "时光流转与外界不同的隐秘福地。",
+      "category": "place",
+      "status": "active"
+    },
+    {
+      "key": "codex.place.war_front",
+      "name": "魔界战线",
+      "desc": "每周魔潮来袭时修士据守的战线。",
+      "category": "place",
+      "status": "active"
+    },
+    {
+      "key": "codex.place.boundary_realm",
+      "name": "界隙秘境",
+      "desc": "裂隙入口与神魂潮汐构成的界隙之地。",
+      "category": "place",
+      "status": "active"
+    },
+    {
+      "key": "codex.place.floating_boat",
+      "name": "云舟渡口",
+      "desc": "往来三界的云舟停靠渡口。",
+      "category": "place",
+      "status": "active"
+    },
+    {
+      "key": "codex.place.mist_grotto_2",
+      "name": "雾隐洞天·二层",
+      "desc": "精英巡守镇守的洞天二层。",
+      "category": "place",
+      "status": "active"
     }
+
   ]
 }

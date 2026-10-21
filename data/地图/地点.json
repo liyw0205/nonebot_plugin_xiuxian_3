@@ -81,7 +81,8 @@
         "sect.quest",
         "manual.consultation"
       ],
-      "key": "xuantian.sect_gate"
+      "key": "xuantian.sect_gate",
+      "codex_entry_key": "codex.place.sect_gate"
     },
     {
       "name": "灵泉谷",
@@ -136,7 +137,8 @@
         "livelihood.farming",
         "production.alchemy"
       ],
-      "key": "cave.mist_grotto"
+      "key": "cave.mist_grotto",
+      "codex_entry_key": "codex.place.mist_grotto"
     },
     {
       "name": "魔渊入口",
@@ -157,7 +159,8 @@
       "actions": [
         "world.intro.demon"
       ],
-      "key": "demon.abyss_gate"
+      "key": "demon.abyss_gate",
+      "codex_entry_key": "codex.place.abyss_gate"
     },
     {
       "name": "万兽山入口",
@@ -247,7 +250,8 @@
         "economy.trade.three_realms"
       ],
       "local_reputation_maximum": 1000,
-      "key": "beast.three_realms_trade_port"
+      "key": "beast.three_realms_trade_port",
+      "codex_entry_key": "codex.place.trade_port"
     },
     {
       "name": "玄天界·云城",
@@ -279,7 +283,8 @@
       "status": "active",
       "local_reputation_maximum": 1000,
       "actions": ["specials.dispatch.dao_service"],
-      "key": "dao_service"
+      "key": "dao_service",
+      "codex_entry_key": "codex.place.dao_service"
     },
     {
       "name": "玄天阵堂",
@@ -300,7 +305,8 @@
       "actions": [
         "progression.recover_foundation_shock"
       ],
-      "key": "xuantian.array_hall"
+      "key": "xuantian.array_hall",
+      "codex_entry_key": "codex.place.array_hall"
     },
     {
       "name": "远古洞天",
@@ -309,7 +315,8 @@
       "status": "locked",
       "requirements": [{"type": "realm", "realm_key": "soul_transformation", "min_layer": 1}, {"type": "item", "item_key": "item.domain_core", "quantity": 1}],
       "actions": ["explore.ancient_domain"],
-      "key": "cave.ancient_domain"
+      "key": "cave.ancient_domain",
+      "codex_entry_key": "codex.place.ancient_domain"
     },
     {
       "name": "魔渊深层",
@@ -318,7 +325,8 @@
       "status": "locked",
       "requirements": [{"type": "realm", "realm_key": "soul_transformation", "min_layer": 1}, {"type": "faction_reputation", "faction": "demon", "min": 3000}],
       "actions": ["explore.abyss_depths"],
-      "key": "demon.abyss_depths"
+      "key": "demon.abyss_depths",
+      "codex_entry_key": "codex.place.abyss_depths"
     },
     {
       "name": "祖灵湖",
@@ -327,7 +335,8 @@
       "status": "open",
       "requirements": [{"type": "realm", "realm_key": "soul_transformation", "min_layer": 1}, {"type": "faction_reputation", "faction": "beast", "min": 3000}],
       "actions": ["explore.ancestral_lake"],
-      "key": "beast.ancestral_lake"
+      "key": "beast.ancestral_lake",
+      "codex_entry_key": "codex.place.ancestral_lake"
     },
     {
       "name": "领域前线",
@@ -349,7 +358,8 @@
       "status": "open",
       "requirements": [{"type": "realm", "realm_key": "soul_transformation", "min_layer": 1}],
       "actions": ["world.enter_void_route", "explore.void_route"],
-      "key": "void.portal"
+      "key": "void.portal",
+      "codex_entry_key": "codex.place.void_portal"
     },
     {
       "name": "虚空第一航道",
@@ -359,7 +369,8 @@
       "requirements": [{"type": "realm", "realm_key": "void_refining", "min_layer": 1}],
       "travel": {"anchor_min": 1, "anchor_max": 3},
       "actions": ["world.enter_void_route", "explore.void_route", "event.void_storm"],
-      "key": "void.first_route"
+      "key": "void.first_route",
+      "codex_entry_key": "codex.place.first_route"
     },
     {
       "name": "虚空档案遗迹",
@@ -369,7 +380,8 @@
       "requirements": [{"type": "realm", "realm_key": "void_refining", "min_layer": 1}],
       "travel": {"anchor_min": 2, "anchor_max": 4},
       "actions": ["world.enter_void_route", "explore.archive_ruins"],
-      "key": "void.archive_ruins"
+      "key": "void.archive_ruins",
+      "codex_entry_key": "codex.place.archive_ruins"
     },
     {
       "name": "时序福地",
@@ -378,7 +390,8 @@
       "status": "open",
       "requirements": [{"type": "realm", "realm_key": "void_refining", "min_layer": 1}],
       "actions": ["world.enter_void_route", "explore.time_garden"],
-      "key": "cave.time_garden"
+      "key": "cave.time_garden",
+      "codex_entry_key": "codex.place.time_garden"
     },
     {
       "name": "魔界战线",
@@ -388,7 +401,8 @@
       "requirements": [{"type": "realm", "realm_key": "nascent_soul", "min_layer": 1}],
       "actions": ["event.demon_invasion"],
       "aliases": ["魔界战场", "玄天魔界战场"],
-      "key": "xuantian.war_front"
+      "key": "xuantian.war_front",
+      "codex_entry_key": "codex.place.war_front"
     },
     {
       "name": "界隙秘境",
@@ -401,7 +415,8 @@
       ],
       "actions": ["event.boundary_rift"],
       "aliases": ["界隙", "边界秘境"],
-      "key": "cave.boundary_realm"
+      "key": "cave.boundary_realm",
+      "codex_entry_key": "codex.place.boundary_realm"
     },
     {
       "name": "云舟渡口",
@@ -413,7 +428,8 @@
       "environment": {"training_bp": 11000},
       "local_reputation_maximum": 1000,
       "actions": ["explore.cloud_boat_trial", "instance.secret_realm.cloud_boat"],
-      "key": "xuantian.floating_boat"
+      "key": "xuantian.floating_boat",
+      "codex_entry_key": "codex.place.floating_boat"
     },
     {
       "name": "雾隐洞天二层",
@@ -427,7 +443,8 @@
       ],
       "environment": {"risk": "high"},
       "actions": ["explore.mist_grotto_2", "instance.secret_realm.mist_depth_2"],
-      "key": "cave.mist_grotto_2"
+      "key": "cave.mist_grotto_2",
+      "codex_entry_key": "codex.place.mist_grotto_2"
     },
     {
       "name": "百草坡",
