@@ -209,6 +209,28 @@
       "requirements": [{"type": "realm", "realm_key": "soul_transformation", "min_layer": 1}],
       "status": "active",
       "key": "item.pill.domain_restore"
+    },
+    {
+      "name": "时序护心丹",
+      "desc": "以时痕草凝炼的护心丹，服用时恢复 30 点精力，受精力上限与 5 分钟同物品冷却约束。",
+      "item_type": "consumable",
+      "quality": "rare",
+      "stack_limit": 99,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [
+        {
+          "type": "restore_choice",
+          "resources": ["stamina"],
+          "amount": 30,
+          "cooldown_seconds": 300
+        }
+      ],
+      "requirements": [],
+      "source_recipe_key": "recipe.pill.time_ward",
+      "status": "active",
+      "key": "item.pill.time_ward"
     }
   ],
   "category": "丹药",

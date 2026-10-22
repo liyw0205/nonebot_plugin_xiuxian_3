@@ -1569,6 +1569,96 @@
         "烹饪灵米饭"
       ],
       "desc": "将粗糙灵米细心烹煮，做成能补充体力或精力的饭食。"
+    },
+    {
+      "key": "recipe.pill.time_ward",
+      "name": "时序护心丹",
+      "profession": "alchemy",
+      "inputs": {
+        "item.herb.time_trace": 1,
+        "item.herb.spirit_leaf": 2
+      },
+      "energy_cost": 6,
+      "duration_seconds": 60,
+      "daily_limit": 3,
+      "tool_key": "item.tool.basic_furnace",
+      "tool_cost_bp": 100,
+      "currency_cost": 0,
+      "outputs": {
+        "item.pill.time_ward": 1
+      },
+      "high_quality_bonus": {},
+      "failure_refunds": {
+        "item.herb.time_trace": 1,
+        "item.herb.spirit_leaf": 1
+      },
+      "min_realm_layer": 1,
+      "required_realm": "qi_sensing",
+      "additional_realms": [],
+      "proficiency_bp": 2000,
+      "required_location": [],
+      "teaching_allowed": false,
+      "required_path": null,
+      "required_paths": [],
+      "required_subprofession": [],
+      "success_threshold_bp": 4500,
+      "high_quality_threshold_bp": 8000,
+      "facility_kind": "alchemy",
+      "failure_refund_bp": null,
+      "binding_kind": null,
+      "binding_duration_seconds": 0,
+      "binding_slot_limit": 0,
+      "cross_realm_faction": null,
+      "status": "active",
+      "desc": "以时痕草与灵叶凝炼护心丹，服用时恢复精力。",
+      "aliases": [
+        "时序护心丹"
+      ]
+    },
+    {
+      "key": "recipe.array.time_anchor",
+      "name": "时序锚定阵",
+      "profession": "formation",
+      "inputs": {
+        "item.herb.time_trace": 2,
+        "item.mat.array_sand": 1
+      },
+      "energy_cost": 6,
+      "duration_seconds": 90,
+      "daily_limit": 3,
+      "tool_key": null,
+      "tool_cost_bp": 0,
+      "currency_cost": 0,
+      "outputs": {
+        "item.array.gathering_basic": 1
+      },
+      "high_quality_bonus": {},
+      "failure_refunds": {
+        "item.herb.time_trace": 1,
+        "item.mat.array_sand": 1
+      },
+      "min_realm_layer": 1,
+      "required_realm": "qi_gathering",
+      "additional_realms": [],
+      "proficiency_bp": 2000,
+      "required_location": [],
+      "teaching_allowed": false,
+      "required_path": null,
+      "required_paths": [],
+      "required_subprofession": [],
+      "success_threshold_bp": 4500,
+      "high_quality_threshold_bp": 8000,
+      "facility_kind": "array",
+      "failure_refund_bp": null,
+      "binding_kind": null,
+      "binding_duration_seconds": 0,
+      "binding_slot_limit": 0,
+      "cross_realm_faction": null,
+      "status": "active",
+      "desc": "以时痕草稳固阵基，布下引导灵气汇入生产流程的基础聚灵阵。",
+      "aliases": [
+        "时序锚定阵"
+      ]
     }
   ]
 }

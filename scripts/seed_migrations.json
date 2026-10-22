@@ -22,6 +22,20 @@
     "new_sha256": "a4afe7f516d5cffbec44d429bf080cfae2cde3a9fbfd90dd7280aa2a9874557c",
     "new_commit": "d059905cea0a6a777f8a122394823076f59bed40"
   },
+  "道具/丹药.json": {
+    "old_sha256": {
+      "22823edf6796277f5cac2aa39ad05efa3e7b1b862ce19042df4202ba218932b9": "d059905cea0a6a777f8a122394823076f59bed40:data/道具/丹药.json"
+    },
+    "new_sha256": "db3012643f73d5e0d72f687136dfac44672ee89630632d447142c4e2418a29e5",
+    "new_commit": "1d643e609fd01b0fccd33dbfbae08045811b0466"
+  },
+  "生产/配方.json": {
+    "old_sha256": {
+      "9ae47f249225e626fbdc5d3d507f1738dcf3f819cabef14ad85d7d1b306befd4": "d059905cea0a6a777f8a122394823076f59bed40:data/生产/配方.json"
+    },
+    "new_sha256": "000ddc804017ead97d6422459d224400d999f1c4bab528cd2f55fe37281937db",
+    "new_commit": "1d643e609fd01b0fccd33dbfbae08045811b0466"
+  },
   "剧情/主线.json": {
     "old_sha256": {
       "bcaf8bb927740ed41d016382a81c0cbc61a18f096e4945c28a42e99407763580": "e61e67cf180c2e3b280a160da81cef50cd685b77:data/剧情/主线.json",
