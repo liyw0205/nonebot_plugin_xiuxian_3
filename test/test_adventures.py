@@ -248,17 +248,31 @@ def test_bounty_board_herb_claim_replay_and_reputation() -> None:
 
             board = await runtime.dispatch(_context(user, "board"), "悬赏榜")
             assert board.code == "BOUNTY_BOARD"
-            assert "草药补给" in board.message
-            assert "前置不足" in board.message
-            assert board.data["offers"][0]["status"] == "available"
+            # The board shows the stable daily batch (3 slots) for an eligible
+            # player; every batch entry without an accepted bounty in progress
+            # is actionable.
+            available = [
+                row for row in board.data["offers"] if row["status"] == "available"
+            ]
+            assert available, "a fresh eligible player must see actionable offers"
+            assert "前置不足" not in board.message
+            first = available[0]
 
             accepted = await runtime.dispatch(
                 _context(user, "accept", operation_id="bounty-accept-1"),
-                "接取悬赏 草药补给",
+                f"接取悬赏 {first['label']}",
             )
             assert accepted.code == "BOUNTY_ACCEPTED"
+            assert accepted.data["bounty_key"] == first["bounty_key"]
             assert accepted.data["progress"] == 0
-            _inventory(runtime, user, **{"item.herb.blood_grass": 5})
+            target_key = next(
+                definition["target_key"]
+                for definition in json.load(
+                    open(Path(__file__).parents[1] / "data/任务/悬赏.json", encoding="utf-8")
+                )["records"]
+                if definition["key"] == first["bounty_key"]
+            )
+            _inventory(runtime, user, **{target_key: 5})
 
             claimed = await runtime.dispatch(
                 _context(user, "claim", operation_id="bounty-claim-1"),
