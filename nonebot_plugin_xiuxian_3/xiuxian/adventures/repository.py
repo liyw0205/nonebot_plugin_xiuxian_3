@@ -415,6 +415,28 @@ class AdventuresRepositoryMixin:
         await self.initialize()
         return await asyncio.to_thread(self._get_bounty_board_sync, platform, platform_user_id)
 
+    def _bounty_daily_batch(
+        self,
+        connection: sqlite3.Connection,
+        row: sqlite3.Row | dict[str, Any],
+        now: datetime,
+        business_date: str,
+        refresh_seed: str,
+    ) -> list[Any]:
+        """Return today's stable batch: eligible open definitions in the
+        player's seeded order, truncated to the batch size. Ineligible
+        bounties (realm/permit prerequisites not yet met) never consume batch
+        slots, so a fresh player always sees actionable offers."""
+
+        batch_size = 3
+        open_definitions = [
+            definition
+            for definition in bounty_definitions(self.content)
+            if definition.runtime_status == "open"
+            and self._bounty_player_eligible(connection, row, definition, now)
+        ]
+        return list(refresh_bounty_candidates(open_definitions, seed=refresh_seed))[:batch_size]
+
     def _get_bounty_board_sync(self, platform: str, platform_user_id: str) -> BountyBoardRecord:
         now = self._now()
         business_date = now.date().isoformat()
@@ -437,9 +459,31 @@ class AdventuresRepositoryMixin:
                     (row["id"], serialize_datetime(now)),
                 ).fetchone()
             daily_counts = _bounty_daily_counts(connection, int(row["id"]), business_date)
+            # The board shows a stable daily batch. Ineligible bounties
+            # (realm/permit prerequisites not yet met) never consume batch
+            # slots — the board keeps them out so a fresh player always sees
+            # actionable offers. The accepted bounty is always rendered
+            # (appended if outside the batch), and claimed/expired ones stay
+            # visible through it.
+            batched_definitions = self._bounty_daily_batch(
+                connection, row, now, business_date, refresh_seed
+            )
+            batch_keys = {definition.key for definition in batched_definitions}
+            accepted_key = accepted["bounty_key"] if accepted is not None else None
+            if accepted_key is not None and accepted_key not in batch_keys:
+                accepted_definition = next(
+                    (
+                        definition
+                        for definition in bounty_definitions(self.content)
+                        if definition.key == accepted_key
+                    ),
+                    None,
+                )
+                if accepted_definition is not None:
+                    batched_definitions.append(accepted_definition)
             offers: list[BountyOfferView] = []
             accepted_snapshot = _bounty_snapshot(accepted["snapshot_json"]) if accepted is not None else None
-            for definition in bounty_definitions(self.content):
+            for definition in batched_definitions:
                 is_accepted = accepted is not None and accepted["bounty_key"] == definition.key
                 if is_accepted:
                     assert accepted_snapshot is not None
@@ -728,19 +772,16 @@ class AdventuresRepositoryMixin:
             candidate_weights: list[dict[str, Any]] = []
             refresh_seed = bounty_refresh_seed(int(row["id"]), business_date)
             if bounty_key is None:
-                eligible = [
-                    definition
-                    for definition in bounty_definitions(self.content)
-                    if definition.runtime_status == "open"
-                    and self._bounty_player_eligible(connection, row, definition, now)
-                ]
+                batch = self._bounty_daily_batch(
+                    connection, row, now, business_date, refresh_seed
+                )
                 candidates = [
                     definition
-                    for definition in eligible
+                    for definition in batch
                     if daily_counts.get(definition.key, 0) < definition.daily_limit
                 ]
                 if not candidates:
-                    if eligible:
+                    if batch:
                         raise BountyDailyLimitError("daily bounty limit reached")
                     raise BountyRequirementError("no eligible bounty candidates")
                 bounty_choice_seed = uuid4().hex
