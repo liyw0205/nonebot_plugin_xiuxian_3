@@ -38,11 +38,11 @@ def _edit(root: Path, relative: str, key: str, **changes: object) -> None:
 def test_m9_content_references_are_closed() -> None:
     summary = validate_content_references(ContentBundle.load(DATA))
     assert summary["locations"] == 33
-    assert summary["exploration_modes"] == 19
+    assert summary["exploration_modes"] == 20
     assert summary["bounties"] == 34
-    assert summary["recipes"] == 32
+    assert summary["recipes"] == 35
     assert summary["sources"] == 14
-    assert summary["combat_enemies"] == 55
+    assert summary["combat_enemies"] == 57
 
 
 def test_exploration_rejects_missing_reward_pool(tmp_path: Path) -> None:

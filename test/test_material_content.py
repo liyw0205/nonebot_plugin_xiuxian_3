@@ -50,7 +50,7 @@ def test_declared_material_sources_close_actual_reward_and_recipe_references():
     assert summary["materials"] == 13
     assert summary["gathering_sources"] == 18
     assert summary["modes"] == 10
-    assert summary["recipe_consumers"] == 30
+    assert summary["recipe_consumers"] == 32
 
 
 @pytest.mark.parametrize("sources, message", [
