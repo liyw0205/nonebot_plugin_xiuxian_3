@@ -63,6 +63,61 @@
       "required_reputation": 200
     },
     {
+      "key": "trade.xuantian_to_demon.array_sand",
+      "name": "阵砂兑换魔核",
+      "desc": "在魔渊集市以阵砂与灵石兑换魔核，兑换后绑定二十四小时。",
+      "status": "active",
+      "label": "阵砂兑换魔核",
+      "aliases": [
+        "trade.xuantian_to_demon.array_sand",
+        "xuantian_to_demon.array_sand",
+        "阵砂兑换魔核",
+        "阵砂换魔核",
+        "阵砂到魔界",
+        "魔界阵砂贸易"
+      ],
+      "location_key": "demon.abyss_market",
+      "input_items": {
+        "item.mat.array_sand": 10
+      },
+      "currency_cost": 200,
+      "output_items": {
+        "item.demon_core": 1
+      },
+      "required_faction": "demon",
+      "required_reputation": 200
+    },
+    {
+      "key": "trade.three_realms.soul_crystal",
+      "name": "三界贸易口神魂晶换云铁",
+      "desc": "在三界贸易口以神魂晶兑换玄天云铁，兑换后绑定二十四小时。",
+      "status": "active",
+      "label": "神魂晶兑换云铁",
+      "aliases": [
+        "trade.three_realms.soul_crystal",
+        "three_realms.soul_crystal",
+        "神魂晶兑换云铁",
+        "神魂晶换云铁",
+        "神魂晶到玄天",
+        "神魂晶贸易"
+      ],
+      "location_key": "beast.three_realms_trade_port",
+      "input_items": {
+        "item.soul_crystal": 1
+      },
+      "currency_cost": 0,
+      "output_items": {
+        "item.material.cloud_iron": 10
+      },
+      "required_faction": "beast",
+      "required_reputation": 200,
+      "weekly_limit": 3,
+      "required_reputations": {
+        "demon": 200,
+        "beast": 200
+      }
+    },
+    {
       "key": "trade.three_realms",
       "name": "三界贸易口兑换神魂晶",
       "desc": "在三界贸易口以魔核与妖血兑换神魂晶，须同时具备魔界与妖界声望。",
