@@ -25,14 +25,14 @@
       "1702a0efb3369a4b9d1fc4133087f88af141c4de42c05acd288116a08656b3c4": "b3f5662b76857aeb410f29f28a4d6b13b190bfcd:data/灵兽/灵兽.json"
     },
     "new_sha256": "5910662572585ac5924d8e338b520df3b55484e434f7606731893ea376b5b16e",
-    "new_commit": "PENDING"
+    "new_commit": "f3dbdbdd770aad25b232f2c23c91b32f1a8ccb97"
   },
   "灵兽/蜕变.json": {
     "old_sha256": {
       "3b321f3f4f14c9c97e9f8302c2366c3901492aa883e9bef0e171456d546834ff": "b3f5662b76857aeb410f29f28a4d6b13b190bfcd:data/灵兽/蜕变.json"
     },
     "new_sha256": "f354db009593ec9ba936a40debb0df7801287cd12cc77e356fadf071aa977fdc",
-    "new_commit": "PENDING"
+    "new_commit": "f3dbdbdd770aad25b232f2c23c91b32f1a8ccb97"
   },
   "道具/材料.json": {
     "old_sha256": {
