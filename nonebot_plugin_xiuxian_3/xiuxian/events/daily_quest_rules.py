@@ -119,7 +119,7 @@ def daily_task_definitions(content: ContentBundle | None = None) -> tuple[DailyT
     bundle = content or bundled_content()
     definitions: list[DailyTaskDefinition] = []
     names: set[str] = set()
-    operation_owners: dict[str, str] = {}
+    operation_owners: dict[str, list[tuple[str, dict[str, Any]]]] = {}
     for row in bundle.list("quest", include_locked=False):
         if row.get("claim_group") != "daily":
             continue
@@ -148,16 +148,16 @@ def daily_task_definitions(content: ContentBundle | None = None) -> tuple[DailyT
             ):
                 raise ContentError(f"daily task source fields are invalid: {label}")
             operation = _string(raw_source.get("operation"), f"{label}.operation")
-            owner = operation_owners.get(operation)
-            if owner is not None and owner != key:
-                raise ContentError(f"daily source operation belongs to multiple tasks: {operation}")
-            operation_owners[operation] = key
             result = raw_source.get("result")
             if not isinstance(result, dict):
                 raise ContentError(f"daily task source result must be an object: {label}")
             for field, expected in result.items():
                 if not isinstance(field, str) or not field or not _valid_condition(expected):
                     raise ContentError(f"daily task source result condition is invalid: {label}.{field}")
+            for previous_key, previous in operation_owners.get(operation, []):
+                if previous_key != key and _conditions_overlap(previous, result):
+                    raise ContentError(f"daily source operation has overlapping tasks: {operation}")
+            operation_owners.setdefault(operation, []).append((key, dict(result)))
             required = raw_source.get("required_fields")
             if (
                 not isinstance(required, list)
@@ -209,6 +209,18 @@ def source_matches(source: DailyTaskSource, operation: str, result: dict[str, An
             if actual not in expected["one_of"]:
                 return False
         elif actual != expected:
+            return False
+    return True
+
+
+def _conditions_overlap(left: dict[str, Any], right: dict[str, Any]) -> bool:
+    """Return whether two result predicates can match the same event."""
+    for field in set(left) & set(right):
+        first = left[field]
+        second = right[field]
+        first_values = set(first["one_of"]) if isinstance(first, dict) else {first}
+        second_values = set(second["one_of"]) if isinstance(second, dict) else {second}
+        if first_values.isdisjoint(second_values):
             return False
     return True
 
