@@ -16,6 +16,38 @@
       "success_bp": 10000,
       "failure_recovery_seconds": 0,
       "skill_slots": 1
+    },
+    {
+      "key": "beast.evolution.iron_rat_2",
+      "status": "active",
+      "source_key": "beast.iron_rat",
+      "target_key": "beast.jade_rat",
+      "kind": "beast",
+      "required_level": 18,
+      "required_affinity": 60,
+      "costs": {
+        "item.ancestral_blood": 2,
+        "currency.spirit_stone": 600
+      },
+      "success_bp": 10000,
+      "failure_recovery_seconds": 0,
+      "skill_slots": 2
+    },
+    {
+      "key": "mount.evolution.bamboo_deer_1",
+      "status": "active",
+      "source_key": "mount.bamboo_deer",
+      "target_key": "mount.cloud_elk",
+      "kind": "mount",
+      "required_level": 12,
+      "required_affinity": 50,
+      "costs": {
+        "item.beast_blood": 2,
+        "currency.spirit_stone": 500
+      },
+      "success_bp": 10000,
+      "failure_recovery_seconds": 0,
+      "skill_slots": 1
     }
   ],
   "schema": "xiuxian.content"
