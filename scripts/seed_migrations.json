@@ -13,6 +13,13 @@
     "new_sha256": "a18053142feb5a64ebf24c43eb5aadb492dfc0412333b3cd8dc2780dd0e545c4",
     "new_commit": "3e009434e6e6ff26b65419cb13458298b9661293"
   },
+  "经济/跨界贸易.json": {
+    "old_sha256": {
+      "1f87578a42d6ceb15c461adf54708c2b7e8aee4b918ed6d353029dfcbc173783": "952314fb2dd3efe60f67c1934e8f096262e39c02:data/经济/跨界贸易.json"
+    },
+    "new_sha256": "7f95291a2f96b722eb78ce1761b2ef7d69b0db4c4ee80d58560d440857d55975",
+    "new_commit": "40df9d1bd85893d289e96fbe0141256a0744b6ba"
+  },
   "道具/材料.json": {
     "old_sha256": {
       "a1d03eb055fe89b1a240e695589b40edaf1407202a0d5c5f09d722b6131d217e": "579c3ab277d90eafd9d267693be89e678b533282:data/道具/材料.json",

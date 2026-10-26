@@ -496,3 +496,57 @@ def test_manifest_seed_migrates_when_the_trade_file_is_registered(host: Path) ->
     assert repeated.returncode == 0, repeated.stdout + repeated.stderr
     assert "种子更新 0 个" in repeated.stdout
     preserved(host)
+
+
+def old_official_trade_seed() -> bytes:
+    document = json.loads((ROOT / "data" / TRADE_FILE).read_text(encoding="utf-8"))
+    document["records"] = [
+        record
+        for record in document["records"]
+        if record["key"]
+        not in {
+            "trade.xuantian_to_demon.array_sand",
+            "trade.three_realms.soul_crystal",
+        }
+    ]
+    blob = (json.dumps(document, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+    rule = json.loads((ROOT / "scripts/seed_migrations.json").read_text(encoding="utf-8"))[
+        TRADE_FILE.as_posix()
+    ]
+    assert hashlib.sha256(blob).hexdigest() in rule["old_sha256"]
+    return blob
+
+
+def test_known_official_trade_seed_migrates_with_backup_and_repeat_is_idempotent(
+    host: Path,
+) -> None:
+    old = old_official_trade_seed()
+    trade_path = host / "data" / TRADE_FILE
+    trade_path.write_bytes(old)
+
+    result = deploy(host)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "matchers=1 handlers=1" in result.stdout
+    assert "种子更新 1 个" in result.stdout
+    assert trade_path.read_bytes() == (ROOT / "data" / TRADE_FILE).read_bytes()
+    backups = list((host / ".xiuxian3/backups").glob("deploy-*"))
+    assert len(backups) == 1
+    assert (backups[0] / "data" / TRADE_FILE).read_bytes() == old
+    preserved(host)
+
+    repeated = deploy(host)
+    assert repeated.returncode == 0, repeated.stdout + repeated.stderr
+    assert "种子更新 0 个" in repeated.stdout
+    preserved(host)
+
+
+def test_custom_trade_seed_is_preserved(host: Path) -> None:
+    custom = old_official_trade_seed() + b"\n"
+    trade_path = host / "data" / TRADE_FILE
+    trade_path.write_bytes(custom)
+
+    result = deploy(host)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "种子更新 0 个" in result.stdout
+    assert trade_path.read_bytes() == custom
+    preserved(host)
