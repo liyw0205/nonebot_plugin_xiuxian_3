@@ -321,6 +321,24 @@ name/desc/label 非空、阵营属于白名单、旗标须在 `quest.` 命名空
 （合同与常量一致、别名逐键相等、未知许可 ValueError、14 项校验失败用例与加载期重复键拒绝）；
 回归 `test_trade_permit_dispatch.py` 3 passed。未跑全量/压测/部署，未验 QQ 真机。
 
+灵兽蜕变内容扩展（Goal D）已在 `develop` 完成：`data/灵兽/灵兽.json` 5 → 7 条记录、
+`data/灵兽/蜕变.json` 1 → 3 条蜕变边。新增两条蜕变边 `beast.evolution.iron_rat_2`
+（`beast.iron_rat`→`beast.jade_rat`，兽类，18 级/60 好感/技能位 2，成本 `item.ancestral_blood`×2 +
+600 灵石）与 `mount.evolution.bamboo_deer_1`（`mount.bamboo_deer`→`mount.cloud_elk`，骑乘，
+12 级/50 好感/技能位 1，成本 `item.beast_blood`×2 + 500 灵石），各源只保留一条出边以免
+`source_key` 解析歧义；新增两个蜕变形态 `beast.jade_rat`（玉背鼠，1–30 级，
+`exploration_discovery_bp` 500）与 `mount.cloud_elk`（云角鹿，1–25 级，500），沿用既有
+`companion.evolution` 来源、`item.food.coarse_spirit_rice` 喂养与
+`exploration_discovery_bp` 效果白名单，容量 3/2 与既有同 kind 记录一致；成本只引用既有闭合材料
+（`item.ancestral_blood`/`item.beast_blood`）与灵石。运行时未改：`companion_evolution_definitions`
+内容派生照常解析，`蜕变灵兽 <实例>` 对兽类与骑乘两条边均按快照结算（实例变为对应形态、
+`evolution_stage=evolved`、技能位按边生效），已蜕变实例再蜕变被拒且不扣材料，冻结回执/幂等回放
+语义不变。官方 `灵兽/灵兽.json`（`1702a0ef…`→`59106625…`）与 `灵兽/蜕变.json`
+（`3b321f3f…`→`f354db00…`）已登记 `scripts/seed_migrations.json`。
+聚焦证据：新增 `test_companion_evolution_content.py` 2 passed（三边合同与单出边、形态等级/效果/
+容量、成本闭合、真实运行时兽类与骑乘两条边结算且重复蜕变被拒）；回归
+`test_companions.py` 等 35 passed。未跑全量/压测/部署，未验 QQ 真机。
+
 日常修行变体（Goal E）已在 `develop` 完成：`data/任务/任务.json` 日常任务 11 → 17 条
 （`cultivation_exploration` 2→4、`daily_life` 4→6、`other` 5→7，`claim_group=daily` 全部 active），
 新增 6 条任务全部只引用真实 `operations` 账本条目与既有开放内容，未新增物品/地点/命令、未改选择逻辑：

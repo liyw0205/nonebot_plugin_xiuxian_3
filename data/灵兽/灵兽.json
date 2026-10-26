@@ -75,7 +75,9 @@
       "name": "小型灵兽行囊",
       "desc": "可挂在灵兽身上的轻便行囊，能替主人携带少量行旅物资。",
       "kind": "beast_gear",
-      "source": ["recipe.companion.sack_small"],
+      "source": [
+        "recipe.companion.sack_small"
+      ],
       "source_recipe_key": "recipe.companion.sack_small",
       "instance_mode": "unique",
       "durability_bp": 1000,
@@ -90,7 +92,9 @@
       "name": "竹鹿鞍具",
       "desc": "为竹鹿量身制作的鞍具，让山路上的骑行更稳当省力。",
       "kind": "mount_tack",
-      "source": ["recipe.companion.bamboo_saddle"],
+      "source": [
+        "recipe.companion.bamboo_saddle"
+      ],
       "source_recipe_key": "recipe.companion.bamboo_saddle",
       "instance_mode": "unique",
       "durability_bp": 1000,
@@ -99,6 +103,50 @@
         "value": -1
       },
       "key": "mount.tack.bamboo_saddle",
+      "status": "active"
+    },
+    {
+      "name": "玉背鼠",
+      "desc": "铁背鼠蜕变后的温润灵兽，背甲泛出玉色光泽，嗅觉能穿透薄雾寻得隐秘。",
+      "kind": "beast",
+      "source": [
+        "companion.evolution"
+      ],
+      "level_range": [
+        1,
+        30
+      ],
+      "feed_item_key": "item.food.coarse_spirit_rice",
+      "feed_experience": 10,
+      "effect": {
+        "type": "exploration_discovery_bp",
+        "value": 500,
+        "cap": 10000
+      },
+      "capacity_per_player": 3,
+      "key": "beast.jade_rat",
+      "status": "active"
+    },
+    {
+      "name": "云角鹿",
+      "desc": "竹鹿蜕变后的灵骑，鹿角如云絮舒展，奔行时能踏风渡溪。",
+      "kind": "mount",
+      "source": [
+        "companion.evolution"
+      ],
+      "level_range": [
+        1,
+        25
+      ],
+      "feed_item_key": "item.food.coarse_spirit_rice",
+      "feed_experience": 10,
+      "effect": {
+        "type": "exploration_discovery_bp",
+        "value": 500,
+        "cap": 10000
+      },
+      "capacity_per_player": 2,
+      "key": "mount.cloud_elk",
       "status": "active"
     }
   ],
