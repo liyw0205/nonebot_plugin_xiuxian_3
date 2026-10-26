@@ -524,16 +524,17 @@ def test_known_official_trade_seed_migrates_with_backup_and_repeat_is_idempotent
     trade_path = host / "data" / TRADE_FILE
     trade_path.write_bytes(old)
 
-    result = deploy(host, data_only=True)
+    result = deploy(host)
     assert result.returncode == 0, result.stdout + result.stderr
+    assert "matchers=1 handlers=1" in result.stdout
     assert "种子更新 1 个" in result.stdout
     assert trade_path.read_bytes() == (ROOT / "data" / TRADE_FILE).read_bytes()
-    backups = list((host / "data/.xiuxian3/backups").glob("deploy-*"))
+    backups = list((host / ".xiuxian3/backups").glob("deploy-*"))
     assert len(backups) == 1
     assert (backups[0] / "data" / TRADE_FILE).read_bytes() == old
     preserved(host)
 
-    repeated = deploy(host, data_only=True)
+    repeated = deploy(host)
     assert repeated.returncode == 0, repeated.stdout + repeated.stderr
     assert "种子更新 0 个" in repeated.stdout
     preserved(host)
@@ -544,7 +545,7 @@ def test_custom_trade_seed_is_preserved(host: Path) -> None:
     trade_path = host / "data" / TRADE_FILE
     trade_path.write_bytes(custom)
 
-    result = deploy(host, data_only=True)
+    result = deploy(host)
     assert result.returncode == 0, result.stdout + result.stderr
     assert "种子更新 0 个" in result.stdout
     assert trade_path.read_bytes() == custom

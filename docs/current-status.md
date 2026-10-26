@@ -321,6 +321,27 @@ name/desc/label 非空、阵营属于白名单、旗标须在 `quest.` 命名空
 （合同与常量一致、别名逐键相等、未知许可 ValueError、14 项校验失败用例与加载期重复键拒绝）；
 回归 `test_trade_permit_dispatch.py` 3 passed。未跑全量/压测/部署，未验 QQ 真机。
 
+跨界贸易渠道扩展（Goal F）已在 `develop` 完成（数据提交 `40df9d1`、清单种子迁移与内容测试
+`425bb15`）：`data/经济/跨界贸易.json` 贸易记录 3 → 5 条（`trade.defaults` 不计入），
+新增 `trade.xuantian_to_demon.array_sand`（阵砂×10 + 200 灵石 → 魔核×1 @ `demon.abyss_market`，
+demon 200 门、复用默认周限 5/绑定 86400）与 `trade.three_realms.soul_crystal`（神魂晶×1 →
+云铁×10 @ `beast.three_realms_trade_port`，beast 200 单门 + demon/beast 200 双门、周限 3），
+全部输入/输出物品、地点、阵营、声望键、周限与绑定时长取自既有内容，未新增物品/地点/许可/命令、
+未改 DB 与快照语义；两条贸易的中文别名并入既有别名表且无跨贸易冲突。官方 `跨界贸易.json`
+新旧 SHA-256（`1f87578a…`→`7f95291a…`）与 Git provenance 已登记 `scripts/seed_migrations.json`，
+迁移测试新增反向助手（旧 4 记录 blob 升级、重复升级幂等、有效自定义变体保留）。修复 CI 中该
+切片的 2 项失败：两个种子迁移用例原用 `deploy(host, data_only=True)`，data-only 不安装源码却仍
+执行 `--validate`，宿主预置的占位 `__init__.py` 不注册 matcher，必然报“插件已加载但没有注册
+matcher”（旧宿主则报“宿主插件入口不存在”），且备份目录断言误指 `data/.xiuxian3`；现改用与其他
+种子迁移用例一致的完整 `deploy(host)` 并断言 `matchers=1 handlers=1`，备份目录改为
+`<host>/.xiuxian3/backups`（`425bb15` 的 CI 在 3.11/3.12 均复现同一 2 项失败，本地同序复现一致）。
+聚焦证据：
+`test_cross_realm_trade_content.py` 27 passed（5 条贸易合同逐字段、别名逐键相等、
+22 项校验失败用例、新贸易只引用闭合物品与开放地点、声望不足拒绝且零写）；
+回归 `test_cross_realm_trade.py`+`test_cross_realm_events.py`+
+`test_cross_realm_void_frontier_content.py`+`test_documentation.py` 55 passed。
+未跑全量/压测/部署，未验 QQ 真机。
+
 竞技场家族内容化已在 `develop` 完成（数据提交 `dbb563f`、清单种子迁移 `0a6e71d`）：
 新增 `data/特殊/竞技场.json`（kind `arena_rule`，4 条记录：`arena.defaults` 承载段位带
 500/1000/1500 与阵营清单 {xuantian,demon,beast}；`arena.spar` 承载个人竞技快照 7 天/30 分钟、
