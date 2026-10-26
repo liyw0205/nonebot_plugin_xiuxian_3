@@ -321,6 +321,25 @@ name/desc/label 非空、阵营属于白名单、旗标须在 `quest.` 命名空
 （合同与常量一致、别名逐键相等、未知许可 ValueError、14 项校验失败用例与加载期重复键拒绝）；
 回归 `test_trade_permit_dispatch.py` 3 passed。未跑全量/压测/部署，未验 QQ 真机。
 
+日常修行变体（Goal E）已在 `develop` 完成：`data/任务/任务.json` 日常任务 11 → 17 条
+（`cultivation_exploration` 2→4、`daily_life` 4→6、`other` 5→7，`claim_group=daily` 全部 active），
+新增 6 条任务全部只引用真实 `operations` 账本条目与既有开放内容，未新增物品/地点/命令、未改选择逻辑：
+高阶探索（`explore.void_route`）与元婴探索（`explore.demon_abyss`）各补一条深层探索变体；
+宗门兑换（`social.sect_exchange`，四个既有宗门兑换项）补 `daily_life`；灵树浇水
+（`routine.spirit_tree.water`）补 `daily_life`；完成派遣（`specials.settle_dispatch`，outcome
+success/partial/delayed）与领取挂机（`specials.claim_idle`，status claimed）补 `other`。
+规则层把「同一 operation 只能归属一条任务」收紧为「同一 operation 的多条任务判定条件不得重叠」：
+`daily_quest_rules.daily_task_definitions` 新增 `_conditions_overlap`（任一共享字段取值集合不相交即视为
+不重叠，无共享字段则保守判为重叠并拒绝），使 `exploration.settle`/`exploration.settle_combat` 可同时
+服务近郊采集与两条高阶变体；`daily_quest_repository._project_daily_task_sources` 相应移除
+`sources overlap` 硬拒绝，改由既有 `daily_task_events` 逐 (task, operation) 幂等投影，一条结算可
+分别记入多条任务且重复请求不重复计数，快照/幂等/回放语义不变。同时把既有 `task.daily.cultivation` 的来源判定恢复为 `result: {}`（任何结算修炼都计入），修正前序改动误将默认调息修炼排除、导致该任务无法完成的语义回退。官方 `任务/任务.json` 新旧
+SHA-256（`be7a4098…`→`c219c608…`，旧值 provenance 修正为完整 40 位
+`cf72c83cb1427a24d80e57e03fb9202effbc0959`）已登记 `scripts/seed_migrations.json`。
+聚焦证据：`test_daily_variants_content.py` 7 passed（三组池形状 4/6/7=17、每条来源 operation 均为
+包内真实结算、探索 mode 为开放模式且境界高于新手档、新变体目标地点开放、同 operation 无重叠谓词）；
+回归 `test_daily_tasks.py` 等见下。未跑全量/压测/部署，未验 QQ 真机。
+
 跨界贸易渠道扩展（Goal F）已在 `develop` 完成（数据提交 `40df9d1`、清单种子迁移与内容测试
 `425bb15`）：`data/经济/跨界贸易.json` 贸易记录 3 → 5 条（`trade.defaults` 不计入），
 新增 `trade.xuantian_to_demon.array_sand`（阵砂×10 + 200 灵石 → 魔核×1 @ `demon.abyss_market`，

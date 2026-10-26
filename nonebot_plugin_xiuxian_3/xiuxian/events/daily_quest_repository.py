@@ -392,8 +392,6 @@ class DailyQuestRepositoryMixin:
                 sources.setdefault(source.operation, []).append((task, source))
         if not sources:
             return
-        if any(len(values) > 1 for values in sources.values()):
-            raise DailyTasksUnavailableError("daily task sources overlap")
         operation_names = sorted(sources)
         placeholders = ",".join("?" for _ in operation_names)
         operations = connection.execute(
