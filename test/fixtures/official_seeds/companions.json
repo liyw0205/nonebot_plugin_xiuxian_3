@@ -1,0 +1,106 @@
+{
+  "kind": "companion",
+  "records": [
+    {
+      "name": "木鼠",
+      "desc": "常见于林间的灵性小兽，嗅觉敏锐，能察觉附近的细微动静。",
+      "kind": "beast",
+      "source": [
+        "xuantian.outskirts",
+        "story.mainline.xuantian",
+        "story.mainline.xuantian:chapter.1.stage.1"
+      ],
+      "level_range": [
+        1,
+        10
+      ],
+      "feed_item_key": "item.food.coarse_spirit_rice",
+      "feed_experience": 10,
+      "effect": {
+        "type": "exploration_discovery_bp",
+        "value": 200,
+        "cap": 10000
+      },
+      "capacity_per_player": 3,
+      "key": "beast.wood_rat",
+      "status": "active"
+    },
+    {
+      "name": "铁背鼠",
+      "desc": "木鼠蜕变后的坚韧灵兽，背甲如铁，能够守护主人的行旅。",
+      "kind": "beast",
+      "source": [
+        "companion.evolution"
+      ],
+      "level_range": [
+        1,
+        20
+      ],
+      "feed_item_key": "item.food.coarse_spirit_rice",
+      "feed_experience": 10,
+      "effect": {
+        "type": "exploration_discovery_bp",
+        "value": 350,
+        "cap": 10000
+      },
+      "capacity_per_player": 3,
+      "key": "beast.iron_rat",
+      "status": "active"
+    },
+    {
+      "name": "竹鹿",
+      "desc": "生于竹林的温驯灵鹿，熟悉山路，适合陪伴主人长途跋涉。",
+      "kind": "mount",
+      "source": [
+        "story.mainline.xuantian",
+        "story.mainline.xuantian:chapter.1.stage.1"
+      ],
+      "level_range": [
+        1,
+        5
+      ],
+      "transport_experience": 5,
+      "transport_injury_chance_bp": 1000,
+      "transport_injury_recovery_seconds": 1800,
+      "effect": {
+        "type": "transport_duration_multiplier_bp",
+        "value_per_level": 300
+      },
+      "stamina": 20,
+      "capacity_per_player": 1,
+      "key": "mount.bamboo_deer",
+      "status": "active"
+    },
+    {
+      "name": "小型灵兽行囊",
+      "desc": "可挂在灵兽身上的轻便行囊，能替主人携带少量行旅物资。",
+      "kind": "beast_gear",
+      "source": ["recipe.companion.sack_small"],
+      "source_recipe_key": "recipe.companion.sack_small",
+      "instance_mode": "unique",
+      "durability_bp": 1000,
+      "effect": {
+        "type": "carry_capacity",
+        "value": 5
+      },
+      "key": "beast.gear.sack_small",
+      "status": "active"
+    },
+    {
+      "name": "竹鹿鞍具",
+      "desc": "为竹鹿量身制作的鞍具，让山路上的骑行更稳当省力。",
+      "kind": "mount_tack",
+      "source": ["recipe.companion.bamboo_saddle"],
+      "source_recipe_key": "recipe.companion.bamboo_saddle",
+      "instance_mode": "unique",
+      "durability_bp": 1000,
+      "effect": {
+        "type": "transport_stamina_cost_delta",
+        "value": -1
+      },
+      "key": "mount.tack.bamboo_saddle",
+      "status": "active"
+    }
+  ],
+  "schema": "xiuxian.content"
+}

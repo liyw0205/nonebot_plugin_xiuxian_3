@@ -684,3 +684,201 @@ def test_custom_wayfaring_seed_is_preserved(host: Path) -> None:
     assert "种子更新 0 个" in result.stdout
     assert pass_path.read_bytes() == custom
     preserved(host)
+
+
+SEED_FIXTURES = Path(__file__).resolve().parent / "fixtures" / "official_seeds"
+PLACE_CODEX_FILE = Path("图鉴/条目.json")
+DAILY_TASK_FILE = Path("任务/任务.json")
+PILL_FILE = Path("道具/丹药.json")
+COMPANION_FILE = Path("灵兽/灵兽.json")
+COMPANION_EVOLUTION_FILE = Path("灵兽/蜕变.json")
+RECIPE_FILE = Path("生产/配方.json")
+
+PLACE_CODEX_ADDED = frozenset(
+    {
+        "codex.place.sect_gate",
+        "codex.place.mist_grotto",
+        "codex.place.abyss_gate",
+        "codex.place.trade_port",
+        "codex.place.dao_service",
+        "codex.place.array_hall",
+        "codex.place.ancient_domain",
+        "codex.place.abyss_depths",
+        "codex.place.ancestral_lake",
+        "codex.place.void_portal",
+        "codex.place.first_route",
+        "codex.place.archive_ruins",
+        "codex.place.time_garden",
+        "codex.place.war_front",
+        "codex.place.boundary_realm",
+        "codex.place.floating_boat",
+        "codex.place.mist_grotto_2",
+    }
+)
+
+
+def _registered_old_blob(relative: Path, blob: bytes) -> bytes:
+    """Pin a reconstructed or archived blob against the migration table."""
+
+    rule = json.loads((ROOT / "scripts/seed_migrations.json").read_text(encoding="utf-8"))[
+        relative.as_posix()
+    ]
+    assert hashlib.sha256(blob).hexdigest() in rule["old_sha256"], (
+        f"the reversed blob must equal a registered old official seed: {relative}"
+    )
+    return blob
+
+
+def _without_records(relative: Path, keys: frozenset[str]) -> bytes:
+    document = json.loads((ROOT / "data" / relative).read_text(encoding="utf-8"))
+    document["records"] = [
+        record for record in document["records"] if record["key"] not in keys
+    ]
+    blob = (json.dumps(document, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+    return _registered_old_blob(relative, blob)
+
+
+def old_official_place_codex() -> bytes:
+    return _without_records(PLACE_CODEX_FILE, PLACE_CODEX_ADDED)
+
+
+def old_official_daily_tasks() -> bytes:
+    # The daily slice reserialised the whole board, so the deployed blob is
+    # archived verbatim instead of reconstructed from the current formatting.
+    return _registered_old_blob(
+        DAILY_TASK_FILE, (SEED_FIXTURES / "daily_tasks.json").read_bytes()
+    )
+
+
+def old_official_pills() -> bytes:
+    # Reserialised by the time-craft slice; see old_official_daily_tasks.
+    return _registered_old_blob(
+        PILL_FILE, (SEED_FIXTURES / "pills.json").read_bytes()
+    )
+
+
+def old_official_companions() -> bytes:
+    # Reserialised by the companion-evolution slice; see old_official_daily_tasks.
+    return _registered_old_blob(
+        COMPANION_FILE, (SEED_FIXTURES / "companions.json").read_bytes()
+    )
+
+
+def old_official_companion_evolutions() -> bytes:
+    return _without_records(
+        COMPANION_EVOLUTION_FILE,
+        frozenset(
+            {
+                "beast.evolution.iron_rat_2",
+                "mount.evolution.bamboo_deer_1",
+            }
+        ),
+    )
+
+
+def old_official_recipes() -> bytes:
+    return _without_records(
+        RECIPE_FILE, frozenset({"recipe.pill.time_ward", "recipe.array.time_anchor"})
+    )
+
+
+@pytest.mark.parametrize(
+    "reverse",
+    [
+        old_official_place_codex,
+        old_official_daily_tasks,
+        old_official_pills,
+        old_official_companions,
+        old_official_companion_evolutions,
+        old_official_recipes,
+    ],
+)
+def test_goal_a_i_seed_reverse_helpers_match_registered_old_blobs(reverse) -> None:
+    # Every seed file the A-I goals changed must be upgradeable from the blob
+    # that preceded the change; the helper asserts the digest itself.
+    assert reverse()
+
+
+A_I_CHANGED_SEEDS = (
+    "任务/任务.json",
+    "冒险/秘境专用.json",
+    "图鉴/条目.json",
+    "地图/地点.json",
+    "引导/引导.json",
+    "灵兽/灵兽.json",
+    "灵兽/蜕变.json",
+    "生产/配方.json",
+    "经济/跨界贸易.json",
+    "道具/丹药.json",
+    "道历/行卷.json",
+)
+
+
+def test_goal_a_i_changed_seeds_all_declare_migration_rules() -> None:
+    rules = json.loads(
+        (ROOT / "scripts/seed_migrations.json").read_text(encoding="utf-8")
+    )
+    missing = [relative for relative in A_I_CHANGED_SEEDS if relative not in rules]
+    assert missing == [], "changed seeds without a migration rule: " + ", ".join(missing)
+
+
+def test_content_manifest_covers_every_data_file() -> None:
+    manifest = json.loads((ROOT / "data" / MANIFEST_FILE).read_text(encoding="utf-8"))
+    listed = set(manifest["files"])
+    on_disk = {
+        path.relative_to(ROOT / "data").as_posix()
+        for path in (ROOT / "data").rglob("*.json")
+    }
+    # The manifest describes the table it belongs to but does not list itself.
+    on_disk.discard(MANIFEST_FILE.as_posix())
+    assert sorted(on_disk - listed) == []
+    assert sorted(listed - on_disk) == []
+
+
+def test_known_official_place_codex_seed_migrates_with_backup_and_repeat_is_idempotent(
+    host: Path,
+) -> None:
+    # The codex entries and the location wiring shipped together, so an old
+    # host carries the previous blob of both files; migrating only one of them
+    # would leave 17 dangling codex references.
+    old = old_official_place_codex()
+    old_locations = old_official_locations()
+    codex_path = host / "data" / PLACE_CODEX_FILE
+    location_path = host / "data" / LOCATION_FILE
+    codex_path.write_bytes(old)
+    location_path.write_bytes(old_locations)
+
+    result = deploy(host)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "matchers=1 handlers=1" in result.stdout
+    assert "种子更新 2 个" in result.stdout
+    assert codex_path.read_bytes() == (ROOT / "data" / PLACE_CODEX_FILE).read_bytes()
+    assert location_path.read_bytes() == (ROOT / "data" / LOCATION_FILE).read_bytes()
+    backups = list((host / ".xiuxian3/backups").glob("deploy-*"))
+    assert len(backups) == 1
+    assert (backups[0] / "data" / PLACE_CODEX_FILE).read_bytes() == old
+    assert (backups[0] / "data" / LOCATION_FILE).read_bytes() == old_locations
+    preserved(host)
+
+    repeated = deploy(host)
+    assert repeated.returncode == 0, repeated.stdout + repeated.stderr
+    assert "种子更新 0 个" in repeated.stdout
+    preserved(host)
+
+
+def test_custom_place_codex_seed_is_preserved(host: Path) -> None:
+    custom_document = json.loads(
+        (ROOT / "data" / PLACE_CODEX_FILE).read_text(encoding="utf-8")
+    )
+    custom_document["records"][0]["desc"] = "自定义图鉴描述"
+    custom = (json.dumps(custom_document, ensure_ascii=False, indent=2) + "\n").encode(
+        "utf-8"
+    )
+    codex_path = host / "data" / PLACE_CODEX_FILE
+    codex_path.write_bytes(custom)
+
+    result = deploy(host)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "种子更新 0 个" in result.stdout
+    assert codex_path.read_bytes() == custom
+    preserved(host)
