@@ -423,6 +423,19 @@ matcher”（旧宿主则报“宿主插件入口不存在”），且备份目�
 新增迁移/自定义保留用例（`-k wayfaring` 3 passed）；`test_documentation.py` 2 passed；
 `compileall` 与 `git diff --check` 通过。未跑全量/压测/部署，未验 QQ 真机。
 
+跨域内容一致性收口（Goal J）已在 `develop` 完成：`data/内容清单.json` 登记 62 份与磁盘
+63 份数据 JSON 双向一致（唯一差集为清单自身，清单不登记自己）；Goals A–I 改动的 11 个
+官方种子全部具备迁移规则，其中 Goal A 的 `图鉴/条目.json` 原缺规则，现登记旧 blob
+`d51b99c1…`（provenance `44be5213…`）与现行 blob `bb71dd2f…`（发货提交 `2ea7007`）；
+`scripts/seed_migrations.json` 17 条规则的 `new_sha256` 全部与现行文件一致。
+`test_seed_migration.py` 新增 A–I 覆盖钉值（改动种子缺规则即失败）、清单覆盖用例、
+6 个反向助手（`图鉴/条目`、`灵兽/蜕变`、`生产/配方` 由现行种子重建；`任务/任务`、
+`道具/丹药`、`灵兽/灵兽` 因切片整file重排改为 `test/fixtures/official_seeds/` 归档旧 blob
+并按指纹校验）与 `图鉴/条目` 部署用例：旧宿主同时迁移图鉴与地点两枚种子（避免 17 条
+codex 悬空）、备份、重复部署幂等、自定义种子保留。计数复核
+`test_material_content.py`+`test_combat_content.py` 29 passed（材料矩阵与战斗内容钉值
+未因 A–I 漂移）。未重做 A–I 内容，未跑全量/压测/部署，未验 QQ 真机。
+
 竞技场家族内容化已在 `develop` 完成（数据提交 `dbb563f`、清单种子迁移 `0a6e71d`）：
 新增 `data/特殊/竞技场.json`（kind `arena_rule`，4 条记录：`arena.defaults` 承载段位带
 500/1000/1500 与阵营清单 {xuantian,demon,beast}；`arena.spar` 承载个人竞技快照 7 天/30 分钟、
