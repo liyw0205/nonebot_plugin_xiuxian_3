@@ -1,0 +1,420 @@
+{
+  "kind": "quest",
+  "records": [
+    {
+      "name": "魔界引导",
+      "desc": "确认魔界的污染与契约风险，取得深渊门的引路资格。",
+      "status": "active",
+      "operation": "world.accept_demon_intro",
+      "claim_policy": "once_per_player",
+      "introduction": {
+        "costs": {"currency.spirit_stone": 100},
+        "reward_key": "reward.world.demon_intro",
+        "access_flag": "access.demon_abyss_gate",
+        "required_location_key": "demon.abyss_gate",
+        "required_realm_key": "foundation",
+        "required_realm_layer": 1,
+        "arrival_route_key": "route.cloud_to_abyss_intro"
+      },
+      "key": "quest.demon_intro"
+    },
+    {
+      "name": "妖界引导",
+      "desc": "读懂妖族源流并完成一次近郊见闻，取得万兽山的引路资格。",
+      "status": "active",
+      "operation": "world.complete_beast_intro",
+      "claim_policy": "once_per_player",
+      "introduction": {
+        "costs": {"currency.spirit_stone": 100},
+        "reward_key": "reward.world.beast_intro",
+        "access_flag": "access.beast_ten_thousand_hills",
+        "required_location_key": "xuantian.outskirts",
+        "required_realm_key": "foundation",
+        "required_realm_layer": 1,
+        "arrival_route_key": null,
+        "required_read_component": "beast_history_read",
+        "required_evidence": {
+          "location_key": "xuantian.outskirts",
+          "mode_keys": ["explore.gather_outskirts", "explore.trial_outskirts"],
+          "status": "settled"
+        }
+      },
+      "key": "quest.beast_intro"
+    },
+    {
+      "name": "第一次寻仙",
+      "desc": "离开熟悉的日常，亲自踏出寻仙问道的第一步。",
+      "status": "open",
+      "claim_group": "guidance",
+      "trigger": {
+        "operations": ["player.start_seeking"],
+        "result": {"created": true}
+      },
+      "reward_key": "reward.quest.first_seeking",
+      "claim_policy": "once_per_player",
+      "expires": false,
+      "key": "quest.first_seeking"
+    },
+    {
+      "name": "第一次入道",
+      "desc": "完成凡人引导，选定修行道路，正式开始修炼。",
+      "status": "open",
+      "claim_group": "guidance",
+      "trigger": {
+        "operations": ["player.enter_cultivation"],
+        "result": {"changed": true}
+      },
+      "reward_key": "reward.quest.first_cultivation",
+      "claim_policy": "once_per_player",
+      "expires": false,
+      "key": "quest.first_cultivation"
+    },
+    {
+      "name": "第一次采集",
+      "desc": "在近郊采下第一份灵草，熟悉山野间的采集之道。",
+      "status": "open",
+      "claim_group": "guidance",
+      "trigger": {
+        "operations": ["exploration.settle", "exploration.settle_combat"],
+        "result": {
+          "mode_key": "explore.gather_outskirts",
+          "status": "settled",
+          "battle_outcome": {"one_of": [null, "won"]}
+        }
+      },
+      "reward_key": "reward.quest.first_gather",
+      "claim_policy": "once_per_player",
+      "expires": false,
+      "key": "quest.first_gather"
+    },
+    {
+      "name": "第一次生产",
+      "desc": "完成一份炼制订单，迈出将灵材化为成品的第一步。",
+      "status": "open",
+      "claim_group": "guidance",
+      "trigger": {
+        "operations": ["production.complete", "production.recover"],
+        "result": {"status": "completed", "success": true}
+      },
+      "reward_key": "reward.quest.first_craft",
+      "claim_policy": "once_per_player",
+      "expires": false,
+      "key": "quest.first_craft"
+    },
+    {
+      "name": "元婴准备",
+      "desc": "备齐凝结元婴所需的历练与材料，为金丹化婴做好准备。",
+      "status": "open",
+      "trigger": {"operation": "progression.prepare_nascent_soul", "result": "success"},
+      "reward_key": "reward.quest.prepare_nascent_soul",
+      "claim_policy": "once_per_player",
+      "expires": false,
+      "key": "quest.prepare_nascent_soul"
+    },
+    {
+      "name": "化神许可",
+      "desc": "完成远古洞天、材料委托与三界历练，取得冲击化神境的资格。",
+      "status": "open",
+      "trigger": {"operation": "quest.domain_material_commission", "result": "success"},
+      "requirements": ["quest.domain_material_commission", "quest.ancient_domain_line", "event.cross_realm_victory"],
+      "reward": {"preparation_bp": 600},
+      "claim_policy": "once_per_player",
+      "expires": false,
+      "key": "quest.soul_transformation"
+    },
+    {
+      "name": "炼虚许可",
+      "desc": "完成界壁试炼并取得虚空档案，获得踏入炼虚境的资格。",
+      "status": "open",
+      "trigger": {"operation": "quest.break_void", "result": "success"},
+      "requirements": ["void_wall_trial_count>=3", "item.void_archive>=1"],
+      "reward": {"breakthrough_permission": "void_refining"},
+      "claim_policy": "once_per_player",
+      "expires": false,
+      "key": "quest.break_void"
+    },
+    {
+      "name": "合道许可",
+      "desc": "走完三界主线、完成道心挑战并交付大师作品，取得合道资格。",
+      "status": "open",
+      "trigger": {"operation": "quest.dao_union", "result": "success"},
+      "requirements": ["three_realms.mainline", "dao_union.challenge", "dao_union.masterwork"],
+      "reward": {"permission": "dao_union"},
+      "claim_policy": "once_per_player",
+      "expires": false,
+      "key": "quest.dao_union"
+    },
+    {
+      "name": "守界防御",
+      "desc": "参与守界防御，协助抵御边界异动，积累守望三界的功绩。",
+      "status": "open",
+      "requirements": ["realm.dao_union.layer1"],
+      "target": 3,
+      "reward": {"dao_fruit_progress": 150, "ascension_merit": 150, "world_merit": 300, "item.tribulation_token": 1},
+      "claim_policy": "once_per_season",
+      "expires": false,
+      "key": "task.dao_origin.guard"
+    },
+    {
+      "name": "留界建设",
+      "desc": "投身公共建设，修缮道场与边界设施，为众生留下安身之所。",
+      "status": "open",
+      "requirements": ["realm.dao_union.layer1"],
+      "target": 3,
+      "codex_entry_key": "codex.dao.service_settlement",
+      "reward": {"dao_fruit_progress": 160, "ascension_merit": 150, "world_merit": 300, "item.tribulation_token": 1},
+      "claim_policy": "once_per_season",
+      "expires": false,
+      "key": "task.dao_origin.build"
+    },
+    {
+      "name": "道统传承",
+      "desc": "将修行经验传授给后来者，让所学之道得以延续。",
+      "status": "open",
+      "requirements": ["realm.dao_union.layer1"],
+      "target": 3,
+      "reward": {"dao_fruit_progress": 160, "ascension_merit": 150, "world_merit": 400, "item.tribulation_token": 1},
+      "claim_policy": "once_per_season",
+      "expires": false,
+      "key": "task.dao_origin.teach"
+    },
+    {
+      "name": "静心修行",
+      "desc": "完成一次修行，让灵台与周天更为澄明。",
+      "status": "active",
+      "claim_group": "daily",
+      "daily_task": {
+        "group": "cultivation_exploration",
+        "weight": 1,
+        "target": 1,
+        "sources": [
+          {
+            "operation": "progression.settle_cultivation",
+            "result": {},
+            "required_fields": ["session_id", "mode_key", "cultivation_gain"]
+          }
+        ]
+      },
+      "key": "task.daily.cultivation"
+    },
+    {
+      "name": "近郊采集",
+      "desc": "在近郊完成两次成功采集，败退不计入此项。",
+      "status": "active",
+      "claim_group": "daily",
+      "daily_task": {
+        "group": "cultivation_exploration",
+        "weight": 1,
+        "target": 2,
+        "sources": [
+          {
+            "operation": "exploration.settle",
+            "result": {
+              "mode_key": "explore.gather_outskirts",
+              "status": "settled",
+              "battle_pending": false,
+              "expired": false,
+              "battle_outcome": {"one_of": [null, "won"]}
+            },
+            "required_fields": ["exploration_id", "mode_key", "result"]
+          },
+          {
+            "operation": "exploration.settle_combat",
+            "result": {
+              "mode_key": "explore.gather_outskirts",
+              "status": "settled",
+              "battle_pending": false,
+              "expired": false,
+              "battle_outcome": {"one_of": [null, "won"]}
+            },
+            "required_fields": ["exploration_id", "mode_key", "result"]
+          }
+        ]
+      },
+      "key": "task.daily.outskirts_gather"
+    },
+    {
+      "name": "道历问安",
+      "desc": "于今日道历中留下一笔问安记录。",
+      "status": "active",
+      "claim_group": "daily",
+      "daily_task": {
+        "group": "daily_life",
+        "weight": 1,
+        "target": 1,
+        "sources": [
+          {
+            "operation": "routine.checkin.daily",
+            "result": {"makeup": false},
+            "required_fields": ["target_date", "consecutive_days"]
+          }
+        ]
+      },
+      "key": "task.daily.checkin"
+    },
+    {
+      "name": "完成一炉炼制",
+      "desc": "完成一份成功的炼制订单。",
+      "status": "active",
+      "claim_group": "daily",
+      "daily_task": {
+        "group": "daily_life",
+        "weight": 1,
+        "target": 1,
+        "sources": [
+          {
+            "operation": "production.complete",
+            "result": {"status": "completed", "success": true},
+            "required_fields": ["order_id", "recipe_key"]
+          },
+          {
+            "operation": "production.recover",
+            "result": {"status": "completed", "success": true},
+            "required_fields": ["order_id", "recipe_key"]
+          }
+        ]
+      },
+      "key": "task.daily.production"
+    },
+    {
+      "name": "交付城镇委托",
+      "desc": "将一份已承接的城镇委托妥善交付。",
+      "status": "active",
+      "claim_group": "daily",
+      "daily_task": {
+        "group": "daily_life",
+        "weight": 1,
+        "target": 1,
+        "sources": [
+          {
+            "operation": "livelihood.deliver_commission",
+            "result": {"status": "delivered"},
+            "required_fields": ["claim_id", "commission_id", "commission_key"]
+          }
+        ]
+      },
+      "key": "task.daily.commission"
+    },
+    {
+      "name": "收获灵田",
+      "desc": "收取一处灵田中成熟的灵植。",
+      "status": "active",
+      "claim_group": "daily",
+      "daily_task": {
+        "group": "daily_life",
+        "weight": 1,
+        "target": 1,
+        "sources": [
+          {
+            "operation": "livelihood.harvest",
+            "result": {"status": "harvested"},
+            "required_fields": ["plot_id", "crop_key", "harvest"]
+          }
+        ]
+      },
+      "key": "task.daily.field_harvest"
+    },
+    {
+      "name": "完成一份悬赏",
+      "desc": "完成并领取一份悬赏报酬。",
+      "status": "active",
+      "claim_group": "daily",
+      "daily_task": {
+        "group": "other",
+        "weight": 1,
+        "target": 1,
+        "sources": [
+          {
+            "operation": "bounty.claim",
+            "result": {"status": "claimed"},
+            "required_fields": ["bounty_key", "progress", "target"]
+          }
+        ]
+      },
+      "key": "task.daily.bounty"
+    },
+    {
+      "name": "静养调息",
+      "desc": "完成一次静养休整，调和身心气息。",
+      "status": "active",
+      "claim_group": "daily",
+      "daily_task": {
+        "group": "other",
+        "weight": 1,
+        "target": 1,
+        "sources": [
+          {
+            "operation": "progression.settle_retreat",
+            "result": {"status": "settled", "retreat_key": "progression.retreat.restful"},
+            "required_fields": ["session_id", "cycles"]
+          },
+          {
+            "operation": "progression.recover_retreat",
+            "result": {"status": "settled", "retreat_key": "progression.retreat.restful"},
+            "required_fields": ["session_id", "cycles"]
+          }
+        ]
+      },
+      "key": "task.daily.restful_retreat"
+    },
+    {
+      "name": "抵达商路终点",
+      "desc": "完成一次短途商路行程并平安抵达。",
+      "status": "active",
+      "claim_group": "daily",
+      "daily_task": {
+        "group": "other",
+        "weight": 1,
+        "target": 1,
+        "sources": [
+          {
+            "operation": "livelihood.settle_route",
+            "result": {"status": "settled"},
+            "required_fields": ["route_id", "route_key", "settled_at"]
+          }
+        ]
+      },
+      "key": "task.daily.route"
+    },
+    {
+      "name": "照料灵田",
+      "desc": "为一处正在生长的灵田完成一次养护。",
+      "status": "active",
+      "claim_group": "daily",
+      "daily_task": {
+        "group": "other",
+        "weight": 1,
+        "target": 1,
+        "sources": [
+          {
+            "operation": "livelihood.maintain_plot",
+            "result": {"status": "growing"},
+            "required_fields": ["plot_id", "maintenance_count", "required_maintenance"]
+          }
+        ]
+      },
+      "key": "task.daily.field_maintenance"
+    },
+    {
+      "name": "战胜一名敌手",
+      "desc": "在正式斗法中由自己参与并结算一场胜利。",
+      "status": "active",
+      "claim_group": "daily",
+      "daily_task": {
+        "group": "other",
+        "weight": 1,
+        "target": 1,
+        "sources": [
+          {
+            "operation": "battle.resolve",
+            "result": {"status": "settled", "outcome": "won"},
+            "required_fields": ["battle_id", "enemy_key"],
+            "battle_types": ["pve.exploration", "pve.demon_war_front"]
+          }
+        ]
+      },
+      "key": "task.daily.pve_victory"
+    }
+  ],
+  "schema": "xiuxian.content"
+}

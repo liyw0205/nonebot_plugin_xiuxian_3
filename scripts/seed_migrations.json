@@ -136,5 +136,12 @@
     },
     "new_sha256": "69c890f343beff77dd5c59a0826eb13f46a0585ce7714ec8db7aeaa2ab515e2b",
     "new_commit": "36c9db9b6d50cab7ecd680d2bd234fb83768c5fa"
+  },
+  "图鉴/条目.json": {
+    "old_sha256": {
+      "d51b99c168b22ca47776ae7c523b0c7dcf5e66e2104cf68eda8bf9043178f1ce": "44be52139804523570ec1f2588b8f9bdf568c8a0:data/图鉴/条目.json"
+    },
+    "new_sha256": "bb71dd2f6f3011a0cff66ee928f518c1aafd6036709d0d11e3282aa0d681ce50",
+    "new_commit": "2ea700721f9772dd0c8adfd13b67db0140a61805"
   }
 }

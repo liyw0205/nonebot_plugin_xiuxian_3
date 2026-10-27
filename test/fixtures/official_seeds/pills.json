@@ -1,0 +1,216 @@
+{
+  "kind": "item",
+  "records": [
+    {
+      "name": "低阶疗伤丹",
+      "desc": "用于战斗中疗愈伤势，可恢复部分气血。",
+      "item_type": "pill",
+      "quality": "common",
+      "stack_limit": 99,
+      "instance_mode": "stack",
+      "bind_type": "unbound",
+      "tradeable": true,
+      "effects": [
+        {
+          "type": "restore_hp_bp",
+          "value": 3000,
+          "uses_per_battle": 1
+        }
+      ],
+      "requirements": [],
+      "status": "active",
+      "key": "item.pill.healing_low"
+    },
+    {
+      "name": "焦点丹",
+      "desc": "凝神静气，助你在下一次修炼中多得一成修为。",
+      "item_type": "pill",
+      "quality": "common",
+      "stack_limit": 99,
+      "instance_mode": "stack",
+      "bind_type": "unbound",
+      "tradeable": true,
+      "effects": [
+        {
+          "type": "cultivation_state_bp",
+          "value": 1000,
+          "scope": "one_session"
+        }
+      ],
+      "requirements": [],
+      "status": "active",
+      "key": "item.pill.focus_low"
+    },
+    {
+      "name": "聚气护脉丹",
+      "desc": "护住聚气时的经脉，突破失败也能留住大部分修为。",
+      "item_type": "pill",
+      "quality": "common",
+      "stack_limit": 9,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [
+        {
+          "type": "breakthrough_failure_protection",
+          "target": "qi_gathering",
+          "cultivation_retention_bp": 9000,
+          "weakness_seconds": 1800
+        }
+      ],
+      "requirements": [],
+      "status": "active",
+      "key": "item.pill.qi_guard"
+    },
+    {
+      "name": "筑基丹",
+      "desc": "药力沉稳，可助修士迈过筑基门槛。",
+      "item_type": "pill",
+      "quality": "common",
+      "stack_limit": 9,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [
+        {
+          "type": "breakthrough_requirement",
+          "target": "foundation"
+        }
+      ],
+      "requirements": [],
+      "status": "active",
+      "key": "item.pill.foundation_draft"
+    },
+    {
+      "name": "筑基护脉丹",
+      "desc": "筑基时护持经脉，降低失败后修为受损的程度。",
+      "item_type": "pill",
+      "quality": "common",
+      "stack_limit": 9,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [
+        {
+          "type": "breakthrough_failure_protection",
+          "target": "foundation",
+          "cultivation_retention_bp": 8500,
+          "weakness_seconds": 7200
+        }
+      ],
+      "requirements": [],
+      "status": "active",
+      "key": "item.pill.foundation_guard"
+    },
+    {
+      "name": "凝核丹",
+      "desc": "凝炼金丹所需的丹药，筑基圆满后方可服用。",
+      "item_type": "pill",
+      "quality": "rare",
+      "stack_limit": 9,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [
+        {
+          "type": "breakthrough_requirement",
+          "target": "golden_core"
+        }
+      ],
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "foundation",
+          "min_layer": 10
+        }
+      ],
+      "status": "active",
+      "key": "item.pill.core_condense"
+    },
+    {
+      "name": "金丹护脉丹",
+      "desc": "金丹突破时稳固经脉，减轻失败带来的修为损耗。",
+      "item_type": "pill",
+      "quality": "rare",
+      "stack_limit": 9,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [
+        {
+          "type": "breakthrough_failure_protection",
+          "target": "golden_core",
+          "cultivation_retention_bp": 7000,
+          "weakness_seconds": 14400
+        }
+      ],
+      "requirements": [],
+      "status": "active",
+      "key": "item.pill.golden_core_guard"
+    },
+    {
+      "name": "金丹恢复丹",
+      "desc": "平复金丹突破后的震荡，服用需耗费灵石调息。",
+      "item_type": "pill",
+      "quality": "rare",
+      "stack_limit": 9,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [
+        {
+          "type": "recover_breakthrough_shock",
+          "target": "foundation_shock",
+          "currency_cost": 200
+        }
+      ],
+      "requirements": [],
+      "status": "active",
+      "key": "item.pill.golden_core_restore"
+    },
+    {
+      "name": "凝魂丹",
+      "desc": "温养神魂、凝聚元婴的关键丹药，金丹圆满后方可使用。",
+      "item_type": "pill",
+      "quality": "heaven",
+      "stack_limit": 9,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [{"type": "breakthrough_requirement", "target": "nascent_soul"}],
+      "requirements": [{"type": "realm", "realm_key": "golden_core", "min_layer": 10}],
+      "status": "active",
+      "key": "item.pill.soul_condense"
+    },
+    {
+      "name": "魂元丹",
+      "desc": "以魂元涤荡心神，可减轻魔渊污染，也会带来一段疲乏。",
+      "item_type": "pill",
+      "quality": "heaven",
+      "stack_limit": 9,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [{"type": "heart_demon_purify", "pollution_delta": -10, "fatigue_hours": 3}],
+      "requirements": [],
+      "status": "active",
+      "key": "item.pill.soul_restore"
+    },
+    {
+      "name": "领域复原丹",
+      "desc": "修复受损的领域根基，服用后需静养一段时日。",
+      "item_type": "pill",
+      "quality": "heaven",
+      "stack_limit": 9,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [{"type": "domain_crack_recovery", "weakness_seconds": 28800, "currency_cost": 2000}],
+      "requirements": [{"type": "realm", "realm_key": "soul_transformation", "min_layer": 1}],
+      "status": "active",
+      "key": "item.pill.domain_restore"
+    }
+  ],
+  "category": "丹药",
+  "schema": "xiuxian.content"
+}
