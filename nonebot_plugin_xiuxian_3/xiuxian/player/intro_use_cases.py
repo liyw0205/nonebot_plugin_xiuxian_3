@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from ...contracts import CommandContext, CommandResult
 from ..content import ContentBundle, bundled_content
 from ..repository import (
@@ -18,13 +20,11 @@ from ..repository import (
     WeaknessActiveError,
 )
 from .intro_rules import (
-    GUIDE_COMMANDS,
-    GUIDE_CHOOSE_SERVICE,
-    GUIDE_GATHER_BLOOD_GRASS,
-    GUIDE_LABELS,
-    GUIDE_READ_WORLD,
     SERVICE_LABELS,
     TRAVEL_LABELS,
+    guide_commands,
+    guide_definition,
+    guides_for_stage,
     resolve_destination,
     resolve_guide,
     resolve_service,
@@ -41,7 +41,7 @@ class IntroApplication:
         self.content = content or bundled_content()
 
     def world_intro_text(self) -> str:
-        definition = self.content.get("guide", GUIDE_READ_WORLD, include_locked=False)
+        definition = self.content.get("guide", "guide.read_world", include_locked=False)
         body = definition.get("content") if definition else None
         if not isinstance(body, str) or not body.strip():
             raise ValueError("guide.read_world requires non-empty content")
@@ -69,24 +69,58 @@ class IntroApplication:
     def _stage(player) -> str:
         return STAGE_LABELS.get(player.stage, "修行阶段")
 
-    @staticmethod
-    def _guide_progress(player) -> str:
-        return f"{len(set(player.intro_flags))}/3"
+    def _guide_definition(self, guide_key: str) -> dict[str, Any] | None:
+        try:
+            return guide_definition(guide_key, self.content)
+        except ValueError:
+            return None
 
     @staticmethod
-    def _guide_hint(player) -> str:
-        pending = [key for key in GUIDE_LABELS if key not in set(player.intro_flags)]
+    def _guide_body(definition: dict[str, Any] | None) -> str:
+        if not definition:
+            return ""
+        body = definition.get("desc")
+        return body.strip() if isinstance(body, str) else ""
+
+    def _stage_guides(self, player) -> tuple[dict[str, Any], ...]:
+        """The guides the player's current stage may still work on."""
+
+        return guides_for_stage(str(player.stage), self.content)
+
+    def _guide_progress(self, player) -> str:
+        # Stage-filtered: a mortal never sees the realm-gated guides counted in
+        # their denominator, and a graduated player is measured against their own
+        # tier instead of the onboarding trio.
+        available = self._stage_guides(player)
+        if not available:
+            return "0/0"
+        completed = set(player.intro_flags)
+        done = sum(1 for definition in available if definition["key"] in completed)
+        return f"{done}/{len(available)}"
+
+    def _guide_hint(self, player) -> str:
+        available = self._stage_guides(player)
+        completed = set(player.intro_flags)
+        pending = [definition for definition in available if definition["key"] not in completed]
         if not pending:
-            return f"用{command_link('选择道途', '选择道途')}填写自己的修行方向。"
-        key = pending[0]
-        if key == GUIDE_GATHER_BLOOD_GRASS and player.location_key != "xuantian.outskirts":
-            return f"先{command_link('前往近郊', '前往近郊')}，再完成教学采集。"
-        if key == GUIDE_CHOOSE_SERVICE:
+            # Graduation is only half the onboarding: a mortal or a graduated
+            # seeker is still told to declare a path, exactly as before.
+            if str(player.stage) in {"mortal", "seeker"}:
+                return f"用{command_link('选择道途', '选择道途')}填写自己的修行方向。"
+            return f"引导已全部完成，可用{command_link('我的状态', '我的状态')}查看当前进展。"
+        definition = pending[0]
+        if definition["locations"] and player.location_key not in definition["locations"]:
+            label = TRAVEL_LABELS.get(definition["locations"][0], definition["locations"][0])
+            destination = "前往近郊" if definition["locations"][0] == "xuantian.outskirts" else f"前往{label}"
+            return f"先{command_link(destination, destination)}，再完成{definition['label']}。"
+        if definition["options"]:
             return "选择一项生产教学：" + "、".join(
-                command_link(f"完成引导 {name}", f"完成引导 {name}") for name in SERVICE_LABELS.values()
+                command_link(f"完成引导 {SERVICE_LABELS[option]}", f"完成引导 {SERVICE_LABELS[option]}")
+                for option in definition["options"]
             ) + "。"
-        command = f"完成引导 {GUIDE_COMMANDS[key]}"
-        return command_link(command, command) + "，继续凡人引导。"
+        command = f"完成引导 {definition['command']}"
+        suffix = "继续凡人引导。" if str(player.stage) == "mortal" else "继续修行。"
+        return command_link(command, command) + "，" + suffix
 
     async def complete_intro(self, context: CommandContext) -> CommandResult:
         guide_key, service_key, error = self._parse_guide(context.command_args)
@@ -120,15 +154,17 @@ class IntroApplication:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
 
         player = record.player
+        definition = self._guide_definition(guide_key)
+        label = definition["label"] if definition else guide_key
         if not record.changed:
             message = (
                 "## 引导已完成\n\n"
-                f"**{self._display_name(player)}**，`{GUIDE_LABELS[guide_key]}`已经记录过了。\n\n"
+                f"**{self._display_name(player)}**，`{label}`已经记录过了。\n\n"
                 f"- **引导进度**：{self._guide_progress(player)}\n"
                 f"- **当前阶段**：{self._stage(player)}\n\n"
                 f"> 下一步：{self._guide_hint(player)}"
             )
-        elif guide_key == GUIDE_READ_WORLD:
+        elif guide_key == "guide.read_world":
             message = (
                 "## 修仙世界\n\n"
                 f"{self.world_intro_text()}\n\n"
@@ -138,7 +174,7 @@ class IntroApplication:
                 f"- **引导进度**：{self._guide_progress(player)}\n\n"
                 f"> 下一步：{self._guide_hint(player)}"
             )
-        elif guide_key == GUIDE_GATHER_BLOOD_GRASS:
+        elif guide_key == "guide.gather_blood_grass":
             message = (
                 "## 教学采集完成\n\n"
                 f"**{self._display_name(player)}**，你在玄天近郊采得 **止血草 ×{record.item_quantity}**。\n\n"
@@ -146,12 +182,22 @@ class IntroApplication:
                 f"- **引导进度**：{self._guide_progress(player)}\n\n"
                 f"> 下一步：{self._guide_hint(player)}"
             )
-        else:
+        elif guide_key == "guide.choose_service":
             service_name = SERVICE_LABELS.get(record.selected_service or service_key or "", "生产")
             message = (
                 "## 生产教学已选\n\n"
                 f"**{self._display_name(player)}**，你选择了 **{service_name}** 教学。\n\n"
                 f"- **精力**：{player.energy}/{player.energy_max}\n"
+                f"- **引导进度**：{self._guide_progress(player)}\n\n"
+                f"> 下一步：{self._guide_hint(player)}"
+            )
+        else:
+            body = self._guide_body(definition)
+            lead = f"\n\n{body}\n\n" if body else "\n\n"
+            message = (
+                f"## {label}已记录\n"
+                f"{lead}"
+                f"- **当前阶段**：{self._stage(player)}\n"
                 f"- **引导进度**：{self._guide_progress(player)}\n\n"
                 f"> 下一步：{self._guide_hint(player)}"
             )
@@ -247,22 +293,27 @@ class IntroApplication:
             },
         )
 
-    @staticmethod
-    def _parse_guide(args: tuple[str, ...]) -> tuple[str, str | None, str | None]:
+    def _parse_guide(self, args: tuple[str, ...]) -> tuple[str, str | None, str | None]:
+        commands = guide_commands(self.content)
+        hints = "、".join(f"`完成引导 {command}`" for command in sorted(set(commands.values())))
         if not args or len(args) > 2:
-            return "", None, "请使用 `完成引导 阅读`、`完成引导 采集` 或 `完成引导 炼丹/炼器/布阵`。"
-        guide_key = resolve_guide(args[0])
+            return "", None, f"请使用 {hints}。"
+        guide_key = resolve_guide(args[0], self.content)
+        definition = self._guide_definition(guide_key) if guide_key else None
+        options = tuple(definition["options"]) if definition else ()
+        needs_service = bool(options)
         service_key: str | None = None
         if len(args) == 2:
-            if guide_key != GUIDE_CHOOSE_SERVICE:
+            if not needs_service:
                 return "", None, "只有生产教学需要指定炼丹、炼器或布阵。"
             service_key = resolve_service(args[1])
-        elif guide_key == GUIDE_CHOOSE_SERVICE:
+        elif needs_service:
             service_key = resolve_service(args[0])
         if guide_key is None:
-            return "", None, "未知引导，请选择阅读、采集、炼丹、炼器或布阵。"
-        if guide_key == GUIDE_CHOOSE_SERVICE and service_key is None:
-            return "", None, "生产教学请选择炼丹、炼器或布阵。"
+            return "", None, f"未知引导，请选择 {hints}。"
+        if needs_service and service_key is None:
+            names = "、".join(SERVICE_LABELS[option] for option in options)
+            return "", None, f"生产教学请选择{names}。"
         return guide_key, service_key, None
 
 

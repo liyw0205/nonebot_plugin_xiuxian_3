@@ -1,10 +1,11 @@
 {
   "引导/引导.json": {
     "old_sha256": {
+      "ee7e3980a5ece605107cd35a59cb14d533b4cabcee305798b0440a313e12d459": "9de693077677699def1ccb53150356b9ca4fee9c:data/引导/引导.json",
       "5a63404e134c2d1cd1165a9407ce467cb391ea024e681a6a0ed036e91a7af6c7": "42db275e70a60bbb5d268b7384d2eef44e6be80f:data/引导/引导.json"
     },
-    "new_sha256": "ee7e3980a5ece605107cd35a59cb14d533b4cabcee305798b0440a313e12d459",
-    "new_commit": "9de693077677699def1ccb53150356b9ca4fee9c"
+    "new_sha256": "aa3e6929b04313130a2ae6c1d52be5f3379faca9610389f0e07ba0252af11a53",
+    "new_commit": "4a8b3930e076b91b48e494d447b3179aa16b9f8b"
   },
   "技能/技能.json": {
     "old_sha256": {

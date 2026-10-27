@@ -550,3 +550,77 @@ def test_custom_trade_seed_is_preserved(host: Path) -> None:
     assert "种子更新 0 个" in result.stdout
     assert trade_path.read_bytes() == custom
     preserved(host)
+
+
+GUIDE_FILE = Path("引导/引导.json")
+
+
+def old_official_guides() -> bytes:
+    # The deployed three-guide blob before the cultivator tier: drop only the
+    # three added records and the label/command/aliases fields this slice
+    # introduced, leaving the mortal trio byte-identical.
+    document = json.loads((ROOT / "data" / GUIDE_FILE).read_text(encoding="utf-8"))
+    document["records"] = [
+        record
+        for record in document["records"]
+        if record["key"]
+        not in {
+            "guide.mine_entry",
+            "guide.dispatch_entry",
+            "guide.secret_realm_entry",
+        }
+    ]
+    for record in document["records"]:
+        for field in ("label", "command", "aliases"):
+            record.pop(field, None)
+        if record["key"] == "guide.choose_service":
+            # The cooking option was added with the cultivator tier; the prior
+            # official blob listed only alchemy/artifice/formation.
+            record["options"] = ["alchemy", "artifice", "formation"]
+    blob = (json.dumps(document, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+    rule = json.loads((ROOT / "scripts/seed_migrations.json").read_text(encoding="utf-8"))[
+        GUIDE_FILE.as_posix()
+    ]
+    assert hashlib.sha256(blob).hexdigest() in rule["old_sha256"], (
+        "the reversed blob must equal a registered old official guide seed"
+    )
+    return blob
+
+
+def test_known_official_guide_seed_migrates_with_backup_and_repeat_is_idempotent(
+    host: Path,
+) -> None:
+    old = old_official_guides()
+    guide_path = host / "data" / GUIDE_FILE
+    guide_path.write_bytes(old)
+
+    result = deploy(host)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "matchers=1 handlers=1" in result.stdout
+    assert "种子更新 1 个" in result.stdout
+    assert guide_path.read_bytes() == (ROOT / "data" / GUIDE_FILE).read_bytes()
+    backups = list((host / ".xiuxian3/backups").glob("deploy-*"))
+    assert len(backups) == 1
+    assert (backups[0] / "data" / GUIDE_FILE).read_bytes() == old
+    preserved(host)
+
+    repeated = deploy(host)
+    assert repeated.returncode == 0, repeated.stdout + repeated.stderr
+    assert "种子更新 0 个" in repeated.stdout
+    preserved(host)
+
+
+def test_custom_guide_seed_is_preserved(host: Path) -> None:
+    # A curated variant that is NOT a registered official blob must survive as a
+    # custom seed instead of being overwritten by the shipped guide table.
+    custom_document = json.loads((ROOT / "data" / GUIDE_FILE).read_text(encoding="utf-8"))
+    custom_document["records"][0]["desc"] = "自定义引导描述"
+    custom = (json.dumps(custom_document, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+    guide_path = host / "data" / GUIDE_FILE
+    guide_path.write_bytes(custom)
+
+    result = deploy(host)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "种子更新 0 个" in result.stdout
+    assert guide_path.read_bytes() == custom
+    preserved(host)

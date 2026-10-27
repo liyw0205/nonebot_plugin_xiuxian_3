@@ -3,10 +3,17 @@
   "records": [
     {
       "name": "阅读世界说明",
+      "label": "阅读世界说明",
       "desc": "了解玄天界的来历与修行常识，再决定如何开启自己的仙途。",
       "content": "玄天界以灵脉贯通山川，灵气随四时涨落。青石镇与近郊是凡人最常踏足的地方，沿着灵泉、云城和商路向外，才会遇见更广阔的洞天与险地。\n\n修行者从凡人起步，寻得灵根与道途后，方能感应天地灵气。修为需要日积月累，境界突破也要备妥功法、资源与心境；一味急进，可能招来伤势或劫难。\n\n天地并非只有玄天一界。魔界有自己的城域、势力与交易，妖界则由万灵和古老祖脉支撑；诸界之间既有往来，也有各自的规矩。洞天福地、遗迹和秘境藏着机缘，但其中的道路、守卫与风险都要亲自探明。\n\n修行不止打坐与争斗。行走、采集、采矿、炼制、经营和结交道友，都能留下见闻与助力。所得各有来源，出发前查看地点、境界和所需凭据，遇到危险时及时收手。\n\n从青石镇迈出第一步后，你可以按自己的道途探索玄天，也能循着线索前往其他世界。每一份机缘都要靠行动取得，选择如何修行，则由你自己决定。",
       "status": "active",
       "operation": "guide.read_world",
+      "command": "阅读",
+      "aliases": [
+        "阅读",
+        "世界",
+        "阅读世界"
+      ],
       "requirements": [
         {
           "type": "stage",
@@ -23,9 +30,16 @@
     },
     {
       "name": "教学采集止血草",
+      "label": "教学采集",
       "desc": "前往近郊寻找止血草，练习辨认草木与安全采集。",
       "status": "active",
       "operation": "guide.gather_blood_grass",
+      "command": "采集",
+      "aliases": [
+        "采集",
+        "止血草",
+        "教学采集"
+      ],
       "requirements": [
         {
           "type": "stage",
@@ -57,9 +71,19 @@
     },
     {
       "name": "选择生产教学",
+      "label": "生产教学",
       "desc": "从炼丹、炼器或布阵中选择一门入门技艺，学习如何处理灵材。",
       "status": "active",
       "operation": "guide.choose_service",
+      "command": "炼丹",
+      "aliases": [
+        "服务",
+        "生产",
+        "炼丹",
+        "炼器",
+        "布阵",
+        "烹饪"
+      ],
       "requirements": [
         {
           "type": "stage",
@@ -73,7 +97,8 @@
       "options": [
         "alchemy",
         "artifice",
-        "formation"
+        "formation",
+        "cooking"
       ],
       "preview_does_not_consume": true,
       "repeatable": false,
@@ -82,6 +107,91 @@
         "key": "selected_service"
       },
       "key": "guide.choose_service"
+    },
+    {
+      "name": "矿区准入指路",
+      "label": "矿区准入指路",
+      "desc": "了解云铁矿区的准入凭据与登记方式，知道该备好矿镐还是登记许可。",
+      "content": "云铁矿区位于玄天云城以西，矿脉丰饶但准入严格。想进矿区，先要备好凭据：基础矿镐可以直接采矿，矿区登记许可则长期有效；两者取其一即可。\n\n出发前先用 `生产预览 基础矿镐` 或 `生产预览 矿区登记` 看清材料与去处，再决定自己打造还是走登记一路。凭据不是消耗品，备齐之后矿区便长期向你开放。\n\n矿区里的矿石各有品阶，采集需要体力，也可能惊动守卫。量力而行，把采到的矿石带回云城或宗门，才能换成真正的修行资本。",
+      "status": "active",
+      "operation": "guide.mine_entry",
+      "command": "矿区",
+      "aliases": [
+        "矿区",
+        "矿镐",
+        "采矿",
+        "矿区准入",
+        "云铁矿区"
+      ],
+      "requirements": [
+        {
+          "type": "stage",
+          "stage": "cultivator"
+        }
+      ],
+      "cost": {},
+      "repeatable": true,
+      "output": {
+        "type": "intro_flag",
+        "key": "guide.mine_entry"
+      },
+      "key": "guide.mine_entry"
+    },
+    {
+      "name": "派遣指路",
+      "label": "派遣指路",
+      "desc": "了解派遣的接受、结算与取消，知道如何让分身替自己行走天下。",
+      "content": "派遣是把分身送往远方替你办事。接受派遣后需要等待行程走完，再到时限结算；赶时间时也可以中途取消，但已消耗的代价不会退回。\n\n派遣结果分为成功、延误、部分达成与失败四类，报酬随之不同。出发前先看清目的地、风险与回报，再决定这一趟值不值得。\n\n接派遣前确认自己的体力与随身物资充足，结算后再去查看收获；同一件事重复结算不会重复发放，可以放心操作。",
+      "status": "active",
+      "operation": "guide.dispatch_entry",
+      "command": "派遣",
+      "aliases": [
+        "派遣",
+        "派遣指路",
+        "接受派遣",
+        "结算派遣"
+      ],
+      "requirements": [
+        {
+          "type": "stage",
+          "stage": "cultivator"
+        }
+      ],
+      "cost": {},
+      "repeatable": true,
+      "output": {
+        "type": "intro_flag",
+        "key": "guide.dispatch_entry"
+      },
+      "key": "guide.dispatch_entry"
+    },
+    {
+      "name": "秘境指路",
+      "label": "秘境指路",
+      "desc": "了解秘境的预览、进入与结算流程，知道进秘境前该准备什么。",
+      "content": "秘境是独立的探索区域：先 `秘境预览` 看清门槛、体力消耗与掉落，再用 `进入秘境` 填写秘境名，进入后按节点推进，最后结算收取奖励。\n\n有的秘境需要许可或旗标，有的需要队伍同行；体力、境界与凭据都要提前备妥。秘境之中常有战斗，胜负会影响最终奖励。\n\n首次通关通常有额外回报，重复通关则按重复档发放。结算之后记得查看收获与下一步线索，再决定是否继续深入。",
+      "status": "active",
+      "operation": "guide.secret_realm_entry",
+      "command": "秘境",
+      "aliases": [
+        "秘境",
+        "秘境指路",
+        "进入秘境",
+        "秘境预览"
+      ],
+      "requirements": [
+        {
+          "type": "stage",
+          "stage": "cultivator"
+        }
+      ],
+      "cost": {},
+      "repeatable": true,
+      "output": {
+        "type": "intro_flag",
+        "key": "guide.secret_realm_entry"
+      },
+      "key": "guide.secret_realm_entry"
     }
   ],
   "schema": "xiuxian.content"
