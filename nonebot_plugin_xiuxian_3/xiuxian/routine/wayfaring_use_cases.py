@@ -18,6 +18,19 @@ from ..repository import (
     WayfaringPaidTrackInactiveError,
 )
 from .models import WayfaringClaimRecord, WayfaringStatusRecord
+from .wayfaring import TIMETRACE_PASS_KEY, WAYFARING_PASS_KEY
+
+_PASS_ARGUMENTS = {
+    "问道": WAYFARING_PASS_KEY,
+    "问道行卷": WAYFARING_PASS_KEY,
+    "wayfaring": WAYFARING_PASS_KEY,
+    "pass.wayfaring": WAYFARING_PASS_KEY,
+    "时序": TIMETRACE_PASS_KEY,
+    "时序行卷": TIMETRACE_PASS_KEY,
+    "timetrace": TIMETRACE_PASS_KEY,
+    "pass.timetrace": TIMETRACE_PASS_KEY,
+}
+_INVALID_PASS_ARGUMENT = "\x00invalid-pass"
 
 
 class WayfaringApplication:
@@ -27,11 +40,21 @@ class WayfaringApplication:
         self.repository = repository
 
     @staticmethod
-    def _operation_id(context: CommandContext, name: str) -> str:
+    def _operation_id(
+        context: CommandContext, name: str, pass_key: str = WAYFARING_PASS_KEY
+    ) -> str:
         if context.operation_id:
             return context.operation_id
         request_key = context.message_id or context.request_id
-        return f"pass.wayfaring.{name}:{context.adapter}:{context.user_id}:{request_key}"
+        return f"{pass_key}.{name}:{context.adapter}:{context.user_id}:{request_key}"
+
+    @staticmethod
+    def _pass_key(args: tuple[str, ...], default: str | None):
+        if not args:
+            return default
+        if len(args) != 1:
+            return _INVALID_PASS_ARGUMENT
+        return _PASS_ARGUMENTS.get(args[0].strip().casefold(), _INVALID_PASS_ARGUMENT)
 
     @staticmethod
     def _display_name(player) -> str:
@@ -78,15 +101,17 @@ class WayfaringApplication:
                 f"- **付费奖励**：已领取 {len(record.claimed_paid)} 级",
                 "",
                 "> 发送 `领取行卷 <等级>` 领取嘉奖；持有月道契可用 `领取行卷 <等级> 付费` 领取道契嘉奖。",
+                "> 可用 `问道行卷 <卷名>` 查看其他行卷，`开始行卷 <卷名>` 开启新卷。",
             )
         )
 
     async def get_status(self, context: CommandContext) -> CommandResult:
-        if context.command_args:
-            return CommandResult(False, "INVALID_WAYFARING_COMMAND", "问道行卷无需附加参数。", context.request_id)
+        pass_key = self._pass_key(context.command_args, None)
+        if pass_key is _INVALID_PASS_ARGUMENT:
+            return CommandResult(False, "INVALID_WAYFARING_COMMAND", "请使用 `问道行卷 [卷名]`，如 `问道行卷 时序`。", context.request_id)
         try:
             record = await self.repository.get_wayfaring_status(
-                platform=context.adapter, platform_user_id=context.user_id
+                platform=context.adapter, platform_user_id=context.user_id, pass_key=pass_key
             )
         except WayfaringNotStartedError:
             return CommandResult(False, "WAYFARING_NOT_STARTED", "行卷尚未开启，请先发送 `开始行卷`。", context.request_id)
@@ -106,6 +131,7 @@ class WayfaringApplication:
             self._status_message(record),
             context.request_id,
             data={
+                "pass_key": record.pass_key,
                 "status": record.status,
                 "cycle_start": record.cycle_start,
                 "cycle_end": record.cycle_end,
@@ -123,14 +149,16 @@ class WayfaringApplication:
         )
 
     async def start(self, context: CommandContext) -> CommandResult:
-        if context.command_args:
-            return CommandResult(False, "INVALID_WAYFARING_COMMAND", "开始行卷无需附加参数。", context.request_id)
-        operation_id = self._operation_id(context, "start")
+        pass_key = self._pass_key(context.command_args, WAYFARING_PASS_KEY)
+        if pass_key is _INVALID_PASS_ARGUMENT:
+            return CommandResult(False, "INVALID_WAYFARING_COMMAND", "请使用 `开始行卷 [卷名]`，如 `开始行卷 时序`。", context.request_id)
+        operation_id = self._operation_id(context, "start", pass_key)
         try:
             record = await self.repository.start_wayfaring(
                 platform=context.adapter,
                 platform_user_id=context.user_id,
                 operation_id=operation_id,
+                pass_key=pass_key,
             )
         except WayfaringAlreadyStartedError:
             return CommandResult(False, "WAYFARING_ALREADY_STARTED", "本周期行卷已经开启。", context.request_id, operation_id)

@@ -2132,23 +2132,28 @@ class RoutineRepositoryMixin:
         platform: str,
         platform_user_id: str,
         operation_id: str,
+        pass_key: str = WAYFARING_PASS_KEY,
     ) -> WayfaringStatusRecord:
         await self.initialize()
         async with self._inflight:
             return await asyncio.to_thread(
-                self._start_wayfaring_sync, platform, platform_user_id, operation_id
+                self._start_wayfaring_sync,
+                platform,
+                platform_user_id,
+                operation_id,
+                pass_key,
             )
 
     def _start_wayfaring_sync(
-        self, platform: str, platform_user_id: str, operation_id: str
+        self, platform: str, platform_user_id: str, operation_id: str, pass_key: str
     ) -> WayfaringStatusRecord:
-        operation_name = "pass.wayfaring.start"
+        operation_name = f"{pass_key}.start"
         request_hash = self._request_hash(
             operation_name,
             {
                 "platform": platform,
                 "platform_user_id": platform_user_id,
-                "pass_key": WAYFARING_PASS_KEY,
+                "pass_key": pass_key,
             },
         )
         now = self._now()
@@ -2165,16 +2170,16 @@ class RoutineRepositoryMixin:
                 return self._wayfaring_status_from_payload(
                     decode_json_strict(existing["result_json"]), replay=True
                 )
+            definition = wayfaring_definition(self.content, pass_key=pass_key)
             player = self._require_player(connection, platform, platform_user_id)
             current = connection.execute(
-                "SELECT * FROM wayfaring_passes WHERE player_id = ? AND pass_key = ? ORDER BY cycle_start DESC LIMIT 1",
-                (player["id"], WAYFARING_PASS_KEY),
+                "SELECT * FROM wayfaring_passes WHERE player_id = ? ORDER BY cycle_start DESC, id DESC LIMIT 1",
+                (player["id"],),
             ).fetchone()
             if current is not None and str(current["status"]) in {"active", "completed"}:
                 if date.fromisoformat(str(current["cycle_end"])) >= now.date():
                     raise WayfaringAlreadyStartedError("wayfaring pass is already active")
                 self._sync_wayfaring_points(connection, player, current, now)
-            definition = wayfaring_definition(self.content)
             cycle_start = now.date()
             cycle_end = cycle_start + timedelta(days=definition.cycle_days - 1)
             connection.execute(
@@ -2187,7 +2192,7 @@ class RoutineRepositoryMixin:
                 ) VALUES (?, ?, ?, ?, 'active', 0, ?, 0, ?, 0, '[]', '[]', ?, ?, ?)
                 """,
                 (
-                    player["id"], WAYFARING_PASS_KEY, cycle_start.isoformat(), cycle_end.isoformat(),
+                    player["id"], pass_key, cycle_start.isoformat(), cycle_end.isoformat(),
                     cycle_start.isoformat(), wayfaring_week_start(cycle_start).isoformat(),
                     json.dumps(definition.snapshot(), ensure_ascii=False, sort_keys=True),
                     now_text, now_text,
@@ -2195,7 +2200,7 @@ class RoutineRepositoryMixin:
             )
             pass_row = connection.execute(
                 "SELECT * FROM wayfaring_passes WHERE player_id = ? AND pass_key = ? AND cycle_start = ?",
-                (player["id"], WAYFARING_PASS_KEY, cycle_start.isoformat()),
+                (player["id"], pass_key, cycle_start.isoformat()),
             ).fetchone()
             if pass_row is None:
                 raise RuntimeError("wayfaring pass initialization failed")
@@ -2210,25 +2215,31 @@ class RoutineRepositoryMixin:
             return self._wayfaring_status_from_payload(payload)
 
     async def get_wayfaring_status(
-        self, *, platform: str, platform_user_id: str
+        self, *, platform: str, platform_user_id: str, pass_key: str | None = None
     ) -> WayfaringStatusRecord:
         await self.initialize()
         async with self._inflight:
             return await asyncio.to_thread(
-                self._get_wayfaring_status_sync, platform, platform_user_id
+                self._get_wayfaring_status_sync, platform, platform_user_id, pass_key
             )
 
     def _get_wayfaring_status_sync(
-        self, platform: str, platform_user_id: str
+        self, platform: str, platform_user_id: str, pass_key: str | None = None
     ) -> WayfaringStatusRecord:
         now = self._now()
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             player = self._require_player(connection, platform, platform_user_id)
-            pass_row = connection.execute(
-                "SELECT * FROM wayfaring_passes WHERE player_id = ? AND pass_key = ? ORDER BY cycle_start DESC LIMIT 1",
-                (player["id"], WAYFARING_PASS_KEY),
-            ).fetchone()
+            if pass_key is None:
+                pass_row = connection.execute(
+                    "SELECT * FROM wayfaring_passes WHERE player_id = ? ORDER BY cycle_start DESC, id DESC LIMIT 1",
+                    (player["id"],),
+                ).fetchone()
+            else:
+                pass_row = connection.execute(
+                    "SELECT * FROM wayfaring_passes WHERE player_id = ? AND pass_key = ? ORDER BY cycle_start DESC, id DESC LIMIT 1",
+                    (player["id"], pass_key),
+                ).fetchone()
             if pass_row is None:
                 raise WayfaringNotStartedError("wayfaring pass has not started")
             self._sync_wayfaring_points(connection, player, pass_row, now)
@@ -2277,21 +2288,29 @@ class RoutineRepositoryMixin:
             raise WayfaringLevelInvalidError("invalid wayfaring level") from exc
         if level <= 0 or track not in {"free", "paid"}:
             raise WayfaringLevelInvalidError("invalid wayfaring level or track")
-        operation_name = "pass.wayfaring.claim"
-        request_hash = self._request_hash(
-            operation_name,
-            {
-                "platform": platform,
-                "platform_user_id": platform_user_id,
-                "pass_key": WAYFARING_PASS_KEY,
-                "level": level,
-                "track": track,
-            },
-        )
         now = self._now()
         now_text = serialize_datetime(now)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
+            player = self._require_player(connection, platform, platform_user_id)
+            pass_row = connection.execute(
+                "SELECT * FROM wayfaring_passes WHERE player_id = ? ORDER BY cycle_start DESC, id DESC LIMIT 1",
+                (player["id"],),
+            ).fetchone()
+            if pass_row is None:
+                raise WayfaringNotStartedError("wayfaring pass has not started")
+            pass_key = str(pass_row["pass_key"])
+            operation_name = f"{pass_key}.claim"
+            request_hash = self._request_hash(
+                operation_name,
+                {
+                    "platform": platform,
+                    "platform_user_id": platform_user_id,
+                    "pass_key": pass_key,
+                    "level": level,
+                    "track": track,
+                },
+            )
             existing = connection.execute(
                 "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
                 (operation_id,),
@@ -2302,13 +2321,6 @@ class RoutineRepositoryMixin:
                 return self._wayfaring_claim_from_payload(
                     decode_json_strict(existing["result_json"]), replay=True
                 )
-            player = self._require_player(connection, platform, platform_user_id)
-            pass_row = connection.execute(
-                "SELECT * FROM wayfaring_passes WHERE player_id = ? AND pass_key = ? ORDER BY cycle_start DESC LIMIT 1",
-                (player["id"], WAYFARING_PASS_KEY),
-            ).fetchone()
-            if pass_row is None:
-                raise WayfaringNotStartedError("wayfaring pass has not started")
             definition = self._wayfaring_rule(pass_row)
             if level > definition.max_level:
                 raise WayfaringLevelInvalidError("invalid wayfaring level")
@@ -2368,7 +2380,7 @@ class RoutineRepositoryMixin:
             )
             payload = {
                 "player": self._player_payload(self._row_to_player(updated)),
-                "pass_key": WAYFARING_PASS_KEY,
+                "pass_key": pass_key,
                 "level": level,
                 "track": track,
                 "reward": actual_reward,
@@ -2463,7 +2475,10 @@ class RoutineRepositoryMixin:
     @staticmethod
     def _wayfaring_rule(pass_row: sqlite3.Row) -> WayfaringDefinition:
         try:
-            definition = parse_wayfaring_snapshot(decode_json_strict(pass_row["snapshot_json"]))
+            definition = parse_wayfaring_snapshot(
+                decode_json_strict(pass_row["snapshot_json"]),
+                pass_key=str(pass_row["pass_key"]),
+            )
             start = date.fromisoformat(str(pass_row["cycle_start"]))
             end = date.fromisoformat(str(pass_row["cycle_end"]))
         except (TypeError, ValueError) as exc:
