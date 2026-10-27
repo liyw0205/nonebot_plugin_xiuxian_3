@@ -11,6 +11,7 @@ from ..rewards.rules import local_reputation_maximum
 from .rules import honor_title
 
 WAYFARING_PASS_KEY = "pass.wayfaring"
+TIMETRACE_PASS_KEY = "pass.timetrace"
 
 _SOURCE_OPERATIONS = {
     "player.start_seeking": "player.start_seeking",
@@ -22,7 +23,30 @@ _SOURCE_OPERATIONS = {
     "exploration.settle": "exploration.settle",
     "routine.claim_dao_contract": "dao_contract.daily",
 }
+_TIMETRACE_SOURCE_OPERATIONS = {
+    "exploration.settle": "exploration.settle",
+    "livelihood.harvest": "livelihood.harvest",
+    "production.complete": "production.complete",
+    "specials.settle_dispatch": "specials.settle_dispatch",
+    "time_fort.settle": "time_fort.settle",
+}
+_PASS_SOURCES = {
+    WAYFARING_PASS_KEY: _SOURCE_OPERATIONS,
+    TIMETRACE_PASS_KEY: _TIMETRACE_SOURCE_OPERATIONS,
+}
 _PAID_ITEM_KEYS = frozenset({"item.clue.recipe_basic", "item.token.spirit_tree_water"})
+_TIMETRACE_PAID_ITEM_KEYS = frozenset(
+    {
+        "item.clue.recipe_basic",
+        "item.token.spirit_tree_water",
+        "item.herb.time_trace",
+        "item.mat.array_sand",
+    }
+)
+_PASS_PAID_ITEMS = {
+    WAYFARING_PASS_KEY: _PAID_ITEM_KEYS,
+    TIMETRACE_PASS_KEY: _TIMETRACE_PAID_ITEM_KEYS,
+}
 _SNAPSHOT_FIELDS = frozenset(
     {
         "key",
@@ -97,9 +121,13 @@ class WayfaringDefinition:
         }
 
 
-def wayfaring_definition(content: ContentBundle | None = None) -> WayfaringDefinition:
+def wayfaring_definition(
+    content: ContentBundle | None = None, *, pass_key: str = WAYFARING_PASS_KEY
+) -> WayfaringDefinition:
+    if pass_key not in _PASS_SOURCES:
+        raise ContentError("wayfaring pass key is not supported")
     bundle = content or bundled_content()
-    row = bundle.get("wayfaring_pass", WAYFARING_PASS_KEY)
+    row = bundle.get("wayfaring_pass", pass_key)
     if row is None or row.get("status") not in ("active", "open"):
         raise ContentError("wayfaring pass is missing or inactive")
     expected = (_SNAPSHOT_FIELDS - {"local_reputation_maximum", "reward_labels"}) | {
@@ -113,8 +141,12 @@ def wayfaring_definition(content: ContentBundle | None = None) -> WayfaringDefin
         maximum = local_reputation_maximum(row.get("local_reputation_key"), bundle)
     except TypeError as exc:
         raise ContentError("wayfaring local reputation content is invalid") from exc
-    rewards = _parse_rewards(row.get("free_rewards"), row.get("max_level"), "free")
-    paid_rewards = _parse_rewards(row.get("paid_rewards"), row.get("max_level"), "paid")
+    rewards = _parse_rewards(
+        row.get("free_rewards"), row.get("max_level"), "free", pass_key
+    )
+    paid_rewards = _parse_rewards(
+        row.get("paid_rewards"), row.get("max_level"), "paid", pass_key
+    )
     keys = {key for reward in (*rewards, *paid_rewards) for key in reward}
     labels: dict[str, str] = {}
     free_items = {
@@ -156,13 +188,17 @@ def wayfaring_definition(content: ContentBundle | None = None) -> WayfaringDefin
         key: value for key, value in row.items() if key not in {"status", "desc"}
     }
     snapshot.update(local_reputation_maximum=maximum, reward_labels=labels)
-    return parse_wayfaring_snapshot(snapshot)
+    return parse_wayfaring_snapshot(snapshot, pass_key=pass_key)
 
 
-def parse_wayfaring_snapshot(value: Any) -> WayfaringDefinition:
+def parse_wayfaring_snapshot(
+    value: Any, *, pass_key: str = WAYFARING_PASS_KEY
+) -> WayfaringDefinition:
+    if pass_key not in _PASS_SOURCES:
+        raise ContentError("wayfaring pass key is not supported")
     if not isinstance(value, dict) or set(value) != _SNAPSHOT_FIELDS:
         raise ContentError("wayfaring snapshot fields are invalid")
-    if value.get("key") != WAYFARING_PASS_KEY:
+    if value.get("key") != pass_key:
         raise ContentError("wayfaring snapshot identity is invalid")
     name = _text(value.get("name"), "name")
     numbers = {
@@ -182,12 +218,12 @@ def parse_wayfaring_snapshot(value: Any) -> WayfaringDefinition:
         numbers["weekly_point_cap"],
         numbers["max_level"] * numbers["points_per_level"],
     )
-    sources = _parse_sources(value.get("sources"))
+    sources = _parse_sources(value.get("sources"), pass_key)
     free_rewards = _parse_rewards(
-        value.get("free_rewards"), numbers["max_level"], "free"
+        value.get("free_rewards"), numbers["max_level"], "free", pass_key
     )
     paid_rewards = _parse_rewards(
-        value.get("paid_rewards"), numbers["max_level"], "paid"
+        value.get("paid_rewards"), numbers["max_level"], "paid", pass_key
     )
     reputation_key = value.get("local_reputation_key")
     if (
@@ -202,7 +238,7 @@ def parse_wayfaring_snapshot(value: Any) -> WayfaringDefinition:
     if not isinstance(labels, dict) or set(labels) != reward_keys:
         raise ContentError("wayfaring reward labels must match its rewards")
     return WayfaringDefinition(
-        key=WAYFARING_PASS_KEY,
+        key=pass_key,
         name=name,
         **numbers,
         sources=sources,
@@ -215,11 +251,12 @@ def parse_wayfaring_snapshot(value: Any) -> WayfaringDefinition:
     )
 
 
-def _parse_sources(value: Any) -> dict[str, dict[str, Any]]:
-    if not isinstance(value, dict) or set(value) != set(_SOURCE_OPERATIONS):
+def _parse_sources(value: Any, pass_key: str) -> dict[str, dict[str, Any]]:
+    allowed = _PASS_SOURCES[pass_key]
+    if not isinstance(value, dict) or set(value) != set(allowed):
         raise ContentError("wayfaring sources must match settled source operations")
     result: dict[str, dict[str, Any]] = {}
-    for operation, source_key in _SOURCE_OPERATIONS.items():
+    for operation, source_key in allowed.items():
         source = value[operation]
         if (
             not isinstance(source, dict)
@@ -238,7 +275,7 @@ def _parse_sources(value: Any) -> dict[str, dict[str, Any]]:
 
 
 def _parse_rewards(
-    value: Any, max_level: Any, track: str
+    value: Any, max_level: Any, track: str, pass_key: str
 ) -> tuple[dict[str, int], ...]:
     levels = _positive_integer(max_level, "max_level")
     if not isinstance(value, list) or len(value) != levels:
@@ -257,7 +294,7 @@ def _parse_rewards(
                 if quantity != 1:
                     raise ContentError("wayfaring title reward quantity must be one")
             elif track == "paid":
-                if key not in _PAID_ITEM_KEYS:
+                if key not in _PASS_PAID_ITEMS[pass_key]:
                     raise ContentError(f"unsupported wayfaring paid reward: {key}")
             elif key != "local_reputation" and not key.startswith(
                 ("item.herb.", "item.mat.", "item.ore.")
@@ -325,6 +362,7 @@ def wayfaring_week_start(value: date | datetime | str) -> date:
 
 
 __all__ = [
+    "TIMETRACE_PASS_KEY",
     "WAYFARING_PASS_KEY",
     "WayfaringDefinition",
     "parse_wayfaring_snapshot",

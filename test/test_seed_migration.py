@@ -624,3 +624,63 @@ def test_custom_guide_seed_is_preserved(host: Path) -> None:
     assert "种子更新 0 个" in result.stdout
     assert guide_path.read_bytes() == custom
     preserved(host)
+
+
+PASS_FILE = Path("道历/行卷.json")
+
+
+def old_official_wayfaring_passes() -> bytes:
+    # The deployed single-volume blob before the timetrace volume: the seed is
+    # hand-formatted (inline source objects), so reverse by text instead of a
+    # json re-dump that would reformat every untouched line.
+    text = (ROOT / "data" / PASS_FILE).read_text(encoding="utf-8")
+    start = text.index('    },\n    {\n      "key": "pass.timetrace"')
+    closing = "      ]\n    }\n  ]\n}"
+    end = text.index(closing, start)
+    blob = (text[:start] + "    }\n  ]\n}" + text[end + len(closing):]).encode("utf-8")
+    rule = json.loads((ROOT / "scripts/seed_migrations.json").read_text(encoding="utf-8"))[
+        PASS_FILE.as_posix()
+    ]
+    assert hashlib.sha256(blob).hexdigest() in rule["old_sha256"], (
+        "the reversed blob must equal the registered old official wayfaring seed"
+    )
+    return blob
+
+
+def test_known_official_wayfaring_seed_migrates_with_backup_and_repeat_is_idempotent(
+    host: Path,
+) -> None:
+    old = old_official_wayfaring_passes()
+    pass_path = host / "data" / PASS_FILE
+    pass_path.write_bytes(old)
+
+    result = deploy(host)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "matchers=1 handlers=1" in result.stdout
+    assert "种子更新 1 个" in result.stdout
+    assert pass_path.read_bytes() == (ROOT / "data" / PASS_FILE).read_bytes()
+    backups = list((host / ".xiuxian3/backups").glob("deploy-*"))
+    assert len(backups) == 1
+    assert (backups[0] / "data" / PASS_FILE).read_bytes() == old
+    preserved(host)
+
+    repeated = deploy(host)
+    assert repeated.returncode == 0, repeated.stdout + repeated.stderr
+    assert "种子更新 0 个" in repeated.stdout
+    preserved(host)
+
+
+def test_custom_wayfaring_seed_is_preserved(host: Path) -> None:
+    # A host that curated its own volume table must keep it: the shipped
+    # two-volume seed is not a registered old blob and must not overwrite it.
+    custom_document = json.loads((ROOT / "data" / PASS_FILE).read_text(encoding="utf-8"))
+    custom_document["records"][0]["desc"] = "自定义行卷描述"
+    custom = (json.dumps(custom_document, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+    pass_path = host / "data" / PASS_FILE
+    pass_path.write_bytes(custom)
+
+    result = deploy(host)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "种子更新 0 个" in result.stdout
+    assert pass_path.read_bytes() == custom
+    preserved(host)
