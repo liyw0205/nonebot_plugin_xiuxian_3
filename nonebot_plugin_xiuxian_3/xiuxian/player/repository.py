@@ -579,52 +579,69 @@ class PlayerRepositoryMixin:
                 )
 
             row = self._require_player(connection, platform, platform_user_id)
-            if row["stage"] not in {STAGE_MORTAL, "seeker"}:
-                raise PlayerStageConflictError("player is not ready for mortal introduction")
+            from ..player.intro_rules import guide_definitions, guides_for_stage
+
+            definitions = guide_definitions(self.content)
+            by_key = {definition["key"]: definition for definition in definitions}
+            definition = by_key.get(guide_key)
+            if definition is None:
+                raise ValueError("unsupported introduction guide")
+            # The record's own stage requirement is the gate; a graduated player
+            # still reaches the mortal lessons through the seeker stopover.
+            available = {
+                item["key"] for item in guides_for_stage(str(row["stage"]), self.content)
+            }
+            if guide_key not in available:
+                raise PlayerStageConflictError("player is not ready for this guide")
 
             intro_state = json_object(row["intro_json"], {})
             flags = [str(item) for item in intro_state.get("flags", [])]
             selected = str(intro_state.get("selected_service") or row["selected_service"] or "") or None
             changed = guide_key not in flags
-            if not changed and guide_key == "guide.choose_service" and selected != service_key:
+            if not changed and "options" in definition and definition["options"] and selected != service_key:
                 raise OperationConflictError("teaching service differs from the completed choice")
 
             item_quantity = 0
             stamina = player_integer(row, "stamina")
             energy = player_integer(row, "energy")
             if changed:
-                if guide_key == "guide.gather_blood_grass":
-                    if row["location_key"] != "xuantian.outskirts":
-                        raise LocationRequiredError("gathering lesson requires the outskirts")
-                    if stamina < 2:
-                        raise ResourceInsufficientError("stamina is insufficient")
-                    stamina -= 2
-                    item_quantity = 1 + (hashlib.blake2b(operation_id.encode("utf-8"), digest_size=1).digest()[0] % 2)
-                elif guide_key == "guide.choose_service":
-                    if energy < 2:
-                        raise ResourceInsufficientError("energy is insufficient")
-                    energy -= 2
+                locations = definition["locations"]
+                if locations and row["location_key"] not in locations:
+                    raise LocationRequiredError("guide requires another location")
+                cost = definition["cost"]
+                if cost:
+                    resource = str(cost["resource_key"])
+                    amount = int(cost["amount"])
+                    if resource == "stamina":
+                        if stamina < amount:
+                            raise ResourceInsufficientError("stamina is insufficient")
+                        stamina -= amount
+                    else:
+                        if energy < amount:
+                            raise ResourceInsufficientError("energy is insufficient")
+                        energy -= amount
+                quantity_range = definition["quantity_range"]
+                if quantity_range is not None:
+                    span = quantity_range[1] - quantity_range[0] + 1
+                    item_quantity = quantity_range[0] + (
+                        hashlib.blake2b(operation_id.encode("utf-8"), digest_size=1).digest()[0] % span
+                    )
+                if definition["output_type"] == "teaching_unlock":
                     selected = service_key
-                elif guide_key == "guide.read_world":
-                    pass
-                else:
-                    raise ValueError("unsupported introduction guide")
                 flags.append(guide_key)
 
             from ..player.intro_rules import intro_complete
 
-            stage_advanced = row["stage"] == STAGE_MORTAL and intro_complete(flags)
+            stage_advanced = row["stage"] == STAGE_MORTAL and intro_complete(flags, self.content)
             stage = "seeker" if stage_advanced else row["stage"]
             intro_state = {"flags": sorted(set(flags)), "selected_service": selected}
+            reward_item = definition["item_key"]
+            rewards = {reward_item: item_quantity} if reward_item and item_quantity else None
             grant_player_state(
                 connection,
                 row,
                 updated_at=serialize_datetime(now),
-                rewards=(
-                    {"item.herb.blood_grass": item_quantity}
-                    if item_quantity
-                    else None
-                ),
+                rewards=rewards,
                 value_delta={
                     "stamina": stamina - player_integer(row, "stamina"),
                     "energy": energy - player_integer(row, "energy"),
@@ -661,13 +678,13 @@ class PlayerRepositoryMixin:
                     serialize_datetime(now),
                 ),
             )
-            if changed and guide_key == "guide.gather_blood_grass":
+            if changed and reward_item and item_quantity:
                 record_material_discoveries(
                     connection,
                     player_id=int(row["id"]),
                     operation_id=operation_id,
                     occurred_at=now,
-                    reward={"item.herb.blood_grass": item_quantity},
+                    reward={reward_item: item_quantity},
                     snapshot={"source": "player.complete_intro", "guide_key": guide_key},
                 )
             return IntroRecord(

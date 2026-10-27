@@ -379,6 +379,32 @@ matcher”（旧宿主则报“宿主插件入口不存在”），且备份目�
 `test_cross_realm_void_frontier_content.py`+`test_documentation.py` 55 passed。
 未跑全量/压测/部署，未验 QQ 真机。
 
+引导内容第三阶段（Goal H）已在 `develop` 完成：`data/引导/引导.json` 引导记录 3 → 6 条，
+按记录补齐 `label`/`command`/`aliases` 并新增三条修行者（cultivator）引导 `guide.mine_entry`
+（矿区准入指路，命令 `矿区`）、`guide.dispatch_entry`（派遣指路，命令 `派遣`）与
+`guide.secret_realm_entry`（秘境指路，命令 `秘境`），三者 `requirements` 均为
+`[{type: stage, stage: cultivator}]`、无消耗、`repeatable`、`output` 为 `intro_flag`，只引用既有
+生产与探索入口，未新增物品/地点/命令。规则层 `player/intro_rules.py` 改为内容派生
+（`guide_definitions`/`guide_labels`/`guide_commands`/`guide_alias_map`/`guides_for_stage`/
+`mortal_guides`），并保留 `GUIDE_READ_WORLD`/`GUIDE_GATHER_BLOOD_GRASS`/`GUIDE_CHOOSE_SERVICE`/
+`INTRO_GUIDES` 全部既有公开名字；`intro_complete()` 只统计 `stage == mortal` 的记录，扩表不影响
+「毕业」语义。阶段门与效果派发解耦：`player/repository.py::_complete_intro_once` 不再硬编码每条
+引导的分支，改由记录自身的 `requirements`（阶段/地点）判定准入（不在当前阶段可用的引导仍抛
+`PLAYER_STAGE_CONFLICT`）、由 `cost`/`quantity_range`/`output_type` 派发消耗与奖励，`stage_advanced`
+仍要求玩家处于 `mortal` 且凡人三引导齐备；`player/intro_use_cases.py` 的进度与提示按阶段过滤
+（凡人见 `n/3`，修行者只计其自身层），消息按记录 `label`/`desc` 渲染并为新引导走通用分支。
+官方 `引导/引导.json` 新旧 SHA-256（`ee7e3980…`→`26be7bd8…`）已登记 `scripts/seed_migrations.json`，
+反向助手同时保留更早的 `5a63404e…` 来源以便旧宿主升级。聚焦证据：新增 `test_guide_stage2_content.py`
+8 passed（两层合同与闭合引用、别名逐键相等、凡人毕业只认凡人三引导、按阶段过滤分母、修行者三引导
+真实结算且回放不重复扣费/发奖、毕业前拒绝并不写入、凡人全流程毕业仍为 `seeker`）、
+`test_onboarding.py` 4 passed；`test_seed_migration.py` 新增两条引导迁移用例（旧 blob 升级 + 重复
+幂等、自定义变体保留），CI 同序复现 `test_seed_migration.py`+`test_installation_docs.py` 43 passed。
+另修一处本片回归：内容化的选择项若只列三条生产，`服务教学` 提示会少一项，与 `service.cook_meal`
+的 `teaching.service = cooking` 前置不符，故记录 `options` 补齐为 alchemy/artifice/formation/cooking，
+`test_player_interaction.py` 恢复通过；全量 2686 passed / 39 failed，逐一与 HEAD 工作树比对后
+39 项全部为未改动 HEAD 上同样失败的既有失败（`test_adapter_simulation.py`、`test_data_completion.py`、
+`test_boundary_rift_secret_realm.py` 等），本片未新增失败。未跑压测/部署，未验 QQ 真机。
+
 竞技场家族内容化已在 `develop` 完成（数据提交 `dbb563f`、清单种子迁移 `0a6e71d`）：
 新增 `data/特殊/竞技场.json`（kind `arena_rule`，4 条记录：`arena.defaults` 承载段位带
 500/1000/1500 与阵营清单 {xuantian,demon,beast}；`arena.spar` 承载个人竞技快照 7 天/30 分钟、
