@@ -77,15 +77,19 @@ code: available -> claimed | expired | revoked
 
 ## 问道行卷事务流程
 
-1. 开卷先检查 operation：相同输入回放原结果，不同输入返回冲突。新请求从
-   `data/道历/行卷.json` 解析开放的 `pass.wayfaring`，校验逐级奖励、物品/称号引用、地方名望
+1. 开卷先检查 operation：相同输入回放原结果，不同输入返回冲突。新请求按命令卷名从
+   `data/道历/行卷.json` 解析对应开放卷（缺省 `pass.wayfaring`，`时序`/`时序行卷`/`timetrace`/
+   `pass.timetrace` 选 `pass.timetrace`），校验逐级奖励、物品/称号引用、地方名望
    地点和任意开启星期的满级可达性。默认 28 日、30 级、每级 80 点、日上限 100、周上限 600；
-   参数无效时不创建周期。现有周期尚未到期时不得另开一卷。
+   时序卷 21 日、24 级、每级 60 点、日上限 120、周上限 500。参数无效或卷名未知时不创建周期。
+   现有周期尚未到期时不得另开一卷（含另一卷）；同一角色同一时刻只有一卷在途。
 2. 起止日期使用服务端 UTC 业务日，首尾两日均属于周期，自然周从周一开始。周期记录冻结规则、
-   行卷与来源名称、两条奖励线、奖励展示名、地方名望地点和上限。之后查询、计分和领奖只使用
+   行卷键与来源名称、两条奖励线、奖励展示名、地方名望地点和上限。之后查询、计分和领奖只使用
    `snapshot_json`，不随现行内容变更；内容关闭只阻止新开卷，不影响已经承诺的周期。
+   快照身份按数据库行的行卷键校验，恢复快照不读取现行内容。
 3. 来源只读取当前角色在周期日期内的已结算 operation，按结算时间和 operation ID 确定顺序。
-   八种允许来源及默认点数如下；来源名称和点数来自行卷 JSON，不允许客户端指定来源或数量。
+   允许来源集合按卷固定；来源名称和点数来自行卷 JSON，不允许客户端指定来源或数量。
+   问道卷八种允许来源及默认点数如下：
 
 | 已结算 operation | 来源键 | 默认点数 |
 |:--|:--|--:|
@@ -97,6 +101,18 @@ code: available -> claimed | expired | revoked
 | `bounty.claim` | `bounty.claim` | 25 |
 | `exploration.settle` | `exploration.settle` | 20 |
 | `routine.claim_dao_contract` | `dao_contract.daily` | 10 |
+
+   时序卷只接受采集、派遣与生产三类已结算来源，共五种：
+
+| 已结算 operation | 来源键 | 默认点数 |
+|:--|:--|--:|
+| `exploration.settle` | `exploration.settle` | 20 |
+| `livelihood.harvest` | `livelihood.harvest` | 25 |
+| `production.complete` | `production.complete` | 25 |
+| `specials.settle_dispatch` | `specials.settle_dispatch` | 30 |
+| `time_fort.settle` | `time_fort.settle` | 40 |
+
+   多一条、少一条或卷键不符都拒绝加载；问道卷的来源集合不因时序卷存在而放宽。
 
 4. 每笔来源在同一周期只绑定一次，计入量同时受当日、当周和周期满级总量限制。达到日周上限的
    来源也记录为已处理，不能在下次查询重复补点；周期满级后不再新增积分事件。

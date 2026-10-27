@@ -405,6 +405,24 @@ matcher”（旧宿主则报“宿主插件入口不存在”），且备份目�
 39 项全部为未改动 HEAD 上同样失败的既有失败（`test_adapter_simulation.py`、`test_data_completion.py`、
 `test_boundary_rift_secret_realm.py` 等），本片未新增失败。未跑压测/部署，未验 QQ 真机。
 
+时序行卷（Goal I）已在 `develop` 完成：`data/道历/行卷.json` 行卷 1 → 2 卷，新增第二卷
+`pass.timetrace`（21 日、24 级、每级 60 点、日上限 120、周上限 500），只投影采集
+（`exploration.settle` 20）、灵田收获（`livelihood.harvest` 25）、生产完成
+（`production.complete` 25）、派遣结算（`specials.settle_dispatch` 30）与时序堡垒结算
+（`time_fort.settle` 40）五种已结算来源；免费线发时痕草与既有材料/名望（`local.dao_service`，
+上限 1000），付费线需当前有效月道契并发时痕草、阵砂、配方线索与灵木水分券。
+规则层按卷校验来源集合与付费物品白名单（问道卷八源/两物品不变），快照身份按数据库行的卷键校验、
+恢复快照不读现行内容；仓储以角色最近一期行卷结算，同一角色同时仅一卷在途，
+`开始行卷 [卷名]` / `问道行卷 [卷名]` 用既有命令的可选参数选卷（`时序`/`时序行卷`/`timetrace`/
+`pass.timetrace`），未新增命令或数据库表；`pass.wayfaring.start`/`claim` 与既有 request_hash
+不变，换卷后旧卷仍可查询，领取仍按原 operation 回放。种子迁移登记
+`58ab35ef…`→`69c890f3…`，provenance `36c9db9`。聚焦证据：新增
+`test_scroll_volume2_content.py` 14 passed（卷合同、来源集合隔离与坏来源拒绝、奖励来源闭合
+含时痕草产出池、日/周点数上限与触顶 0 点、free/paid 实发与回放幂等、换卷后重启持久化与旧卷查询、
+未知卷名拒绝）；行卷既有回归 `test_wayfaring*.py` 120 passed；`test_seed_migration.py`
+新增迁移/自定义保留用例（`-k wayfaring` 3 passed）；`test_documentation.py` 2 passed；
+`compileall` 与 `git diff --check` 通过。未跑全量/压测/部署，未验 QQ 真机。
+
 竞技场家族内容化已在 `develop` 完成（数据提交 `dbb563f`、清单种子迁移 `0a6e71d`）：
 新增 `data/特殊/竞技场.json`（kind `arena_rule`，4 条记录：`arena.defaults` 承载段位带
 500/1000/1500 与阵营清单 {xuantian,demon,beast}；`arena.spar` 承载个人竞技快照 7 天/30 分钟、
