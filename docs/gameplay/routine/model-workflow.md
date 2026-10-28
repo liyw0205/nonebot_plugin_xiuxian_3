@@ -140,3 +140,17 @@ code: available -> claimed | expired | revoked
 ## 观测
 
 记录窗口键、参与人数、领取/补领率、补签消耗、灵木产出、道契激活/撤销、机缘池消耗/保底、行卷等级、密令错误率、重复 operation 与管理员撤销。
+
+## 功业录事务流程
+
+1. 定义来自 `data/功业/功业.json`（kind `achievement`）：`active`/`open` 可领取，
+   `closed` 保留占位且只阻止新领取，`locked`/`planned` 不入表；`领取功业 <序号>` 的序号
+   按解析后的表顺序，也接受功业键或展示名。
+2. 领取在同一事务内先回放已提交 operation，再检查 `achievement_claims(player_id,
+   achievement_key)` 唯一约束与条目关闭状态；来源未达成返回 `ACHIEVEMENT_NOT_COMPLETED`。
+3. 来源投影复用既有路径：入道、问安（含第三条 `routine.checkin.daily:3`）、生产订单、
+   图鉴首见计数取业务表，其余事件读 `activity_events.event_key`；不新建事件表。
+4. 奖励交给 `grant_player_reward_actual`，地方名望上限读取地点内容；道号走
+   `grant_player_honor_title`。奖励、道号、领取记录与 operation 同事务提交，失败整笔回滚。
+5. 条目改名或关闭不改变已保存的领取结果；坏内容（未知道号、无上限地点、未知奖励键）
+   整域拒绝加载，不回退到旧硬编码表。

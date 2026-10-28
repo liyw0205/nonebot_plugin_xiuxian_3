@@ -109,5 +109,26 @@ operation 和唯一约束；图鉴五条首见、首次派遣及试炼塔十层�
 
 `HonorRecord`：道号/功业键、触发来源、获得时间、展示状态；已获得记录不可删除，只能隐藏展示。
 
+## 功业录内容合同
+
+功业定义唯一来源为 `data/功业/功业.json`（kind `achievement`），条目字段
+`key`/`label`/`source_event`/`reward`/`status`，有地方名望奖励时另带
+`local_reputation_key`。当前 6 条：首次问安、首次生产、首次派遣、五条图鉴、试炼塔十层，
+以及三问安累计的三日不辍；`领取功业 <序号>` 的序号按该文件声明顺序解析。
+完整合同见[v0.8 内容基线](content-v0.8.md)。
+
+- `key` 必须以 `achievement.` 开头且全局唯一；`label`、`source_event` 必须非空。
+- `reward` 只允许 `local_reputation`、`service_reputation`（正整数）与 `title_key`
+  （必须是已存在且未关闭的道号）；不允许修为、境界或突破物。
+- 有 `local_reputation` 时必须声明可解析的 `local_reputation_key`（地点需有正的上限）；
+  没有地方名望奖励时不得声明该字段。
+- 只有 `active`/`open` 条目可领取；`closed` 条目保留序号占位、只阻止新领取，已领取记录与
+  奖励不回退；`locked`/`planned` 只登记不入表；全部条目缺失或文件未登记清单时整域拒绝加载。
+- 完成判定沿用既有来源投影：`player.start_seeking`、`routine.checkin.daily`（第三条为
+  `:3`）、`production.complete`、`specials.codex.count.5` 取业务表，其余事件读
+  `activity_events.event_key`；领取仍按 operation 回放、`achievement_claims` 唯一约束，
+  奖励走共享资产事务。
+- 奖励展示名、名望上限与归属都由同一份内容决定；关闭条目只阻止新领取，不回收已发放奖励。
+
 `WayfaringPass`：角色、行卷键、起止业务日、状态、规则快照、积分、日周计入量和两条奖励线的已领取等级。
 规则快照包含来源、奖励、展示名及地方名望上限，不保存内容或规则版本标识。
