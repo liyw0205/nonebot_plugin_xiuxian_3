@@ -436,6 +436,24 @@ codex 悬空）、备份、重复部署幂等、自定义种子保留。计数�
 `test_material_content.py`+`test_combat_content.py` 29 passed（材料矩阵与战斗内容钉值
 未因 A–I 漂移）。未重做 A–I 内容，未跑全量/压测/部署，未验 QQ 真机。
 
+功业录内容化（v0.8）已在 `develop` 完成（数据与加载器 `7f3e085`、清单迁移 `3eab8e1`、
+内容基线 `6dcd8f3`）：功业定义从 `routine/rules.py` 的 Python 元组迁到
+`data/功业/功业.json`（kind `achievement`，6 条），新增 `routine/achievement_content.py`
+校验字段集合、`achievement.` 键前缀、奖励白名单（地方名望/服务信誉/道号）、道号存在且未关闭、
+地方名望键与上限可解析、`status` 取值与空内容整域拒绝；`rules.ACHIEVEMENTS` 改由内容派生并
+保留同名导出，`achievement()` 支持按传入内容解析，`routine/use_cases.py`、`routine/repository.py`
+与其他 `ACHIEVEMENTS` 导入方的展示/序号解析/领取路径不变。既有五条（首次问安/首次生产/
+首次派遣/五条图鉴/试炼塔十层）语义与数值不变，新增 `achievement.three_day_checkin`
+（三日不辍，第三条问安，名望 5，复用既有 `routine.checkin.daily:3` 投影，未新增事件类型）。
+关闭语义落地：`closed` 条目保留序号占位，未领取显示“内容未开放”、领取返回 `CONTENT_CLOSED`，
+已领取记录与原始奖励不回退；`locked`/`planned` 只登记不入表，未知状态整域拒绝。
+`data/内容清单.json` 登记新文件并更新清单指纹（`927b9ef1…`→`dd4e5e6d…`），迁移规则
+`new_commit` 指向实际发货提交。聚焦证据：`test_achievement_content.py` 19 passed（内容合同、
+12 项坏记录拒绝、空内容拒绝、关闭与锁定语义、第三条问安真实领取、回放与重复领取）；
+`test_routine.py` + `test_documentation.py` 17 passed；`test_seed_migration.py -k manifest`
+3 passed（旧宿主升级、幂等、自定义种子保留）。develop CI（Quality and Release `40680500166`，
+head `6dcd8f3`）成功。未跑全量/压测/部署，未验 QQ 真机。
+
 竞技场家族内容化已在 `develop` 完成（数据提交 `dbb563f`、清单种子迁移 `0a6e71d`）：
 新增 `data/特殊/竞技场.json`（kind `arena_rule`，4 条记录：`arena.defaults` 承载段位带
 500/1000/1500 与阵营清单 {xuantian,demon,beast}；`arena.spar` 承载个人竞技快照 7 天/30 分钟、
