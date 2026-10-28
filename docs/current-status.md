@@ -472,6 +472,16 @@ head `6dcd8f3`）成功。未跑全量/压测/部署，未验 QQ 真机。
 3 passed（旧宿主升级、幂等、自定义种子保留）。develop CI（Quality and Release `40708847422`，
 head `66d34f6`）成功。未跑全量/压测/部署，未验 QQ 真机。
 
+图鉴里程碑扩展（v0.8）已在 `develop` 完成：`data/图鉴/里程碑.json` 由 6 条扩到 12 条，
+新增 6 条只复用既有图鉴条目（显式 `entry_keys`）与既有地方名望奖励，覆盖此前零里程碑的
+challenge/story/route/service 分类；既有 6 条顺序与数值不变，`图鉴`/`领取图鉴里程碑` 的展示、
+未完成拒绝、领取事务、operation 回放与唯一约束语义不变；该文件首次登记迁移规则（旧 blob 指纹
++ provenance）。聚焦证据：`test_codex_milestone_content.py` 2 passed（12 条与文件一致、
+entry_keys 全部可解析、名望键与解锁可解析、图鉴按序展示 12 条）；`test_codex.py` 11 passed
+（1 项 `test_place_codex_keys_come_from_location_content_on_both_adapters` 在本地报
+`TRAVEL_ROUTE_INVALID`，与本次仅改里程碑数据无关，待 develop CI 复核归属）。
+未跑全量/压测/部署，未验 QQ 真机。
+
 七日入道内容化（v1.0）已在 `develop` 完成（数据与派生 `1f2d3da`、清单迁移 `16efb4f`）：
 `SEVEN_DAY_GOALS`（7 条）从 `routine/rules.py` 的 Python 元组迁到 `data/道历/七日目标.json`
 （kind `seven_day_goal`），由 `routine/routine_content.py::seven_day_goal_definitions()` 校验
