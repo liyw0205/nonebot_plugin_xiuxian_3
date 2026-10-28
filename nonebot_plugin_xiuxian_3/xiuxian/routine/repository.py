@@ -2762,6 +2762,8 @@ class RoutineRepositoryMixin:
             definition = dao_contract(receipt.contract_key)
         except ValueError as exc:
             raise BillingReceiptInvalidError("receipt contract is not registered") from exc
+        if definition.closed:
+            raise DaoContractClosedError("dao contract content is closed")
         subject = f"{platform}:{platform_user_id}"
         now = self._now()
         if receipt.subject != subject:

@@ -1,0 +1,47 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "dao_contract",
+  "records": [
+    {
+      "key": "dao_contract.daily",
+      "label": "日道契",
+      "duration_days": 1,
+      "price": 30,
+      "daily_reward": {
+        "spirit_stones": 30,
+        "energy": 2
+      },
+      "status": "active"
+    },
+    {
+      "key": "dao_contract.weekly",
+      "label": "周道契",
+      "duration_days": 7,
+      "price": 180,
+      "daily_reward": {
+        "spirit_stones": 35,
+        "energy": 3
+      },
+      "status": "active",
+      "activation_reward": {
+        "item.ticket.fate_basic": 2
+      }
+    },
+    {
+      "key": "dao_contract.monthly",
+      "label": "月道契",
+      "duration_days": 30,
+      "price": 600,
+      "daily_reward": {
+        "spirit_stones": 40,
+        "energy": 4
+      },
+      "status": "active",
+      "activation_reward": {
+        "item.cosmetic.dao_name_frame": 1
+      },
+      "reputation_every_days": 7,
+      "reputation_reward": 3
+    }
+  ]
+}

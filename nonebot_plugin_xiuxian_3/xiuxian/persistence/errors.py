@@ -1817,6 +1817,10 @@ class DaoContractNotActiveError(RuntimeError):
     """The contract is not active for the requested business date."""
 
 
+class DaoContractClosedError(RuntimeError):
+    """The contract's content is closed and cannot be activated."""
+
+
 class DaoContractAlreadyRevokedError(RuntimeError):
     """The contract is already revoked or cannot be revoked."""
 

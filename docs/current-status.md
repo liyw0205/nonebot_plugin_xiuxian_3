@@ -454,6 +454,24 @@ codex 悬空）、备份、重复部署幂等、自定义种子保留。计数�
 3 passed（旧宿主升级、幂等、自定义种子保留）。develop CI（Quality and Release `40680500166`，
 head `6dcd8f3`）成功。未跑全量/压测/部署，未验 QQ 真机。
 
+道号与道契内容化（v0.9）已在 `develop` 完成（数据与加载器 `24ecef2`、清单迁移 `cbcaa9c`、
+内容基线 `66d34f6`）：`HONOR_TITLES`（17 条）与 `DAO_CONTRACTS`（3 条）从 `routine/rules.py`
+的 Python 元组迁到 `data/道历/道号.json`（kind `honor_title`）与 `data/道历/道契.json`
+（kind `dao_contract`），由新增 `routine/routine_content.py` 统一校验字段、键前缀、奖励数值与
+`status`；`rules` 保留同名导出与顺序，`功业录`/`佩戴称号`/`我的道契`/`激活道契`/`领取道契`
+路径不变。道号 `source_event` 允许为空（5 条行卷道号由行卷奖励直接写入），其余沿用既有来源
+投影；道契时长/价格/每日与激活奖励/名望周期与旧表逐字段一致。`功业录` 对未获得的道号显示
+获取提示（`hint`），已获得/已佩戴行不变，`data.titles` 增加 `hint` 字段。关闭语义沿用 v0.8：
+`closed` 道号保留序号占位、不再自动授予、已获得仍可佩戴；`closed` 道契不可新激活并返回
+`CONTENT_CLOSED`（凭证不消耗），已激活权益的领取不受影响；`locked`/`planned` 只登记不入表，
+未知状态与空表整域拒绝。`data/内容清单.json` 登记两份新文件并更新清单指纹
+（`dd4e5e6d…`→`12ed228d…`），迁移规则 `new_commit` 指向实际发货提交。聚焦证据：
+`test_routine_content.py` 24 passed（逐字段一致、18 项坏记录拒绝、空表拒绝、关闭/锁定语义、
+功业录提示、关闭道契拒绝激活且凭证未消耗）；`test_routine.py` + `test_documentation.py`
+17 passed；`test_void_spire.py` 19 passed（道号键消费方）；`test_seed_migration.py -k manifest`
+3 passed（旧宿主升级、幂等、自定义种子保留）。develop CI（Quality and Release `40708847422`，
+head `66d34f6`）成功。未跑全量/压测/部署，未验 QQ 真机。
+
 竞技场家族内容化已在 `develop` 完成（数据提交 `dbb563f`、清单种子迁移 `0a6e71d`）：
 新增 `data/特殊/竞技场.json`（kind `arena_rule`，4 条记录：`arena.defaults` 承载段位带
 500/1000/1500 与阵营清单 {xuantian,demon,beast}；`arena.spar` 承载个人竞技快照 7 天/30 分钟、

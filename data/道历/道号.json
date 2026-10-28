@@ -1,0 +1,125 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "honor_title",
+  "records": [
+    {
+      "key": "title.first_seeking",
+      "label": "初入道途",
+      "source_event": "player.start_seeking",
+      "hint": "首次寻仙问道",
+      "status": "active"
+    },
+    {
+      "key": "title.town_helper",
+      "label": "城镇助行者",
+      "source_event": "routine.checkin.daily:3",
+      "hint": "累计三次道历问安",
+      "status": "active"
+    },
+    {
+      "key": "title.mist_watcher",
+      "label": "雾中守门人",
+      "source_event": "story.mainline.xuantian:chapter.1.stage.3",
+      "hint": "完成玄天主线第一章第三关「雾中守门」",
+      "status": "active"
+    },
+    {
+      "key": "title.dispatch_helper",
+      "label": "派遣行者",
+      "source_event": "specials.dispatch.settled",
+      "hint": "首次结算派遣",
+      "status": "active"
+    },
+    {
+      "key": "title.first_tower_clear",
+      "label": "试炼先行",
+      "source_event": "specials.tower.floor.10",
+      "hint": "雾隐塔第十层胜利",
+      "status": "active"
+    },
+    {
+      "key": "title.three_realms_tower.domain_guardian",
+      "label": "三界守界人",
+      "source_event": "specials.three_realms_tower.floor.40",
+      "hint": "三界塔第四十层胜利",
+      "status": "active"
+    },
+    {
+      "key": "title.season.final_heaven.ascension",
+      "label": "凌霄先登",
+      "source_event": "season.final_heaven.claim.ascension",
+      "hint": "终局赛季飞升结局领取",
+      "status": "active"
+    },
+    {
+      "key": "title.season.final_heaven.dao",
+      "label": "留界道统",
+      "source_event": "season.final_heaven.claim.dao",
+      "hint": "终局赛季留界结局领取",
+      "status": "active"
+    },
+    {
+      "key": "title.season.final_heaven.cooperation",
+      "label": "同道共济",
+      "source_event": "season.final_heaven.claim.cooperation",
+      "hint": "终局赛季协作结局领取",
+      "status": "active"
+    },
+    {
+      "key": "title.void_spire.witness",
+      "label": "虚空见证者",
+      "source_event": "specials.void_spire.floor.60",
+      "hint": "虚空塔第六十层胜利",
+      "status": "active"
+    },
+    {
+      "key": "title.void_spire.origin",
+      "label": "道源登塔者",
+      "source_event": "specials.void_spire.floor.75",
+      "hint": "虚空塔第七十五层胜利",
+      "status": "active"
+    },
+    {
+      "key": "title.void_spire.ascension",
+      "label": "虚空登临者",
+      "source_event": "specials.void_spire.floor.90",
+      "hint": "虚空塔第九十层胜利",
+      "status": "active"
+    },
+    {
+      "key": "title.wayfaring.pathfinder",
+      "label": "行路先行",
+      "source_event": null,
+      "hint": "问道行卷免费线第 7 级（或付费线第 1 级）",
+      "status": "active"
+    },
+    {
+      "key": "title.wayfaring.trailblazer",
+      "label": "拓途行者",
+      "source_event": null,
+      "hint": "问道行卷免费线第 14 级",
+      "status": "active"
+    },
+    {
+      "key": "title.wayfaring.seeker",
+      "label": "寻道客",
+      "source_event": null,
+      "hint": "问道行卷免费线第 20 级",
+      "status": "active"
+    },
+    {
+      "key": "title.wayfaring.wayfarer",
+      "label": "万里行者",
+      "source_event": null,
+      "hint": "问道行卷免费线第 30 级",
+      "status": "active"
+    },
+    {
+      "key": "title.wayfaring.licensed",
+      "label": "道契行者",
+      "source_event": null,
+      "hint": "问道行卷付费线第 5 级（此后每 5 级）",
+      "status": "active"
+    }
+  ]
+}

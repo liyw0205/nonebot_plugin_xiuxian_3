@@ -30,6 +30,7 @@ from ..repository import (
     HonorTitleClosedError,
     HonorTitleNotFoundError,
     DaoContractAlreadyClaimedError,
+    DaoContractClosedError,
     DaoContractInvalidError,
     DaoContractNotActiveError,
     RedemptionCodeAlreadyClaimedError,
@@ -525,6 +526,12 @@ class RoutineApplication:
                 state_text = "内容未开放" if title_definition.closed else "未获得"
             else:
                 state_text = "已获得"
+            if (
+                not item.acquired
+                and not title_definition.closed
+                and title_definition.hint
+            ):
+                state_text = f"{state_text}（{title_definition.hint}）"
             lines.append(f"- **{index}. {item.label}**：{state_text}")
             titles.append(
                 {
@@ -533,6 +540,7 @@ class RoutineApplication:
                     "label": item.label,
                     "acquired": item.acquired,
                     "equipped": item.equipped,
+                    "hint": title_definition.hint,
                 }
             )
         lines.extend(
@@ -759,6 +767,8 @@ class RoutineApplication:
             )
         except BillingReceiptInvalidError:
             return CommandResult(False, "BILLING_RECEIPT_INVALID", "道契凭证无效或未通过验证，未发放任何权益。", context.request_id, operation_id)
+        except DaoContractClosedError:
+            return CommandResult(False, "CONTENT_CLOSED", "这类道契暂未开放，凭证未使用，未发放任何权益。", context.request_id, operation_id)
         except BillingReceiptAlreadyUsedError:
             return CommandResult(False, "BILLING_RECEIPT_USED", "这张道契凭证已经使用过了。", context.request_id, operation_id)
         except PlayerNotFoundError:
