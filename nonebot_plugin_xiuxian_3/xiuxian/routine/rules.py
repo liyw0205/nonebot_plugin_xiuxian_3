@@ -93,6 +93,7 @@ class HonorTitleDefinition:
     label: str
     source_event: str | None
     closed: bool = False
+    hint: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -140,6 +141,7 @@ class DaoContractDefinition:
     activation_reward: tuple[tuple[str, int], ...] = ()
     reputation_every_days: int | None = None
     reputation_reward: int = 0
+    closed: bool = False
 
     def daily_reward_map(self) -> dict[str, int]:
         return {key: int(value) for key, value in self.daily_reward}
@@ -148,86 +150,26 @@ class DaoContractDefinition:
         return {key: int(value) for key, value in self.activation_reward}
 
 
-HONOR_TITLES: tuple[HonorTitleDefinition, ...] = (
-    HonorTitleDefinition("title.first_seeking", "初入道途", "player.start_seeking"),
-    HonorTitleDefinition("title.town_helper", "城镇助行者", "routine.checkin.daily:3"),
-    HonorTitleDefinition(
-        "title.mist_watcher",
-        "雾中守门人",
-        "story.mainline.xuantian:chapter.1.stage.3",
-    ),
-    HonorTitleDefinition("title.dispatch_helper", "派遣行者", "specials.dispatch.settled"),
-    HonorTitleDefinition("title.first_tower_clear", "试炼先行", "specials.tower.floor.10"),
-    HonorTitleDefinition(
-        "title.three_realms_tower.domain_guardian",
-        "三界守界人",
-        "specials.three_realms_tower.floor.40",
-    ),
-    HonorTitleDefinition(
-        "title.season.final_heaven.ascension",
-        "凌霄先登",
-        "season.final_heaven.claim.ascension",
-    ),
-    HonorTitleDefinition(
-        "title.season.final_heaven.dao",
-        "留界道统",
-        "season.final_heaven.claim.dao",
-    ),
-    HonorTitleDefinition(
-        "title.season.final_heaven.cooperation",
-        "同道共济",
-        "season.final_heaven.claim.cooperation",
-    ),
-    HonorTitleDefinition(
-        "title.void_spire.witness",
-        "虚空见证者",
-        "specials.void_spire.floor.60",
-    ),
-    HonorTitleDefinition(
-        "title.void_spire.origin",
-        "道源登塔者",
-        "specials.void_spire.floor.75",
-    ),
-    HonorTitleDefinition(
-        "title.void_spire.ascension",
-        "虚空登临者",
-        "specials.void_spire.floor.90",
-    ),
-    HonorTitleDefinition("title.wayfaring.pathfinder", "行路先行", None),
-    HonorTitleDefinition("title.wayfaring.trailblazer", "拓途行者", None),
-    HonorTitleDefinition("title.wayfaring.seeker", "寻道客", None),
-    HonorTitleDefinition("title.wayfaring.wayfarer", "万里行者", None),
-    HonorTitleDefinition("title.wayfaring.licensed", "道契行者", None),
-)
+def _content_honor_titles() -> tuple[HonorTitleDefinition, ...]:
+    """Derive the honor-title table from the shipped content package."""
+
+    from .routine_content import honor_title_definitions
+
+    return honor_title_definitions()
 
 
-DAO_CONTRACTS: tuple[DaoContractDefinition, ...] = (
-    DaoContractDefinition(
-        "dao_contract.daily",
-        "日道契",
-        duration_days=1,
-        price=30,
-        daily_reward=(("spirit_stones", 30), ("energy", 2)),
-    ),
-    DaoContractDefinition(
-        "dao_contract.weekly",
-        "周道契",
-        duration_days=7,
-        price=180,
-        daily_reward=(("spirit_stones", 35), ("energy", 3)),
-        activation_reward=((FATE_TICKET, 2),),
-    ),
-    DaoContractDefinition(
-        "dao_contract.monthly",
-        "月道契",
-        duration_days=30,
-        price=600,
-        daily_reward=(("spirit_stones", 40), ("energy", 4)),
-        activation_reward=(("item.cosmetic.dao_name_frame", 1),),
-        reputation_every_days=7,
-        reputation_reward=3,
-    ),
-)
+HONOR_TITLES: tuple[HonorTitleDefinition, ...] = _content_honor_titles()
+
+
+def _content_dao_contracts() -> tuple[DaoContractDefinition, ...]:
+    """Derive the dao-contract table from the shipped content package."""
+
+    from .routine_content import dao_contract_definitions
+
+    return dao_contract_definitions()
+
+
+DAO_CONTRACTS: tuple[DaoContractDefinition, ...] = _content_dao_contracts()
 
 
 

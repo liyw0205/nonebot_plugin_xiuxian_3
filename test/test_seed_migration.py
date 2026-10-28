@@ -454,6 +454,8 @@ def old_official_manifest() -> bytes:
             "任务/跨界任务.json",
             "特殊/竞技场.json",
             "功业/功业.json",
+            "道历/道号.json",
+            "道历/道契.json",
         }
     ]
     blob = (json.dumps(document, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
@@ -480,6 +482,8 @@ def test_manifest_seed_migrates_when_the_trade_file_is_registered(host: Path) ->
     (host / "data" / "任务/跨界任务.json").unlink()
     (host / "data" / "特殊/竞技场.json").unlink()
     (host / "data" / "功业/功业.json").unlink()
+    (host / "data" / "道历/道号.json").unlink()
+    (host / "data" / "道历/道契.json").unlink()
     result = deploy(host)
     assert result.returncode == 0, result.stdout + result.stderr
     assert "matchers=1 handlers=1" in result.stdout
