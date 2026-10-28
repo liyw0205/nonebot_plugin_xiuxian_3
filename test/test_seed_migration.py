@@ -361,6 +361,18 @@ def old_official_locations() -> bytes:
         pattern = f',\n      "codex_entry_key": "codex.place.{tail}"'
         assert pattern in text, tail
         text = text.replace(pattern, "", 1)
+    # The depths slice also opened two terminal locations; an old host still
+    # has them locked, so the reversed blob must flip both statuses back.
+    for key in ("cave.ancient_domain", "demon.abyss_depths"):
+        end = text.index(f'"key": "{key}"')
+        start = text.rindex("    {", 0, end)
+        block = text[start:end]
+        assert block.count('"status": "open"') == 1, key
+        text = (
+            text[:start]
+            + block.replace('"status": "open"', '"status": "locked"', 1)
+            + text[end:]
+        )
     blob = text.encode("utf-8")
     rule = json.loads((ROOT / "scripts/seed_migrations.json").read_text(encoding="utf-8"))[
         LOCATION_FILE.as_posix()

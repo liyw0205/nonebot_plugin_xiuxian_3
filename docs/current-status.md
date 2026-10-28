@@ -472,6 +472,23 @@ head `6dcd8f3`）成功。未跑全量/压测/部署，未验 QQ 真机。
 3 passed（旧宿主升级、幂等、自定义种子保留）。develop CI（Quality and Release `40708847422`，
 head `66d34f6`）成功。未跑全量/压测/部署，未验 QQ 真机。
 
+远古洞天与魔渊深层探索开放（v0.7 探索基线）已在 `develop` 完成（数据与测试 `c35c1b7`、
+种子迁移 `942d547`、内容基线 `39e5ce7`）：`cave.ancient_domain` 与 `demon.abyss_depths`
+由 `locked` 改为 `open`（准入与区域入边不变），补上两处地点原本悬空的动作——
+`explore.ancient_domain`（1200 秒/18 体力/2 精力/每日 2 次/战斗 60%）与
+`explore.abyss_depths`（1500 秒/22 体力/3 精力/每日 2 次/战斗 75%），各带真实奖池与
+遭遇池；新增四名地点绑定敌人（洞天守禁灵卫/洞天残影、深渊潜行者/魔气怨影，化神 L1，
+复用既有敌人技能与掉落池族）与两个遭遇池，不新增物品、技能或掉落池类型。
+远古洞天开放后，此前因地点不可进入而实际不可达的 v0.4 三人秘境
+`instance.secret_realm.ancient_domain` 亦随之可达。五份改动种子（地点/模式/敌人/遭遇池/奖励）
+均登记旧/新 SHA-256 与 provenance，`地图/地点.json` 反向助手同时回退状态翻转与 codex 属性。
+聚焦证据：`test_exploration_depths_content.py` 8 passed（引用闭合、6 项坏记录拒绝、
+魔渊深层真实开始→过期→结算→回放）；`test_combat_content.py`+`test_material_content.py`+
+`test_exploration_integrity.py`+`test_documentation.py` 43 passed（战斗钉值 61/39/17/33/15/14）；
+`test_seed_migration.py -k "location or manifest"` 4 passed（旧 locked 宿主升级、自定义保留）。
+develop CI（Quality and Release `40733834366`，head `39e5ce7`）成功。未跑全量/压测/部署，
+未验 QQ 真机。
+
 竞技场家族内容化已在 `develop` 完成（数据提交 `dbb563f`、清单种子迁移 `0a6e71d`）：
 新增 `data/特殊/竞技场.json`（kind `arena_rule`，4 条记录：`arena.defaults` 承载段位带
 500/1000/1500 与阵营清单 {xuantian,demon,beast}；`arena.spar` 承载个人竞技快照 7 天/30 分钟、

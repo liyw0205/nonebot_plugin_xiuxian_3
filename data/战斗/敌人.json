@@ -820,6 +820,146 @@
       "combat_profile": {"random_pool_key": "battle.enemy.time_garden_keeper", "reward": {"spirit_stones": 105}, "drop_pool_key": "reward_pool.enemy.void"},
       "key": "enemy.time_garden_keeper",
       "status": "active"
+    },
+    {
+      "key": "enemy.ancient_domain_warden",
+      "name": "洞天守禁灵卫",
+      "desc": "由洞天禁制凝聚的守卫，见生人踏入便以领域压制逼迫退让。",
+      "location_key": "cave.ancient_domain",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "soul_transformation",
+          "min_layer": 1
+        }
+      ],
+      "stats": {
+        "hp": 1680,
+        "attack": 122,
+        "initiative": 26,
+        "agility": 19
+      },
+      "skills": [
+        "enemy_skill.domain_suppress"
+      ],
+      "behavior": {
+        "can_critical": true,
+        "can_escape": false
+      },
+      "reward_refs": [],
+      "combat_profile": {
+        "random_pool_key": "battle.enemy.ancient_domain_warden",
+        "reward": {
+          "spirit_stones": 96
+        },
+        "drop_pool_key": "reward_pool.enemy.void"
+      },
+      "status": "active"
+    },
+    {
+      "key": "enemy.ancient_domain_echo",
+      "name": "洞天残影",
+      "desc": "旧日洞天修士留下的残影，只余下反复演练的防守本能。",
+      "location_key": "cave.ancient_domain",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "soul_transformation",
+          "min_layer": 1
+        }
+      ],
+      "stats": {
+        "hp": 1420,
+        "attack": 108,
+        "initiative": 21,
+        "agility": 24
+      },
+      "skills": [
+        "enemy_skill.boundary_wall"
+      ],
+      "behavior": {
+        "can_critical": false,
+        "can_escape": false
+      },
+      "reward_refs": [],
+      "combat_profile": {
+        "random_pool_key": "battle.enemy.ancient_domain_echo",
+        "reward": {
+          "spirit_stones": 84
+        },
+        "drop_pool_key": "reward_pool.enemy.void"
+      },
+      "status": "active"
+    },
+    {
+      "key": "enemy.abyss_depth_stalker",
+      "name": "深渊潜行者",
+      "desc": "伏在深层魔气里的猎手，惯以突进撕开来者的护体灵光。",
+      "location_key": "demon.abyss_depths",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "soul_transformation",
+          "min_layer": 1
+        }
+      ],
+      "stats": {
+        "hp": 1750,
+        "attack": 132,
+        "initiative": 29,
+        "agility": 22
+      },
+      "skills": [
+        "enemy_skill.charge"
+      ],
+      "behavior": {
+        "can_critical": true,
+        "can_escape": false
+      },
+      "reward_refs": [],
+      "combat_profile": {
+        "random_pool_key": "battle.enemy.abyss_depth_stalker",
+        "reward": {
+          "spirit_stones": 104
+        },
+        "drop_pool_key": "reward_pool.enemy.three_realms"
+      },
+      "status": "active"
+    },
+    {
+      "key": "enemy.abyss_pollution_wraith",
+      "name": "魔气怨影",
+      "desc": "被深层魔气浸透后散不去的怨念，靠近时以魔息侵蚀心神。",
+      "location_key": "demon.abyss_depths",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "soul_transformation",
+          "min_layer": 1
+        }
+      ],
+      "stats": {
+        "hp": 1520,
+        "attack": 116,
+        "initiative": 23,
+        "agility": 18
+      },
+      "skills": [
+        "skill.demonic.abyss_communion"
+      ],
+      "behavior": {
+        "can_critical": false,
+        "can_escape": false
+      },
+      "reward_refs": [],
+      "combat_profile": {
+        "random_pool_key": "battle.enemy.abyss_pollution_wraith",
+        "reward": {
+          "spirit_stones": 88
+        },
+        "drop_pool_key": "reward_pool.enemy.three_realms"
+      },
+      "status": "active"
     }
   ],
   "schema": "xiuxian.content"

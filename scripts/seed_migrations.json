@@ -98,10 +98,39 @@
   "地图/地点.json": {
     "old_sha256": {
       "d2e8dcde2bc4fd9daa0bde5ba3ce2b024ffcf9aabf52b9a3732d27bec2694efa": "44be52139804523570ec1f2588b8f9bdf568c8a0:data/地图/地点.json",
-      "206a98cbe488ef5130cc6dcec124de19667c7b233a2d0e79416894a52a1f7d43": "38133f2007e7cbf0bf69425517724c57c9668e58:data/地图/地点.json"
+      "206a98cbe488ef5130cc6dcec124de19667c7b233a2d0e79416894a52a1f7d43": "38133f2007e7cbf0bf69425517724c57c9668e58:data/地图/地点.json",
+      "b775aa8bdd369b60efa638f944312593e2fbe4d588d73f0199ae5902ba1c0e4f": "2ee45a684fd6bb214374769c4fb8e6e48811c5b7:data/地图/地点.json"
     },
-    "new_sha256": "b775aa8bdd369b60efa638f944312593e2fbe4d588d73f0199ae5902ba1c0e4f",
-    "new_commit": "2ea700721f9772dd0c8adfd13b67db0140a61805"
+    "new_sha256": "4252694487c80791ab766aef5a516bd45824ae6dd86b19ee5aae37c7a6b60988",
+    "new_commit": "c35c1b78adf9c46393de8c3db0dc3606a572751b"
+  },
+  "探索/模式.json": {
+    "old_sha256": {
+      "46b445e534f5e4778923ef2fa29505ecc7fd5212679840a2e89f625ab6655cdb": "2ee45a684fd6bb214374769c4fb8e6e48811c5b7:data/探索/模式.json"
+    },
+    "new_sha256": "2f5c61d8adc3b09c4c9759ff68731deb350fa7370560fbb7c6ae521c560eb472",
+    "new_commit": "c35c1b78adf9c46393de8c3db0dc3606a572751b"
+  },
+  "战斗/敌人.json": {
+    "old_sha256": {
+      "e171189c111d361becd7f4907993e1dce35456d9ea061fa7565d212d86796726": "2ee45a684fd6bb214374769c4fb8e6e48811c5b7:data/战斗/敌人.json"
+    },
+    "new_sha256": "501f749a4c716b2985e5302347dd2b1e430b0882ace6f09aae4097a3f752c650",
+    "new_commit": "c35c1b78adf9c46393de8c3db0dc3606a572751b"
+  },
+  "战斗/遭遇池.json": {
+    "old_sha256": {
+      "c82ddc6feb2621ca5da2da4063d0c286a563efa0736f09491789f003d6665a34": "2ee45a684fd6bb214374769c4fb8e6e48811c5b7:data/战斗/遭遇池.json"
+    },
+    "new_sha256": "3a07338f675db50afee396c3b23a42092843719997709f212f20c3b4c2a57f3a",
+    "new_commit": "c35c1b78adf9c46393de8c3db0dc3606a572751b"
+  },
+  "奖励/奖励.json": {
+    "old_sha256": {
+      "ac1edb3622d77fb07f13c2e329bb7be8e86b525b7809872eb0f233318f499105": "2ee45a684fd6bb214374769c4fb8e6e48811c5b7:data/奖励/奖励.json"
+    },
+    "new_sha256": "10d9338ead41a62609941f5f1b5e8588024bbefd541d13aaa454f67f85cd56fc",
+    "new_commit": "c35c1b78adf9c46393de8c3db0dc3606a572751b"
   },
   "地图/区域.json": {
     "old_sha256": {
