@@ -395,8 +395,13 @@ class RoutineApplication:
             "",
         ]
         goals = []
+        from .rules import seven_day_goal
+
         for goal in record.goals:
+            definition = seven_day_goal(goal.day_number)
             state_text = self._seven_day_state_text(goal.state)
+            if goal.state == "pending" and definition.hint:
+                state_text = f"{state_text}（{definition.hint}）"
             lines.append(f"- **D{goal.day_number} {goal.label}**：{state_text}（{goal.target_date}）")
             goals.append(
                 {
@@ -404,6 +409,7 @@ class RoutineApplication:
                     "label": goal.label,
                     "target_date": goal.target_date,
                     "state": goal.state,
+                    "hint": definition.hint,
                     "reward": goal.reward,
                 }
             )

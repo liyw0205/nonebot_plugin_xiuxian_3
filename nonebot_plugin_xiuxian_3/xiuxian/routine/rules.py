@@ -30,61 +30,18 @@ class SevenDayGoalDefinition:
     event_key: str
     closed: bool = False
     local_reputation_key: str | None = None
+    hint: str = ""
 
 
-SEVEN_DAY_GOALS: tuple[SevenDayGoalDefinition, ...] = (
-    SevenDayGoalDefinition(
-        1,
-        "quest.seven_day.day1_checkin",
-        "道历问安",
-        (("item.food.coarse_spirit_rice", 1),),
-        "routine.checkin.daily",
-    ),
-    SevenDayGoalDefinition(
-        2,
-        "quest.seven_day.day2_gather",
-        "完成一次近郊采集",
-        (("item.herb.blood_grass", 2),),
-        "explore.gather_outskirts",
-    ),
-    SevenDayGoalDefinition(
-        3,
-        "quest.seven_day.day3_production_preview",
-        "查看一次生产预览或开始生产",
-        (("spirit_stones", 30),),
-        "production.preview",
-    ),
-    SevenDayGoalDefinition(
-        4,
-        "quest.seven_day.day4_bounty",
-        "接取一次悬赏",
-        (("local_reputation", 2),),
-        "bounty.accept",
-        local_reputation_key=ROUTINE_LOCAL_REPUTATION_KEY,
-    ),
-    SevenDayGoalDefinition(
-        5,
-        "quest.seven_day.day5_tower",
-        "完成试炼塔一层",
-        (("item.mat.array_sand", 2),),
-        "specials.tower.floor.1",
-    ),
-    SevenDayGoalDefinition(
-        6,
-        "quest.seven_day.day6_dispatch",
-        "完成一次派遣",
-        (("spirit_stones", 50),),
-        "specials.dispatch.settled",
-    ),
-    SevenDayGoalDefinition(
-        7,
-        "quest.seven_day.day7_path",
-        "选择道途",
-        (("local_reputation", 5), (FATE_TICKET, 2)),
-        "player.enter_cultivation",
-        local_reputation_key=ROUTINE_LOCAL_REPUTATION_KEY,
-    ),
-)
+def _content_seven_day_goals() -> tuple[SevenDayGoalDefinition, ...]:
+    """Derive the seven-day goal table from the shipped content package."""
+
+    from .routine_content import seven_day_goal_definitions
+
+    return seven_day_goal_definitions()
+
+
+SEVEN_DAY_GOALS: tuple[SevenDayGoalDefinition, ...] = _content_seven_day_goals()
 
 
 @dataclass(frozen=True, slots=True)

@@ -472,6 +472,16 @@ head `6dcd8f3`）成功。未跑全量/压测/部署，未验 QQ 真机。
 3 passed（旧宿主升级、幂等、自定义种子保留）。develop CI（Quality and Release `40708847422`，
 head `66d34f6`）成功。未跑全量/压测/部署，未验 QQ 真机。
 
+七日入道内容化（v1.0）已在 `develop` 完成（数据与派生 `1f2d3da`、清单迁移 `16efb4f`）：
+`SEVEN_DAY_GOALS`（7 条）从 `routine/rules.py` 的 Python 元组迁到 `data/道历/七日目标.json`
+（kind `seven_day_goal`），由 `routine/routine_content.py::seven_day_goal_definitions()` 校验
+日数连续唯一、键前缀、`hint`/`event_key` 非空、奖励正数、地方名望键可解析与 `status` 语义；
+`rules` 由内容派生并保留同名导出与日数顺序，`七日入道`/`领取七日目标` 的进度、快照、回放与
+幂等路径不变。玩家可见增量：`七日入道` 对未完成目标显示 `hint`（`data.goals` 附带 `hint`）。
+聚焦证据：`test_routine_content.py` 35 passed（含 7 条逐字段一致、9 项坏记录拒绝、
+七日入道提示与日数不变）；`test_routine.py` 17 passed；`test_documentation.py` 2 passed。
+未跑全量/压测/部署，未验 QQ 真机。
+
 远古洞天与魔渊深层探索开放（v0.7 探索基线）已在 `develop` 完成（数据与测试 `c35c1b7`、
 种子迁移 `942d547`、内容基线 `39e5ce7`）：`cave.ancient_domain` 与 `demon.abyss_depths`
 由 `locked` 改为 `open`（准入与区域入边不变），补上两处地点原本悬空的动作——

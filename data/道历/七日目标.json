@@ -1,0 +1,71 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "seven_day_goal",
+  "records": [
+    {
+      "day_number": 1,
+      "key": "quest.seven_day.day1_checkin",
+      "label": "道历问安",
+      "hint": "发送 `道历问安` 完成当日问安",
+      "event_key": "routine.checkin.daily",
+      "reward": {"item.food.coarse_spirit_rice": 1},
+      "status": "active"
+    },
+    {
+      "day_number": 2,
+      "key": "quest.seven_day.day2_gather",
+      "label": "完成一次近郊采集",
+      "hint": "前往近郊并结算一次采集",
+      "event_key": "explore.gather_outskirts",
+      "reward": {"item.herb.blood_grass": 2},
+      "status": "active"
+    },
+    {
+      "day_number": 3,
+      "key": "quest.seven_day.day3_production_preview",
+      "label": "查看一次生产预览或开始生产",
+      "hint": "发送 `生产预览` 或开始一次生产",
+      "event_key": "production.preview",
+      "reward": {"spirit_stones": 30},
+      "status": "active"
+    },
+    {
+      "day_number": 4,
+      "key": "quest.seven_day.day4_bounty",
+      "label": "接取一次悬赏",
+      "hint": "在悬赏榜接取一份悬赏",
+      "event_key": "bounty.accept",
+      "reward": {"local_reputation": 2},
+      "local_reputation_key": "local.xuantian.new_town",
+      "status": "active"
+    },
+    {
+      "day_number": 5,
+      "key": "quest.seven_day.day5_tower",
+      "label": "完成试炼塔一层",
+      "hint": "在雾隐塔胜利完成第一层",
+      "event_key": "specials.tower.floor.1",
+      "reward": {"item.mat.array_sand": 2},
+      "status": "active"
+    },
+    {
+      "day_number": 6,
+      "key": "quest.seven_day.day6_dispatch",
+      "label": "完成一次派遣",
+      "hint": "结算一次派遣",
+      "event_key": "specials.dispatch.settled",
+      "reward": {"spirit_stones": 50},
+      "status": "active"
+    },
+    {
+      "day_number": 7,
+      "key": "quest.seven_day.day7_path",
+      "label": "选择道途",
+      "hint": "完成入道并选择一条道途",
+      "event_key": "player.enter_cultivation",
+      "reward": {"local_reputation": 5, "item.ticket.fate_basic": 2},
+      "local_reputation_key": "local.xuantian.new_town",
+      "status": "active"
+    }
+  ]
+}
