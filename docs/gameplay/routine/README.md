@@ -137,6 +137,7 @@ operation 和唯一约束；图鉴五条首见、首次派遣及试炼塔十层�
 `佩戴称号 <序号>` 与功业录展示顺序。道号字段 `key`/`label`/`source_event`/`hint`/`status`，
 道契字段 `key`/`label`/`duration_days`/`price`/`daily_reward`/`activation_reward`/
 `reputation_every_days`/`reputation_reward`/`status`。完整合同见[v0.9 内容基线](content-v0.9.md)。
+七日入道合同见[v1.0 内容基线](content-v1.0.md)。
 
 - `功业录` 对未获得的道号显示 `hint`（来源提示），已获得/已佩戴行不变；
   `data.titles` 附带 `hint` 字段。

@@ -259,3 +259,77 @@ def test_closed_dao_contract_refuses_activation(
             await runtime.close()
 
     asyncio.run(run())
+
+
+def test_seven_day_goal_content_matches_the_shipped_table() -> None:
+    from nonebot_plugin_xiuxian_3.xiuxian.routine.routine_content import (
+        seven_day_goal_definitions,
+    )
+    from nonebot_plugin_xiuxian_3.xiuxian.routine.rules import SEVEN_DAY_GOALS
+
+    bundle = ContentBundle.load(Path(__file__).parents[1] / "data")
+    goals = seven_day_goal_definitions(bundle)
+    assert goals == SEVEN_DAY_GOALS
+    assert [goal.day_number for goal in goals] == [1, 2, 3, 4, 5, 6, 7]
+    assert [goal.key for goal in goals] == [
+        "quest.seven_day.day1_checkin",
+        "quest.seven_day.day2_gather",
+        "quest.seven_day.day3_production_preview",
+        "quest.seven_day.day4_bounty",
+        "quest.seven_day.day5_tower",
+        "quest.seven_day.day6_dispatch",
+        "quest.seven_day.day7_path",
+    ]
+    assert goals[0].reward == (("item.food.coarse_spirit_rice", 1),)
+    assert goals[0].event_key == "routine.checkin.daily"
+    assert goals[3].reward == (("local_reputation", 2),)
+    assert goals[3].local_reputation_key == "local.xuantian.new_town"
+    assert goals[6].reward == (
+        ("local_reputation", 5),
+        ("item.ticket.fate_basic", 2),
+    )
+    assert all(goal.hint and not goal.closed for goal in goals)
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"day_number": 8},
+        {"day_number": 2},
+        {"key": "quest.bad"},
+        {"hint": ""},
+        {"event_key": ""},
+        {"reward": {"spirit_stones": 0}},
+        {"status": "paused"},
+        {"local_reputation_key": None, "reward": {"local_reputation": 2}},
+        {"unexpected": 1},
+    ],
+)
+def test_seven_day_goal_content_rejects_invalid_records(changes: dict) -> None:
+    from nonebot_plugin_xiuxian_3.xiuxian.routine.routine_content import (
+        seven_day_goal_definitions,
+    )
+
+    content = _replace_record(
+        bundled_content(), "seven_day_goal", "quest.seven_day.day1_checkin", **changes
+    )
+    with pytest.raises(ContentError):
+        seven_day_goal_definitions(content)
+
+
+def test_seven_day_status_shows_each_pending_hint() -> None:
+    async def run() -> None:
+        clock = MutableClock(datetime(2026, 9, 22, tzinfo=timezone.utc))
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir, clock=clock)
+            user = "routine-seven-day-hint"
+            await _enter_mortal(runtime, user)
+            status = await runtime.dispatch(_context(user, "seven-day"), "七日入道")
+            goals = status.data["goals"]
+            assert [goal["day"] for goal in goals] == [1, 2, 3, 4, 5, 6, 7]
+            assert goals[0]["hint"] == "发送 `道历问安` 完成当日问安"
+            assert "发送 `道历问安` 完成当日问安" in status.message
+            assert goals[6]["hint"] == "完成入道并选择一条道途"
+            await runtime.close()
+
+    asyncio.run(run())
