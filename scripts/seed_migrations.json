@@ -175,5 +175,12 @@
     },
     "new_sha256": "bb71dd2f6f3011a0cff66ee928f518c1aafd6036709d0d11e3282aa0d681ce50",
     "new_commit": "2ea700721f9772dd0c8adfd13b67db0140a61805"
+  },
+  "图鉴/里程碑.json": {
+    "old_sha256": {
+      "4600f72d3197621a7cecbd8e913e297b40535272568b2697532b8103d1ad7db2": "1fa98bcbd5c4234e4d11dd2c927be84fde9fe43f:data/图鉴/里程碑.json"
+    },
+    "new_sha256": "f8e21cdf6e33331a984a2d3e93fc6631c87181487911e3b18aeb930414ec58fb",
+    "new_commit": "PENDING"
   }
 }

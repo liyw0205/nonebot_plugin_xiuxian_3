@@ -67,3 +67,12 @@
 图鉴只记修士亲历的见闻；斗法中对手的名号会隐去身份，未曾经历的故事不会展露。
 
 验收：同一来源重放不双建条目且不补写历史漏记；伪造前端条目拒绝；隐藏内容不泄漏；集合奖励唯一且不含战斗/修为收益；保持引用闭合的内容调整不改历史首见；机缘结算故障不留下扣费、所得或图鉴；管理员修复只追加审计说明。
+
+## 里程碑扩展（v0.8）
+
+`data/图鉴/里程碑.json` 由 6 条扩到 12 条，新增 6 条复用既有图鉴条目、只用既有地方名望奖励：
+`codex.challenge.trials_3`、`codex.story.threads_3`、`codex.route.three_roads`、
+`codex.service.town_three`、`codex.place.xuantian_five`、`codex.challenge.domain_3`。
+条目字段仍为 `key`/`name`/`desc`/`entry_keys`/`reward`/`unlocks`/`status`，`entry_keys` 是显式清单；
+`图鉴` 按文件顺序展示 12 条，`领取图鉴里程碑 <序号>` 的未完成/领取/回放/唯一约束语义不变。
+既有 6 条顺序与数值不变，新条目追加在末尾。

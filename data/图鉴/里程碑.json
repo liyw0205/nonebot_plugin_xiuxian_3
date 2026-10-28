@@ -113,6 +113,116 @@
         "display.domain_observatory"
       ],
       "status": "active"
+    },
+    {
+      "key": "codex.challenge.trials_3",
+      "name": "初试三境",
+      "desc": "收录雾隐洞天、云舟渡口与远古洞天三则秘境见闻后领取。",
+      "entry_keys": [
+        "codex.instance.mist_grotto",
+        "codex.instance.cloud_boat",
+        "codex.domain.ancient_domain"
+      ],
+      "reward": {
+        "type": "local_reputation",
+        "reputation_key": "local.xuantian.new_town",
+        "name": "青石镇名望",
+        "amount": 6
+      },
+      "unlocks": [],
+      "status": "active"
+    },
+    {
+      "key": "codex.story.threads_3",
+      "name": "三卷纪事",
+      "desc": "收录道统服务缘起、玄天商路与飞升结局三则纪事后领取。",
+      "entry_keys": [
+        "codex.story.dao_service_origin",
+        "codex.story.xuantian.road.merchant",
+        "codex.ending.public_ascend"
+      ],
+      "reward": {
+        "type": "local_reputation",
+        "reputation_key": "local.xuantian.new_town",
+        "name": "青石镇名望",
+        "amount": 5
+      },
+      "unlocks": [],
+      "status": "active"
+    },
+    {
+      "key": "codex.route.three_roads",
+      "name": "三路通览",
+      "desc": "收录城镇道路、界壁通路与虚空遗迹路段三则路线见闻后领取。",
+      "entry_keys": [
+        "codex.route.town_road",
+        "codex.route.boundary",
+        "codex.void.route_ruins"
+      ],
+      "reward": {
+        "type": "local_reputation",
+        "reputation_key": "local.xuantian.new_town",
+        "name": "青石镇名望",
+        "amount": 4
+      },
+      "unlocks": [],
+      "status": "active"
+    },
+    {
+      "key": "codex.service.town_three",
+      "name": "道统三事",
+      "desc": "收录道统服务缘起、公共建设与结算三则见闻后领取。",
+      "entry_keys": [
+        "codex.dao.service_origin",
+        "codex.dao.service_public_works",
+        "codex.dao.service_settlement"
+      ],
+      "reward": {
+        "type": "local_reputation",
+        "reputation_key": "local.xuantian.new_town",
+        "name": "青石镇名望",
+        "amount": 3
+      },
+      "unlocks": [],
+      "status": "active"
+    },
+    {
+      "key": "codex.place.xuantian_five",
+      "name": "玄天五地",
+      "desc": "收录青石镇、近郊、灵田、领域前线与云城五则地点见闻后领取。",
+      "entry_keys": [
+        "codex.place.new_town",
+        "codex.place.outskirts",
+        "codex.place.spirit_field",
+        "codex.place.domain_front",
+        "codex.place.cloud_city"
+      ],
+      "reward": {
+        "type": "local_reputation",
+        "reputation_key": "local.xuantian.cloud_city",
+        "name": "云城名望",
+        "amount": 5
+      },
+      "unlocks": [],
+      "status": "active"
+    },
+    {
+      "key": "codex.challenge.domain_3",
+      "name": "领域三录",
+      "desc": "收录远古洞天、山体道途与领域深层三则挑战见闻后领取。",
+      "entry_keys": [
+        "codex.domain.ancient_domain",
+        "codex.domain.mountain_body",
+        "codex.instance.mist_grotto"
+      ],
+      "reward": {
+        "type": "local_reputation",
+        "reputation_key": "local.xuantian.new_town",
+        "name": "青石镇名望",
+        "amount": 4
+      },
+      "unlocks": [],
+      "status": "active"
     }
   ]
 }
