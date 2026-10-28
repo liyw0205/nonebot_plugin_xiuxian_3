@@ -130,5 +130,21 @@ operation 和唯一约束；图鉴五条首见、首次派遣及试炼塔十层�
   奖励走共享资产事务。
 - 奖励展示名、名望上限与归属都由同一份内容决定；关闭条目只阻止新领取，不回收已发放奖励。
 
+## 道号与道契内容合同
+
+道号唯一来源为 `data/道历/道号.json`（kind `honor_title`，17 条），道契唯一来源为
+`data/道历/道契.json`（kind `dao_contract`，3 条）；两份文件的顺序就是
+`佩戴称号 <序号>` 与功业录展示顺序。道号字段 `key`/`label`/`source_event`/`hint`/`status`，
+道契字段 `key`/`label`/`duration_days`/`price`/`daily_reward`/`activation_reward`/
+`reputation_every_days`/`reputation_reward`/`status`。完整合同见[v0.9 内容基线](content-v0.9.md)。
+
+- `功业录` 对未获得的道号显示 `hint`（来源提示），已获得/已佩戴行不变；
+  `data.titles` 附带 `hint` 字段。
+- 道号 `source_event` 可为空（行卷道号由行卷奖励直接写入），其余道号按既有来源投影自动授予。
+- `closed` 道号保留序号占位、不再自动授予，已获得仍可佩戴；`closed` 道契不可新激活
+  （`CONTENT_CLOSED`，凭证不消耗），已激活权益的领取不受影响；`locked`/`planned` 只登记不入表。
+- 道契价格/时长/每日与激活奖励/名望周期与旧硬编码表逐字段一致；激活仍校验签名凭证金额，
+  领取仍按业务日、operation 回放与唯一约束结算。
+
 `WayfaringPass`：角色、行卷键、起止业务日、状态、规则快照、积分、日周计入量和两条奖励线的已领取等级。
 规则快照包含来源、奖励、展示名及地方名望上限，不保存内容或规则版本标识。
