@@ -230,40 +230,6 @@ DAO_CONTRACTS: tuple[DaoContractDefinition, ...] = (
 )
 
 
-ACHIEVEMENTS: tuple[AchievementDefinition, ...] = (
-    AchievementDefinition(
-        "achievement.first_checkin",
-        "首次道历问安",
-        "routine.checkin.daily",
-        (("local_reputation", 3),),
-        local_reputation_key=ROUTINE_LOCAL_REPUTATION_KEY,
-    ),
-    AchievementDefinition(
-        "achievement.first_craft",
-        "首次完成生产",
-        "production.complete",
-        (("service_reputation", 2),),
-    ),
-    AchievementDefinition(
-        "achievement.first_dispatch",
-        "首次完成派遣",
-        "specials.dispatch.settled",
-        (("title_key", "title.dispatch_helper"),),
-    ),
-    AchievementDefinition(
-        "achievement.codex_5",
-        "收录五条图鉴",
-        "specials.codex.count.5",
-        (("local_reputation", 5),),
-        local_reputation_key=ROUTINE_LOCAL_REPUTATION_KEY,
-    ),
-    AchievementDefinition(
-        "achievement.tower_10",
-        "试炼塔十层",
-        "specials.tower.floor.10",
-        (("title_key", "title.first_tower_clear"),),
-    ),
-)
 
 
 _REDEMPTION_FORBIDDEN_KEYS = frozenset(
@@ -395,6 +361,17 @@ def honor_title(key: str) -> HonorTitleDefinition:
     raise ValueError(f"unsupported honor title: {key}")
 
 
+def _content_achievements() -> tuple[AchievementDefinition, ...]:
+    """Derive the achievement table from the shipped content package."""
+
+    from .achievement_content import achievement_definitions
+
+    return achievement_definitions()
+
+
+ACHIEVEMENTS: tuple[AchievementDefinition, ...] = _content_achievements()
+
+
 def dao_contract(key: str) -> DaoContractDefinition:
     for definition in DAO_CONTRACTS:
         if definition.key == key:
@@ -402,8 +379,14 @@ def dao_contract(key: str) -> DaoContractDefinition:
     raise ValueError(f"unsupported dao contract: {key}")
 
 
-def achievement(key: str) -> AchievementDefinition:
-    for definition in ACHIEVEMENTS:
+def achievement(key: str, content: ContentBundle | None = None) -> AchievementDefinition:
+    if content is None:
+        definitions = ACHIEVEMENTS
+    else:
+        from .achievement_content import achievement_definitions
+
+        definitions = achievement_definitions(content)
+    for definition in definitions:
         if definition.key == key:
             return definition
     raise ValueError(f"unsupported achievement: {key}")
