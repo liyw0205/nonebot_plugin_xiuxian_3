@@ -1,0 +1,51 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "achievement",
+  "records": [
+    {
+      "key": "achievement.first_checkin",
+      "label": "首次道历问安",
+      "source_event": "routine.checkin.daily",
+      "reward": {"local_reputation": 3},
+      "local_reputation_key": "local.xuantian.new_town",
+      "status": "active"
+    },
+    {
+      "key": "achievement.first_craft",
+      "label": "首次完成生产",
+      "source_event": "production.complete",
+      "reward": {"service_reputation": 2},
+      "status": "active"
+    },
+    {
+      "key": "achievement.first_dispatch",
+      "label": "首次完成派遣",
+      "source_event": "specials.dispatch.settled",
+      "reward": {"title_key": "title.dispatch_helper"},
+      "status": "active"
+    },
+    {
+      "key": "achievement.codex_5",
+      "label": "收录五条图鉴",
+      "source_event": "specials.codex.count.5",
+      "reward": {"local_reputation": 5},
+      "local_reputation_key": "local.xuantian.new_town",
+      "status": "active"
+    },
+    {
+      "key": "achievement.tower_10",
+      "label": "试炼塔十层",
+      "source_event": "specials.tower.floor.10",
+      "reward": {"title_key": "title.first_tower_clear"},
+      "status": "active"
+    },
+    {
+      "key": "achievement.three_day_checkin",
+      "label": "三日不辍",
+      "source_event": "routine.checkin.daily:3",
+      "reward": {"local_reputation": 5},
+      "local_reputation_key": "local.xuantian.new_town",
+      "status": "active"
+    }
+  ]
+}
