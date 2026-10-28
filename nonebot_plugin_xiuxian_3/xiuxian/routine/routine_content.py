@@ -7,7 +7,11 @@ from typing import TYPE_CHECKING, Any
 from ..content import ContentBundle, ContentError, bundled_content
 
 if TYPE_CHECKING:  # pragma: no cover - typing only, avoids an import cycle
-    from .rules import DaoContractDefinition, HonorTitleDefinition
+    from .rules import (
+        DaoContractDefinition,
+        HonorTitleDefinition,
+        SevenDayGoalDefinition,
+    )
 
 _CLAIMABLE_STATUSES = frozenset({"active", "open"})
 _CLOSED_STATUSES = frozenset({"closed"})
@@ -28,6 +32,21 @@ _CONTRACT_FIELDS = frozenset(
 )
 _CONTRACT_OPTIONAL_FIELDS = frozenset(
     {"activation_reward", "reputation_every_days", "reputation_reward"}
+)
+_SEVEN_DAY_FIELDS = frozenset(
+    {
+        "day_number",
+        "key",
+        "label",
+        "hint",
+        "event_key",
+        "reward",
+        "local_reputation_key",
+        "status",
+    }
+)
+_SEVEN_DAY_REQUIRED_FIELDS = frozenset(
+    {"day_number", "key", "label", "hint", "event_key", "reward", "status"}
 )
 
 
@@ -132,6 +151,70 @@ def dao_contract_definitions(
             )
         )
     return tuple(definitions)
+
+
+def seven_day_goal_definitions(
+    content: ContentBundle | None = None,
+) -> tuple["SevenDayGoalDefinition", ...]:
+    """Return every listed seven-day goal ordered by day number."""
+
+    from .rules import SevenDayGoalDefinition
+    from ..rewards.rules import local_reputation_maximum
+
+    bundle = content or bundled_content()
+    rows, statuses = _listed_rows(bundle, "seven_day_goal", "seven day goal")
+    definitions: list[SevenDayGoalDefinition] = []
+    seen_days: set[int] = set()
+    seen_keys: set[str] = set()
+    for row, closed in zip(rows, statuses):
+        fields = set(row)
+        if not fields >= _SEVEN_DAY_REQUIRED_FIELDS or fields - _SEVEN_DAY_FIELDS:
+            raise ContentError("seven day goal fields are invalid")
+        day_number = row.get("day_number")
+        if isinstance(day_number, bool) or not isinstance(day_number, int) or day_number < 1:
+            raise ContentError(f"seven day goal day number is invalid: {day_number!r}")
+        key = _text(row.get("key"), "key")
+        if not key.startswith("quest.seven_day."):
+            raise ContentError(f"seven day goal key is invalid: {key}")
+        label = _text(row.get("label"), f"label {key}")
+        hint = _text(row.get("hint"), f"hint {key}")
+        event_key = _text(row.get("event_key"), f"event key {key}")
+        reward = _reward(row.get("reward"), f"reward {key}")
+        reputation_key = row.get("local_reputation_key")
+        if "local_reputation" in dict(reward):
+            if not isinstance(reputation_key, str) or not reputation_key.startswith("local."):
+                raise ContentError(f"seven day goal {key} requires a local reputation key")
+            try:
+                local_reputation_maximum(reputation_key, bundle)
+            except TypeError as exc:
+                raise ContentError(
+                    f"seven day goal {key} local reputation content is invalid"
+                ) from exc
+        elif reputation_key is not None:
+            raise ContentError(
+                f"seven day goal {key} declares a reputation key without a local reward"
+            )
+        if day_number in seen_days:
+            raise ContentError(f"duplicate seven day goal day: {day_number}")
+        if key in seen_keys:
+            raise ContentError(f"duplicate seven day goal: {key}")
+        seen_days.add(day_number)
+        seen_keys.add(key)
+        definitions.append(
+            SevenDayGoalDefinition(
+                day_number=day_number,
+                key=key,
+                label=label,
+                reward=reward,
+                event_key=event_key,
+                closed=closed,
+                local_reputation_key=reputation_key,
+                hint=hint,
+            )
+        )
+    if sorted(seen_days) != list(range(1, len(seen_days) + 1)):
+        raise ContentError("seven day goal days must be contiguous from 1")
+    return tuple(sorted(definitions, key=lambda definition: definition.day_number))
 
 
 def _listed_rows(
