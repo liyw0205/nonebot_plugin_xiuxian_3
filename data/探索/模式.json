@@ -429,6 +429,50 @@
       "enemy_pool_key": "encounter.void.time_garden",
       "access_any": [],
       "status": "open"
+    },
+    {
+      "key": "explore.ancient_domain",
+      "name": "远古洞天探索",
+      "desc": "在洞天残存的灵力与古老禁制之间搜寻领域残片与神魂结晶，偶尔惊动守禁的古老灵卫。",
+      "aliases": [
+        "远古洞天探索",
+        "洞天寻遗"
+      ],
+      "location_key": "cave.ancient_domain",
+      "required_realm": "soul_transformation",
+      "required_layer": 1,
+      "duration_seconds": 1200,
+      "stamina_cost": 18,
+      "energy_cost": 2,
+      "daily_limit": 2,
+      "random_pool": "loot.ancient_domain",
+      "reward_pool_key": "reward_pool.exploration.ancient_domain",
+      "battle_chance_bp": 6000,
+      "enemy_pool_key": "encounter.cave.ancient_domain",
+      "access_any": [],
+      "status": "open"
+    },
+    {
+      "key": "explore.abyss_depths",
+      "name": "魔渊深层探索",
+      "desc": "深入魔渊罕有人至的层界，采得凝实魔核与契约线索，也要提防潜伏于魔气中的怨影。",
+      "aliases": [
+        "魔渊深层探索",
+        "深层魔渊"
+      ],
+      "location_key": "demon.abyss_depths",
+      "required_realm": "soul_transformation",
+      "required_layer": 1,
+      "duration_seconds": 1500,
+      "stamina_cost": 22,
+      "energy_cost": 3,
+      "daily_limit": 2,
+      "random_pool": "loot.abyss_depths",
+      "reward_pool_key": "reward_pool.exploration.abyss_depths",
+      "battle_chance_bp": 7500,
+      "enemy_pool_key": "encounter.demon.abyss_depths",
+      "access_any": [],
+      "status": "open"
     }
   ]
 }

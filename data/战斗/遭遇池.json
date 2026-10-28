@@ -16,6 +16,8 @@
     {"key": "encounter.void.archive_ruins", "name": "档案遗迹遭遇", "desc": "档案遗迹中守护旧律的残影。", "status": "active", "candidates": [{"enemy_key": "enemy.void_ruins_sentinel", "weight": 65}, {"enemy_key": "enemy.archive_keeper", "weight": 35}]},
     {"key": "encounter.dao.origin_gate", "name": "道源门试炼遭遇", "desc": "道源门前检验道心的镇关人。", "status": "active", "candidates": [{"enemy_key": "enemy.dao_gatekeeper", "weight": 100}]},
     {"key": "encounter.tribulation.sky_terrace", "name": "天劫回音遭遇", "desc": "渡劫台上凝成的天劫回音。", "status": "active", "candidates": [{"enemy_key": "enemy.tribulation_heaven", "weight": 100}]},
-    {"key": "encounter.void.time_garden", "name": "时序福地遭遇", "desc": "时序福地中徘徊的时光残影与守园人。", "status": "active", "candidates": [{"enemy_key": "enemy.time_garden_echo", "weight": 60}, {"enemy_key": "enemy.time_garden_keeper", "weight": 40}]}
+    {"key": "encounter.void.time_garden", "name": "时序福地遭遇", "desc": "时序福地中徘徊的时光残影与守园人。", "status": "active", "candidates": [{"enemy_key": "enemy.time_garden_echo", "weight": 60}, {"enemy_key": "enemy.time_garden_keeper", "weight": 40}]},
+    {"key": "encounter.cave.ancient_domain", "name": "远古洞天遭遇", "desc": "洞天禁制间游走的守禁灵卫与旧日残影。", "status": "active", "candidates": [{"enemy_key": "enemy.ancient_domain_warden", "weight": 60}, {"enemy_key": "enemy.ancient_domain_echo", "weight": 40}]},
+    {"key": "encounter.demon.abyss_depths", "name": "魔渊深层遭遇", "desc": "深层魔气中潜伏的猎手与散不去的怨影。", "status": "active", "candidates": [{"enemy_key": "enemy.abyss_depth_stalker", "weight": 55}, {"enemy_key": "enemy.abyss_pollution_wraith", "weight": 45}]}
   ]
 }

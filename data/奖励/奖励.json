@@ -1627,6 +1627,70 @@
       ],
       "key": "reward_pool.enemy.dao_origin",
       "status": "active"
+    },
+    {
+      "key": "reward_pool.exploration.ancient_domain",
+      "name": "远古洞天探索所得",
+      "desc": "洞天深处可得领域核心碎片与神魂结晶，偶有灵石散落。",
+      "pool_type": "weighted",
+      "item_weight_bonus": true,
+      "outcomes": [
+        {
+          "weight": 40,
+          "rewards": {
+            "item.domain_core_fragment": 1
+          }
+        },
+        {
+          "weight": 25,
+          "rewards": {
+            "item.soul_crystal": 1
+          }
+        },
+        {
+          "weight": 20,
+          "rewards": {
+            "spirit_stones": 150
+          }
+        },
+        {
+          "weight": 15,
+          "no_reward": true
+        }
+      ],
+      "status": "active"
+    },
+    {
+      "key": "reward_pool.exploration.abyss_depths",
+      "name": "魔渊深层探索所得",
+      "desc": "深处采得凝实魔核与契约线索，也为魔界声望记下一笔。",
+      "pool_type": "weighted",
+      "item_weight_bonus": true,
+      "outcomes": [
+        {
+          "weight": 40,
+          "rewards": {
+            "item.demon_core": 1
+          }
+        },
+        {
+          "weight": 25,
+          "rewards": {
+            "faction_reputation.demon": 20
+          }
+        },
+        {
+          "weight": 20,
+          "rewards": {
+            "item.clue.demon_contract": 1
+          }
+        },
+        {
+          "weight": 15,
+          "no_reward": true
+        }
+      ],
+      "status": "active"
     }
   ],
   "schema": "xiuxian.content"
