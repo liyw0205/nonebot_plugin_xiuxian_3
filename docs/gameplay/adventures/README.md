@@ -111,3 +111,12 @@ v0.6 `story.mainline.dao_echoes` 已开放玩家流程：炼虚 L10 后可查询
 - 秘境使用探索和战斗的资源锁，失败不重抽入口池；首通奖励唯一，重复挑战只给练习收益。
 - 斗法留影可公开脱敏战报、个人日志和失败原因；不暴露对手平台 ID、私密故事旗标或完整背包。
 - 主线关卡推进剧情旗标和地点/服务资格，不直接改变道途或飞升结局；高阶主线必须满足十层门槛。
+
+## 终端地点悬赏（v0.1）
+
+魔渊深层与远古洞天开放后，悬赏池新增 4 条化神悬赏，全部复用既有
+`reward_pool.bounty.*` 奖池与既有名望键，不引入新物品或新字段：
+`bounty.abyss_core`（`item.demon_core`×3）、`bounty.abyss_clue`（`item.clue.demon_contract`×1）、
+`bounty.domain_soul`（`item.soul_crystal`×2）、`bounty.domain_fragment_raid`
+（`item.domain_core_fragment`×4）。悬赏记录本身不含 `location_key`：榜单按既有境界与目标过滤，
+接取/结算/放弃沿用既有事务与 operation 回放，`daily_limit` 与 `consume_target` 语义不变。
