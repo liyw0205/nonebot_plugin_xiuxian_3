@@ -31,3 +31,14 @@
 
 角色属性来自 `foundation/stats/`，物品来自 `foundation/items/`。战斗不接受客户端伤害值、
 行动选择或结算结果；服务端根据开始时快照和自动行动策略生成完整回放。
+
+## 渡劫试炼内容合同（v0.1）
+
+渡劫试炼的敌方尺度与阶段表唯一来源为 `data/战斗/渡劫.json`（kind `tribulation_trial`，
+`trial.tribulation.heaven`）：`enemy` 提供 `max_hp`/`attack`/`initiative`/`agility`，
+`phases` 提供 `key`/`min_hp_bp`/`attack`/`skill_key`/`enemy_hit_bonus_bp`/`player_damage_bp`。
+`combat/tribulation_content.py` 校验：数值为正、阶段按 `min_hp_bp` 严格递减且末段为 0、
+阶段技能必须是已登记 `owner_type=enemy` 技能、`player_damage_bp` ∈ (0,10000]、空表与重复阶段键拒绝。
+`tribulation_rules.py` 由内容派生 `ENEMY_KEY`/`ENEMY_MAX_HP`/`ENEMY_ATTACK`/`ENEMY_INITIATIVE`/
+`ENEMY_AGILITY`/`PHASES` 并保留同名导出；`phase_for_hp()` 仍按 `hp/max_hp` 的万分之一比较，
+`stat_snapshot()` 与战斗会话快照语义不变。本版数值与旧硬编码表逐字段一致。
