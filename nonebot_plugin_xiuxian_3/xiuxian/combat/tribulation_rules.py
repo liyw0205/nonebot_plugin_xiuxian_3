@@ -21,6 +21,7 @@ ENEMY_AGILITY = int(_TRIAL["enemy"]["agility"])
 @dataclass(frozen=True, slots=True)
 class TribulationPhase:
     key: str
+    label: str
     min_hp_bp: int
     attack: int
     skill_key: str

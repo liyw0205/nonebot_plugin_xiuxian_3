@@ -38,11 +38,12 @@ def tribulation_trial(content: ContentBundle | None = None) -> dict[str, Any]:
         if not isinstance(phase, dict):
             raise ContentError("tribulation trial phase is invalid")
         if set(phase) != {
-            "key", "min_hp_bp", "attack", "skill_key",
+            "key", "label", "min_hp_bp", "attack", "skill_key",
             "enemy_hit_bonus_bp", "player_damage_bp",
         }:
             raise ContentError("tribulation trial phase fields are invalid")
         key = _text(phase["key"], "phase key")
+        label = _text(phase["label"], f"phase {key} label")
         if key in seen:
             raise ContentError(f"duplicate tribulation phase: {key}")
         seen.add(key)
@@ -57,7 +58,7 @@ def tribulation_trial(content: ContentBundle | None = None) -> dict[str, Any]:
         if damage <= 0:
             raise ContentError(f"phase {key} damage bp must be positive")
         parsed.append({
-            "key": key, "min_hp_bp": bp, "attack": attack, "skill_key": skill,
+            "key": key, "label": label, "min_hp_bp": bp, "attack": attack, "skill_key": skill,
             "enemy_hit_bonus_bp": hit, "player_damage_bp": damage,
         })
     if [item["min_hp_bp"] for item in parsed] != sorted(
@@ -81,6 +82,7 @@ def tribulation_phases(content: ContentBundle | None = None) -> tuple["Tribulati
     return tuple(
         TribulationPhase(
             key=item["key"],
+            label=item["label"],
             min_hp_bp=item["min_hp_bp"],
             attack=item["attack"],
             skill_key=item["skill_key"],

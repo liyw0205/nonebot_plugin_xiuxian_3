@@ -19,7 +19,8 @@
           "attack": 5500,
           "skill_key": "skill.tribulation.thunder",
           "enemy_hit_bonus_bp": 0,
-          "player_damage_bp": 10000
+          "player_damage_bp": 10000,
+          "label": "雷劫"
         },
         {
           "key": "heart",
@@ -27,7 +28,8 @@
           "attack": 8000,
           "skill_key": "skill.tribulation.heart",
           "enemy_hit_bonus_bp": 200,
-          "player_damage_bp": 9500
+          "player_damage_bp": 9500,
+          "label": "心魔"
         },
         {
           "key": "dao",
@@ -35,7 +37,8 @@
           "attack": 12000,
           "skill_key": "skill.tribulation.dao",
           "enemy_hit_bonus_bp": 400,
-          "player_damage_bp": 9000
+          "player_damage_bp": 9000,
+          "label": "道劫"
         }
       ],
       "status": "active"

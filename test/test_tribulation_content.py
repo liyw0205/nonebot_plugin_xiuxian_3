@@ -57,6 +57,11 @@ def test_trial_content_matches_the_shipped_scale() -> None:
         ("heart", 3334, 8000, 200, 9500),
         ("dao", 0, 12000, 400, 9000),
     ]
+    assert [(p.key, p.label) for p in PHASES] == [
+        ("thunder", "雷劫"),
+        ("heart", "心魔"),
+        ("dao", "道劫"),
+    ]
     assert [p.skill_key for p in PHASES] == [
         "skill.tribulation.thunder",
         "skill.tribulation.heart",
@@ -87,6 +92,7 @@ def test_phase_for_hp_boundaries(hp: int, expected: str) -> None:
         {"phases": []},
         {"phases": [{"key": "a", "min_hp_bp": 0, "attack": 1, "skill_key": "skill.tribulation.dao", "enemy_hit_bonus_bp": 0, "player_damage_bp": 9000}] * 2},
         {"status": "closed"},
+        {"phases": [{"key": "a", "label": "", "min_hp_bp": 0, "attack": 1, "skill_key": "skill.tribulation.dao", "enemy_hit_bonus_bp": 0, "player_damage_bp": 9000}]},
         {"enemy_key": ""},
     ],
 )
