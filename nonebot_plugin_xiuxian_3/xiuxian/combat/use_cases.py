@@ -22,6 +22,15 @@ from ..utils.text import escape_markdown
 from .repository import CombatRepositoryMixin
 
 
+def _phase_label(phase_key: str) -> str:
+    from .tribulation_rules import PHASES
+
+    for phase in PHASES:
+        if phase.key == phase_key:
+            return phase.label
+    return phase_key
+
+
 class CombatApplication:
     """Start and present server-driven combat without accepting client actions."""
 
@@ -246,7 +255,7 @@ class CombatApplication:
             actor = "你" if action["actor_key"] == "player" else enemy_label
             target = enemy_label if action["target_key"] == "enemy" else "你"
             phase = action.get("state", {}).get("tribulation_phase")
-            phase_text = f"（{phase}阶段）" if phase else ""
+            phase_text = f"（{_phase_label(phase)}阶段）" if phase else ""
             lines.append(
                 f"- 回合 {action['round_no']}：{actor}{phase_text} 使用 `{action['skill_key']}` 攻击 {target}，伤害 {action['damage']}。"
             )

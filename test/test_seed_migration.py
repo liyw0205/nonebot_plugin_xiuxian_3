@@ -469,6 +469,7 @@ def old_official_manifest() -> bytes:
             "道历/道号.json",
             "道历/道契.json",
             "道历/七日目标.json",
+            "战斗/渡劫.json",
         }
     ]
     blob = (json.dumps(document, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
@@ -498,6 +499,7 @@ def test_manifest_seed_migrates_when_the_trade_file_is_registered(host: Path) ->
     (host / "data" / "道历/道号.json").unlink()
     (host / "data" / "道历/道契.json").unlink()
     (host / "data" / "道历/七日目标.json").unlink()
+    (host / "data" / "战斗/渡劫.json").unlink()
     result = deploy(host)
     assert result.returncode == 0, result.stdout + result.stderr
     assert "matchers=1 handlers=1" in result.stdout

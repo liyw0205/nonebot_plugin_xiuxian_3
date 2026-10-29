@@ -7,17 +7,21 @@ from dataclasses import dataclass
 from typing import Mapping
 
 
-PROFILE_KEY = "battle_profile.tribulation_trial"
-ENEMY_KEY = "enemy.tribulation_heaven"
-ENEMY_MAX_HP = 150_000
-ENEMY_ATTACK = 5_500
-ENEMY_INITIATIVE = 1_600
-ENEMY_AGILITY = 650
+from .tribulation_content import tribulation_phases, tribulation_trial
+
+_TRIAL = tribulation_trial()
+PROFILE_KEY = str(_TRIAL["battle_profile_key"])
+ENEMY_KEY = str(_TRIAL["enemy_key"])
+ENEMY_MAX_HP = int(_TRIAL["enemy"]["max_hp"])
+ENEMY_ATTACK = int(_TRIAL["enemy"]["attack"])
+ENEMY_INITIATIVE = int(_TRIAL["enemy"]["initiative"])
+ENEMY_AGILITY = int(_TRIAL["enemy"]["agility"])
 
 
 @dataclass(frozen=True, slots=True)
 class TribulationPhase:
     key: str
+    label: str
     min_hp_bp: int
     attack: int
     skill_key: str
@@ -25,11 +29,7 @@ class TribulationPhase:
     player_damage_bp: int
 
 
-PHASES = (
-    TribulationPhase("thunder", 6_667, 5_500, "skill.tribulation.thunder", 0, 10_000),
-    TribulationPhase("heart", 3_334, 8_000, "skill.tribulation.heart", 200, 9_500),
-    TribulationPhase("dao", 0, 12_000, "skill.tribulation.dao", 400, 9_000),
-)
+PHASES: tuple[TribulationPhase, ...] = tribulation_phases()
 
 
 def phase_for_hp(enemy_hp: int, enemy_max_hp: int = ENEMY_MAX_HP) -> TribulationPhase:

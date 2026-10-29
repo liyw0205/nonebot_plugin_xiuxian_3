@@ -472,6 +472,14 @@ head `6dcd8f3`）成功。未跑全量/压测/部署，未验 QQ 真机。
 3 passed（旧宿主升级、幂等、自定义种子保留）。develop CI（Quality and Release `40708847422`，
 head `66d34f6`）成功。未跑全量/压测/部署，未验 QQ 真机。
 
+渡劫试炼内容化（v0.1）已在 `develop` 完成：`combat/tribulation_rules.py` 的敌方尺度
+（`max_hp=150000`/`attack=5500`/`initiative=1600`/`agility=650`）与三阶段表迁到
+`data/战斗/渡劫.json`（kind `tribulation_trial`），由新增 `combat/tribulation_content.py` 校验
+数值、阶段递减与末段 0bp、敌方技能归属、伤害区间、重复阶段键与空表；`rules` 保留同名导出，
+`phase_for_hp()` 的万分之一比较与 `stat_snapshot()`/战斗快照语义不变，数值逐字段一致。
+聚焦证据：`test_tribulation_content.py` 14 passed（数值与阶段逐字段一致、`phase_for_hp`
+六档边界、六类坏记录与末段非 0 拒绝）。未跑全量/压测/部署，未验 QQ 真机。
+
 图鉴里程碑扩展（v0.8）已在 `develop` 完成：`data/图鉴/里程碑.json` 由 6 条扩到 12 条，
 新增 6 条只复用既有图鉴条目（显式 `entry_keys`）与既有地方名望奖励，覆盖此前零里程碑的
 challenge/story/route/service 分类；既有 6 条顺序与数值不变，`图鉴`/`领取图鉴里程碑` 的展示、
