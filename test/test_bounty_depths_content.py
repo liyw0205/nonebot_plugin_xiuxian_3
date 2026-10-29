@@ -65,3 +65,63 @@ def test_depth_bounty_content_rejects_broken_records(changes: dict) -> None:
     bundle = _replace_bounty(ContentBundle.load(DATA), KEYS[0], **changes)
     with pytest.raises((ContentError, ValueError, KeyError)):
         bounty_definitions(bundle)
+
+
+def test_depth_bounty_enters_a_daily_batch_and_can_be_accepted() -> None:
+    import asyncio
+    import shutil
+    from datetime import datetime, timedelta, timezone
+    from tempfile import TemporaryDirectory
+
+    from nonebot_plugin_xiuxian_3.contracts import CommandContext
+    from nonebot_plugin_xiuxian_3.runtime import create_runtime
+
+    label = bounty_definition("bounty.abyss_core", ContentBundle.load(DATA)).label
+
+    def ctx(user: str, name: str, operation_id: str = "") -> CommandContext:
+        return CommandContext(
+            adapter="web", user_id=user, request_id=name, operation_id=operation_id
+        )
+
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            shutil.copytree(DATA, Path(data_dir) / "data")
+            clock = datetime(2026, 9, 22, 6, tzinfo=timezone.utc)
+            runtime = create_runtime(data_dir=Path(data_dir), clock=lambda: clock)
+            user = "bounty-depth"
+            try:
+                await runtime.dispatch(ctx(user, "create"), "开始修仙")
+                await runtime.dispatch(ctx(user, "seek"), "寻仙问道")
+                import sqlite3
+
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE players SET realm_key='soul_transformation', realm_layer=4 "
+                        "WHERE platform_user_id = ?",
+                        (user,),
+                    )
+                seen: list[str] = []
+                for _ in range(90):
+                    board = await runtime.dispatch(ctx(user, "board"), "悬赏榜")
+                    labels = [item["label"] for item in board.data["offers"]]
+                    seen.append("|".join(labels))
+                    if label in labels:
+                        break
+                    clock = clock + timedelta(days=1)
+                else:
+                    raise AssertionError(
+                        "the depth bounty never entered a three-slot daily batch; "
+                        f"first batches: {seen[:5]}"
+                    )
+                accepted = await runtime.dispatch(
+                    ctx(user, "accept", "depth-accept"), f"接取悬赏 {label}"
+                )
+                assert accepted.ok, accepted
+                duplicate = await runtime.dispatch(
+                    ctx(user, "accept-2", "depth-accept-2"), f"接取悬赏 {label}"
+                )
+                assert duplicate.ok is False
+            finally:
+                await runtime.close()
+
+    asyncio.run(run())
