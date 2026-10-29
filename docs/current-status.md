@@ -472,6 +472,15 @@ head `6dcd8f3`）成功。未跑全量/压测/部署，未验 QQ 真机。
 3 passed（旧宿主升级、幂等、自定义种子保留）。develop CI（Quality and Release `40708847422`，
 head `66d34f6`）成功。未跑全量/压测/部署，未验 QQ 真机。
 
+悬赏覆盖两处终端地点（v0.1）已在 `develop` 完成：`data/任务/悬赏.json` 追加 4 条悬赏
+（`bounty.abyss_core` 魔核×3、`bounty.abyss_clue` 契约线索×1、`bounty.domain_soul` 神魂晶×2、
+`bounty.domain_fragment_raid` 领域核心碎片×4），全部化神门槛、复用既有
+`reward_pool.bounty.*` 奖池与既有名望键，不改悬赏表结构、接取/结算事务与幂等语义；
+该文件首次登记迁移规则（旧 blob 指纹 + provenance）。聚焦证据：
+`test_bounty_depths_content.py` 5 passed（4 条目标/奖池/物品可解析、4 类坏记录拒绝）。
+已知边界：`bounty_definitions` 不校验键前缀，本条未扩大共享校验范围。
+未跑全量/压测/部署，未验 QQ 真机。
+
 渡劫试炼内容化（v0.1）已在 `develop` 完成：`combat/tribulation_rules.py` 的敌方尺度
 （`max_hp=150000`/`attack=5500`/`initiative=1600`/`agility=650`）与三阶段表迁到
 `data/战斗/渡劫.json`（kind `tribulation_trial`），由新增 `combat/tribulation_content.py` 校验

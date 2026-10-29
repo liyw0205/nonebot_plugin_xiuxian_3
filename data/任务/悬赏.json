@@ -7,7 +7,9 @@
       "desc": "收集止血草，为镇中药铺补充常用药材。",
       "quality": "common",
       "status": "open",
-      "aliases": ["止血草补给"],
+      "aliases": [
+        "止血草补给"
+      ],
       "required_realm": "mortal",
       "required_layer": 0,
       "path_keys": [],
@@ -28,7 +30,9 @@
       "desc": "完成一份生产订单，协助坊市处理积压委托。",
       "quality": "common",
       "status": "open",
-      "aliases": ["生产"],
+      "aliases": [
+        "生产"
+      ],
       "required_realm": null,
       "required_layer": 0,
       "path_keys": [],
@@ -49,18 +53,44 @@
       "desc": "向云城矿务司交付云铁，补足器坊储备。",
       "quality": "uncommon",
       "status": "open",
-      "aliases": ["云铁悬赏"],
+      "aliases": [
+        "云铁悬赏"
+      ],
       "required_realm": "foundation",
       "required_layer": 4,
       "path_keys": [],
       "access_any": [
-        {"type": "subprofession", "value": "mining"},
-        {"type": "intro_flag", "value": "permit.cloud_mine"},
-        {"type": "intro_flag", "value": "cloud_mine.permit"},
-        {"type": "intro_flag", "value": "commission.cloud_mine"},
-        {"type": "inventory_item", "item_key": "item.permit.cloud_mine", "quantity": 1},
-        {"type": "inventory_item", "item_key": "item.tool.mining_pickaxe", "quantity": 1},
-        {"type": "inventory_item", "item_key": "item.tool.mining_pickaxe_t2", "quantity": 1}
+        {
+          "type": "subprofession",
+          "value": "mining"
+        },
+        {
+          "type": "intro_flag",
+          "value": "permit.cloud_mine"
+        },
+        {
+          "type": "intro_flag",
+          "value": "cloud_mine.permit"
+        },
+        {
+          "type": "intro_flag",
+          "value": "commission.cloud_mine"
+        },
+        {
+          "type": "inventory_item",
+          "item_key": "item.permit.cloud_mine",
+          "quantity": 1
+        },
+        {
+          "type": "inventory_item",
+          "item_key": "item.tool.mining_pickaxe",
+          "quantity": 1
+        },
+        {
+          "type": "inventory_item",
+          "item_key": "item.tool.mining_pickaxe_t2",
+          "quantity": 1
+        }
       ],
       "weight": 80,
       "duration_seconds": 7200,
@@ -79,7 +109,9 @@
       "desc": "进入雾隐洞天二层，击败雾隐精英。",
       "quality": "rare",
       "status": "open",
-      "aliases": ["精英悬赏"],
+      "aliases": [
+        "精英悬赏"
+      ],
       "required_realm": "golden_core",
       "required_layer": 1,
       "path_keys": [],
@@ -100,7 +132,9 @@
       "desc": "向深渊救援营交付粗糙灵米，支援前线补给。",
       "quality": "rare",
       "status": "open",
-      "aliases": ["魔界救援悬赏"],
+      "aliases": [
+        "魔界救援悬赏"
+      ],
       "required_realm": null,
       "required_layer": 0,
       "path_keys": [],
@@ -114,7 +148,9 @@
       "reputation_key": "local.xuantian.new_town",
       "required_intro_flag": "access.demon_abyss_gate",
       "consume_target": true,
-      "reward_labels": {"faction_reputation.demon": "魔界声望"}
+      "reward_labels": {
+        "faction_reputation.demon": "魔界声望"
+      }
     },
     {
       "key": "bounty.beast_habitat",
@@ -122,7 +158,9 @@
       "desc": "协助万兽山完成灵兽迁徙，维护栖地秩序。",
       "quality": "rare",
       "status": "open",
-      "aliases": ["万兽栖地"],
+      "aliases": [
+        "万兽栖地"
+      ],
       "required_realm": null,
       "required_layer": 0,
       "path_keys": [],
@@ -136,7 +174,9 @@
       "reputation_key": "local.xuantian.new_town",
       "consume_target": false,
       "required_permit": "permit.beast_trade",
-      "reward_labels": {"faction_reputation.beast": "妖界声望"}
+      "reward_labels": {
+        "faction_reputation.beast": "妖界声望"
+      }
     },
     {
       "key": "bounty.spell_trial",
@@ -147,7 +187,9 @@
       "aliases": [],
       "required_realm": "qi_sensing",
       "required_layer": 1,
-      "path_keys": ["spell"],
+      "path_keys": [
+        "spell"
+      ],
       "weight": 100,
       "duration_seconds": 3600,
       "daily_limit": 1,
@@ -165,10 +207,14 @@
       "desc": "入近郊伏妖，淬炼肉身、磨砺护体之法。",
       "quality": "uncommon",
       "status": "open",
-      "aliases": ["体修悬赏"],
+      "aliases": [
+        "体修悬赏"
+      ],
       "required_realm": "qi_sensing",
       "required_layer": 1,
-      "path_keys": ["body"],
+      "path_keys": [
+        "body"
+      ],
       "weight": 100,
       "duration_seconds": 3600,
       "daily_limit": 1,
@@ -186,7 +232,9 @@
       "desc": "向界壁巡守交付虚空晶，协助稳定炼虚境附近的航道。",
       "quality": "mythic",
       "status": "open",
-      "aliases": ["虚空晶交付"],
+      "aliases": [
+        "虚空晶交付"
+      ],
       "required_realm": "void_refining",
       "required_layer": 1,
       "path_keys": [],
@@ -207,7 +255,10 @@
       "desc": "为青石镇旅舍收集粗糙灵米，完成一份凡人阶段的稳定委托。",
       "quality": "common",
       "status": "open",
-      "aliases": ["灵米送暖", "灵米委托"],
+      "aliases": [
+        "灵米送暖",
+        "灵米委托"
+      ],
       "required_realm": "mortal",
       "required_layer": 0,
       "path_keys": [],
@@ -228,7 +279,9 @@
       "desc": "为青石镇修缮棚屋收集木材，完成凡人阶段的公开采办。",
       "quality": "common",
       "status": "open",
-      "aliases": ["木材修缮悬赏"],
+      "aliases": [
+        "木材修缮悬赏"
+      ],
       "required_realm": "mortal",
       "required_layer": 0,
       "path_keys": [],
@@ -249,7 +302,9 @@
       "desc": "为初阶药房补足灵叶，按实际取得的材料计数。",
       "quality": "common",
       "status": "open",
-      "aliases": ["灵叶采集悬赏"],
+      "aliases": [
+        "灵叶采集悬赏"
+      ],
       "required_realm": "qi_sensing",
       "required_layer": 2,
       "path_keys": [],
@@ -270,7 +325,9 @@
       "desc": "为山径修缮筹集铁石，适合感气阶段反复完成。",
       "quality": "common",
       "status": "open",
-      "aliases": ["铁石补给悬赏"],
+      "aliases": [
+        "铁石补给悬赏"
+      ],
       "required_realm": "qi_sensing",
       "required_layer": 3,
       "path_keys": [],
@@ -291,7 +348,9 @@
       "desc": "交付阵砂，补充聚气修士的基础阵材库存。",
       "quality": "uncommon",
       "status": "open",
-      "aliases": ["阵砂补库悬赏"],
+      "aliases": [
+        "阵砂补库悬赏"
+      ],
       "required_realm": "qi_gathering",
       "required_layer": 1,
       "path_keys": [],
@@ -312,7 +371,9 @@
       "desc": "为聚灵阵作坊采办木材，目标来自公开采集与生活奖励。",
       "quality": "common",
       "status": "open",
-      "aliases": ["灵木采办悬赏"],
+      "aliases": [
+        "灵木采办悬赏"
+      ],
       "required_realm": "qi_gathering",
       "required_layer": 2,
       "path_keys": [],
@@ -333,7 +394,9 @@
       "desc": "完成一份公开烹饪配方并交付云灵茶，换取作坊信誉。",
       "quality": "uncommon",
       "status": "open",
-      "aliases": ["云灵茶悬赏"],
+      "aliases": [
+        "云灵茶悬赏"
+      ],
       "required_realm": "qi_gathering",
       "required_layer": 4,
       "path_keys": [],
@@ -354,7 +417,9 @@
       "desc": "在公开历练中击退劫修学徒，稳定近郊往来。",
       "quality": "uncommon",
       "status": "open",
-      "aliases": ["劫修清剿"],
+      "aliases": [
+        "劫修清剿"
+      ],
       "required_realm": "foundation",
       "required_layer": 1,
       "path_keys": [],
@@ -375,7 +440,9 @@
       "desc": "从雾隐洞天或其守卫掉落中取得雾隐核心。",
       "quality": "uncommon",
       "status": "open",
-      "aliases": ["雾核悬赏"],
+      "aliases": [
+        "雾核悬赏"
+      ],
       "required_realm": "foundation",
       "required_layer": 4,
       "path_keys": [],
@@ -396,7 +463,9 @@
       "desc": "交付云铁，协助云城工坊完成金丹阶段的器材验收。",
       "quality": "rare",
       "status": "open",
-      "aliases": ["云铁验收悬赏"],
+      "aliases": [
+        "云铁验收悬赏"
+      ],
       "required_realm": "golden_core",
       "required_layer": 1,
       "path_keys": [],
@@ -417,7 +486,9 @@
       "desc": "补齐云舟航线票据碎片，支持金丹修士的公开航路。",
       "quality": "rare",
       "status": "open",
-      "aliases": ["云舟票补悬赏"],
+      "aliases": [
+        "云舟票补悬赏"
+      ],
       "required_realm": "golden_core",
       "required_layer": 2,
       "path_keys": [],
@@ -438,7 +509,9 @@
       "desc": "在魔界公开历练中取得魔核并交回边境集市。",
       "quality": "rare",
       "status": "open",
-      "aliases": ["魔核回收悬赏"],
+      "aliases": [
+        "魔核回收悬赏"
+      ],
       "required_realm": "nascent_soul",
       "required_layer": 1,
       "path_keys": [],
@@ -459,7 +532,9 @@
       "desc": "击退界隙守望者，维持跨界边境的公开巡查线。",
       "quality": "rare",
       "status": "open",
-      "aliases": ["界隙守望悬赏"],
+      "aliases": [
+        "界隙守望悬赏"
+      ],
       "required_realm": "nascent_soul",
       "required_layer": 1,
       "path_keys": [],
@@ -480,7 +555,9 @@
       "desc": "在万兽山公开狩猎中取得兽血，交由跨界研究处验收。",
       "quality": "rare",
       "status": "open",
-      "aliases": ["兽血采样悬赏"],
+      "aliases": [
+        "兽血采样悬赏"
+      ],
       "required_realm": "nascent_soul",
       "required_layer": 2,
       "path_keys": [],
@@ -501,7 +578,9 @@
       "desc": "在祖灵湖公开探索中取得祖灵血，供领域研究使用。",
       "quality": "rare",
       "status": "open",
-      "aliases": ["祖灵血样悬赏"],
+      "aliases": [
+        "祖灵血样悬赏"
+      ],
       "required_realm": "soul_transformation",
       "required_layer": 1,
       "path_keys": [],
@@ -522,7 +601,9 @@
       "desc": "收集领域核心碎片，完成化神阶段的公共建设委托。",
       "quality": "rare",
       "status": "open",
-      "aliases": ["领域碎片悬赏"],
+      "aliases": [
+        "领域碎片悬赏"
+      ],
       "required_realm": "soul_transformation",
       "required_layer": 4,
       "path_keys": [],
@@ -543,7 +624,9 @@
       "desc": "击退祖灵湖影，完成化神阶段的湖岸巡查。",
       "quality": "rare",
       "status": "open",
-      "aliases": ["祖灵湖守望悬赏"],
+      "aliases": [
+        "祖灵湖守望悬赏"
+      ],
       "required_realm": "soul_transformation",
       "required_layer": 1,
       "path_keys": [],
@@ -564,7 +647,9 @@
       "desc": "向虚空航道补充虚空锚，维持炼虚阶段的公开航行。",
       "quality": "mythic",
       "status": "open",
-      "aliases": ["虚空锚补给悬赏"],
+      "aliases": [
+        "虚空锚补给悬赏"
+      ],
       "required_realm": "void_refining",
       "required_layer": 2,
       "path_keys": [],
@@ -585,7 +670,9 @@
       "desc": "将档案遗迹取得的碎片交回云城档案处。",
       "quality": "mythic",
       "status": "open",
-      "aliases": ["档案碎片悬赏"],
+      "aliases": [
+        "档案碎片悬赏"
+      ],
       "required_realm": "void_refining",
       "required_layer": 4,
       "path_keys": [],
@@ -606,7 +693,9 @@
       "desc": "向道源服务处交付道果碎片，换取终局服务名望。",
       "quality": "mythic",
       "status": "open",
-      "aliases": ["道果碎片悬赏"],
+      "aliases": [
+        "道果碎片悬赏"
+      ],
       "required_realm": "dao_union",
       "required_layer": 1,
       "path_keys": [],
@@ -627,7 +716,9 @@
       "desc": "交付虚空档案，协助道源门完成资料整理。",
       "quality": "mythic",
       "status": "open",
-      "aliases": ["道源档案悬赏"],
+      "aliases": [
+        "道源档案悬赏"
+      ],
       "required_realm": "dao_union",
       "required_layer": 3,
       "path_keys": [],
@@ -648,7 +739,9 @@
       "desc": "完成一次道源服务派遣，记录公开轮值贡献。",
       "quality": "mythic",
       "status": "open",
-      "aliases": ["道统轮值悬赏"],
+      "aliases": [
+        "道统轮值悬赏"
+      ],
       "required_realm": "dao_union",
       "required_layer": 6,
       "path_keys": [],
@@ -669,7 +762,9 @@
       "desc": "交付天劫护符，为渡劫台的公开护持库补充材料。",
       "quality": "mythic",
       "status": "open",
-      "aliases": ["天劫护持悬赏"],
+      "aliases": [
+        "天劫护持悬赏"
+      ],
       "required_realm": "tribulation",
       "required_layer": 3,
       "path_keys": [],
@@ -690,7 +785,9 @@
       "desc": "向渡劫台交付天劫凭证，完成终局资格核验。",
       "quality": "mythic",
       "status": "open",
-      "aliases": ["天劫凭证悬赏"],
+      "aliases": [
+        "天劫凭证悬赏"
+      ],
       "required_realm": "tribulation",
       "required_layer": 6,
       "path_keys": [],
@@ -711,7 +808,9 @@
       "desc": "在公开天劫遭遇中击败天劫回响，记录渡劫台战果。",
       "quality": "mythic",
       "status": "open",
-      "aliases": ["天劫回响悬赏"],
+      "aliases": [
+        "天劫回响悬赏"
+      ],
       "required_realm": "tribulation",
       "required_layer": 3,
       "path_keys": [],
@@ -724,6 +823,98 @@
       "reward_pool_key": "reward_pool.bounty.void_anchoring",
       "reputation_key": "local.xuantian.floating_boat",
       "consume_target": false,
+      "reward_labels": {}
+    },
+    {
+      "key": "bounty.abyss_core",
+      "name": "深渊魔核",
+      "desc": "深入魔渊深层收集凝实魔核，交由魔界商队验货。",
+      "quality": "rare",
+      "status": "open",
+      "aliases": [
+        "魔核悬赏"
+      ],
+      "required_realm": "soul_transformation",
+      "required_layer": 1,
+      "path_keys": [],
+      "weight": 70,
+      "duration_seconds": 21600,
+      "daily_limit": 1,
+      "target_kind": "inventory_gain",
+      "target_key": "item.demon_core",
+      "target_amount": 3,
+      "reward_pool_key": "reward_pool.bounty.demon_relief",
+      "reputation_key": "local.xuantian.domain_front",
+      "consume_target": true,
+      "reward_labels": {}
+    },
+    {
+      "key": "bounty.abyss_clue",
+      "name": "深渊契约",
+      "desc": "在魔渊深层寻回一纸契约线索，供后续勘验。",
+      "quality": "epic",
+      "status": "open",
+      "aliases": [
+        "契约线索悬赏"
+      ],
+      "required_realm": "soul_transformation",
+      "required_layer": 1,
+      "path_keys": [],
+      "weight": 40,
+      "duration_seconds": 28800,
+      "daily_limit": 1,
+      "target_kind": "inventory_gain",
+      "target_key": "item.clue.demon_contract",
+      "target_amount": 1,
+      "reward_pool_key": "reward_pool.bounty.demon_relief",
+      "reputation_key": "local.xuantian.domain_front",
+      "consume_target": true,
+      "reward_labels": {}
+    },
+    {
+      "key": "bounty.domain_soul",
+      "name": "洞天神魂",
+      "desc": "于远古洞天采得神魂晶，补足领域工坊的消耗。",
+      "quality": "rare",
+      "status": "open",
+      "aliases": [
+        "神魂晶悬赏"
+      ],
+      "required_realm": "soul_transformation",
+      "required_layer": 1,
+      "path_keys": [],
+      "weight": 60,
+      "duration_seconds": 21600,
+      "daily_limit": 1,
+      "target_kind": "inventory_gain",
+      "target_key": "item.soul_crystal",
+      "target_amount": 2,
+      "reward_pool_key": "reward_pool.bounty.void_anchoring",
+      "reputation_key": "local.xuantian.domain_front",
+      "consume_target": true,
+      "reward_labels": {}
+    },
+    {
+      "key": "bounty.domain_fragment_raid",
+      "name": "洞天残片",
+      "desc": "从远古洞天取回四枚领域核心碎片，用于加固禁制。",
+      "quality": "epic",
+      "status": "open",
+      "aliases": [
+        "领域碎片深层悬赏"
+      ],
+      "required_realm": "soul_transformation",
+      "required_layer": 2,
+      "path_keys": [],
+      "weight": 35,
+      "duration_seconds": 28800,
+      "daily_limit": 1,
+      "target_kind": "inventory_gain",
+      "target_key": "item.domain_core_fragment",
+      "target_amount": 4,
+      "reward_pool_key": "reward_pool.bounty.elite_hunt",
+      "reputation_key": "local.xuantian.domain_front",
+      "consume_target": true,
       "reward_labels": {}
     }
   ],
