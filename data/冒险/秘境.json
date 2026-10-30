@@ -109,6 +109,36 @@
       "quota_limit": 2,
       "expiry_seconds": 3600,
       "reputation_key": "local.xuantian.new_town"
+    },
+    {
+      "key": "instance.secret_realm.ironwood_trial",
+      "record_type": "common",
+      "name": "铁木试炼",
+      "desc": "铁木林深处的试炼径以旧木为门，守林灵兽拦在最后一段。",
+      "status": "active",
+      "aliases": ["铁木林秘境"],
+      "required_realm": "qi_sensing",
+      "required_layer": 2,
+      "location_key": "xuantian.ironwood_grove",
+      "stamina_cost": 12,
+      "ticket_key": null,
+      "ticket_quantity": 0,
+      "node_keys": ["resource", "encounter", "choice"],
+      "enemy_key": "enemy.ironwood_weasel",
+      "first_reward": {
+        "item.mat.wood": 3,
+        "item.ore.ironstone": 2,
+        "local.xuantian.new_town": 8
+      },
+      "repeat_reward_pool": [
+        {"weight": 1, "no_reward": true},
+        {"weight": 1, "rewards": {"item.mat.wood": 2}},
+        {"weight": 1, "rewards": {"item.ore.ironstone": 1}}
+      ],
+      "quota_period": "week",
+      "quota_limit": 2,
+      "expiry_seconds": 3600,
+      "reputation_key": "local.xuantian.new_town"
     }
   ]
 }

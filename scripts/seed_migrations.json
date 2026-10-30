@@ -193,5 +193,12 @@
     },
     "new_sha256": "774124f445ea4c48ff41cfc33923ab04600676d2b777da3c77e5689b4de30aee",
     "new_commit": "e8a6f096bab464d61efe430159a315172bc52453"
+  },
+  "冒险/秘境.json": {
+    "old_sha256": {
+      "952cd9cdd3dd00da67efd36677673f110ebacb273c671ea4c6552f3a33e022cc": "f9e22ac6ba228769373249db6aace96ac5c5ac60:data/冒险/秘境.json"
+    },
+    "new_sha256": "166354edb6cccf1f75810302bcf791967e8138703f2438a49f0313e54fb7aa41",
+    "new_commit": "PENDING"
   }
 }

@@ -54,6 +54,7 @@ def test_qq_and_onebot_secret_realm_preview_are_isolated() -> None:
                 "instance.secret_realm.spring_path",
                 "instance.secret_realm.mist_depth_2",
                 "instance.secret_realm.cloud_boat",
+                "instance.secret_realm.ironwood_trial",
                 "instance.secret_realm.demon_abyss",
                 "instance.secret_realm.ancient_domain",
                     "instance.secret_realm.ancestral_hall",

@@ -27,7 +27,7 @@ operation ledger 幂等。
 权限、资产扣除和声望写入都在事务中完成。悬赏奖励中的
 地方名望和服务信誉写入独立声誉表，不直接改境界、道途或战斗属性。
 
-秘境命令为 `秘境预览`、`进入秘境 雾隐秘境|灵泉小径|雾隐洞天二层秘境|云舟秘境`、`选择秘境节点 资源|遭遇|选择` 和 `结算秘境`。
+秘境命令为 `秘境预览`、`进入秘境 雾隐秘境|灵泉小径|雾隐洞天二层秘境|云舟秘境|铁木林秘境`、`选择秘境节点 资源|遭遇|选择` 和 `结算秘境`。
 秘境运行时使用独立 `secret_realm_runs` 表保存节点顺序、内容/规则版本、战斗编号和票券/体力锁；遭遇节点
 复用 combat 域的服务端自动回合，多遭遇路线按 run/node 索引生成独立战斗 operation。失败退还未消费的门票但保留体力消耗，
 过期释放门票和体力；首通奖励只在本人第一次成功结算时发放，重复 operation 只回放原结果。QQ 官方与 OneBot V11 使用同一 application，身份和
@@ -151,3 +151,19 @@ v0.6 `story.mainline.dao_echoes` 已开放玩家流程：炼虚 L10 后可查询
 凭证只在登舟时扣一次（登舟与探索准入各需一张，公开来源为悬赏 `reward_pool.bounty.elite_hunt`）；
 `travel_arrival` 目标全部是普通通路端点，云舟专属地点只作为探索目标出现。
 门槛 `golden_core` L1，与云舟航线及探索模式声明的门槛一致；不新增地点、航线、模式、奖池或物品。
+
+## 铁木试炼秘境（v0.7）
+
+`instance.secret_realm.ironwood_trial`（铁木试炼，别名 `铁木林秘境`）补上铁木林
+`xuantian.ironwood_grove` 的副本入口——该地点此前有采集/试炼模式与遭遇池
+`encounter.xuantian.ironwood`，却没有秘境。它是一条 `record_type=common` 的纯内容记录，
+由既有通用秘境引擎驱动，不新增仓储、命令或字段：
+
+- 准入：地点 `xuantian.ironwood_grove`、`qi_sensing` L2、体力 12、周配额 2，**无凭证**；
+- 路线：`resource` → `encounter`（`enemy.ironwood_weasel`）→ `choice`；
+- 首通：`item.mat.wood`×3、`item.ore.ironstone`×2、`local.xuantian.new_town` 名望 8；
+- 重复：三选一权重池（空手 / 木材×2 / 铁石×1），第二次通关起不再发首通奖励；
+- 超时 3600 秒退还体力，战斗失败不退体力且无首通奖励。
+
+专项测试 `test/test_secret_realm_ironwood.py` 覆盖预览、地点/境界/体力/配额四类拒绝、
+完整通关、节点重放返回同一战斗、重复结算幂等、重复奖池、战斗失败与超时退款。

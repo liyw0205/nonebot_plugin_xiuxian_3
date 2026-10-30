@@ -472,6 +472,18 @@ head `6dcd8f3`）成功。未跑全量/压测/部署，未验 QQ 真机。
 3 passed（旧宿主升级、幂等、自定义种子保留）。develop CI（Quality and Release `40708847422`，
 head `66d34f6`）成功。未跑全量/压测/部署，未验 QQ 真机。
 
+铁木试炼秘境（v0.7）已在 `develop` 完成：`data/冒险/秘境.json` 新增
+`instance.secret_realm.ironwood_trial`（铁木试炼，别名 `铁木林秘境`），补上
+`xuantian.ironwood_grove` 的副本入口。该记录为 `record_type=common` 的纯内容，由既有通用
+秘境引擎驱动：准入为地点 + `qi_sensing` L2 + 体力 12 + 周配额 2（无凭证），路线
+`resource`→`encounter`（`enemy.ironwood_weasel`）→`choice`，首通给 `item.mat.wood`×3、
+`item.ore.ironstone`×2 与 `local.xuantian.new_town` 名望 8，重复通关走三选一权重池，
+超时 3600 秒退还体力。未改仓储/命令/字段/事务/幂等语义。该文件此前从未登记迁移规则，
+本轮首次登记 `scripts/seed_migrations.json`（旧 blob provenance `f9e22ac`）。聚焦证据：
+`test_secret_realm_ironwood.py` 5 passed（预览、地点/境界/体力/配额四类拒绝、完整通关、
+节点重放同战斗、重复结算幂等、重复奖池、战斗失败无首通、超时退款）；
+`test_secret_realm_intro.py` 预览集合已按数据更新。未跑全量/压测/部署，未验 QQ 真机。
+
 玄天洞天卷中篇（chapter.7.stage.1–3）已在 `develop` 完成：`data/剧情/主线.json` 新增
 `chapter.7.stage.1`（抵达 `xuantian.floating_boat`）、`chapter.7.stage.2`（乘
 `route.cloud_to_mist2` 下到 `cave.mist_grotto_2` 并结算 `explore.mist_grotto_2` 取得
