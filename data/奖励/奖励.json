@@ -1691,6 +1691,20 @@
         }
       ],
       "status": "active"
+    },
+    {
+      "name": "云城巡夜奖励池",
+      "desc": "巡夜所得的修为与灵石，按固定权重抽取，偶尔带些夜市货色。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 30, "rewards": {"cultivation": 70, "spirit_stones": 25}},
+        {"weight": 25, "rewards": {"cultivation": 80, "spirit_stones": 35}},
+        {"weight": 20, "rewards": {"cultivation": 90, "spirit_stones": 45, "item.food.coarse_spirit_rice": 1}},
+        {"weight": 15, "rewards": {"cultivation": 100, "spirit_stones": 55, "item.spirit_water": 1}},
+        {"weight": 10, "rewards": {"cultivation": 110, "spirit_stones": 65, "item.mat.wood": 2}}
+      ],
+      "key": "reward_pool.exploration.cloud_city_patrol",
+      "status": "active"
     }
   ],
   "schema": "xiuxian.content"

@@ -473,6 +473,25 @@
       "enemy_pool_key": "encounter.demon.abyss_depths",
       "access_any": [],
       "status": "open"
+    },
+    {
+      "key": "explore.cloud_city_patrol",
+      "name": "云城巡夜",
+      "desc": "沿云城街巷巡查，驱散行凶的劫修与游荡的妖兽。",
+      "aliases": ["云城巡夜", "巡夜"],
+      "location_key": "xuantian.cloud_city",
+      "required_realm": "golden_core",
+      "required_layer": 1,
+      "duration_seconds": 150,
+      "stamina_cost": 8,
+      "energy_cost": 0,
+      "daily_limit": 4,
+      "random_pool": "gather.cloud_city_patrol",
+      "reward_pool_key": "reward_pool.exploration.cloud_city_patrol",
+      "battle_chance_bp": 0,
+      "enemy_pool_key": null,
+      "access_any": [],
+      "status": "open"
     }
   ]
 }

@@ -472,6 +472,15 @@ head `6dcd8f3`）成功。未跑全量/压测/部署，未验 QQ 真机。
 3 passed（旧宿主升级、幂等、自定义种子保留）。develop CI（Quality and Release `40708847422`，
 head `66d34f6`）成功。未跑全量/压测/部署，未验 QQ 真机。
 
+云城巡夜已在 `develop` 完成：`data/探索/模式.json` 新增 `explore.cloud_city_patrol`
+（`xuantian.cloud_city`，`golden_core` L1，150 秒、8 体力、每日 4 次、无战斗），
+`data/奖励/奖励.json` 新增 `reward_pool.exploration.cloud_city_patrol`（5 档加权，
+只产出修为、灵石与既有物品）。云城此前是唯一没有任何探索模式的枢纽地点。聚焦证据：
+`test_exploration_cloud_city_patrol.py` 2 passed（结算发奖实测 修为+80/灵石×35；地点拒入
+不扣体力；每日第 5 次 `EXPLORATION_QUOTA_EXHAUSTED`）。带战斗的变体在结算 battle 时抛
+`PERSISTENCE_ERROR`，根因未定位，故本轮按无战斗模式交付并回退遭遇池改动，未保留未验证分支。
+未跑全量/压测/部署，未验 QQ 真机。
+
 铁木试炼秘境（v0.7）已在 `develop` 完成：`data/冒险/秘境.json` 新增
 `instance.secret_realm.ironwood_trial`（铁木试炼，别名 `铁木林秘境`），补上
 `xuantian.ironwood_grove` 的副本入口。该记录为 `record_type=common` 的纯内容，由既有通用

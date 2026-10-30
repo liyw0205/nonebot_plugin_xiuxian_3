@@ -28,3 +28,11 @@
 
 不新增物品、技能、掉落池类型、通路或秘境；不改既有模式数值与既有地点门槛；不引入污染/
 失败新机制（沿用既有探索失败与战斗失败语义）。
+
+## 云城巡夜（v0.7 补充）
+
+`explore.cloud_city_patrol`（云城巡夜，别名 `巡夜`）为枢纽 `xuantian.cloud_city` 补上日常玩法：
+`golden_core` L1、150 秒、8 体力、每日 4 次、无战斗；结算按
+`reward_pool.exploration.cloud_city_patrol` 的 5 档权重发放修为、灵石与既有物品。
+失败与重复边界全部沿用探索引擎：地点/境界/体力不足不扣资源，第 5 次 `EXPLORATION_QUOTA_EXHAUSTED`，
+未到期 `EXPLORATION_NOT_READY`，重复结算幂等。专项见 `test/test_exploration_cloud_city_patrol.py`。
