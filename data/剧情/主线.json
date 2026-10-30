@@ -2715,6 +2715,7 @@
         {"command": "前往", "argument": "青石镇", "description": "从灵泉谷走公开通路回青石镇，等待行程结束并结算移动。"}
       ],
       "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.6.stage.3"]},
+      "next_stage_key": "chapter.7.stage.1",
       "retry": {
         "on_incomplete": "keep_running",
         "cooldown_seconds": 0,
@@ -2726,6 +2727,95 @@
       "required_realm": "qi_sensing",
       "required_layer": 2,
       "first_clear_reward": {"spirit_stones": 50, "service_reputation": 5},
+      "repeat_reward": {"spirit_stones": 20}
+    },
+    {
+      "key": "chapter.7.stage.1",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 7,
+      "stage": 1,
+      "name": "洞天二层启程",
+      "desc": "从云舟渡口登舟，把行程一路推到雾隐洞天二层的入口。",
+      "body": "旧载归册之后，镇务翻出另一页：雾隐洞天不止一层，二层在洞天下沉的那道裂隙之后，谷中采不到，矿道也走不进去，只有云舟肯在那处停靠。渡口的舟工把话说得干脆：洞天二层的凭证一张只能开一道门，登舟要一张，进洞还要一张，凑不齐就别指望在半途折返。先沿公开通路走到云舟渡口，把启程这一趟结算成抵达，再看手里的凭证够不够。",
+      "objectives": [
+        {"key": "reach_cloud_boat_dock", "type": "travel_arrival", "label": "在主线开始后抵达云舟渡口", "destination_key": "xuantian.floating_boat"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "云城", "description": "从青石镇走公开通路前往云城，行程结束后结算移动。"},
+        {"command": "前往", "argument": "云舟渡口", "description": "在云城登舟前往云舟渡口（需五百灵石渡资），结算移动后抵达。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.7.stage.1"]},
+      "next_stage_key": "chapter.7.stage.2",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "行程尚未在云舟渡口结算时关卡保持进行中，不扣主线奖励；备好渡资再走一次，结算抵达后即可领取。"
+      },
+      "status": "open",
+      "aliases": ["洞天二层启程"],
+      "prerequisites": ["chapter.6.stage.3"],
+      "required_realm": "golden_core",
+      "required_layer": 1,
+      "first_clear_reward": {"spirit_stones": 40, "item.cave_pass_advanced": 1},
+      "repeat_reward": {"spirit_stones": 20}
+    },
+    {
+      "key": "chapter.7.stage.2",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 7,
+      "stage": 2,
+      "name": "二层寻铁",
+      "desc": "乘云舟下到雾隐洞天二层，把洞天深处的云铁带回一块。",
+      "body": "洞天二层的气味与一层不同：石壁更冷，回响更长，脚下每一块落石都像有人在更深处敲过。舟工只送到裂口，余下的路要自己走完——六百息的探索，四成的机会撞上守洞的东西，撞上了就得打，打不赢就只剩一身伤和一张作废的行程。这里出的是云铁，比矿道里采到的更沉，也更难带出来；结算时手里至少要有一块，才算真的下过二层。",
+      "objectives": [
+        {"key": "mist_two_cloud_iron", "type": "exploration_reward", "label": "在主线开始后的洞天二层探索中取得云铁", "mode_key": "explore.mist_grotto_2", "location_key": "cave.mist_grotto_2", "item_key": "item.material.cloud_iron", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "登上云舟", "argument": "洞天二层", "description": "在云城或云舟渡口登舟前往雾隐洞天二层（需洞天二层凭证与五百灵石），随后发送 `结算云舟` 抵达。"},
+        {"command": "开始探索", "argument": "洞天二层探索", "description": "在洞天二层开始探索（需凭证、消耗体力、每日两次），随后发送 `结算探索` 取得云铁。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.7.stage.2"]},
+      "next_stage_key": "chapter.7.stage.3",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未结算云舟或探索未取得云铁时关卡保持进行中，不扣主线奖励；备齐凭证与体力再来一次，结算后即可领取。"
+      },
+      "status": "open",
+      "aliases": ["二层寻铁"],
+      "prerequisites": ["chapter.7.stage.1"],
+      "required_realm": "golden_core",
+      "required_layer": 1,
+      "first_clear_reward": {"item.material.cloud_iron": 2, "service_reputation": 5},
+      "repeat_reward": {"spirit_stones": 20}
+    },
+    {
+      "key": "chapter.7.stage.3",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 7,
+      "stage": 3,
+      "name": "归镇记功",
+      "desc": "带着二层云铁乘舟回云城，再走回青石镇把这趟记进账册。",
+      "body": "云铁压在行囊里，比来时沉得多。洞天二层的裂口在身后合拢，舟工照旧只送到云城，剩下的路要自己走回青石镇：渡口、云城、镇门，三处关文一处不落，账册才认这一趟。镇务把云铁过了秤，说洞天卷到这一层算是走通了，再往下的裂隙不在玄天的旧载里，得等它自己有名有姓的那一天。",
+      "objectives": [
+        {"key": "return_town_with_mist_iron", "type": "travel_arrival", "label": "在主线开始后带着二层云铁回到青石镇", "destination_key": "xuantian.new_town"}
+      ],
+      "actions": [
+        {"command": "登上云舟", "argument": "返回云城", "description": "从雾隐洞天二层登舟返回云城，随后发送 `结算云舟` 抵达。"},
+        {"command": "前往", "argument": "青石镇", "description": "从云城走公开通路回到青石镇，结算移动后交铁记功。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.7.stage.3"]},
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "行程尚未回到青石镇结算时关卡保持进行中，不扣主线奖励；重新启程并结算移动，即可领记功之赏。"
+      },
+      "status": "open",
+      "aliases": ["归镇记功"],
+      "prerequisites": ["chapter.7.stage.2"],
+      "required_realm": "golden_core",
+      "required_layer": 1,
+      "first_clear_reward": {"spirit_stones": 60, "service_reputation": 5},
       "repeat_reward": {"spirit_stones": 20}
     }
   ]

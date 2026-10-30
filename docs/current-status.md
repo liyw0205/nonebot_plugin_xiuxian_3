@@ -472,6 +472,21 @@ head `6dcd8f3`）成功。未跑全量/压测/部署，未验 QQ 真机。
 3 passed（旧宿主升级、幂等、自定义种子保留）。develop CI（Quality and Release `40708847422`，
 head `66d34f6`）成功。未跑全量/压测/部署，未验 QQ 真机。
 
+玄天洞天卷中篇（chapter.7.stage.1–3）已在 `develop` 完成：`data/剧情/主线.json` 新增
+`chapter.7.stage.1`（抵达 `xuantian.floating_boat`）、`chapter.7.stage.2`（乘
+`route.cloud_to_mist2` 下到 `cave.mist_grotto_2` 并结算 `explore.mist_grotto_2` 取得
+`item.material.cloud_iron` ≥1）、`chapter.7.stage.3`（乘 `route.cloud_return` 回云城再走回
+`xuantian.new_town` 合卷、尾关如实留空后继）；`chapter.6.stage.3` 前链改为
+`chapter.7.stage.1`。本卷首次给 `cave.mist_grotto_2` 剧情用途：该层无普通入边、只能乘云舟，
+故三关的 `travel_arrival` 目标全部落在普通通路端点，云舟专属地点只作为 `exploration_reward`
+目标出现。凭证在登舟时扣一次、结算不重复扣；门槛 `golden_core` L1 与航线/模式声明一致。
+聚焦证据：`test_mainline_chapter7.py` 2 passed（端到端 渡口→云舟→二层探索→返程→回镇，
+提前领取被拒、逐关领取、凭证只扣一次、二次结算不重复移动、幂等回放、三条状态事件；
+以及 `travel_arrival` 目标必为通路端点且非云舟终点）；`test_mainline_content.py`+
+`test_mainline_chapter5.py`+`test_mainline_chapter6.py`+`test_mainline_chapter7.py`+
+`test_mainline.py`+`test_documentation.py` 全绿；`test_seed_migration.py` 反向助手字节级复现
+旧官方 blob。未跑全量/压测/部署，未验 QQ 真机。
+
 玄天洞天卷开篇（chapter.6.stage.1–3）已在 `develop` 完成：`data/剧情/主线.json` 新增
 `chapter.6.stage.1`（回 `xuantian.new_town` 接旧载）、`chapter.6.stage.2`（`explore.spring_gather`
 结算取得 `item.herb.spirit_leaf` ≥1）、`chapter.6.stage.3`（回镇合卷、尾关如实留空后继），

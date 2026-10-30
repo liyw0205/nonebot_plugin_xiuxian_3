@@ -139,3 +139,15 @@ v0.6 `story.mainline.dao_echoes` 已开放玩家流程：炼虚 L10 后可查询
 `chapter.6.stage.3` 回镇交还旧载并合卷。三关门槛 `qi_sensing` L2，与前序 15 关一致地
 沿用既有目标类型、状态事件与失败重试语义，不新增通路、模式、奖池或物品；
 `chapter.5.stage.3` 的 `next_stage_key` 前链到 `chapter.6.stage.1`，本卷尾关如实留空。
+
+## 玄天洞天卷中篇（chapter.7.stage.1–3）
+
+玄天主线第四卷开篇三关，首次把 `cave.mist_grotto_2`（雾隐洞天二层）接入剧情——
+该层无法徒步抵达，只能乘云舟进入，此前没有任何剧情用途：
+`chapter.7.stage.1` 沿公开通路抵达云舟渡口（`travel_arrival` → `xuantian.floating_boat`）、
+`chapter.7.stage.2` 经 `route.cloud_to_mist2` 乘云舟下到二层并结算 `explore.mist_grotto_2`
+取得 `item.material.cloud_iron` ≥1（600 秒/15 体力/每日 2 次/`battle_chance_bp` 4000，
+需 `item.cave_pass_advanced`）、`chapter.7.stage.3` 乘 `route.cloud_return` 回云城再走回青石镇合卷。
+凭证只在登舟时扣一次（登舟与探索准入各需一张，公开来源为悬赏 `reward_pool.bounty.elite_hunt`）；
+`travel_arrival` 目标全部是普通通路端点，云舟专属地点只作为探索目标出现。
+门槛 `golden_core` L1，与云舟航线及探索模式声明的门槛一致；不新增地点、航线、模式、奖池或物品。
