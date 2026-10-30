@@ -115,7 +115,7 @@
       "2f5c61d8adc3b09c4c9759ff68731deb350fa7370560fbb7c6ae521c560eb472": "c35c1b78adf9c46393de8c3db0dc3606a572751b:data/探索/模式.json"
     },
     "new_sha256": "42bb4af46071bbb391cd309c8b1403bec642c3f3e681fe63f2f50679ac8aa6ad",
-    "new_commit": "PENDING"
+    "new_commit": "81f28fa7c36574ef6cfe659a703fd3d63711c5b2"
   },
   "战斗/敌人.json": {
     "old_sha256": {
@@ -138,7 +138,7 @@
       "10d9338ead41a62609941f5f1b5e8588024bbefd541d13aaa454f67f85cd56fc": "c35c1b78adf9c46393de8c3db0dc3606a572751b:data/奖励/奖励.json"
     },
     "new_sha256": "ab3dda55aaffcf47646cdee8cc5ca13e3e49d504d1896216dd3441ce63b116c1",
-    "new_commit": "PENDING"
+    "new_commit": "81f28fa7c36574ef6cfe659a703fd3d63711c5b2"
   },
   "地图/区域.json": {
     "old_sha256": {
