@@ -472,6 +472,18 @@ head `6dcd8f3`）成功。未跑全量/压测/部署，未验 QQ 真机。
 3 passed（旧宿主升级、幂等、自定义种子保留）。develop CI（Quality and Release `40708847422`，
 head `66d34f6`）成功。未跑全量/压测/部署，未验 QQ 真机。
 
+玄天航路卷开篇（chapter.5.stage.1–3）已在 `develop` 完成：`data/剧情/主线.json` 新增
+`chapter.5.stage.1`（抵达 `xuantian.floating_boat`，公开通路 青石镇→云城→云舟渡口）、
+`chapter.5.stage.2`（`explore.cloud_boat_trial` 结算取得 `item.ticket.cloud_boat_fragment` ≥1）、
+`chapter.5.stage.3`（归镇 `xuantian.new_town`，本卷尾关如实留空后继），三关正文均 ≥80 字、
+含目标/行动/首通状态事件/失败重试，境界门槛 `golden_core` L1；`chapter.4.stage.3` 的
+`next_stage_key` 由空改为 `chapter.5.stage.1`（数据驱动尾关规则下它不再是尾关），三关列入
+内容化校验集合。聚焦证据：`test_mainline_chapter5.py` 1 passed（提前领取被拒、真实结算
+青石镇→云城→云舟渡口、云舟试炼取残票、归镇、幂等回放、三条状态事件）；
+`test_mainline_content.py`+`test_mainline.py`+`test_mainline_chapter5.py` 19 passed；
+`test_seed_migration.py -k "mainline or manifest"` 4 passed（反向助手仅回退本卷增量与
+`chapter.4.stage.3` 前链字段）。未跑全量/压测/部署，未验 QQ 真机。
+
 悬赏覆盖两处终端地点（v0.1）已在 `develop` 完成：`data/任务/悬赏.json` 追加 4 条悬赏
 （`bounty.abyss_core` 魔核×3、`bounty.abyss_clue` 契约线索×1、`bounty.domain_soul` 神魂晶×2、
 `bounty.domain_fragment_raid` 领域核心碎片×4），全部化神门槛、复用既有

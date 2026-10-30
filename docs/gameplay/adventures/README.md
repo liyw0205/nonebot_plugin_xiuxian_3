@@ -120,3 +120,11 @@ v0.6 `story.mainline.dao_echoes` 已开放玩家流程：炼虚 L10 后可查询
 `bounty.domain_soul`（`item.soul_crystal`×2）、`bounty.domain_fragment_raid`
 （`item.domain_core_fragment`×4）。悬赏记录本身不含 `location_key`：榜单按既有境界与目标过滤，
 接取/结算/放弃沿用既有事务与 operation 回放，`daily_limit` 与 `consume_target` 语义不变。
+
+## 玄天航路卷（chapter.5.stage.1–3）
+
+玄天主线第二卷开篇三关：`chapter.5.stage.1` 抵达 `xuantian.floating_boat`（公开通路
+青石镇→云城→云舟渡口，渡资五百灵石）、`chapter.5.stage.2` 在渡口结算 `explore.cloud_boat_trial`
+取得 `item.ticket.cloud_boat_fragment` ≥1、`chapter.5.stage.3` 经云城返回青石镇合卷；
+尾关不设 `next_stage_key`，前链由内容数据驱动。三关门槛 `golden_core` L1，沿用既有目标类型
+（`travel_arrival`/`exploration_reward`）、状态事件与失败重试语义，不新增通路、模式或物品。

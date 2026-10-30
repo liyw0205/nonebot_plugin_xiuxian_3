@@ -13,7 +13,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 HELPER = ROOT / "scripts/install_plugin_source.py"
 MAINLINE = Path("剧情/主线.json")
-OLD_SHA = "9fd8d8a3675f4b04f58e3b3c631e8995a8bd2db51467abb64f8a4a66e6156341"
+OLD_SHA = "0f7cd87d1a9502dd2006ccc809b85383a1c26eea2f79dbd1ff3b4d0c9736e1db"
 
 
 def old_official_mainline() -> bytes:
@@ -89,6 +89,9 @@ def old_official_mainline() -> bytes:
         "lane.traveler.chapter.08",
         "lane.traveler.chapter.09",
         "lane.traveler.chapter.10",
+        "chapter.5.stage.1",
+        "chapter.5.stage.2",
+        "chapter.5.stage.3",
     ):
         start = text.index(f'      "key": "{key}"')
         try:
@@ -110,7 +113,7 @@ def old_official_mainline() -> bytes:
                 # Only the closing tail stage omits ahead reference; others must drop one.
                 # Only story-tail stages legitimately omit the ahead reference.
                 tail = key in (
-                    "chapter.4.stage.3",
+                    "chapter.5.stage.3",
                     "domain_frontier.protect.6",
                     "void_archive.return.8",
                     "lane.builder.chapter.10",
@@ -127,6 +130,8 @@ def old_official_mainline() -> bytes:
                 1,
             )
             assert '"dao_union"' not in section
+        if key == "chapter.4.stage.3":
+            assert '"next_stage_key"' not in section
         text = text[:start] + section + text[end:]
     blob = text.encode("utf-8")
     assert hashlib.sha256(blob).hexdigest() == OLD_SHA

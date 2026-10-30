@@ -218,7 +218,7 @@ def test_xuantian_mainline_chapter_two_content_runs_on_both_adapters() -> None:
                     assert settle_result.code == "TRAVEL_COMPLETED", (hop, settle_result.code, settle_result.message)
                 finale_claim = await send("claim-玄天新章", "领取主线奖励 玄天新章")
                 assert finale_claim.code == "MAINLINE_REWARD_CLAIMED"
-                assert finale_claim.data["next_stage_key"] is None
+                assert finale_claim.data["next_stage_key"] == "chapter.5.stage.1"
                 replay = await send("claim-玄天新章", "领取主线奖励 玄天新章")
                 assert replay.data["idempotent_replay"] is True
                 with runtime.repository._connect() as connection:
@@ -242,7 +242,7 @@ def test_mainline_tail_stage_may_close_without_next_stage_key(tmp_path: Path) ->
     data_dir = tmp_path / "content"
     shutil.copytree(source, data_dir)
     definitions = mainline_definitions(ContentBundle.load(data_dir), story_key=MAINLINE_STORY_KEY)
-    finale = next(item for item in definitions if item.key == "chapter.4.stage.3")
+    finale = next(item for item in definitions if item.key == "chapter.5.stage.3")
     assert finale.next_stage_key is None
     assert finale.objectives and finale.actions and finale.state_events and finale.retry_message
 
