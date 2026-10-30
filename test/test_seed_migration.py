@@ -13,7 +13,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 HELPER = ROOT / "scripts/install_plugin_source.py"
 MAINLINE = Path("剧情/主线.json")
-OLD_SHA = "0f7cd87d1a9502dd2006ccc809b85383a1c26eea2f79dbd1ff3b4d0c9736e1db"
+OLD_SHA = "9fd8d8a3675f4b04f58e3b3c631e8995a8bd2db51467abb64f8a4a66e6156341"
 
 
 def old_official_mainline() -> bytes:
@@ -130,9 +130,19 @@ def old_official_mainline() -> bytes:
                 1,
             )
             assert '"dao_union"' not in section
-        if key == "chapter.4.stage.3":
-            assert '"next_stage_key"' not in section
         text = text[:start] + section + text[end:]
+    # The three route-volume stages were appended after the previous last record,
+    # and appending turned that record's closing brace into a comma. Truncating at
+    # the previous last record restores the original tail exactly.
+    last = text.index('      "key": "lane.traveler.chapter.10"')
+    last_end = text.index("\n    }", last) + len("\n    }")
+    text = text[:last_end] + "\n  ]\n}\n"
+    # chapter.4.stage.3 gained a forward link in this slice; the old blob has none.
+    link = text.index('      "key": "chapter.4.stage.3"')
+    link_end = text.index("\n    }", link)
+    linked = text[link:link_end]
+    assert '\n      "next_stage_key": "chapter.5.stage.1",' in linked
+    text = text[:link] + linked.replace('\n      "next_stage_key": "chapter.5.stage.1",', '', 1) + text[link_end:]
     blob = text.encode("utf-8")
     assert hashlib.sha256(blob).hexdigest() == OLD_SHA
     return blob
