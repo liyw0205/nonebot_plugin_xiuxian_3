@@ -916,6 +916,33 @@
       "reputation_key": "local.xuantian.domain_front",
       "consume_target": true,
       "reward_labels": {}
+    },
+    {
+      "key": "bounty.ironwood_timber", "name": "铁木备料", "desc": "为宗门制器备下铁木林出的旧木，交付镇务入库。", "quality": "common",
+      "status": "open", "aliases": ["铁木备料"],
+      "required_realm": "qi_sensing", "required_layer": 2, "path_keys": [],
+      "weight": 100, "duration_seconds": 1800, "daily_limit": 1,
+      "target_kind": "inventory_gain", "target_key": "item.mat.wood", "target_amount": 6,
+      "reward_pool_key": "reward_pool.bounty.herb_supply", "reputation_key": "local.xuantian.new_town",
+      "consume_target": true, "reward_labels": {}
+    },
+    {
+      "key": "bounty.ironstone_delivery", "name": "铁石入库", "desc": "把铁木林采得的铁石送进镇务库房，供灵具修缮登记。", "quality": "common",
+      "status": "open", "aliases": ["铁石入库"],
+      "required_realm": "qi_sensing", "required_layer": 2, "path_keys": [],
+      "weight": 100, "duration_seconds": 1800, "daily_limit": 1,
+      "target_kind": "inventory_gain", "target_key": "item.ore.ironstone", "target_amount": 4,
+      "reward_pool_key": "reward_pool.bounty.cloud_mine", "reputation_key": "local.xuantian.new_town",
+      "consume_target": true, "reward_labels": {}
+    },
+    {
+      "key": "bounty.grotto_iron_order", "name": "洞天云铁呈交", "desc": "洞天二层带回的云铁质地沉厚，镇务按件收下并登记。", "quality": "rare",
+      "status": "open", "aliases": ["洞天云铁呈交"],
+      "required_realm": "golden_core", "required_layer": 1, "path_keys": [],
+      "weight": 100, "duration_seconds": 1800, "daily_limit": 1,
+      "target_kind": "inventory_gain", "target_key": "item.material.cloud_iron", "target_amount": 3,
+      "reward_pool_key": "reward_pool.bounty.herb_supply", "reputation_key": "local.xuantian.new_town",
+      "consume_target": true, "reward_labels": {}
     }
   ],
   "schema": "xiuxian.content"

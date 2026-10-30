@@ -472,6 +472,16 @@ head `6dcd8f3`）成功。未跑全量/压测/部署，未验 QQ 真机。
 3 passed（旧宿主升级、幂等、自定义种子保留）。develop CI（Quality and Release `40708847422`，
 head `66d34f6`）成功。未跑全量/压测/部署，未验 QQ 真机。
 
+产出兑换悬赏批次已在 `develop` 完成：`data/任务/悬赏.json` 新增 3 条交付型悬赏，
+把铁木林与洞天二层的产出接回悬赏榜——`bounty.ironwood_timber`（`item.mat.wood`×6）、
+`bounty.ironstone_delivery`（`item.ore.ironstone`×4）、`bounty.grotto_iron_order`
+（`item.material.cloud_iron`×3），均为 `target_kind=inventory_gain`、`consume_target=true`、
+`daily_limit=1`、`duration_seconds=1800`，复用既有 `reward_pool.bounty.*`，未新增物品或奖池。
+聚焦证据：`test_bounty_output_batch.py` 2 passed（三条契约、目标物与奖池存在、目标物确实由
+既有内容产出）、`test_bounty_depths_content.py` 6 passed、`test_bounty_batch.py` 与
+`test_seed_migration.py -k manifest` 7 passed（榜单仍为 3 条批次）。未跑全量/压测/部署，
+未验 QQ 真机。
+
 云城巡夜已在 `develop` 完成：`data/探索/模式.json` 新增 `explore.cloud_city_patrol`
 （`xuantian.cloud_city`，`golden_core` L1，150 秒、8 体力、每日 4 次、无战斗），
 `data/奖励/奖励.json` 新增 `reward_pool.exploration.cloud_city_patrol`（5 档加权，
