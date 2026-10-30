@@ -472,6 +472,17 @@ head `6dcd8f3`）成功。未跑全量/压测/部署，未验 QQ 真机。
 3 passed（旧宿主升级、幂等、自定义种子保留）。develop CI（Quality and Release `40708847422`，
 head `66d34f6`）成功。未跑全量/压测/部署，未验 QQ 真机。
 
+玄天洞天卷开篇（chapter.6.stage.1–3）已在 `develop` 完成：`data/剧情/主线.json` 新增
+`chapter.6.stage.1`（回 `xuantian.new_town` 接旧载）、`chapter.6.stage.2`（`explore.spring_gather`
+结算取得 `item.herb.spirit_leaf` ≥1）、`chapter.6.stage.3`（回镇合卷、尾关如实留空后继），
+三关正文均 ≥80 字、门槛 `qi_sensing` L2；`chapter.5.stage.3` 前链改为 `chapter.6.stage.1`。
+本卷只用普通移动可达地点：`cave.mist_grotto_2` 一类云舟专属地点不写 `cloud_boat_sessions`
+之外的通路，用 `travel_arrival` 指过去会做出永远无法完成的关卡，故不采用。聚焦证据：
+`test_mainline_chapter6.py` 2 passed（端到端链路 + 全部 `travel_arrival` 目标均可行走且非云舟
+专属）；`test_mainline_content.py`+`test_mainline_chapter5.py`+`test_mainline_chapter6.py`+
+`test_mainline.py`+`test_documentation.py` 全绿；`test_seed_migration.py` 反向助手字节级复现
+旧官方 blob。未跑全量/压测/部署，未验 QQ 真机。
+
 玄天航路卷开篇（chapter.5.stage.1–3）已在 `develop` 完成：`data/剧情/主线.json` 新增
 `chapter.5.stage.1`（抵达 `xuantian.floating_boat`，公开通路 青石镇→云城→云舟渡口）、
 `chapter.5.stage.2`（`explore.cloud_boat_trial` 结算取得 `item.ticket.cloud_boat_fragment` ≥1）、

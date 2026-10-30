@@ -128,3 +128,14 @@ v0.6 `story.mainline.dao_echoes` 已开放玩家流程：炼虚 L10 后可查询
 取得 `item.ticket.cloud_boat_fragment` ≥1、`chapter.5.stage.3` 经云城返回青石镇合卷；
 尾关不设 `next_stage_key`，前链由内容数据驱动。三关门槛 `golden_core` L1，沿用既有目标类型
 （`travel_arrival`/`exploration_reward`）、状态事件与失败重试语义，不新增通路、模式或物品。
+
+## 玄天洞天卷（chapter.6.stage.1–3）
+
+玄天主线第三卷开篇三关，全部只用普通移动可达的地点，绝不把 `travel_arrival` 指向云舟/虚空
+专属目的地（这类地点只写 `cloud_boat_sessions`，目标会永远无法完成）：
+`chapter.6.stage.1` 回青石镇接旧载（`travel_arrival` → `xuantian.new_town`）、
+`chapter.6.stage.2` 在灵泉谷结算 `explore.spring_gather` 取得 `item.herb.spirit_leaf` ≥1
+（`xuantian.new_town → xuantian.spirit_field`，90 秒/4 体力）、
+`chapter.6.stage.3` 回镇交还旧载并合卷。三关门槛 `qi_sensing` L2，与前序 15 关一致地
+沿用既有目标类型、状态事件与失败重试语义，不新增通路、模式、奖池或物品；
+`chapter.5.stage.3` 的 `next_stage_key` 前链到 `chapter.6.stage.1`，本卷尾关如实留空。

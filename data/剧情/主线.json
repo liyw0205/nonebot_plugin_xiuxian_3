@@ -2627,6 +2627,7 @@
         {"command": "前往", "argument": "青石镇", "description": "从云城走公开通路回到青石镇，结算移动后交付残票。"}
       ],
       "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.5.stage.3"]},
+      "next_stage_key": "chapter.6.stage.1",
       "retry": {
         "on_incomplete": "keep_running",
         "cooldown_seconds": 0,
@@ -2637,6 +2638,93 @@
       "prerequisites": ["chapter.5.stage.2"],
       "required_realm": "golden_core",
       "required_layer": 1,
+      "first_clear_reward": {"spirit_stones": 50, "service_reputation": 5},
+      "repeat_reward": {"spirit_stones": 20}
+    },
+    {
+      "key": "chapter.6.stage.1",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 6,
+      "stage": 1,
+      "name": "灵泉旧载",
+      "desc": "回青石镇整备，听镇务提起灵泉谷的旧载。",
+      "body": "合卷的凭证交回账册时，镇务翻出一页更早的旧载：灵泉谷的泉眼在玄天中层初定时就已登记，只是当年无人能给谷中灵叶定出价码，这页便一直压在册底。如今航路既已开篇，账册要有人亲自去谷中走一遭，把泉边的草木与清泉重新记回来。先回青石镇把旧载接在手上，再去谷口答话。",
+      "objectives": [
+        {"key": "accept_spirit_field_ledger", "type": "travel_arrival", "label": "在主线开始后回到青石镇接旧载", "destination_key": "xuantian.new_town"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "青石镇", "description": "沿公开通路回到青石镇，等待行程结束并结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.6.stage.1"]},
+      "next_stage_key": "chapter.6.stage.2",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "行程尚未在青石镇结算时关卡保持进行中，不扣主线奖励；重新启程并结算移动，即可接上旧载。"
+      },
+      "status": "open",
+      "aliases": ["灵泉旧载"],
+      "prerequisites": ["chapter.5.stage.3"],
+      "required_realm": "qi_sensing",
+      "required_layer": 2,
+      "first_clear_reward": {"spirit_stones": 40, "item.herb.spirit_leaf": 1},
+      "repeat_reward": {"spirit_stones": 20}
+    },
+    {
+      "key": "chapter.6.stage.2",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 6,
+      "stage": 2,
+      "name": "灵泉验叶",
+      "desc": "在灵泉谷结算一轮采集，取回谷中灵叶。",
+      "body": "谷口的守泉人只认谷里长出来的东西：灵泉谷的采集不比矿区考较气力，六息一株的活计里藏着泉眼的脾气。沿谷走完一轮，把至少一片灵叶攥在手里，才能证明这页旧载不是纸上的空话。采集有限量，走空了便改日再来，别拿旁处的叶子充数。",
+      "objectives": [
+        {"key": "spirit_leaf_ledger_proof", "type": "exploration_reward", "label": "在主线开始后的灵泉谷采集中取得灵叶", "mode_key": "explore.spring_gather", "location_key": "xuantian.spirit_field", "item_key": "item.herb.spirit_leaf", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "灵泉采集", "description": "在灵泉谷开始采集（消耗体力、每日有限次），行程结束结算。"},
+        {"command": "结算探索", "argument": "灵泉采集", "description": "结算本轮采集，取得至少一片灵叶。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.6.stage.2"]},
+      "next_stage_key": "chapter.6.stage.3",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "本轮采集尚未结算或尚无灵叶时关卡保持进行中，不扣主线奖励；补足体力再采一轮并结算，即可领取。"
+      },
+      "status": "open",
+      "aliases": ["灵泉验叶"],
+      "prerequisites": ["chapter.6.stage.1"],
+      "required_realm": "qi_sensing",
+      "required_layer": 2,
+      "first_clear_reward": {"item.herb.spirit_leaf": 2, "service_reputation": 5},
+      "repeat_reward": {"item.herb.spirit_leaf": 1}
+    },
+    {
+      "key": "chapter.6.stage.3",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 6,
+      "stage": 3,
+      "name": "旧载归册",
+      "desc": "带着灵叶回到青石镇，把灵泉谷旧载交还账册。",
+      "body": "灵叶在袖中散着清苦的气味，旧载终于有了能落笔的数字：谷口几处泉眼、岸边几样草木、清泉几日一涨，都在这一趟里记全。从灵泉谷回青石镇，把行程结算成抵达，再把灵叶交回镇务账册——洞天卷自此开篇，界壁那边的雾还等着它自己的名字。",
+      "objectives": [
+        {"key": "return_ledger_to_town", "type": "travel_arrival", "label": "在主线开始后回到青石镇交还旧载", "destination_key": "xuantian.new_town"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "青石镇", "description": "从灵泉谷走公开通路回青石镇，等待行程结束并结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.6.stage.3"]},
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "行程尚未回到青石镇结算时关卡保持进行中，不扣主线奖励；重新启程并结算移动，即可领回册之赏。"
+      },
+      "status": "open",
+      "aliases": ["旧载归册"],
+      "prerequisites": ["chapter.6.stage.2"],
+      "required_realm": "qi_sensing",
+      "required_layer": 2,
       "first_clear_reward": {"spirit_stones": 50, "service_reputation": 5},
       "repeat_reward": {"spirit_stones": 20}
     }

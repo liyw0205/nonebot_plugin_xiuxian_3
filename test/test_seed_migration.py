@@ -92,6 +92,9 @@ def old_official_mainline() -> bytes:
         "chapter.5.stage.1",
         "chapter.5.stage.2",
         "chapter.5.stage.3",
+        "chapter.6.stage.1",
+        "chapter.6.stage.2",
+        "chapter.6.stage.3",
     ):
         start = text.index(f'      "key": "{key}"')
         try:
@@ -113,7 +116,7 @@ def old_official_mainline() -> bytes:
                 # Only the closing tail stage omits ahead reference; others must drop one.
                 # Only story-tail stages legitimately omit the ahead reference.
                 tail = key in (
-                    "chapter.5.stage.3",
+                    "chapter.6.stage.3",
                     "domain_frontier.protect.6",
                     "void_archive.return.8",
                     "lane.builder.chapter.10",
@@ -131,7 +134,7 @@ def old_official_mainline() -> bytes:
             )
             assert '"dao_union"' not in section
         text = text[:start] + section + text[end:]
-    # The three route-volume stages were appended after the previous last record,
+    # The three grotto-volume stages were appended after the previous last record,
     # and appending turned that record's closing brace into a comma. Truncating at
     # the previous last record restores the original tail exactly.
     last = text.index('      "key": "lane.traveler.chapter.10"')

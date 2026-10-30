@@ -242,7 +242,7 @@ def test_mainline_tail_stage_may_close_without_next_stage_key(tmp_path: Path) ->
     data_dir = tmp_path / "content"
     shutil.copytree(source, data_dir)
     definitions = mainline_definitions(ContentBundle.load(data_dir), story_key=MAINLINE_STORY_KEY)
-    finale = next(item for item in definitions if item.key == "chapter.5.stage.3")
+    finale = next(item for item in definitions if item.key == "chapter.6.stage.3")
     assert finale.next_stage_key is None
     assert finale.objectives and finale.actions and finale.state_events and finale.retry_message
 
