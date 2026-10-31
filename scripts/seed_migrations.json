@@ -185,10 +185,11 @@
   },
   "图鉴/里程碑.json": {
     "old_sha256": {
-      "4600f72d3197621a7cecbd8e913e297b40535272568b2697532b8103d1ad7db2": "1fa98bcbd5c4234e4d11dd2c927be84fde9fe43f:data/图鉴/里程碑.json"
+      "4600f72d3197621a7cecbd8e913e297b40535272568b2697532b8103d1ad7db2": "1fa98bcbd5c4234e4d11dd2c927be84fde9fe43f:data/图鉴/里程碑.json",
+      "f8e21cdf6e33331a984a2d3e93fc6631c87181487911e3b18aeb930414ec58fb": "d7c996e819cf7396a59bf49640714cdde1c6d7dd:data/图鉴/里程碑.json"
     },
-    "new_sha256": "f8e21cdf6e33331a984a2d3e93fc6631c87181487911e3b18aeb930414ec58fb",
-    "new_commit": "d7c996e"
+    "new_sha256": "63b95d54309a893591811eae17c1c71e6921bbc3f75f6b0342c03a7fd992a47e",
+    "new_commit": "PENDING"
   },
   "任务/悬赏.json": {
     "old_sha256": {

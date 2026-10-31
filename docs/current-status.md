@@ -472,6 +472,15 @@ head `6dcd8f3`）成功。未跑全量/压测/部署，未验 QQ 真机。
 3 passed（旧宿主升级、幂等、自定义种子保留）。develop CI（Quality and Release `40708847422`，
 head `66d34f6`）成功。未跑全量/压测/部署，未验 QQ 真机。
 
+图鉴里程碑 v0.9 已在 `develop` 完成：`data/图鉴/里程碑.json` 12 条 → 15 条，新增三组
+指向**既有** `codex.place.*` 条目的里程碑——`codex.place.materials_three`（铁木林/玄武岩径/
+云铁矿区 → 青石镇名望 6）、`codex.place.grotto_three`（雾隐洞天一层/二层/云舟渡口 →
+青石镇名望 8）、`codex.place.city_three`（云城/云舟渡口/灵草谷 → 云城名望 8），`unlocks` 留空，
+未新增条目/物品/解锁。聚焦证据：`test_codex_milestone_v09.py` 2 passed（三条契约、条目存在性、
+名望键与上限可解析、无重复条目组）、`test_codex_milestone_content.py` 2 passed（已按 15 条更新
+固定顺序）、`test_seed_migration.py -k manifest` 与里程碑组共 7 passed。未跑全量/压测/部署，
+未验 QQ 真机。
+
 产出兑换悬赏批次已在 `develop` 完成：`data/任务/悬赏.json` 新增 3 条交付型悬赏，
 把铁木林与洞天二层的产出接回悬赏榜——`bounty.ironwood_timber`（`item.mat.wood`×6）、
 `bounty.ironstone_delivery`（`item.ore.ironstone`×4）、`bounty.grotto_iron_order`

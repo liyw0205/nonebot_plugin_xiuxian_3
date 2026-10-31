@@ -223,6 +223,60 @@
       },
       "unlocks": [],
       "status": "active"
+    },
+    {
+      "key": "codex.place.materials_three",
+      "name": "材料三径",
+      "desc": "收录铁木林、玄武岩径与云铁矿区三条采掘地点的图鉴后领取。",
+      "entry_keys": [
+      "codex.place.ironwood_grove",
+      "codex.place.basalt_pass",
+      "codex.place.cloud_mine"
+      ],
+      "reward": {
+        "type": "local_reputation",
+        "reputation_key": "local.xuantian.new_town",
+        "name": "青石镇名望",
+        "amount": 6
+      },
+      "unlocks": [],
+      "status": "active"
+    },
+    {
+      "key": "codex.place.grotto_three",
+      "name": "洞天三层",
+      "desc": "收录雾隐洞天一层、二层与云舟渡口三处洞天航路图鉴后领取。",
+      "entry_keys": [
+      "codex.place.mist_grotto",
+      "codex.place.mist_grotto_2",
+      "codex.place.floating_boat"
+      ],
+      "reward": {
+        "type": "local_reputation",
+        "reputation_key": "local.xuantian.new_town",
+        "name": "青石镇名望",
+        "amount": 8
+      },
+      "unlocks": [],
+      "status": "active"
+    },
+    {
+      "key": "codex.place.city_three",
+      "name": "云城三记",
+      "desc": "收录云城、渡口与灵草谷三处云城周边图鉴后领取。",
+      "entry_keys": [
+      "codex.place.cloud_city",
+      "codex.place.floating_boat",
+      "codex.place.herb_vale"
+      ],
+      "reward": {
+        "type": "local_reputation",
+        "reputation_key": "local.xuantian.cloud_city",
+        "name": "云城名望",
+        "amount": 8
+      },
+      "unlocks": [],
+      "status": "active"
     }
   ]
 }
