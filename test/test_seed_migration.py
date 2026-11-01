@@ -623,6 +623,8 @@ def old_official_guides() -> bytes:
             "guide.mine_entry",
             "guide.dispatch_entry",
             "guide.secret_realm_entry",
+            "guide.seeker_path_hint",
+            "guide.seeker_sect_gate",
         }
     ]
     for record in document["records"]:

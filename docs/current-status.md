@@ -472,6 +472,17 @@ head `6dcd8f3`）成功。未跑全量/压测/部署，未验 QQ 真机。
 3 passed（旧宿主升级、幂等、自定义种子保留）。develop CI（Quality and Release `40708847422`，
 head `66d34f6`）成功。未跑全量/压测/部署，未验 QQ 真机。
 
+引导第三阶段（`seeker` 寻道期）已在 `develop` 完成：实测 `data/引导/引导.json` 此前 6 条
+（mortal 三课 + cultivator 三条），`seeker` 阶段**零引导**——玩家在寻仙问道之后、入道之前没有任何
+指引。本轮新增 `guide.seeker_path_hint`（道途指引，无消耗、可重复）与 `guide.seeker_sect_gate`
+（山门指引，需在 `xuantian.sect_gate`、体力 1、可重复），均以 `intro_flag` 记账；并在
+`intro_rules._TIER_AVAILABILITY` 增加 `seeker -> (seeker, cultivator)`，使这两条不会因入道而变成
+不可达内容。毕业集合仍只统计 mortal 三课（`mortal_guides` 未变）。同时修正本卡此前的错误前提：
+注册表早已数据驱动（六个 `guide_*` 函数按调用派生），无需改硬编码表。聚焦证据：
+`test_guide_seeker_stage.py` 5 passed（契约、seeker 可见且 mortal 不可见、入道后仍可达、
+毕业集合不变、别名解析）、`test_world_intro_content.py` 与 `test_seed_migration.py -k "guide or manifest"`
+合计 12 passed。未跑全量/压测/部署，未验 QQ 真机。
+
 探索入口可发现性已在 `develop` 对齐：实测 25 条探索模式中有 5 条没有任何地点把其列为
 `actions`——`explore.cloud_city_patrol`（云城）、`explore.boundary_rift`（界隙）、
 `explore.dao_origin`（道源门）、`explore.demon_threshold`（魔界深渊门）、

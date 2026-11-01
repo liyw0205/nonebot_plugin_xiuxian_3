@@ -192,6 +192,54 @@
         "key": "guide.secret_realm_entry"
       },
       "key": "guide.secret_realm_entry"
+    },
+    {
+      "name": "道途指引",
+      "label": "道途指引",
+      "desc": "寻仙问道之后先看清六条道途的差别，再决定要不要入道。",
+      "status": "active",
+      "operation": "guide.seeker_path_hint",
+      "command": "道途指引",
+      "aliases": ["道途指引", "择道指引", "看道途"],
+      "requirements": [
+        {
+          "type": "stage",
+          "stage": "seeker"
+        }
+      ],
+      "cost": {},
+      "repeatable": true,
+      "output": {
+        "type": "intro_flag",
+        "key": "guide.seeker_path_hint"
+      },
+      "key": "guide.seeker_path_hint"
+    },
+    {
+      "name": "山门指引",
+      "label": "山门指引",
+      "desc": "入道之前去宗门山门走一趟，看看拜师与门规是怎么说的。",
+      "status": "active",
+      "operation": "guide.seeker_sect_gate",
+      "command": "山门指引",
+      "aliases": ["山门指引", "看山门"],
+      "requirements": [
+        {
+          "type": "stage",
+          "stage": "seeker"
+        }
+,        {
+          "type": "location",
+          "location_key": "xuantian.sect_gate"
+        }
+      ],
+      "cost": {"resource_key": "stamina", "amount": 1},
+      "repeatable": true,
+      "output": {
+        "type": "intro_flag",
+        "key": "guide.seeker_sect_gate"
+      },
+      "key": "guide.seeker_sect_gate"
     }
   ],
   "schema": "xiuxian.content"
