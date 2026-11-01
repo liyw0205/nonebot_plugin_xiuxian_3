@@ -156,9 +156,7 @@
       "environment": {
         "risk": "high"
       },
-      "actions": [
-        "world.intro.demon"
-      ],
+      "actions": ["world.intro.demon", "explore.demon_threshold"],
       "key": "demon.abyss_gate",
       "codex_entry_key": "codex.place.abyss_gate"
     },
@@ -270,9 +268,7 @@
         "training_bp": 11000
       },
       "local_reputation_maximum": 1000,
-      "actions": [
-        "read_entry_requirements"
-      ],
+      "actions": ["read_entry_requirements", "explore.cloud_city_patrol"],
       "codex_entry_key": "codex.place.cloud_city",
       "key": "xuantian.cloud_city"
     },
@@ -357,7 +353,7 @@
       "world": "虚空",
       "status": "open",
       "requirements": [{"type": "realm", "realm_key": "soul_transformation", "min_layer": 1}],
-      "actions": ["world.enter_void_route", "explore.void_route"],
+      "actions": ["world.enter_void_route"],
       "key": "void.portal",
       "codex_entry_key": "codex.place.void_portal"
     },
@@ -413,7 +409,7 @@
         {"type": "realm", "realm_key": "nascent_soul", "min_layer": 1},
         {"type": "intro_flag", "value": "story.mainline.three_realms"}
       ],
-      "actions": ["event.boundary_rift"],
+      "actions": ["event.boundary_rift", "explore.boundary_rift"],
       "aliases": ["界隙", "边界秘境"],
       "key": "cave.boundary_realm",
       "codex_entry_key": "codex.place.boundary_realm"
@@ -514,7 +510,7 @@
         {"type": "dao_fruit_progress", "minimum": 470}
       ],
       "environment": {"risk": "high"},
-      "actions": ["progression.trial.dao_origin"],
+      "actions": ["progression.trial.dao_origin", "explore.dao_origin"],
       "codex_entry_key": "codex.place.dao_origin_gate",
       "key": "dao.origin_gate"
     },
@@ -525,7 +521,7 @@
       "status": "open",
       "requirements": [{"type": "realm", "realm_key": "tribulation", "min_layer": 3}, {"type": "item", "item_key": "item.tribulation_token", "quantity": 1}],
       "environment": {"risk": "extreme"},
-      "actions": ["progression.tribulation_trial"],
+      "actions": ["progression.tribulation_trial", "explore.tribulation_echo"],
       "codex_entry_key": "codex.place.sky_terrace",
       "key": "tribulation.sky_terrace"
     },

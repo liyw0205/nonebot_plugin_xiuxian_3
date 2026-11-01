@@ -378,6 +378,18 @@ def old_official_locations() -> bytes:
         "sect_gate", "time_garden", "trade_port", "void_portal", "war_front",
     )
     text = (ROOT / "data" / LOCATION_FILE).read_text(encoding="utf-8")
+    # The discoverability slice rewrote exploration actions on existing records.
+    action_reverts = (
+        ('      "actions": ["read_entry_requirements", "explore.cloud_city_patrol"]', '      "actions": [\n        "read_entry_requirements"\n      ]'),
+        ('      "actions": ["event.boundary_rift", "explore.boundary_rift"]', '      "actions": ["event.boundary_rift"]'),
+        ('      "actions": ["progression.trial.dao_origin", "explore.dao_origin"]', '      "actions": ["progression.trial.dao_origin"]'),
+        ('      "actions": ["world.intro.demon", "explore.demon_threshold"]', '      "actions": [\n        "world.intro.demon"\n      ]'),
+        ('      "actions": ["progression.tribulation_trial", "explore.tribulation_echo"]', '      "actions": ["progression.tribulation_trial"]'),
+        ('      "actions": ["world.enter_void_route"]', '      "actions": ["world.enter_void_route", "explore.void_route"]'),
+    )
+    for new_line, old_line in action_reverts:
+        assert new_line in text, new_line
+        text = text.replace(new_line, old_line, 1)
     for tail in added_keys:
         pattern = f',\n      "codex_entry_key": "codex.place.{tail}"'
         assert pattern in text, tail

@@ -472,6 +472,18 @@ head `6dcd8f3`）成功。未跑全量/压测/部署，未验 QQ 真机。
 3 passed（旧宿主升级、幂等、自定义种子保留）。develop CI（Quality and Release `40708847422`，
 head `66d34f6`）成功。未跑全量/压测/部署，未验 QQ 真机。
 
+探索入口可发现性已在 `develop` 对齐：实测 25 条探索模式中有 5 条没有任何地点把其列为
+`actions`——`explore.cloud_city_patrol`（云城）、`explore.boundary_rift`（界隙）、
+`explore.dao_origin`（道源门）、`explore.demon_threshold`（魔界深渊门）、
+`explore.tribulation_echo`（天劫台），玩家在自己地点看不到该活动；另有 `void.portal`
+错误列出属于 `void.first_route` 的 `explore.void_route`。本轮在 `data/地图/地点.json`
+把这 5 条模式登记到其 `location_key` 对应地点，并从虚空门户移除错位动作，未新增模式、
+地点或字段，未改探索准入/体力/配额/战斗/结算语义。聚焦证据：
+`test_exploration_discoverability.py` 3 passed（每条 open 模式必须出现在自己地点的 actions、
+地点不得列出他人模式、虚空门户回归）、`test_seed_migration.py -k "location or manifest or reverse"`
+10 passed（反向助手同步还原 6 条 actions 改动后仍字节级复现旧官方 blob）。
+未跑全量/压测/部署，未验 QQ 真机，未发布新版本。
+
 云城巡夜战斗版已在 `develop` 完成，并修掉一个既有缺陷：`enemy.bandit_apprentice`
 此前缺 `combat_profile` 与 `stats.agility`，`combat/rules.py` 的 `enemy_definition` 直接抛
 `ValueError: unsupported enemy`——该敌人被悬赏引用却无法进入任何战斗；补档案后又暴露

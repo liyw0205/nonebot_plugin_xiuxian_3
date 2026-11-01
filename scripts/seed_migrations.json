@@ -104,10 +104,11 @@
     "old_sha256": {
       "d2e8dcde2bc4fd9daa0bde5ba3ce2b024ffcf9aabf52b9a3732d27bec2694efa": "44be52139804523570ec1f2588b8f9bdf568c8a0:data/地图/地点.json",
       "206a98cbe488ef5130cc6dcec124de19667c7b233a2d0e79416894a52a1f7d43": "38133f2007e7cbf0bf69425517724c57c9668e58:data/地图/地点.json",
-      "b775aa8bdd369b60efa638f944312593e2fbe4d588d73f0199ae5902ba1c0e4f": "2ee45a684fd6bb214374769c4fb8e6e48811c5b7:data/地图/地点.json"
+      "b775aa8bdd369b60efa638f944312593e2fbe4d588d73f0199ae5902ba1c0e4f": "2ee45a684fd6bb214374769c4fb8e6e48811c5b7:data/地图/地点.json",
+      "4252694487c80791ab766aef5a516bd45824ae6dd86b19ee5aae37c7a6b60988": "38a07cd4aa5a764672adb1faae3da250f2b093eb:data/地图/地点.json"
     },
-    "new_sha256": "4252694487c80791ab766aef5a516bd45824ae6dd86b19ee5aae37c7a6b60988",
-    "new_commit": "c35c1b78adf9c46393de8c3db0dc3606a572751b"
+    "new_sha256": "bff9e43057f4283774796a4e02b5d58c3c8db301d1a1378c9bba82ead772fe1d",
+    "new_commit": "PENDING"
   },
   "探索/模式.json": {
     "old_sha256": {
