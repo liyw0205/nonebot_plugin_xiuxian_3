@@ -18,6 +18,7 @@
     {"key": "encounter.tribulation.sky_terrace", "name": "天劫回音遭遇", "desc": "渡劫台上凝成的天劫回音。", "status": "active", "candidates": [{"enemy_key": "enemy.tribulation_heaven", "weight": 100}]},
     {"key": "encounter.void.time_garden", "name": "时序福地遭遇", "desc": "时序福地中徘徊的时光残影与守园人。", "status": "active", "candidates": [{"enemy_key": "enemy.time_garden_echo", "weight": 60}, {"enemy_key": "enemy.time_garden_keeper", "weight": 40}]},
     {"key": "encounter.cave.ancient_domain", "name": "远古洞天遭遇", "desc": "洞天禁制间游走的守禁灵卫与旧日残影。", "status": "active", "candidates": [{"enemy_key": "enemy.ancient_domain_warden", "weight": 60}, {"enemy_key": "enemy.ancient_domain_echo", "weight": 40}]},
-    {"key": "encounter.demon.abyss_depths", "name": "魔渊深层遭遇", "desc": "深层魔气中潜伏的猎手与散不去的怨影。", "status": "active", "candidates": [{"enemy_key": "enemy.abyss_depth_stalker", "weight": 55}, {"enemy_key": "enemy.abyss_pollution_wraith", "weight": 45}]}
+    {"key": "encounter.demon.abyss_depths", "name": "魔渊深层遭遇", "desc": "深层魔气中潜伏的猎手与散不去的怨影。", "status": "active", "candidates": [{"enemy_key": "enemy.abyss_depth_stalker", "weight": 55}, {"enemy_key": "enemy.abyss_pollution_wraith", "weight": 45}]},
+    {"key": "encounter.xuantian.cloud_city", "name": "云城巡夜遭遇", "desc": "云城街巷与夜市边缘伏着的劫修与游荡妖兽。", "status": "active", "candidates": [{"enemy_key": "enemy.bandit_apprentice", "weight": 70}, {"enemy_key": "enemy.wood_rat", "weight": 30}]}
   ]
 }

@@ -112,25 +112,27 @@
   "探索/模式.json": {
     "old_sha256": {
       "46b445e534f5e4778923ef2fa29505ecc7fd5212679840a2e89f625ab6655cdb": "2ee45a684fd6bb214374769c4fb8e6e48811c5b7:data/探索/模式.json",
-      "2f5c61d8adc3b09c4c9759ff68731deb350fa7370560fbb7c6ae521c560eb472": "c35c1b78adf9c46393de8c3db0dc3606a572751b:data/探索/模式.json"
+      "2f5c61d8adc3b09c4c9759ff68731deb350fa7370560fbb7c6ae521c560eb472": "c35c1b78adf9c46393de8c3db0dc3606a572751b:data/探索/模式.json",
+      "42bb4af46071bbb391cd309c8b1403bec642c3f3e681fe63f2f50679ac8aa6ad": "2f05ee4de43d2c983d2b1b94a573e64d9cfff79a:data/探索/模式.json"
     },
-    "new_sha256": "42bb4af46071bbb391cd309c8b1403bec642c3f3e681fe63f2f50679ac8aa6ad",
-    "new_commit": "81f28fa7c36574ef6cfe659a703fd3d63711c5b2"
+    "new_sha256": "95a81877438ce59e1fefb4054b6eb19149e0354d6d362ce652e9f8db04f19669",
+    "new_commit": "PENDING"
   },
   "战斗/敌人.json": {
     "old_sha256": {
-      "e171189c111d361becd7f4907993e1dce35456d9ea061fa7565d212d86796726": "2ee45a684fd6bb214374769c4fb8e6e48811c5b7:data/战斗/敌人.json"
+      "e171189c111d361becd7f4907993e1dce35456d9ea061fa7565d212d86796726": "2ee45a684fd6bb214374769c4fb8e6e48811c5b7:data/战斗/敌人.json",
+      "501f749a4c716b2985e5302347dd2b1e430b0882ace6f09aae4097a3f752c650": "2f05ee4de43d2c983d2b1b94a573e64d9cfff79a:data/战斗/敌人.json"
     },
-    "new_sha256": "501f749a4c716b2985e5302347dd2b1e430b0882ace6f09aae4097a3f752c650",
-    "new_commit": "c35c1b78adf9c46393de8c3db0dc3606a572751b"
+    "new_sha256": "c12c85766491f9fe4601153406f920a8d2cc16bc77c28ccff69831d966705d45",
+    "new_commit": "PENDING"
   },
   "战斗/遭遇池.json": {
     "old_sha256": {
       "c82ddc6feb2621ca5da2da4063d0c286a563efa0736f09491789f003d6665a34": "2ee45a684fd6bb214374769c4fb8e6e48811c5b7:data/战斗/遭遇池.json",
-      "3a07338f675db50afee396c3b23a42092843719997709f212f20c3b4c2a57f3a": "c35c1b78adf9c46393de8c3db0dc3606a572751b:data/战斗/遭遇池.json"
+      "3a07338f675db50afee396c3b23a42092843719997709f212f20c3b4c2a57f3a": "2f05ee4de43d2c983d2b1b94a573e64d9cfff79a:data/战斗/遭遇池.json"
     },
-    "new_sha256": "3a07338f675db50afee396c3b23a42092843719997709f212f20c3b4c2a57f3a",
-    "new_commit": "ca2aca02d7d0732e150a6dacf5ed4e4113a1dc52"
+    "new_sha256": "392b5b0d40c7f576366cdf165bdd6ccf0a814dee943faedd71690d9daf23c03d",
+    "new_commit": "PENDING"
   },
   "奖励/奖励.json": {
     "old_sha256": {

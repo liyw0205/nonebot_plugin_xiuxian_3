@@ -488,8 +488,8 @@
       "daily_limit": 4,
       "random_pool": "gather.cloud_city_patrol",
       "reward_pool_key": "reward_pool.exploration.cloud_city_patrol",
-      "battle_chance_bp": 0,
-      "enemy_pool_key": null,
+      "battle_chance_bp": 3500,
+      "enemy_pool_key": "encounter.xuantian.cloud_city",
       "access_any": [],
       "status": "open"
     }

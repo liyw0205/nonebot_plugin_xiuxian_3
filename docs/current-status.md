@@ -472,6 +472,18 @@ head `6dcd8f3`）成功。未跑全量/压测/部署，未验 QQ 真机。
 3 passed（旧宿主升级、幂等、自定义种子保留）。develop CI（Quality and Release `40708847422`，
 head `66d34f6`）成功。未跑全量/压测/部署，未验 QQ 真机。
 
+云城巡夜战斗版已在 `develop` 完成，并修掉一个既有缺陷：`enemy.bandit_apprentice`
+此前缺 `combat_profile` 与 `stats.agility`，`combat/rules.py` 的 `enemy_definition` 直接抛
+`ValueError: unsupported enemy`——该敌人被悬赏引用却无法进入任何战斗；补档案后又暴露
+`BattleRequirementError: battle location differs from exploration snapshot`，故把它的
+`location_key` 由 `xuantian.outskirts` 迁到 `xuantian.cloud_city`（与其拦路劫修设定相容，
+且它本就不在近郊遭遇池）。同时新增遭遇池 `encounter.xuantian.cloud_city`
+（劫修学徒 70 / 木鼠 30），`explore.cloud_city_patrol` 的 `battle_chance_bp` 0→3500。
+澄清一个此前的误判：`settle_exploration` 在 `combat_pending` 时会自动开战并打完再返回，
+所以返回 `EXPLORATION_SETTLED` 是成功而非未触发。聚焦证据：
+`test_exploration_cloud_city_patrol_battle.py` 3 passed（敌人可解析、模式/池契约、
+结算经真实战斗且 `battle_sessions` 恰一行）。未跑全量/压测/部署，未验 QQ 真机。
+
 图鉴里程碑 v0.9 已在 `develop` 完成：`data/图鉴/里程碑.json` 12 条 → 15 条，新增三组
 指向**既有** `codex.place.*` 条目的里程碑——`codex.place.materials_three`（铁木林/玄武岩径/
 云铁矿区 → 青石镇名望 6）、`codex.place.grotto_three`（雾隐洞天一层/二层/云舟渡口 →

@@ -97,7 +97,7 @@
     {
       "name": "劫修学徒",
       "desc": "在近郊拦路掠夺的年轻劫修，刀法粗疏，却已懂得以灵力伤人。",
-      "location_key": "xuantian.outskirts",
+      "location_key": "xuantian.cloud_city",
       "requirements": [
         {
           "type": "realm",
@@ -108,7 +108,8 @@
       "stats": {
         "hp": 180,
         "attack": 26,
-        "initiative": 12
+        "initiative": 12,
+        "agility": 10
       },
       "skills": [
         "enemy_skill.blade_wave"
@@ -116,6 +117,11 @@
       "reward_refs": [
         "reward.battle.bandit_apprentice"
       ],
+      "combat_profile": {
+        "random_pool_key": "battle.enemy.bandit_apprentice",
+        "reward": {"spirit_stones": 6},
+        "drop_pool_key": "reward_pool.enemy.early"
+      },
       "key": "enemy.bandit_apprentice",
       "status": "active"
     },
