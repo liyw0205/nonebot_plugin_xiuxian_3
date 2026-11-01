@@ -2805,6 +2805,7 @@
         {"command": "前往", "argument": "青石镇", "description": "从云城走公开通路回到青石镇，结算移动后交铁记功。"}
       ],
       "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.7.stage.3"]},
+      "next_stage_key": "chapter.8.stage.1",
       "retry": {
         "on_incomplete": "keep_running",
         "cooldown_seconds": 0,
@@ -2813,6 +2814,94 @@
       "status": "open",
       "aliases": ["归镇记功"],
       "prerequisites": ["chapter.7.stage.2"],
+      "required_realm": "golden_core",
+      "required_layer": 1,
+      "first_clear_reward": {"spirit_stones": 60, "service_reputation": 5},
+      "repeat_reward": {"spirit_stones": 20}
+    },
+    {
+      "key": "chapter.8.stage.1",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 8,
+      "stage": 1,
+      "name": "岩径启程",
+      "desc": "从近郊拐进玄武岩径，把这一趟试炼的路先走明白。",
+      "body": "近郊往东有一条被碎石压出来的窄径，尽头是玄武岩垒成的旧试炼场。镇务把话说明白：岩径不算险地，却也不是散步的地方，径上每隔一段就有伏着的岩兽与阵纹残迹，走完全程要留够体力和时辰。这卷不考你打得多漂亮，只考你肯不肯真的走进去、把往返的路记在册上。先沿公开通路走到岩径入口，把启程这趟结算成抵达。",
+      "objectives": [
+        {"key": "reach_basalt_pass", "type": "travel_arrival", "label": "在主线开始后抵达玄武岩径", "destination_key": "xuantian.basalt_pass"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "近郊", "description": "从青石镇走公开通路前往玄天近郊，行程结束后结算移动。"},
+        {"command": "前往", "argument": "玄武岩径", "description": "从近郊拐入玄武岩径，结算移动后抵达试炼场入口。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.8.stage.1"]},
+      "next_stage_key": "chapter.8.stage.2",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "行程尚未在玄武岩径结算时关卡保持进行中，不扣主线奖励；补足体力再走一次，结算抵达后即可领取。"
+      },
+      "status": "open",
+      "aliases": ["岩径启程"],
+      "prerequisites": ["chapter.7.stage.3"],
+      "required_realm": "golden_core",
+      "required_layer": 1,
+      "first_clear_reward": {"spirit_stones": 40},
+      "repeat_reward": {"spirit_stones": 20}
+    },
+    {
+      "key": "chapter.8.stage.2",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 8,
+      "stage": 2,
+      "name": "岩径历练",
+      "desc": "在玄武岩径走完一轮历练，带回一块阵砂。",
+      "body": "试炼场里的岩兽不吃话术，只认脚步。一轮历练二百四十息，六成的机会会撞上守径的岩兽或阵纹所化的傀儡，撞上了就得打完再往前走；打不动也不要紧，退回来养好伤再进。这一趟要带回的是阵砂——阵堂炼纹用的底料，岩径里才有，别处采不到。结算时手里至少攥住一块，才算真的走过这一轮。",
+      "objectives": [
+        {"key": "basalt_array_sand", "type": "exploration_reward", "label": "在主线开始后的岩径历练中取得阵砂", "mode_key": "explore.trial_basalt_pass", "location_key": "xuantian.basalt_pass", "item_key": "item.mat.array_sand", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "玄武岩径历练", "description": "在玄武岩径开始历练（消耗体力、每日四次），随后发送 `结算探索` 结算。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.8.stage.2"]},
+      "next_stage_key": "chapter.8.stage.3",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未结算历练或未取得阵砂时关卡保持进行中，不扣主线奖励；补足体力再走一轮并结算，即可领取。"
+      },
+      "status": "open",
+      "aliases": ["岩径历练"],
+      "prerequisites": ["chapter.8.stage.1"],
+      "required_realm": "golden_core",
+      "required_layer": 1,
+      "first_clear_reward": {"item.mat.array_sand": 2, "service_reputation": 5},
+      "repeat_reward": {"spirit_stones": 20}
+    },
+    {
+      "key": "chapter.8.stage.3",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 8,
+      "stage": 3,
+      "name": "归镇交割",
+      "desc": "带着阵砂沿原路回镇，把岩径这一卷交还账册。",
+      "body": "阵砂在袋里硌得慌，路却比来时短。从岩径退回近郊，再从近郊走回青石镇，两段行程都要结算，账册才认这一趟。镇务把阵砂过了秤，说岩径这处试炼场从玄天初定就立着，只是这些年没人愿意为它单独立卷；如今补上了，阵堂那边也能按册领料。玄天卷到这一层，近郊的边角算是走遍了。",
+      "objectives": [
+        {"key": "return_town_with_array_sand", "type": "travel_arrival", "label": "在主线开始后带着阵砂回到青石镇", "destination_key": "xuantian.new_town"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "近郊", "description": "从玄武岩径退回玄天近郊，行程结束后结算移动。"},
+        {"command": "前往", "argument": "青石镇", "description": "从近郊走公开通路回到青石镇，结算移动后交割阵砂。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.8.stage.3"]},
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "行程尚未回到青石镇结算时关卡保持进行中，不扣主线奖励；重新启程并结算移动，即可领交割之赏。"
+      },
+      "status": "open",
+      "aliases": ["归镇交割"],
+      "prerequisites": ["chapter.8.stage.2"],
       "required_realm": "golden_core",
       "required_layer": 1,
       "first_clear_reward": {"spirit_stones": 60, "service_reputation": 5},

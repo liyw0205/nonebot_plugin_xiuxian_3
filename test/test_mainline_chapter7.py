@@ -205,7 +205,7 @@ def test_xuantian_grotto_second_layer_is_playable_end_to_end() -> None:
                     _context(user, "s3-claim", "s3-claim"), "领取主线奖励 chapter.7.stage.3"
                 )
                 assert third.code == "MAINLINE_REWARD_CLAIMED", third
-                assert third.data.get("next_stage_key") in (None, "")
+                assert third.data["next_stage_key"] == "chapter.8.stage.1"
 
                 replay = await runtime.dispatch(
                     _context(user, "s3-replay", "s3-claim"), "领取主线奖励 chapter.7.stage.3"

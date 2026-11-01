@@ -472,6 +472,18 @@ head `6dcd8f3`）成功。未跑全量/压测/部署，未验 QQ 真机。
 3 passed（旧宿主升级、幂等、自定义种子保留）。develop CI（Quality and Release `40708847422`，
 head `66d34f6`）成功。未跑全量/压测/部署，未验 QQ 真机。
 
+玄天玄武卷（chapter.8.stage.1–3）已在 `develop` 完成：`xuantian.basalt_pass`（玄武岩径）
+此前可徒步抵达、且有 `explore.trial_basalt_pass`（聚气 L3、240 秒、9 体力、每日 4 次、
+`battle_chance_bp` 6000、产阵砂/铁石/灵石），却从未被任何主线目标使用。本轮新增
+`chapter.8.stage.1`（近郊→岩径抵达）、`chapter.8.stage.2`（岩径历练取得 `item.mat.array_sand` ≥1）、
+`chapter.8.stage.3`（岩径→近郊→青石镇交割、尾关如实留空后继），`chapter.7.stage.3` 前链改为
+`chapter.8.stage.1`；三关门槛 `golden_core` L1，不低于前卷，不静默放宽。聚焦证据：
+`test_mainline_chapter8.py` 2 passed（端到端 岩径→历练→归镇、提前领取被拒、逐关领取、
+幂等回放、三条状态事件；以及 `travel_arrival` 目标必为通路端点且非云舟终点）、
+`test_mainline_content.py`/`test_mainline_chapter7.py`/`test_documentation.py` 合计 19 passed、
+`test_seed_migration.py` 反向助手仍字节级复现旧官方 blob（`9fd8d8a3`）。未跑全量/压测/部署，
+未验 QQ 真机。
+
 引导第三阶段（`seeker` 寻道期）已在 `develop` 完成：实测 `data/引导/引导.json` 此前 6 条
 （mortal 三课 + cultivator 三条），`seeker` 阶段**零引导**——玩家在寻仙问道之后、入道之前没有任何
 指引。本轮新增 `guide.seeker_path_hint`（道途指引，无消耗、可重复）与 `guide.seeker_sect_gate`

@@ -98,6 +98,9 @@ def old_official_mainline() -> bytes:
         "chapter.7.stage.1",
         "chapter.7.stage.2",
         "chapter.7.stage.3",
+        "chapter.8.stage.1",
+        "chapter.8.stage.2",
+        "chapter.8.stage.3",
     ):
         start = text.index(f'      "key": "{key}"')
         try:
@@ -119,7 +122,7 @@ def old_official_mainline() -> bytes:
                 # Only the closing tail stage omits ahead reference; others must drop one.
                 # Only story-tail stages legitimately omit the ahead reference.
                 tail = key in (
-                    "chapter.7.stage.3",
+                    "chapter.8.stage.3",
                     "domain_frontier.protect.6",
                     "void_archive.return.8",
                     "lane.builder.chapter.10",
