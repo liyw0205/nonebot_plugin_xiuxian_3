@@ -489,7 +489,8 @@ OneBot 纯文本降级保留可读命令，不泄露 `command:` 或稳定键。�
 批次不含旧固定条目）与 `test_player_interaction.py`（寻道期引导链接）在未改动 HEAD 上同样失败，
 经 stash 对照确认为既有失败。`compileall`、`git diff --check` 通过。develop CI（Quality and Release
 `41462824552`，head `0695ec8`）的 quality 3.11/3.12 与 install-smoke 全部成功，release 按条件跳过。
-未跑全量/压测/部署，未验 QQ 真机，未发版。
+main CI（`41466893645`，head `f0d58e9`）的 quality 3.11/3.12 与 install-smoke 同样全部成功，
+release 按条件跳过。未跑全量/压测/部署，未验 QQ 真机，未发版。
 
 居所物资箱已在 `develop` 完成（业务提交 `3b17af7`、文档 `f2b4ce1`）：
 `capacity.storage_slots` 正式生效，客房/小院/灵圃小院分别提供 10/20/24 格；租约快照冻结容量，
