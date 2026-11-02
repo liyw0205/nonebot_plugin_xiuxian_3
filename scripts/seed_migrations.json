@@ -215,9 +215,10 @@
   },
   "生活/生活.json": {
     "old_sha256": {
-      "79fc40e08fd466619addec23831128366a9f34fa367e9d956c4da2ae465f283d": "0aae79a013b2a1783a4d9a8bd172c81c3d5df126:data/生活/生活.json"
+      "79fc40e08fd466619addec23831128366a9f34fa367e9d956c4da2ae465f283d": "0aae79a013b2a1783a4d9a8bd172c81c3d5df126:data/生活/生活.json",
+      "1a4587e0c77928b3ba77d23957170bd0fcb6b66da6625b8d8a1cb017029b6d8f": "8065415af3e9ecf6c3e6cf98f32ba87da45e623d:data/生活/生活.json"
     },
-    "new_sha256": "1a4587e0c77928b3ba77d23957170bd0fcb6b66da6625b8d8a1cb017029b6d8f",
-    "new_commit": "6007d3198976b00329ba0205c9e676b7cf7c0044"
+    "new_sha256": "0ae0c808cee854e55b9925b4449747b04b83c7c1615d7ee043dc3fd4399edd46",
+    "new_commit": "ab63dd373a5c718d1deecef27766a2c1eeb5960a"
   }
 }
