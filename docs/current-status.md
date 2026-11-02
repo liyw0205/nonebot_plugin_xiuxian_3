@@ -472,6 +472,18 @@ head `6dcd8f3`）成功。未跑全量/压测/部署，未验 QQ 真机。
 3 passed（旧宿主升级、幂等、自定义种子保留）。develop CI（Quality and Release `40708847422`，
 head `66d34f6`）成功。未跑全量/压测/部署，未验 QQ 真机。
 
+居所休整与休整位已在 `develop` 完成（业务提交 `ab63dd3`、种子 provenance `dca3294`、
+文档 `eff34a8`）：`data/生活/生活.json` 三处居所新增 `rest` 块（30 分钟、恢复体力/精力各 8、
+每日 2 次），租约快照写入 `rest_slots` 与休整参数，旧快照缺字段按当前居所定义回退；新增
+`rest_sessions` 表与 `RestRepositoryMixin`，`休整`/`结算休整` 支持活动阻塞、每日上限、
+资源已满不占次数、按上限封顶恢复、operation 回放与重启后结算；`我的居所` 显示休整位、
+今日次数与静养结束时间。聚焦证据：`test_livelihood_rest.py` 6 passed；
+`test_livelihood_residence_content.py` + `test_livelihood_field_selection.py` 16 passed；
+`test_livelihood.py` 24 passed；`test_seed_migration.py -k "manifest or reverse"` 9 passed；
+`test_documentation.py` 2 passed；`compileall`、`git diff --check` 通过。develop CI
+（Quality and Release `41423312864`，head `eff34a8`）成功。未跑全量/压测/部署，
+未验 QQ 真机，未发版。
+
 灵圃小院与多垄灵田已在 `develop` 完成（业务提交 `6007d31`、种子 provenance `d4acab8`、
 文档 `ffc10a8`）：`data/生活/生活.json` 新增 `residence.herb_court`（青石镇名望 60、
 150 灵石/7 日、`capacity.plots=2`）与 `crop.cloud_rice`（灵叶×2 作种、6 小时、维护 2 次、
