@@ -492,6 +492,38 @@ OneBot 纯文本降级保留可读命令，不泄露 `command:` 或稳定键。�
 main CI（`41466893645`，head `f0d58e9`）的 quality 3.11/3.12 与 install-smoke 同样全部成功，
 release 按条件跳过。未跑全量/压测/部署，未验 QQ 真机，未发版。
 
+时序残响与祖灵支脉秘境扩展已在 `develop` 完成（业务提交 `6f8682c`、种子 provenance `f4eaaef`、
+QQ/OneBot 呈现钉值 `9f38bd8`）：`data/冒险/秘境.json` 由 5 条通用记录增至 7 条——
+`instance.secret_realm.time_garden_echo`（时序残响，`cave.time_garden`、炼虚 L1、体力 25、每周 1 次、无凭证，
+四节点 `resource→encounter→choice→encounter`）与 `instance.secret_realm.ancestral_vein`
+（祖灵支脉，`beast.ancestral_lake`、化神 L1、体力 30、每周 1 次、无凭证，同构四节点）。
+两条均 `record_type=common`，由既有通用秘境引擎驱动，不新增表、命令、物品、地点、图鉴或终局写入；
+首通分别为时痕草×2+灵石 200 与兽血×2+三界贸易口名望 8+灵石 150，再入按 2:1 权重抽取；
+祖灵支脉只读境界与地点，不要求祖灵殿的妖界声望 3000 或血脉稳定 5000 bp，不写 `story.ancestral_hall`。
+预览补齐只读资格判断（地点/境界/体力/凭证/周期次数/进行中的秘境与长时行动），不建运行、不扣资源；
+列表为可进入项附 `进入秘境 <中文名>` 蓝字，单项预览只显示该秘境并最多附一个「进入此秘境」按钮；
+`修仙帮助 探索` 追加数据驱动的七条通用秘境列表（无按钮）；QQ 原生 Markdown+单按钮，
+OneBot/未声明 keyboard 的 AppID 降级为「可进入（进入秘境 …）」与「可发送：进入秘境 …」，
+不保留 `command:`、不暴露稳定键。`进入秘境` 无参提示改为从内容派生，不再漏列新秘境。
+官方种子旧 blob `166354ed…`（provenance `2c3c710…`）与新 blob `a886eea7…` 已登记迁移，
+反向助手用 `test/fixtures/official_seeds/common_secret_realms.json` 归档旧整文件。
+顺带纠正两处与本版内容不符的过期断言：`cave.ancient_domain` 自 v0.7 探索内容起确为
+`open`（化神 L1+`item.domain_core`×1），`test_m9_content_integrity.py` 的盘点钉值同步为
+modes 23/悬赏 41/配方 36/敌人 61——两者在未改动 HEAD 上同样失败，非本版引入。
+聚焦证据：`test_secret_realm_expansion.py` 6 passed（内容合同与坏引用拒绝、预览资格/蓝字/单按钮/
+QQ 原生 keyboard/OneBot 文本降级、只读零写、专用与未知秘境拒绝、探索帮助七条链接、首通/周限/
+重复池/过期退款、祖灵支脉重启续跑与结算幂等）；通用秘境组
+`test_secret_realm_content.py`+`instance_content`+`reward_settlement`+`upper`+`ironwood`+
+`intro`+`expansion` 85 passed；帮助/呈现/文档/消息/QQ 能力/仓储边界 31 passed；
+`test_content.py` 10 passed；`test_m9_content_integrity.py` 9 passed；
+`test_seed_migration.py` 全量 29 passed（含新反向助手与迁移/自定义保留/回退），
+`-k "manifest or reverse"` 10 passed；`compileall`、`git diff --check` 通过。
+专用秘境组 42 passed、8 项既有失败（`test_boundary_rift_secret_realm.py` 5 项
+`PERSISTENCE_ERROR≠BOUNDARY_RIFT_COMBAT_PENDING`、`test_ancestral_hall_secret_realm.py` 3 项
+`strategy.ancestral_spirit.bloodline_recovery`）与未改动 HEAD 相同，非本版引入。
+develop CI（Quality and Release `41501923998`，head `9f38bd8`）的 quality 3.11/3.12 与
+install-smoke 全部成功，release 按条件跳过。未跑全量/压测/部署，未验 QQ 真机，未发版。
+
 居所物资箱已在 `develop` 完成（业务提交 `3b17af7`、文档 `f2b4ce1`）：
 `capacity.storage_slots` 正式生效，客房/小院/灵圃小院分别提供 10/20/24 格；租约快照冻结容量，
 旧快照缺字段按当前居所定义回退。`存入居所`/`取回居所` 支持同格合并、满格拒绝新物品种类、
