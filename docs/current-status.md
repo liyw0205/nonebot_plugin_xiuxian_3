@@ -472,6 +472,23 @@ head `6dcd8f3`）成功。未跑全量/压测/部署，未验 QQ 真机。
 3 passed（旧宿主升级、幂等、自定义种子保留）。develop CI（Quality and Release `40708847422`，
 head `66d34f6`）成功。未跑全量/压测/部署，未验 QQ 真机。
 
+灵圃小院与多垄灵田已在 `develop` 完成（业务提交 `6007d31`、种子 provenance `d4acab8`、
+文档 `ffc10a8`）：`data/生活/生活.json` 新增 `residence.herb_court`（青石镇名望 60、
+150 灵石/7 日、`capacity.plots=2`）与 `crop.cloud_rice`（灵叶×2 作种、6 小时、维护 2 次、
+收云纹稻谷×4+灵叶×1、每日 2 次）；`data/道具/材料.json` 新增 `item.grain.cloud_rice` 与
+`item.food.cloud_rice_meal`（恢复体力/精力 8、冷却 600 秒）；`data/生产/配方.json` 新增
+`recipe.food.cloud_rice_meal`（稻谷×3→灵米饭×2，烹饪，`qi_sensing` L1）。运行时把
+`field_plots` 的「每居所一块」改为按 `plot_index` 的多垄唯一约束，旧库自动补列并重建
+`idx_field_plots_slot`；`灵田播种/维护/收获` 接受可选田垄号，未指定时保持既有时间与地块 ID
+顺序，`我的灵田` 列出全部垄位，旧 operation 结果无田垄字段时按第 1 垄回放。聚焦证据：
+`test_livelihood_multi_plot.py` 4 passed（两垄播种/维护/独立收获、越界/占用/日限/重放/冲突、
+坏快照回滚重试、旧单垄居所与索引迁移、重启持久化）；`test_livelihood_field_selection.py`
+14 passed、`test_livelihood_residence_content.py` 2 passed、`test_livelihood.py` 23 passed
+（并发委托用例单跑通过，整文件在资源紧张时出现一次未复现的 `PERSISTENCE_ERROR`）；
+`test_seed_migration.py -k "manifest or reverse"` 9 passed；`test_documentation.py` 2 passed；
+`compileall` 与 `git diff --check` 通过。develop CI（Quality and Release `41401592872`，
+head `ffc10a8`）成功。未跑全量/压测/部署，未验 QQ 真机，未发版。
+
 玄天玄武卷（chapter.8.stage.1–3）已在 `develop` 完成：`xuantian.basalt_pass`（玄武岩径）
 此前可徒步抵达、且有 `explore.trial_basalt_pass`（聚气 L3、240 秒、9 体力、每日 4 次、
 `battle_chance_bp` 6000、产阵砂/铁石/灵石），却从未被任何主线目标使用。本轮新增
