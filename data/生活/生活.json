@@ -420,6 +420,12 @@
         "plots": 1,
         "storage_slots": 10
       },
+      "rest": {
+        "duration_seconds": 1800,
+        "restore_stamina": 8,
+        "restore_energy": 8,
+        "daily_limit": 2
+      },
       "key": "residence.town_room",
       "record_type": "residence",
       "status": "active"
@@ -445,6 +451,12 @@
         "plots": 1,
         "storage_slots": 20
       },
+      "rest": {
+        "duration_seconds": 1800,
+        "restore_stamina": 8,
+        "restore_energy": 8,
+        "daily_limit": 2
+      },
       "key": "residence.courtyard",
       "record_type": "residence",
       "status": "active"
@@ -469,6 +481,12 @@
         "rest_slots": 2,
         "plots": 2,
         "storage_slots": 24
+      },
+      "rest": {
+        "duration_seconds": 1800,
+        "restore_stamina": 8,
+        "restore_energy": 8,
+        "daily_limit": 2
       },
       "key": "residence.herb_court",
       "record_type": "residence",

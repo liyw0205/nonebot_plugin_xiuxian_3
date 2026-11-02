@@ -28,6 +28,11 @@ class ResidenceDefinition:
     plot_count: int = 0
     local_reputation_key: str | None = None
     aliases: tuple[str, ...] = ()
+    rest_slots: int = 0
+    rest_duration_seconds: int = 1800
+    rest_stamina: int = 8
+    rest_energy: int = 8
+    rest_daily_limit: int = 2
 
 
 def _identity(row: dict[str, Any], record_type: str) -> tuple[str, str, tuple[str, ...]]:
@@ -125,6 +130,34 @@ def residence_definitions(content: ContentBundle | None = None) -> dict[str, Res
         plots = capacity.get("plots")
         if isinstance(plots, bool) or not isinstance(plots, int) or plots < 0:
             raise ContentError(f"residence {key} has an invalid plot count")
+        rest_slots = capacity.get("rest_slots")
+        if isinstance(rest_slots, bool) or not isinstance(rest_slots, int) or rest_slots < 0:
+            raise ContentError(f"residence {key} has an invalid rest slot count")
+        rest = row.get("rest")
+        rest_duration_seconds = 1800
+        rest_stamina = 8
+        rest_energy = 8
+        rest_daily_limit = 2
+        if rest is not None:
+            if (
+                not isinstance(rest, dict)
+                or set(rest) != {
+                    "duration_seconds",
+                    "restore_stamina",
+                    "restore_energy",
+                    "daily_limit",
+                }
+            ):
+                raise ContentError(f"residence {key} has invalid rest fields")
+            rest_duration_seconds = rest["duration_seconds"]
+            rest_stamina = rest["restore_stamina"]
+            rest_energy = rest["restore_energy"]
+            rest_daily_limit = rest["daily_limit"]
+            if any(
+                isinstance(value, bool) or not isinstance(value, int) or value <= 0
+                for value in (rest_duration_seconds, rest_stamina, rest_energy, rest_daily_limit)
+            ):
+                raise ContentError(f"residence {key} has invalid rest values")
         if not isinstance(requirements, list) or not requirements:
             raise ContentError(f"residence {key} requires requirements")
         required_stage = "mortal"
@@ -159,6 +192,11 @@ def residence_definitions(content: ContentBundle | None = None) -> dict[str, Res
             plot_count=plots,
             local_reputation_key=reputation_key,
             aliases=aliases,
+            rest_slots=rest_slots,
+            rest_duration_seconds=rest_duration_seconds,
+            rest_stamina=rest_stamina,
+            rest_energy=rest_energy,
+            rest_daily_limit=rest_daily_limit,
         )
         if key in result:
             raise ContentError(f"duplicate residence key: {key}")

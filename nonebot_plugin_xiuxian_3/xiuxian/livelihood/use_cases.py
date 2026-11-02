@@ -34,6 +34,11 @@ from ..repository import (
     ResidenceNotFoundError,
     ResidencePlotRequiredError,
     ResidenceRequiredError,
+    RestBlockedError,
+    RestDailyLimitError,
+    RestNotFoundError,
+    RestNotNeededError,
+    RestNotReadyError,
     SQLitePlayerRepository,
     ResourceInsufficientError,
     TradePermitContentClosedError,
@@ -41,6 +46,16 @@ from ..repository import (
 )
 from .rules import resolve_commission_key
 from .trade_permit_rules import resolve_trade_permit
+
+_BLOCK_LABELS = {
+    "rest": "静养",
+    "travel": "赶路",
+    "retreat": "闭关",
+    "cultivation": "修炼",
+    "production": "生产",
+    "exploration": "探索",
+    "battle": "战斗",
+}
 
 
 class LivelihoodApplication:
@@ -206,6 +221,7 @@ class LivelihoodApplication:
             return CommandResult(False, "INVALID_RESIDENCE_COMMAND", "查看居所无需附加参数。", context.request_id)
         try:
             record = await self.repository.get_residence(platform=context.adapter, platform_user_id=context.user_id)
+            rest = await self.repository.get_rest_summary(platform=context.adapter, platform_user_id=context.user_id)
         except ResidenceNotFoundError:
             return CommandResult(False, "RESIDENCE_NOT_FOUND", "你还没有居所，请先发送 `租住居所`。", context.request_id)
         except PlayerNotFoundError:
@@ -214,12 +230,126 @@ class LivelihoodApplication:
             return CommandResult(False, "PLAYER_SUSPENDED", "当前角色暂时不能查看居所。", context.request_id)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, retryable=True)
+        lines = [
+            "## 我的居所",
+            "",
+            f"**{self._display_name(record.player)}**当前居住在{record.label}。",
+            "",
+            f"- **状态**：{record.status}",
+            f"- **有效至**：{record.ends_at}",
+            f"- **休整位**：{rest['rest_slots']}（今日休整 {rest['used_today']}/{rest['daily_limit']}）",
+        ]
+        if rest["running_until"]:
+            lines.append(f"- **静养中**：将于 {rest['running_until']} 结束")
+        lines.append("- **静养闭关**：可发送 `休整`，结束后 `结算休整`")
         return CommandResult(
             True,
             "RESIDENCE_PROFILE",
-            f"## 我的居所\n\n**{self._display_name(record.player)}**当前居住在{record.label}。\n\n- **状态**：{record.status}\n- **有效至**：{record.ends_at}\n- **静养闭关**：可用",
+            "\n".join(lines),
             context.request_id,
-            data={"residence_id": record.residence_id, "residence_key": record.residence_key, "status": record.status, "ends_at": record.ends_at},
+            data={
+                "residence_id": record.residence_id,
+                "residence_key": record.residence_key,
+                "status": record.status,
+                "ends_at": record.ends_at,
+                "rest_slots": rest["rest_slots"],
+                "rest_used_today": rest["used_today"],
+                "rest_daily_limit": rest["daily_limit"],
+                "rest_running_until": rest["running_until"],
+            },
+        )
+
+    async def rest(self, context: CommandContext) -> CommandResult:
+        if context.command_args:
+            return CommandResult(False, "INVALID_REST_COMMAND", "静养无需附加参数。", context.request_id)
+        operation_id = self._operation_id(context, "livelihood.rest")
+        try:
+            record = await self.repository.start_rest(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                operation_id=operation_id,
+            )
+        except ResidenceRequiredError:
+            return CommandResult(False, "RESIDENCE_REQUIRED", "静养需要先租住有效居所。", context.request_id, operation_id)
+        except ResidencePlotRequiredError:
+            return CommandResult(False, "RESIDENCE_REQUIRED", "当前居所没有休整位。", context.request_id, operation_id)
+        except RestNotNeededError:
+            return CommandResult(False, "REST_NOT_NEEDED", "体力与精力都已充盈，无需静养。", context.request_id, operation_id)
+        except RestDailyLimitError:
+            return CommandResult(False, "REST_DAILY_LIMIT", "今日休整次数已用尽，明日再来。", context.request_id, operation_id)
+        except RestBlockedError as exc:
+            label = _BLOCK_LABELS.get(exc.reason, "其他事务")
+            return CommandResult(False, "REST_BLOCKED", f"你正在{label}，稍后再静养。", context.request_id, operation_id)
+        except PlayerNotFoundError:
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
+        except PlayerSuspendedError:
+            return CommandResult(False, "PLAYER_SUSPENDED", "当前角色暂时不能静养。", context.request_id, operation_id)
+        except OperationConflictError:
+            return CommandResult(False, "OPERATION_CONFLICT", "此事已有安排，请重新起意。", context.request_id, operation_id)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+        return CommandResult(
+            True,
+            "REST_STARTED",
+            (
+                f"## 开始静养\n\n在{record.residence_label}静养片刻。\n\n"
+                f"- **结束时间**：{record.ends_at}\n"
+                f"- **今日休整**：{record.used_today}/{record.daily_limit}"
+            ),
+            context.request_id,
+            operation_id,
+            data={
+                "rest_id": record.rest_id,
+                "residence_key": record.residence_key,
+                "status": record.status,
+                "starts_at": record.starts_at,
+                "ends_at": record.ends_at,
+                "daily_limit": record.daily_limit,
+                "used_today": record.used_today,
+                "idempotent_replay": record.already_completed,
+            },
+        )
+
+    async def settle_rest(self, context: CommandContext) -> CommandResult:
+        if context.command_args:
+            return CommandResult(False, "INVALID_REST_COMMAND", "结算静养无需附加参数。", context.request_id)
+        operation_id = self._operation_id(context, "livelihood.rest_settle")
+        try:
+            record = await self.repository.settle_rest(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                operation_id=operation_id,
+            )
+        except RestNotFoundError:
+            return CommandResult(False, "REST_NOT_FOUND", "当前没有进行中的静养。", context.request_id, operation_id)
+        except RestNotReadyError:
+            return CommandResult(False, "REST_NOT_READY", "静养尚未结束，请稍后再来。", context.request_id, operation_id)
+        except PlayerNotFoundError:
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
+        except PlayerSuspendedError:
+            return CommandResult(False, "PLAYER_SUSPENDED", "当前角色暂时不能结算静养。", context.request_id, operation_id)
+        except OperationConflictError:
+            return CommandResult(False, "OPERATION_CONFLICT", "此事已有安排，请重新起意。", context.request_id, operation_id)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+        return CommandResult(
+            True,
+            "REST_SETTLED",
+            (
+                f"## 静养结束\n\n"
+                f"- **恢复体力**：+{record.restored_stamina}\n"
+                f"- **恢复精力**：+{record.restored_energy}\n"
+                f"- **今日休整**：{record.used_today}/{record.daily_limit}"
+            ),
+            context.request_id,
+            operation_id,
+            data={
+                "rest_id": record.rest_id,
+                "status": record.status,
+                "restored_stamina": record.restored_stamina,
+                "restored_energy": record.restored_energy,
+                "idempotent_replay": record.already_completed,
+            },
         )
 
     async def plant(self, context: CommandContext) -> CommandResult:

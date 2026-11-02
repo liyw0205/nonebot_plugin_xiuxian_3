@@ -126,6 +126,7 @@ _HELP_PAGES = {
         f"制作前先用{command_link('生产预览', '生产预览')}填写配方名，核对材料与花费；"
         f"备妥后{command_link('开始生产', '开始生产')}填写同一配方，到时{command_link('领取生产', '领取生产')}。\n\n"
         f"{command_link('我的灵田', '我的灵田')}可查看田间生长，成熟后{command_link('灵田收获', '灵田收获')}。"
+        f"居所内可{command_link('休整', '休整')}恢复体力与精力，结束后{command_link('结算休整', '结算休整')}。"
         f"{command_link('每日修行', '每日修行')}记下日常安排，"
         f"{command_link('道历问安', '道历问安')}领取当日问安所得。\n\n"
         f"{command_link('灵兽状态', '灵兽状态')}可查看同行灵兽与灵骑。"
@@ -1068,6 +1069,20 @@ class XiuxianApplication:
 
     async def get_residence(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.livelihood.get_profile(context), require_write=False)
+
+    async def rest_residence(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.livelihood.rest(context),
+            write_message="当前事件不允许开始静养。",
+        )
+
+    async def settle_residence_rest(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.livelihood.settle_rest(context),
+            write_message="当前事件不允许结算静养。",
+        )
 
     async def plant_field(self, context: CommandContext) -> CommandResult:
         return await self._invoke(

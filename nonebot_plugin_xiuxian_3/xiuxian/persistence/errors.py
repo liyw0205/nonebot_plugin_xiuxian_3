@@ -824,6 +824,30 @@ class ResidencePlotRequiredError(RuntimeError):
     """The active residence does not provide a usable field plot."""
 
 
+class RestNotNeededError(RuntimeError):
+    """The player already has full stamina and energy."""
+
+
+class RestDailyLimitError(RuntimeError):
+    """The player reached the daily residence rest quota."""
+
+
+class RestBlockedError(RuntimeError):
+    """Another activity prevents starting a residence rest."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(reason)
+        self.reason = reason
+
+
+class RestNotFoundError(RuntimeError):
+    """The player has no running residence rest session."""
+
+
+class RestNotReadyError(RuntimeError):
+    """The residence rest session has not reached its end time."""
+
+
 class LocalReputationInsufficientError(RuntimeError):
     """The player has not reached a residence's local reputation gate."""
 

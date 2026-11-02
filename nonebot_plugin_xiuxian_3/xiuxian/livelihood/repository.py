@@ -22,6 +22,7 @@ from ..persistence.errors import (
 )
 from .commission_repository import CommissionRepositoryMixin
 from .field_repository import FieldPlotRepositoryMixin
+from .rest_repository import RestRepositoryMixin
 from .route_repository import RouteRepositoryMixin
 from .service_repository import ServiceRepositoryMixin
 from .project_repository import ProjectRepositoryMixin
@@ -37,6 +38,7 @@ class LivelihoodRepositoryMixin(
     FieldPlotRepositoryMixin,
     ProjectRepositoryMixin,
     TradePermitRepositoryMixin,
+    RestRepositoryMixin,
 ):
     """Own every persistence transaction that belongs to ``livelihood``."""
 
@@ -141,6 +143,11 @@ class LivelihoodRepositoryMixin(
                             "required_local_reputation": definition.required_local_reputation,
                             "local_reputation_key": definition.local_reputation_key,
                             "plot_count": definition.plot_count,
+                            "rest_slots": definition.rest_slots,
+                            "rest_duration_seconds": definition.rest_duration_seconds,
+                            "rest_stamina": definition.rest_stamina,
+                            "rest_energy": definition.rest_energy,
+                            "rest_daily_limit": definition.rest_daily_limit,
                         },
                         ensure_ascii=False,
                         sort_keys=True,
@@ -226,6 +233,33 @@ class LivelihoodRepositoryMixin(
         reputation_minimum = snapshot["required_local_reputation"]
         reputation_key = snapshot["local_reputation_key"]
         plot_count = snapshot["plot_count"]
+        legacy_definition = None
+        if isinstance(key, str) and key:
+            try:
+                legacy_definition = residence_definition(key, getattr(self, "content", None))
+            except ValueError:
+                legacy_definition = None
+        rest_slots = snapshot.get("rest_slots")
+        rest_duration_seconds = snapshot.get("rest_duration_seconds")
+        rest_stamina = snapshot.get("rest_stamina")
+        rest_energy = snapshot.get("rest_energy")
+        rest_daily_limit = snapshot.get("rest_daily_limit")
+        if legacy_definition is not None:
+            if rest_slots is None:
+                rest_slots = legacy_definition.rest_slots
+            if rest_duration_seconds is None:
+                rest_duration_seconds = legacy_definition.rest_duration_seconds
+            if rest_stamina is None:
+                rest_stamina = legacy_definition.rest_stamina
+            if rest_energy is None:
+                rest_energy = legacy_definition.rest_energy
+            if rest_daily_limit is None:
+                rest_daily_limit = legacy_definition.rest_daily_limit
+        rest_slots = 0 if rest_slots is None else rest_slots
+        rest_duration_seconds = 1800 if rest_duration_seconds is None else rest_duration_seconds
+        rest_stamina = 8 if rest_stamina is None else rest_stamina
+        rest_energy = 8 if rest_energy is None else rest_energy
+        rest_daily_limit = 2 if rest_daily_limit is None else rest_daily_limit
         if (
             not isinstance(key, str)
             or not key
@@ -246,8 +280,25 @@ class LivelihoodRepositoryMixin(
             or isinstance(plot_count, bool)
             or not isinstance(plot_count, int)
             or plot_count < 0
+            or isinstance(rest_slots, bool)
+            or not isinstance(rest_slots, int)
+            or rest_slots < 0
+            or any(
+                isinstance(value, bool) or not isinstance(value, int) or value <= 0
+                for value in (
+                    rest_duration_seconds,
+                    rest_stamina,
+                    rest_energy,
+                    rest_daily_limit,
+                )
+            )
         ):
             raise ValueError("invalid residence snapshot")
+        snapshot["rest_slots"] = rest_slots
+        snapshot["rest_duration_seconds"] = rest_duration_seconds
+        snapshot["rest_stamina"] = rest_stamina
+        snapshot["rest_energy"] = rest_energy
+        snapshot["rest_daily_limit"] = rest_daily_limit
         return snapshot
 
     def _active_residence(self, connection: Any, player_id: int, now: datetime, now_text: str) -> Any:

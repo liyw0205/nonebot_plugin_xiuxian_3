@@ -88,4 +88,30 @@ class TradePermitRecord:
     already_completed: bool = False
 
 
-__all__ = ["FieldPlotRecord", "ResidenceRecord", "TownCommissionRecord", "TownCommissionView", "TradePermitRecord"]
+@dataclass(frozen=True, slots=True)
+class RestRecord:
+    player: PlayerView
+    rest_id: str
+    residence_id: str
+    residence_key: str
+    residence_label: str
+    status: str
+    starts_at: str
+    ends_at: str
+    restore_stamina: int
+    restore_energy: int
+    restored_stamina: int = 0
+    restored_energy: int = 0
+    daily_limit: int = 2
+    used_today: int = 0
+    already_completed: bool = False
+
+
+__all__ = [
+    "FieldPlotRecord",
+    "ResidenceRecord",
+    "RestRecord",
+    "TownCommissionRecord",
+    "TownCommissionView",
+    "TradePermitRecord",
+]
