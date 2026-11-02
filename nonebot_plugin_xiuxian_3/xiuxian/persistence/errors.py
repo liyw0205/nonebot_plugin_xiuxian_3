@@ -2307,3 +2307,15 @@ class SparRequirementError(RuntimeError):
 
 class SparMatchNotFoundError(RuntimeError):
     """The requested direct-spar match does not exist or is not visible."""
+
+
+class VoidMarketRequirementError(RuntimeError):
+    """The player is not at the void market or lacks its entry requirements."""
+
+
+class VoidMarketStockError(RuntimeError):
+    """The weekly void market stock cannot cover the requested quantity."""
+
+
+class VoidMarketDailyCapError(RuntimeError):
+    """The player reached the void market daily purchase cap."""

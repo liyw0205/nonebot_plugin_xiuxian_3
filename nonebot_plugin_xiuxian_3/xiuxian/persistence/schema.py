@@ -2816,4 +2816,38 @@ CREATE TABLE IF NOT EXISTS companion_gear_instances (
 CREATE INDEX IF NOT EXISTS idx_companion_gear_player
     ON companion_gear_instances(player_id, status, created_at);
 
+CREATE TABLE IF NOT EXISTS void_market_purchases (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    purchase_id TEXT NOT NULL UNIQUE,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    offer_key TEXT NOT NULL,
+    week_id TEXT NOT NULL,
+    business_date TEXT NOT NULL,
+    item_key TEXT NOT NULL,
+    quantity INTEGER NOT NULL CHECK (quantity > 0),
+    unit_price INTEGER NOT NULL CHECK (unit_price > 0),
+    total_cost INTEGER NOT NULL CHECK (total_cost > 0),
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    operation_id TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_void_market_purchases_week
+    ON void_market_purchases(week_id, offer_key);
+CREATE INDEX IF NOT EXISTS idx_void_market_purchases_player_day
+    ON void_market_purchases(player_id, business_date);
+
+CREATE TABLE IF NOT EXISTS void_market_item_bindings (
+    source_operation_id TEXT NOT NULL REFERENCES operations(operation_id),
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    item_key TEXT NOT NULL,
+    quantity INTEGER NOT NULL CHECK (quantity > 0),
+    bound_until TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (source_operation_id, item_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_void_market_item_bindings_active
+    ON void_market_item_bindings(player_id, item_key, bound_until);
+
 """

@@ -396,6 +396,8 @@ def register_core_commands(router: CommandRouter, application: XiuxianApplicatio
     router.register("清理摆摊", application.expire_market_order)
     router.register("摆摊列表", application.list_market_orders)
     router.register("跨界贸易", application.execute_cross_realm_trade, aliases=("固定贸易", "三界贸易"))
+    router.register("虚空集市", application.preview_void_market, aliases=("虚空市场", "虚空坊市"))
+    router.register("购买虚空物资", application.purchase_void_market_offer)
     router.register("发布拍卖", application.create_auction)
     router.register("拍卖列表", application.list_auctions, aliases=("查看拍卖",))
     router.register("竞价", application.bid_auction)

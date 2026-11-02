@@ -1,0 +1,69 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "void_market",
+  "records": [
+    {
+      "key": "market.void.defaults",
+      "name": "虚空集市周度补给",
+      "desc": "虚空集市每周一 00:00（UTC）换库，共二十个库存槽；每名修士每日限购三件，购得虚空材料绑定二十四小时。",
+      "status": "active",
+      "location_key": "void.void_market",
+      "week_start_weekday": 1,
+      "week_start_hour_utc": 0,
+      "stock_slots": 20,
+      "daily_purchase_limit": 3,
+      "binding_seconds": 86400,
+      "required_realm": "void_refining",
+      "required_layer": 1,
+      "required_merit": 500
+    },
+    {
+      "key": "offer.void_market.void_crystal",
+      "name": "虚空晶体",
+      "desc": "从虚空集市购得的虚空晶体，购得后绑定二十四小时。",
+      "status": "active",
+      "label": "虚空晶体",
+      "item_key": "item.void_crystal",
+      "quantity": 1,
+      "price_spirit_stones": 12000,
+      "stock": 4,
+      "aliases": [
+        "虚空晶体",
+        "虚晶",
+        "晶体"
+      ]
+    },
+    {
+      "key": "offer.void_market.void_anchor",
+      "name": "虚空锚",
+      "desc": "从虚空集市购得的虚空锚，购得后绑定二十四小时。",
+      "status": "active",
+      "label": "虚空锚",
+      "item_key": "item.void_anchor",
+      "quantity": 1,
+      "price_spirit_stones": 5000,
+      "stock": 8,
+      "aliases": [
+        "虚空锚",
+        "空间锚",
+        "锚"
+      ]
+    },
+    {
+      "key": "offer.void_market.time_trace",
+      "name": "时痕草",
+      "desc": "从虚空集市购得的时痕草，购得后绑定二十四小时。",
+      "status": "active",
+      "label": "时痕草",
+      "item_key": "item.herb.time_trace",
+      "quantity": 1,
+      "price_spirit_stones": 3000,
+      "stock": 8,
+      "aliases": [
+        "时痕草",
+        "时间花",
+        "时花"
+      ]
+    }
+  ]
+}

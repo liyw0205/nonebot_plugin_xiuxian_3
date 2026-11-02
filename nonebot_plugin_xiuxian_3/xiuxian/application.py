@@ -50,6 +50,7 @@ from .routine.gacha_use_cases import GachaApplication
 from .routine.wayfaring_use_cases import WayfaringApplication
 from .economy.use_cases import EconomyApplication
 from .economy.cross_realm_trade_use_cases import CrossRealmTradeApplication
+from .economy.void_market_use_cases import VoidMarketApplication
 from .economy.auction_use_cases import AuctionApplication
 from .economy.purchase_order_use_cases import PurchaseOrderApplication
 from .events.use_cases import EventsApplication
@@ -221,6 +222,7 @@ class XiuxianApplication:
         self.wayfaring = WayfaringApplication(repository)
         self.economy = EconomyApplication(repository)
         self.cross_realm_trade = CrossRealmTradeApplication(repository)
+        self.void_market = VoidMarketApplication(repository)
         self.auction = AuctionApplication(repository)
         self.purchase_orders = PurchaseOrderApplication(repository)
         self.purchase = self.purchase_orders
@@ -257,6 +259,9 @@ class XiuxianApplication:
                 dispatch_lines = self._dispatch_help_lines()
                 if dispatch_lines:
                     body += "\n\n" + dispatch_lines
+                market_lines = self._void_market_help_lines()
+                if market_lines:
+                    body += "\n\n" + market_lines
             return CommandResult(
                 True,
                 "HELP_CATEGORY",
@@ -338,6 +343,33 @@ class XiuxianApplication:
                     f"- {command_link(definition.label, f'接受派遣 {definition.label}')}"
                     f"（{realm_label} L{definition.required_layer}，"
                     f"{definition.duration_seconds // 60} 分钟，每日 {definition.daily_limit} 次）"
+                )
+            return "\n".join(lines)
+        except Exception:
+            return ""
+
+    def _void_market_help_lines(self) -> str:
+        """List the weekly void market offers on the life page.
+
+        Help rendering stays best-effort: content failures fall back to the
+        static page body and never block command dispatch.
+        """
+
+        try:
+            from .economy.void_market_rules import void_market_definition
+
+            definition = void_market_definition(self.content)
+            if not definition.offers:
+                return ""
+            lines: list[str] = [
+                "**虚空集市**",
+                "> 抵达虚空集市后可购买下列物资；每周一 00:00（UTC）换库，"
+                "每人每日限购三件。",
+            ]
+            for offer in definition.offers:
+                lines.append(
+                    f"- {command_link(offer.label, f'购买虚空物资 {offer.label}')}"
+                    f"（灵石 {offer.price_spirit_stones} / 件，每周 {offer.stock} 件）"
                 )
             return "\n".join(lines)
         except Exception:
@@ -1777,6 +1809,20 @@ class XiuxianApplication:
             context,
             lambda: self.cross_realm_trade.execute(context),
             write_message="当前事件不允许执行跨界贸易。",
+        )
+
+    async def preview_void_market(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.void_market.preview(context),
+            require_write=False,
+        )
+
+    async def purchase_void_market_offer(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.void_market.purchase(context),
+            write_message="当前事件不允许购买虚空物资。",
         )
 
     async def create_auction(self, context: CommandContext) -> CommandResult:

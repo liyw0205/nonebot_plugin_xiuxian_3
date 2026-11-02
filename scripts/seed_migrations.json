@@ -99,10 +99,11 @@
       "927b9ef11ebcb259eb8fafad71bda473bb7fdf498558fe728feb2918933ea88f": "7b4ae3c8ee8e0c66f1fd913bc92df5f7401cc4de:data/内容清单.json",
       "dd4e5e6dff3bc10d60ce2e79ea95070b6d6952ab37d093f0e14669bbef131440": "89440093727e70f61a06774c61a1b15823088309:data/内容清单.json",
       "12ed228d748839bd62f3d6756d1970dd26b47da861d9a99ba81efb54bf4d22ec": "24ecef2d1912fd7d821c171445150fbc6e165a13:data/内容清单.json",
-      "bf8e994fc4ece706978add7dfddeb7d83cb3aff2e253b7cc813c6c5691c548c1": "1f2d3da3f342b2ca30525e2f066410ebd46f6efd:data/内容清单.json"
+      "bf8e994fc4ece706978add7dfddeb7d83cb3aff2e253b7cc813c6c5691c548c1": "1f2d3da3f342b2ca30525e2f066410ebd46f6efd:data/内容清单.json",
+      "b8c13d57cc2897ebbd420ced18bd544e3ea0c35de32439e97c491266afa5ca25": "8ce77506fa9f6b5ed21b6e5e448c0cb412f4c164:data/内容清单.json"
     },
-    "new_sha256": "b8c13d57cc2897ebbd420ced18bd544e3ea0c35de32439e97c491266afa5ca25",
-    "new_commit": "931abea9276ae9bb517c8811f4bf12154ab701e0"
+    "new_sha256": "202567bc1a388957ecf3dd74df937e089abf55ae8dc77f04a570b4175e9de15b",
+    "new_commit": "PENDING"
   },
   "地图/地点.json": {
     "old_sha256": {

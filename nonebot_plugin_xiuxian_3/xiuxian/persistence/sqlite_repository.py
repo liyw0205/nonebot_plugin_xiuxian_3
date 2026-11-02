@@ -99,6 +99,7 @@ from ..quests.repository import QuestRepositoryMixin
 from ..quests.cross_realm_repository import DemonQuestRepositoryMixin
 from ..economy.repository import EconomyRepositoryMixin
 from ..economy.cross_realm_trade_repository import CrossRealmTradeRepositoryMixin
+from ..economy.void_market_repository import VoidMarketRepositoryMixin
 from ..economy.auction_repository import AuctionRepositoryMixin
 from ..economy.purchase_order_repository import PurchaseOrderRepositoryMixin
 from ..routine.repository import RoutineRepositoryMixin
@@ -187,6 +188,7 @@ class SQLitePlayerRepository(
     QuestRepositoryMixin,
     EconomyRepositoryMixin,
     CrossRealmTradeRepositoryMixin,
+    VoidMarketRepositoryMixin,
     AuctionRepositoryMixin,
     PurchaseOrderRepositoryMixin,
     AdvancementRepositoryMixin,

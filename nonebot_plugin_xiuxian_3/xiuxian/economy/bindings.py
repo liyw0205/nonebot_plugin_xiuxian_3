@@ -19,8 +19,11 @@ def active_binding_totals(
             UNION ALL
             SELECT quantity, bound_until FROM exploration_item_bindings
             WHERE player_id=? AND item_key=? AND bound_until>?
+            UNION ALL
+            SELECT quantity, bound_until FROM void_market_item_bindings
+            WHERE player_id=? AND item_key=? AND bound_until>?
         )""",
-        (player_id, item_key, now_text) * 3,
+        (player_id, item_key, now_text) * 4,
     ).fetchone()
     return int(row["quantity"]), str(row["first_bound_until"]) if row["first_bound_until"] else None
 
