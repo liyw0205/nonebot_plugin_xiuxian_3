@@ -472,6 +472,25 @@ head `6dcd8f3`）成功。未跑全量/压测/部署，未验 QQ 真机。
 3 passed（旧宿主升级、幂等、自定义种子保留）。develop CI（Quality and Release `40708847422`，
 head `66d34f6`）成功。未跑全量/压测/部署，未验 QQ 真机。
 
+中高阶派遣运行时与呈现已在 `develop` 完成（业务提交 `0695ec8`）：审计确认 `f60ec97` 已交付十条记录的
+数据合同，但 `dispatch_repository._dispatch_preview` 把「只有境界门槛」误判为永远缺少道统条件，
+使十条中高阶派遣在预览和接取时全部不可用；本轮把门槛改为「声明服务信誉时境界或信誉满足其一，
+未声明时只校验境界」，保留 `dispatch.dao_service` 的原语义。加载器新增未知/未开放境界拒绝。
+呈现层：`派遣预览` 列表为可接任务附 `接受派遣 <中文名>` 蓝字，单项预览显示前置/耗时/成本/风险/
+顺利/部分/失败返还并只附一个「接受此项派遣」按钮，接受成功后只附一个「取消派遣」按钮（重放不重复），
+结算/取消附「再看派遣」链接；`修仙帮助 生活` 追加数据驱动的「中高阶派遣」列表（十条筑基至炼虚
+任务与既有道统服务派遣，蓝字预填，无按钮）。
+OneBot 纯文本降级保留可读命令，不泄露 `command:` 或稳定键。顺带修复 `修仙帮助 生活` 因元组逗号
+导致的 `TypeError` 回归（`3b17af7` 引入）。未改 `data/生活/生活.json`，种子账本无需更新。
+聚焦证据：`test_dispatch_mid_high_runtime.py` 2 passed（十路由逐条接取/快照/结算/重放、每日上限、
+失败退款、重启后结算）；`test_dispatch_presentation.py` 5 passed（列表蓝字、门槛过滤、单项按钮与
+文本降级、接受/结算动作、生活帮助列表）；`test_dispatch_rules_content.py` 6 passed（含未知境界
+拒绝与十记录合同/别名）；派遣与帮助回归组 32 passed；3 项 `test_trade_permit_dispatch.py`（悬赏
+批次不含旧固定条目）与 `test_player_interaction.py`（寻道期引导链接）在未改动 HEAD 上同样失败，
+经 stash 对照确认为既有失败。`compileall`、`git diff --check` 通过。develop CI（Quality and Release
+`41462824552`，head `0695ec8`）的 quality 3.11/3.12 与 install-smoke 全部成功，release 按条件跳过。
+未跑全量/压测/部署，未验 QQ 真机，未发版。
+
 居所物资箱已在 `develop` 完成（业务提交 `3b17af7`、文档 `f2b4ce1`）：
 `capacity.storage_slots` 正式生效，客房/小院/灵圃小院分别提供 10/20/24 格；租约快照冻结容量，
 旧快照缺字段按当前居所定义回退。`存入居所`/`取回居所` 支持同格合并、满格拒绝新物品种类、
