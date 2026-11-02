@@ -239,6 +239,18 @@ CREATE INDEX IF NOT EXISTS idx_rest_sessions_player ON rest_sessions(player_id, 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_rest_sessions_active
     ON rest_sessions(player_id) WHERE status = 'running';
 
+CREATE TABLE IF NOT EXISTS residence_storage (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    item_key TEXT NOT NULL,
+    quantity INTEGER NOT NULL CHECK (quantity > 0),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (player_id, item_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_residence_storage_player ON residence_storage(player_id);
+
 CREATE TABLE IF NOT EXISTS field_plots (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     plot_id TEXT NOT NULL UNIQUE,

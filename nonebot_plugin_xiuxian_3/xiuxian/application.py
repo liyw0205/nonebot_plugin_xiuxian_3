@@ -127,6 +127,8 @@ _HELP_PAGES = {
         f"备妥后{command_link('开始生产', '开始生产')}填写同一配方，到时{command_link('领取生产', '领取生产')}。\n\n"
         f"{command_link('我的灵田', '我的灵田')}可查看田间生长，成熟后{command_link('灵田收获', '灵田收获')}。"
         f"居所内可{command_link('休整', '休整')}恢复体力与精力，结束后{command_link('结算休整', '结算休整')}。"
+        f"物资可{command_link('存入居所', '存入居所')}、{command_link('取回居所', '取回居所')}，"
+        f"用{command_link('我的物资箱', '我的物资箱')}查看格数与存量。",
         f"{command_link('每日修行', '每日修行')}记下日常安排，"
         f"{command_link('道历问安', '道历问安')}领取当日问安所得。\n\n"
         f"{command_link('灵兽状态', '灵兽状态')}可查看同行灵兽与灵骑。"
@@ -1083,6 +1085,23 @@ class XiuxianApplication:
             lambda: self.livelihood.settle_rest(context),
             write_message="当前事件不允许结算静养。",
         )
+
+    async def deposit_residence_storage(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.livelihood.deposit_storage(context),
+            write_message="当前事件不允许存入居所物资。",
+        )
+
+    async def withdraw_residence_storage(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.livelihood.withdraw_storage(context),
+            write_message="当前事件不允许取回居所物资。",
+        )
+
+    async def get_residence_storage(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.livelihood.get_storage(context), require_write=False)
 
     async def plant_field(self, context: CommandContext) -> CommandResult:
         return await self._invoke(

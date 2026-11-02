@@ -848,6 +848,18 @@ class RestNotReadyError(RuntimeError):
     """The residence rest session has not reached its end time."""
 
 
+class StorageCapacityError(RuntimeError):
+    """The residence storage box has no free slot for a new item type."""
+
+
+class StorageItemNotFoundError(RuntimeError):
+    """The player has no stored quantity of the requested item."""
+
+
+class StorageQuantityError(RuntimeError):
+    """The player tried to withdraw more than the stored quantity."""
+
+
 class LocalReputationInsufficientError(RuntimeError):
     """The player has not reached a residence's local reputation gate."""
 

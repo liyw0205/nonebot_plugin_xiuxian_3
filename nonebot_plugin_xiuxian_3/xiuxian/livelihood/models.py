@@ -107,10 +107,33 @@ class RestRecord:
     already_completed: bool = False
 
 
+@dataclass(frozen=True, slots=True)
+class StorageItemView:
+    item_key: str
+    label: str
+    quantity: int
+
+
+@dataclass(frozen=True, slots=True)
+class StorageRecord:
+    player: PlayerView
+    capacity: int
+    used_slots: int
+    items: tuple[StorageItemView, ...] = ()
+    item_key: str | None = None
+    label: str | None = None
+    quantity: int = 0
+    stored_quantity: int = 0
+    inventory_quantity: int = 0
+    already_completed: bool = False
+
+
 __all__ = [
     "FieldPlotRecord",
     "ResidenceRecord",
     "RestRecord",
+    "StorageItemView",
+    "StorageRecord",
     "TownCommissionRecord",
     "TownCommissionView",
     "TradePermitRecord",

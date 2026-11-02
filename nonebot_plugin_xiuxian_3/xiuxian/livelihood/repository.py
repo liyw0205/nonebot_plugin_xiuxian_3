@@ -23,6 +23,7 @@ from ..persistence.errors import (
 from .commission_repository import CommissionRepositoryMixin
 from .field_repository import FieldPlotRepositoryMixin
 from .rest_repository import RestRepositoryMixin
+from .storage_repository import StorageRepositoryMixin
 from .route_repository import RouteRepositoryMixin
 from .service_repository import ServiceRepositoryMixin
 from .project_repository import ProjectRepositoryMixin
@@ -39,6 +40,7 @@ class LivelihoodRepositoryMixin(
     ProjectRepositoryMixin,
     TradePermitRepositoryMixin,
     RestRepositoryMixin,
+    StorageRepositoryMixin,
 ):
     """Own every persistence transaction that belongs to ``livelihood``."""
 
@@ -148,6 +150,7 @@ class LivelihoodRepositoryMixin(
                             "rest_stamina": definition.rest_stamina,
                             "rest_energy": definition.rest_energy,
                             "rest_daily_limit": definition.rest_daily_limit,
+                            "storage_slots": definition.storage_slots,
                         },
                         ensure_ascii=False,
                         sort_keys=True,
@@ -244,6 +247,7 @@ class LivelihoodRepositoryMixin(
         rest_stamina = snapshot.get("rest_stamina")
         rest_energy = snapshot.get("rest_energy")
         rest_daily_limit = snapshot.get("rest_daily_limit")
+        storage_slots = snapshot.get("storage_slots")
         if legacy_definition is not None:
             if rest_slots is None:
                 rest_slots = legacy_definition.rest_slots
@@ -255,11 +259,14 @@ class LivelihoodRepositoryMixin(
                 rest_energy = legacy_definition.rest_energy
             if rest_daily_limit is None:
                 rest_daily_limit = legacy_definition.rest_daily_limit
+            if storage_slots is None:
+                storage_slots = legacy_definition.storage_slots
         rest_slots = 0 if rest_slots is None else rest_slots
         rest_duration_seconds = 1800 if rest_duration_seconds is None else rest_duration_seconds
         rest_stamina = 8 if rest_stamina is None else rest_stamina
         rest_energy = 8 if rest_energy is None else rest_energy
         rest_daily_limit = 2 if rest_daily_limit is None else rest_daily_limit
+        storage_slots = 0 if storage_slots is None else storage_slots
         if (
             not isinstance(key, str)
             or not key
@@ -292,6 +299,9 @@ class LivelihoodRepositoryMixin(
                     rest_daily_limit,
                 )
             )
+            or isinstance(storage_slots, bool)
+            or not isinstance(storage_slots, int)
+            or storage_slots < 0
         ):
             raise ValueError("invalid residence snapshot")
         snapshot["rest_slots"] = rest_slots
@@ -299,6 +309,7 @@ class LivelihoodRepositoryMixin(
         snapshot["rest_stamina"] = rest_stamina
         snapshot["rest_energy"] = rest_energy
         snapshot["rest_daily_limit"] = rest_daily_limit
+        snapshot["storage_slots"] = storage_slots
         return snapshot
 
     def _active_residence(self, connection: Any, player_id: int, now: datetime, now_text: str) -> Any:

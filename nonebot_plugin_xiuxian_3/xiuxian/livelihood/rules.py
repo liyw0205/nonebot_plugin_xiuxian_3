@@ -33,6 +33,7 @@ class ResidenceDefinition:
     rest_stamina: int = 8
     rest_energy: int = 8
     rest_daily_limit: int = 2
+    storage_slots: int = 0
 
 
 def _identity(row: dict[str, Any], record_type: str) -> tuple[str, str, tuple[str, ...]]:
@@ -133,6 +134,13 @@ def residence_definitions(content: ContentBundle | None = None) -> dict[str, Res
         rest_slots = capacity.get("rest_slots")
         if isinstance(rest_slots, bool) or not isinstance(rest_slots, int) or rest_slots < 0:
             raise ContentError(f"residence {key} has an invalid rest slot count")
+        storage_slots = capacity.get("storage_slots")
+        if (
+            isinstance(storage_slots, bool)
+            or not isinstance(storage_slots, int)
+            or storage_slots < 0
+        ):
+            raise ContentError(f"residence {key} has an invalid storage slot count")
         rest = row.get("rest")
         rest_duration_seconds = 1800
         rest_stamina = 8
@@ -197,6 +205,7 @@ def residence_definitions(content: ContentBundle | None = None) -> dict[str, Res
             rest_stamina=rest_stamina,
             rest_energy=rest_energy,
             rest_daily_limit=rest_daily_limit,
+            storage_slots=storage_slots,
         )
         if key in result:
             raise ContentError(f"duplicate residence key: {key}")

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from ...contracts import CommandContext, CommandResult
-from ..content import bundled_content
+from ..content import ContentError, bundled_content
 from ..repository import (
     CropContentClosedError,
     CropDailyLimitError,
@@ -41,11 +41,15 @@ from ..repository import (
     RestNotReadyError,
     SQLitePlayerRepository,
     ResourceInsufficientError,
+    StorageCapacityError,
+    StorageItemNotFoundError,
+    StorageQuantityError,
     TradePermitContentClosedError,
     TradePermitRequirementError,
 )
 from .rules import resolve_commission_key
 from .trade_permit_rules import resolve_trade_permit
+from ..items.rules import item_aliases, item_records
 
 _BLOCK_LABELS = {
     "rest": "静养",
@@ -110,6 +114,27 @@ class LivelihoodApplication:
         if slot < 1:
             return False, None
         return True, slot
+
+    def _resolve_storage_args(self, args: tuple[str, ...]) -> tuple[str, int] | None:
+        values = list(args)
+        if not values or len(values) > 2:
+            return None
+        name = values[0].strip()
+        if not name:
+            return None
+        quantity = 1
+        if len(values) == 2:
+            raw_quantity = values[1].strip()
+            if not raw_quantity.isdigit():
+                return None
+            quantity = int(raw_quantity)
+            if quantity < 1:
+                return None
+        try:
+            key = item_aliases(self.repository.content).get(name, name)
+        except ContentError:
+            return None
+        return key, quantity
 
     def _resolve_commission(self, args: tuple[str, ...], *, required: bool = True) -> str | None:
         if len(args) > 1:
@@ -222,6 +247,7 @@ class LivelihoodApplication:
         try:
             record = await self.repository.get_residence(platform=context.adapter, platform_user_id=context.user_id)
             rest = await self.repository.get_rest_summary(platform=context.adapter, platform_user_id=context.user_id)
+            storage = await self.repository.get_storage(platform=context.adapter, platform_user_id=context.user_id)
         except ResidenceNotFoundError:
             return CommandResult(False, "RESIDENCE_NOT_FOUND", "你还没有居所，请先发送 `租住居所`。", context.request_id)
         except PlayerNotFoundError:
@@ -242,6 +268,7 @@ class LivelihoodApplication:
         if rest["running_until"]:
             lines.append(f"- **静养中**：将于 {rest['running_until']} 结束")
         lines.append("- **静养闭关**：可发送 `休整`，结束后 `结算休整`")
+        lines.append(f"- **物资箱**：{storage.used_slots}/{storage.capacity} 格")
         return CommandResult(
             True,
             "RESIDENCE_PROFILE",
@@ -256,6 +283,8 @@ class LivelihoodApplication:
                 "rest_used_today": rest["used_today"],
                 "rest_daily_limit": rest["daily_limit"],
                 "rest_running_until": rest["running_until"],
+                "storage_capacity": storage.capacity,
+                "storage_used_slots": storage.used_slots,
             },
         )
 
@@ -349,6 +378,141 @@ class LivelihoodApplication:
                 "restored_stamina": record.restored_stamina,
                 "restored_energy": record.restored_energy,
                 "idempotent_replay": record.already_completed,
+            },
+        )
+
+    async def deposit_storage(self, context: CommandContext) -> CommandResult:
+        resolved = self._resolve_storage_args(context.command_args)
+        if resolved is None:
+            return CommandResult(False, "INVALID_STORAGE_COMMAND", "可用 `存入居所 止血草 3` 指定物品与数量。", context.request_id)
+        item_key, quantity = resolved
+        if item_key not in item_records(self.repository.content):
+            return CommandResult(False, "ITEM_NOT_FOUND", "没有找到这件物品。", context.request_id)
+        operation_id = self._operation_id(context, "livelihood.deposit_storage")
+        try:
+            record = await self.repository.deposit_storage(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                item_key=item_key,
+                quantity=quantity,
+                operation_id=operation_id,
+            )
+        except ResidenceRequiredError:
+            return CommandResult(False, "RESIDENCE_REQUIRED", "存入居所需要先租住有效居所。", context.request_id, operation_id)
+        except StorageCapacityError:
+            return CommandResult(False, "STORAGE_FULL", "物资箱格数已满，先取回一些物品。", context.request_id, operation_id)
+        except ResourceInsufficientError:
+            return CommandResult(False, "RESOURCE_INSUFFICIENT", "行囊中的数量不足。", context.request_id, operation_id)
+        except PlayerNotFoundError:
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
+        except PlayerSuspendedError:
+            return CommandResult(False, "PLAYER_SUSPENDED", "当前角色暂时不能存取物资。", context.request_id, operation_id)
+        except OperationConflictError:
+            return CommandResult(False, "OPERATION_CONFLICT", "此事已有安排，请重新起意。", context.request_id, operation_id)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+        return CommandResult(
+            True,
+            "STORAGE_DEPOSITED",
+            (
+                f"## 已存入居所\n\n"
+                f"- **物品**：{record.label} ×{record.quantity}\n"
+                f"- **物资箱**：{record.label} ×{record.stored_quantity}\n"
+                f"- **格数**：{record.used_slots}/{record.capacity}"
+            ),
+            context.request_id,
+            operation_id,
+            data={
+                "item_key": record.item_key,
+                "quantity": record.quantity,
+                "stored_quantity": record.stored_quantity,
+                "used_slots": record.used_slots,
+                "capacity": record.capacity,
+                "idempotent_replay": record.already_completed,
+            },
+        )
+
+    async def withdraw_storage(self, context: CommandContext) -> CommandResult:
+        resolved = self._resolve_storage_args(context.command_args)
+        if resolved is None:
+            return CommandResult(False, "INVALID_STORAGE_COMMAND", "可用 `取回居所 止血草 3` 指定物品与数量。", context.request_id)
+        item_key, quantity = resolved
+        if item_key not in item_records(self.repository.content):
+            return CommandResult(False, "ITEM_NOT_FOUND", "没有找到这件物品。", context.request_id)
+        operation_id = self._operation_id(context, "livelihood.withdraw_storage")
+        try:
+            record = await self.repository.withdraw_storage(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                item_key=item_key,
+                quantity=quantity,
+                operation_id=operation_id,
+            )
+        except StorageItemNotFoundError:
+            return CommandResult(False, "STORAGE_ITEM_NOT_FOUND", "物资箱里没有这件物品。", context.request_id, operation_id)
+        except StorageQuantityError:
+            return CommandResult(False, "STORAGE_QUANTITY_INSUFFICIENT", "取回数量超过物资箱库存。", context.request_id, operation_id)
+        except PlayerNotFoundError:
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
+        except PlayerSuspendedError:
+            return CommandResult(False, "PLAYER_SUSPENDED", "当前角色暂时不能存取物资。", context.request_id, operation_id)
+        except OperationConflictError:
+            return CommandResult(False, "OPERATION_CONFLICT", "此事已有安排，请重新起意。", context.request_id, operation_id)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+        return CommandResult(
+            True,
+            "STORAGE_WITHDRAWN",
+            (
+                f"## 已取回物资\n\n"
+                f"- **物品**：{record.label} ×{record.quantity}\n"
+                f"- **物资箱剩余**：{record.label} ×{record.stored_quantity}\n"
+                f"- **格数**：{record.used_slots}/{record.capacity}"
+            ),
+            context.request_id,
+            operation_id,
+            data={
+                "item_key": record.item_key,
+                "quantity": record.quantity,
+                "stored_quantity": record.stored_quantity,
+                "used_slots": record.used_slots,
+                "capacity": record.capacity,
+                "idempotent_replay": record.already_completed,
+            },
+        )
+
+    async def get_storage(self, context: CommandContext) -> CommandResult:
+        if context.command_args:
+            return CommandResult(False, "INVALID_STORAGE_COMMAND", "查看物资箱无需附加参数。", context.request_id)
+        try:
+            record = await self.repository.get_storage(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+            )
+        except PlayerNotFoundError:
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id)
+        except PlayerSuspendedError:
+            return CommandResult(False, "PLAYER_SUSPENDED", "当前角色暂时不能查看物资箱。", context.request_id)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, retryable=True)
+        lines = ["## 我的物资箱", "", f"- **格数**：{record.used_slots}/{record.capacity}"]
+        if record.items:
+            lines.append("")
+            lines.extend(f"- {item.label} ×{item.quantity}" for item in record.items)
+        else:
+            lines.append("- **内容**：空")
+        return CommandResult(
+            True,
+            "STORAGE_PROFILE",
+            "\n".join(lines),
+            context.request_id,
+            data={
+                "capacity": record.capacity,
+                "used_slots": record.used_slots,
+                "items": [
+                    {"item_key": item.item_key, "label": item.label, "quantity": item.quantity}
+                    for item in record.items
+                ],
             },
         )
 
