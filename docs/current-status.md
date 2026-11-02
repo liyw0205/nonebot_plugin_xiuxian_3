@@ -472,6 +472,18 @@ head `6dcd8f3`）成功。未跑全量/压测/部署，未验 QQ 真机。
 3 passed（旧宿主升级、幂等、自定义种子保留）。develop CI（Quality and Release `40708847422`，
 head `66d34f6`）成功。未跑全量/压测/部署，未验 QQ 真机。
 
+居所物资箱已在 `develop` 完成（业务提交 `3b17af7`、文档 `f2b4ce1`）：
+`capacity.storage_slots` 正式生效，客房/小院/灵圃小院分别提供 10/20/24 格；租约快照冻结容量，
+旧快照缺字段按当前居所定义回退。`存入居所`/`取回居所` 支持同格合并、满格拒绝新物品种类、
+行囊与库存校验、租约到期只阻止存入、取空释放格子与 operation 回放；新增 `residence_storage`
+表与 `StorageRepositoryMixin`，`我的物资箱` 显示已用/总格数与中文物品名。未改
+`data/生活/生活.json`，种子账本无需更新。聚焦证据：`test_livelihood_storage.py` 7 passed；
+`test_livelihood_rest.py` + `test_livelihood_residence_content.py` +
+`test_livelihood_field_selection.py` + `test_livelihood.py` 46 passed；
+`test_seed_migration.py -k "manifest or reverse"` 9 passed；`test_documentation.py` 2 passed；
+`compileall`、`git diff --check` 通过。develop CI（`41433241292`，head `f2b4ce1`）成功。
+未跑全量/压测/部署，未验 QQ 真机，未发版。
+
 居所休整与休整位已在 `develop` 完成（业务提交 `ab63dd3`、种子 provenance `dca3294`、
 文档 `eff34a8`）：`data/生活/生活.json` 三处居所新增 `rest` 块（30 分钟、恢复体力/精力各 8、
 每日 2 次），租约快照写入 `rest_slots` 与休整参数，旧快照缺字段按当前居所定义回退；新增
