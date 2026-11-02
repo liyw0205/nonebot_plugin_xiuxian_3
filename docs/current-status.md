@@ -526,6 +526,44 @@ install-smoke 全部成功，release 按条件跳过。main CI（`41505704058`�
 quality 3.11/3.12 与 install-smoke 同样全部成功，release 按条件跳过。
 未跑全量/压测/部署，未验 QQ 真机，未发版。
 
+虚空集市周度补给已在 `develop` 完成（业务提交 `8d18d4a`、种子 provenance `2f8d52d`、
+文档 `60c638b`）：v0.5 冻结的 `market.void_weekly.<week_id>` 契约此前只有航道终点、终点名称与航道准入，
+没有库存、价格、购买用例或持久化；本轮把该契约接入运行时。新增 `data/经济/虚空集市.json`
+（kind `void_market`）：`market.void.defaults` 承载终点 `void.void_market`（只作锚点航道终点，
+与 `void.sect_fortress` 同构，不进 `地点.json`）、UTC 周一 00:00 换库、20 个全宿主共享周库存槽、
+每角色每 UTC 日 3 件上限、24 小时绑定与「炼虚 L1 或虚空功勋 500」准入；三条固定价报价
+虚晶 12000、锚 5000、时痕草 3000 灵石，周库存 4/8/8，合计恰为 20 槽，中文别名（虚晶/晶体、
+空间锚/锚、时间花/时花）与稳定键一同参与解析。加载器校验默认记录与报价的字段类型、正数、
+境界/物品/航道终点引用、`offer.` 前缀、键唯一与跨报价别名冲突，并把「报价库存之和必须等于
+`stock_slots`」作为硬校验，非法内容抛 `ContentError`（导入期构建，部署验载即失败）。
+运行时新增 `VoidMarketDefinition`/`week_start`/`week_id`/`week_refresh_at`/`business_date`/
+`resolve_void_market_offer` 与规则入口，仓储新增只读 `preview_void_market` 与单事务
+`purchase_void_market_offer`：库存不落计数表，余量由本周购买流水求和推导并在 `BEGIN IMMEDIATE`
+内校验，因此并发不超卖、预览零写；新表 `void_market_purchases` 冻结报价/周/业务日/数量/单价/
+总额快照，`void_market_item_bindings` 记录 24 小时绑定并已计入 `economy/bindings.py` 的活跃绑定
+总量（绑定期内不能进入摆摊）；资产变化复用共享事务与 `economy_ledger_entries`（灵石借记 + 物品贷记）。
+入口为 `虚空集市[ 物资名]` 与 `购买虚空物资 <物资名> [数量]`，失败码
+`VOID_MARKET_REQUIREMENT_MISSING`（不在集市或准入不足）、`VOID_DAILY_PURCHASE_CAP`、
+`VOID_STOCK_SOLD_OUT`、`BALANCE_INSUFFICIENT`、`VOID_MARKET_OFFER_NOT_FOUND`、
+`INVALID_VOID_MARKET_COMMAND` 全部零写，同 operation 重放返回原结果、换输入 `LEDGER_CONFLICT`，
+写入故障整笔回滚可原 operation 重试。呈现：QQ 原生 Markdown 列表页各附
+`购买虚空物资 <中文名>` 蓝字预填，单项预览可购买时只附一个「购买此物资」按钮、购买成功后只附
+一个「再看虚空集市」按钮（列表页不堆按钮网格）；OneBot/纯文本降级为可读命令与「可发送：…」，
+不保留 `command:`、不暴露 `offer.*` 稳定键；`修仙帮助 生活` 追加数据驱动报价（无按钮）。
+官方 `data/内容清单.json` 登记新文件并迁移到 `8ce7750…`→`202567bc…`（provenance `8d18d4a`），
+反向清单助手与宿主夹具同步移除该新文件；新数据文件本身按「宿主不存在即安装」语义无需迁移规则。
+聚焦证据：`test_void_market_content.py` 21 passed（合同/周界/二选一准入/16 项非法内容与槽位不等拒绝）、
+`test_void_market.py` 5 passed（真实购买扣费与入账、24 小时绑定、幂等重放与换输入冲突、
+每日 3 件上限与跨日重置、周库存售罄与跨周换库、不在集市/准入不足/灵石不足零写、
+重启后库存与额度保持、QQ Markdown+键盘与 OneBot 纯文本降级、帮助报价）；
+回归 `test_seed_migration.py` 全量 29 passed、`test_content.py`+`test_m9_content_integrity.py`+
+`test_documentation.py` 21 passed、`test_cross_realm_trade*.py`+`test_auction*.py`+
+`test_economy_commission*.py` 154 passed、`test_help.py`+`test_qq_capabilities.py`+
+`test_world.py`+`test_world_content.py`+`test_market_operation_integrity.py` 26 passed；
+`test_player_interaction.py` 1 项失败在未改动 HEAD（`8ce7750` 独立工作树）上同样失败，非本版引入。
+develop CI（Quality and Release `41524124150`，head `60c638b`）的 quality 3.11/3.12 与
+install-smoke 全部成功，release 按条件跳过。未跑全量/压测/部署，未验 QQ 真机，未发版。
+
 居所物资箱已在 `develop` 完成（业务提交 `3b17af7`、文档 `f2b4ce1`）：
 `capacity.storage_slots` 正式生效，客房/小院/灵圃小院分别提供 10/20/24 格；租约快照冻结容量，
 旧快照缺字段按当前居所定义回退。`存入居所`/`取回居所` 支持同格合并、满格拒绝新物品种类、
