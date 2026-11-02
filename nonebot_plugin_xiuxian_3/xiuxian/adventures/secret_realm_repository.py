@@ -24,7 +24,7 @@ from ..rewards.rules import local_reputation_maximum
 from ..specials.codex_projection import record_codex_discovery
 from ..specials.codex_rules import category_for_entry
 from ..utils.equipment import create_equipment_instances
-from .secret_realm_models import SecretRealmPreviewRecord, SecretRealmRunRecord
+from .secret_realm_models import SecretRealmDefinition, SecretRealmPreviewRecord, SecretRealmRunRecord
 from .secret_realm_rules import (
     realm_at_least,
     repeat_reward,
@@ -59,11 +59,68 @@ class SecretRealmRepositoryMixin:
                 "SELECT run_id FROM secret_realm_runs WHERE player_id=? AND status IN ('entered','routing','combat_pending','cleared','failed') ORDER BY id DESC LIMIT 1",
                 (player["id"],),
             ).fetchone()
+            definitions = tuple(secret_realm_definitions(self.content).values())
             return SecretRealmPreviewRecord(
                 player=self._row_to_player(player),
-                definitions=tuple(secret_realm_definitions(self.content).values()),
+                definitions=definitions,
                 active_run_id=str(active["run_id"]) if active else None,
+                eligibility=self._preview_eligibility(
+                    connection,
+                    player,
+                    definitions,
+                    self._now(),
+                    str(active["run_id"]) if active else None,
+                ),
             )
+
+    def _preview_eligibility(
+        self,
+        connection: sqlite3.Connection,
+        player: sqlite3.Row,
+        definitions: tuple[SecretRealmDefinition, ...],
+        now: datetime,
+        active_run_id: str | None,
+    ) -> dict[str, tuple[bool, tuple[str, ...]]]:
+        """Explain which realms the player can enter without starting a run."""
+
+        long_action = self._has_active_long_action(connection, int(player["id"]))
+        inventory = player_inventory(player)
+        eligibility: dict[str, tuple[bool, tuple[str, ...]]] = {}
+        for definition in definitions:
+            missing: list[str] = []
+            if active_run_id is not None:
+                missing.append("已有进行中的秘境")
+            else:
+                if str(player["location_key"]) != definition.location_key:
+                    missing.append("不在秘境入口")
+                if not realm_at_least(
+                    str(player["realm_key"]),
+                    player_integer(player, "realm_layer"),
+                    definition.required_realm,
+                    definition.required_layer,
+                    self.content,
+                ):
+                    missing.append("境界不足")
+                if long_action:
+                    missing.append("已有进行中的长时行动")
+                if player_integer(player, "stamina") < definition.stamina_cost:
+                    missing.append("体力不足")
+                if (
+                    definition.ticket_key
+                    and inventory_amount(inventory, definition.ticket_key)
+                    < definition.ticket_quantity
+                ):
+                    missing.append("缺少秘境凭证")
+                quota_key = self._quota_key(now, definition.quota_period)
+                count = connection.execute(
+                    "SELECT COUNT(*) AS count FROM secret_realm_runs "
+                    "WHERE player_id=? AND instance_key=? AND quota_key=?",
+                    (player["id"], definition.key, quota_key),
+                ).fetchone()
+                if int(count["count"]) >= definition.quota_limit:
+                    missing.append("本周期次数已用尽")
+            eligibility[definition.key] = (not missing, tuple(missing))
+        return eligibility
 
     async def enter_secret_realm(
         self, *, platform: str, platform_user_id: str, instance_key: str, operation_id: str

@@ -292,6 +292,7 @@ def test_migration_manifest_targets_match_current_official_seeds() -> None:
 
 
 SECRET_REALM_FILE = Path("冒险/秘境专用.json")
+COMMON_SECRET_REALM_FILE = Path("冒险/秘境.json")
 
 
 def old_official_secret_realms() -> bytes:
@@ -854,6 +855,15 @@ def old_official_recipes() -> bytes:
     )
 
 
+def old_official_common_secret_realms() -> bytes:
+    # The seed is hand-formatted, so the deployed blob is archived verbatim;
+    # removing the two new records from the current file would change spacing.
+    return _registered_old_blob(
+        COMMON_SECRET_REALM_FILE,
+        (SEED_FIXTURES / "common_secret_realms.json").read_bytes(),
+    )
+
+
 @pytest.mark.parametrize(
     "reverse",
     [
@@ -863,6 +873,7 @@ def old_official_recipes() -> bytes:
         old_official_companions,
         old_official_companion_evolutions,
         old_official_recipes,
+        old_official_common_secret_realms,
     ],
 )
 def test_goal_a_i_seed_reverse_helpers_match_registered_old_blobs(reverse) -> None:

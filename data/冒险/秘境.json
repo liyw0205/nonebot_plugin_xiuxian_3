@@ -139,6 +139,62 @@
       "quota_limit": 2,
       "expiry_seconds": 3600,
       "reputation_key": "local.xuantian.new_town"
+    },
+    {
+      "key": "instance.secret_realm.time_garden_echo",
+      "record_type": "common",
+      "name": "时序残响",
+      "desc": "时序福地深处的旧影循着花畦重现，守园人的残念仍在巡守时痕。",
+      "status": "active",
+      "aliases": ["时园残响", "时序回声"],
+      "required_realm": "void_refining",
+      "required_layer": 1,
+      "location_key": "cave.time_garden",
+      "stamina_cost": 25,
+      "ticket_key": null,
+      "ticket_quantity": 0,
+      "node_keys": ["resource", "encounter", "choice", "encounter"],
+      "enemy_key": "enemy.time_garden_keeper",
+      "first_reward": {
+        "item.herb.time_trace": 2,
+        "spirit_stones": 200
+      },
+      "repeat_reward_pool": [
+        {"weight": 2, "rewards": {"item.herb.time_trace": 1}},
+        {"weight": 1, "no_reward": true}
+      ],
+      "quota_period": "week",
+      "quota_limit": 1,
+      "expiry_seconds": 3600
+    },
+    {
+      "key": "instance.secret_realm.ancestral_vein",
+      "record_type": "common",
+      "name": "祖灵支脉",
+      "desc": "祖灵湖底的一缕支脉仍在回响，循血脉旧路可听见先祖低语。",
+      "status": "active",
+      "aliases": ["祖灵湖支脉", "祖灵回声"],
+      "required_realm": "soul_transformation",
+      "required_layer": 1,
+      "location_key": "beast.ancestral_lake",
+      "stamina_cost": 30,
+      "ticket_key": null,
+      "ticket_quantity": 0,
+      "node_keys": ["resource", "encounter", "choice", "encounter"],
+      "enemy_key": "enemy.ancestral_spirit",
+      "first_reward": {
+        "item.beast_blood": 2,
+        "local.beast.three_realms_trade_port": 8,
+        "spirit_stones": 150
+      },
+      "repeat_reward_pool": [
+        {"weight": 2, "rewards": {"item.beast_blood": 1}},
+        {"weight": 1, "no_reward": true}
+      ],
+      "quota_period": "week",
+      "quota_limit": 1,
+      "expiry_seconds": 3600,
+      "reputation_key": "local.beast.three_realms_trade_port"
     }
   ]
 }

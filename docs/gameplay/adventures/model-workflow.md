@@ -28,6 +28,10 @@ replay: recorded -> indexed -> private/shared -> archived
 - 每条悬赏按内容中的每日次数限额计算，同一时间最多有一条未结/待领悬赏；过期领取不返还已获得物品，状态变化与对应 operation 结果同事务记账。
 - 领奖的资产、数值、阵营/地方名望与服务信誉复用共享角色状态事务；名望只增加至接取时冻结的地点上限之内，结果只记实际增量。悬赏状态、图鉴投影和 operation 与角色状态一起提交，坏 JSON 或故障不能留下部分奖励。
 - 秘境路线节点由服务端保存，玩家只能从当前允许节点选择；进入门票/体力先锁定，结算一次释放或消耗。
+- `secret_realm.preview` 只读：按内容记录逐项报告地点、境界、体力、凭证、周期次数与进行中的
+  秘境/长时行动缺口，不创建运行、不扣资源；列表只为可进入项附入口蓝字，单项预览最多附一个
+  「进入此秘境」完整动作按钮。`instance.secret_realm.time_garden_echo` 与
+  `instance.secret_realm.ancestral_vein` 是 v0.7 的两条普通内容记录，复用本用例，不另建仓储。
 - `instance.secret_realm.boundary_rift` 使用独立队伍类型、运行记录、每周成员额度与结算事务；不得复用 `cave.boundary_realm` 战斗奖励。其固定路线、两场自动战、退款边界和恢复合同见[v0.3 冒险内容](content-v0.3.md#instancesecret_realmboundary_rift-合同)。
 - `instance.secret_realm.demon_abyss` 将专属事务放在冒险域仓储 mixin；与其他秘境共享活动锁表，但不可并行运行。冻结路线、风险和版本快照，过期遭遇不得继续自动战，系统中止补偿只能回滚本 run 已记录的资源变化；详细合同见[v0.3 冒险内容](content-v0.3.md#instancesecret_realmdemon_abyss-合同)。
 - `instance.secret_realm.time_fort` 使用独立队伍 run/成员表；入场冻结时序许可、战斗快照和时间风暴词缀，守时者自动战每三回合写入直接环境伤害动作。失败/过期不退成本，只有系统故障补偿才退款并释放周额度；详细合同见[v0.5 冒险内容](content-v0.5.md#instancesecret_realm-time_fort-合同)。

@@ -33,6 +33,7 @@ class SecretRealmPreviewRecord:
     player: PlayerView
     definitions: tuple[SecretRealmDefinition, ...]
     active_run_id: str | None = None
+    eligibility: dict[str, tuple[bool, tuple[str, ...]]] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)

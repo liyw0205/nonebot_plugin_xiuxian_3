@@ -110,12 +110,18 @@ def test_ancient_domain_record_matches_the_shipped_contract() -> None:
     assert ancient_domain_rules.resolve_ancient_domain_node("本源封印") == "origin_seal"
 
 
-def test_ancient_domain_keeps_its_locked_location() -> None:
+def test_ancient_domain_location_is_open_with_its_shipped_requirements() -> None:
+    # v0.7 exploration content deliberately opened the ancient domain; the
+    # v0.4 three-member secret realm is no longer unreachable by design.
     locations = json.loads((ROOT / "data/地图/地点.json").read_text(encoding="utf-8"))
     record = next(
         row for row in locations["records"] if row["key"] == "cave.ancient_domain"
     )
-    assert record["status"] == "locked", "the ancient domain is a deliberately locked cave"
+    assert record["status"] == "open"
+    assert record["requirements"] == [
+        {"type": "realm", "realm_key": "soul_transformation", "min_layer": 1},
+        {"type": "item", "item_key": "item.domain_core", "quantity": 1},
+    ]
 
 
 def test_heaven_echo_record_matches_the_shipped_contract() -> None:

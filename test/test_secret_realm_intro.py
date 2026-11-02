@@ -55,12 +55,14 @@ def test_qq_and_onebot_secret_realm_preview_are_isolated() -> None:
                 "instance.secret_realm.mist_depth_2",
                 "instance.secret_realm.cloud_boat",
                 "instance.secret_realm.ironwood_trial",
+                "instance.secret_realm.time_garden_echo",
+                "instance.secret_realm.ancestral_vein",
                 "instance.secret_realm.demon_abyss",
                 "instance.secret_realm.ancient_domain",
-                    "instance.secret_realm.ancestral_hall",
-                    "instance.secret_realm.void_ruins",
-                    "instance.secret_realm.time_fort",
-                }
+                "instance.secret_realm.ancestral_hall",
+                "instance.secret_realm.void_ruins",
+                "instance.secret_realm.time_fort",
+            }
             demon_abyss = next(
                 item
                 for item in qq.data["realms"]

@@ -2,7 +2,7 @@
 
 本域把已有的悬赏、秘境与战斗日志正规化，并新增主线关卡。它复用探索/战斗域的快照与结算，不复制第二套战斗引擎。
 
-当前开放草药补给、生产订单、v0.2 云铁矿区/洞天精英悬赏、v0.3 魔界救援与妖界栖地悬赏、v0.1 两个秘境、v0.2 雾隐洞天二层与云舟秘境、v0.3 `instance.secret_realm.boundary_rift` 界隙裂隙秘境、`instance.secret_realm.demon_abyss` 魔界深渊秘境、v0.4 `instance.secret_realm.ancient_domain` 远古洞天和 `instance.secret_realm.ancestral_hall` 祖灵殿、v0.5 `instance.secret_realm.void_ruins` 虚空遗迹与 `instance.secret_realm.time_fort` 时序堡垒、v0.6 `instance.secret_realm.dao_origin` 道源秘境、`instance.secret_realm.heaven_echo` 天劫回音，以及 `instance.legacy.demon_reliquary` 和 `instance.legacy.demon_abyss_echo` 两条线索驱动遗府。虚空遗迹使用独立仓储、专用 2–5 人队伍、十节点路线、两场自动战、托管锚和系统补偿；专项 QQ 官方/OneBot V11 双方向与重启恢复测试见 `test/test_void_ruins_secret_realm_v05.py`。祖灵殿专项见 `test/test_ancestral_hall_secret_realm_v04.py`，时序堡垒专项见 `test/test_time_fort_secret_realm_v05.py`，道源秘境专项见 `test/test_dao_origin_secret_realm_v06.py`。遗府使用遗府专属仓储和稳定键隔离，现无已登记且规则闭合的后续副本待办。斗法记录分享和尚未定义合同的后续内容仍保持锁定；世界/社交域以其他稳定键独立开放的副本不代表相应秘境合同已开放；具名遭遇和天劫试炼的战斗会话由战斗域统一管理，状态总表见[当前开发状态](../../current-status.md)。
+当前开放草药补给、生产订单、v0.2 云铁矿区/洞天精英悬赏、v0.3 魔界救援与妖界栖地悬赏、v0.1 两个秘境、v0.2 雾隐洞天二层与云舟秘境、v0.3 `instance.secret_realm.boundary_rift` 界隙裂隙秘境、`instance.secret_realm.demon_abyss` 魔界深渊秘境、v0.4 `instance.secret_realm.ancient_domain` 远古洞天和 `instance.secret_realm.ancestral_hall` 祖灵殿、v0.5 `instance.secret_realm.void_ruins` 虚空遗迹与 `instance.secret_realm.time_fort` 时序堡垒、v0.6 `instance.secret_realm.dao_origin` 道源秘境、`instance.secret_realm.heaven_echo` 天劫回音，v0.7 `instance.secret_realm.ironwood_trial` 铁木试炼、`instance.secret_realm.time_garden_echo` 时序残响与 `instance.secret_realm.ancestral_vein` 祖灵支脉，以及 `instance.legacy.demon_reliquary` 和 `instance.legacy.demon_abyss_echo` 两条线索驱动遗府。虚空遗迹使用独立仓储、专用 2–5 人队伍、十节点路线、两场自动战、托管锚和系统补偿；专项 QQ 官方/OneBot V11 双方向与重启恢复测试见 `test/test_void_ruins_secret_realm_v05.py`。祖灵殿专项见 `test/test_ancestral_hall_secret_realm_v04.py`，时序堡垒专项见 `test/test_time_fort_secret_realm_v05.py`，道源秘境专项见 `test/test_dao_origin_secret_realm_v06.py`。遗府使用遗府专属仓储和稳定键隔离，现无已登记且规则闭合的后续副本待办。斗法记录分享和尚未定义合同的后续内容仍保持锁定；世界/社交域以其他稳定键独立开放的副本不代表相应秘境合同已开放；具名遭遇和天劫试炼的战斗会话由战斗域统一管理，状态总表见[当前开发状态](../../current-status.md)。
 
 当前运行时已开放 v0.1 的 `bounty.herb_supply`、`bounty.craft_order`，v0.2 的 `bounty.cloud_mine`，感气阶段的
 `bounty.spell_trial`、`bounty.body_trial`，以及 v0.3 的 `bounty.demon_relief`、`bounty.beast_habitat`：悬赏榜为只读查询，
@@ -27,7 +27,10 @@ operation ledger 幂等。
 权限、资产扣除和声望写入都在事务中完成。悬赏奖励中的
 地方名望和服务信誉写入独立声誉表，不直接改境界、道途或战斗属性。
 
-秘境命令为 `秘境预览`、`进入秘境 雾隐秘境|灵泉小径|雾隐洞天二层秘境|云舟秘境|铁木林秘境`、`选择秘境节点 资源|遭遇|选择` 和 `结算秘境`。
+秘境命令为 `秘境预览`（可选一个秘境名查看单项）、`进入秘境 雾隐秘境|灵泉小径|雾隐洞天二层秘境|云舟秘境|铁木林秘境|时序残响|祖灵支脉`、`选择秘境节点 资源|遭遇|选择` 和 `结算秘境`。
+列表预览为每个通用秘境标记「可进入」或具体缺失原因，可进入项附 `进入秘境 <中文名>` 蓝字；
+单项预览只显示该秘境，可进入时附一个「进入此秘境」按钮。`修仙帮助 探索` 在探索模式之后
+追加数据驱动的「当前开放秘境」列表；帮助页本身不附按钮。
 秘境运行时使用独立 `secret_realm_runs` 表保存节点顺序、内容/规则版本、战斗编号和票券/体力锁；遭遇节点
 复用 combat 域的服务端自动回合，多遭遇路线按 run/node 索引生成独立战斗 operation。失败退还未消费的门票但保留体力消耗，
 过期释放门票和体力；首通奖励只在本人第一次成功结算时发放，重复 operation 只回放原结果。QQ 官方与 OneBot V11 使用同一 application，身份和
@@ -167,3 +170,24 @@ v0.6 `story.mainline.dao_echoes` 已开放玩家流程：炼虚 L10 后可查询
 
 专项测试 `test/test_secret_realm_ironwood.py` 覆盖预览、地点/境界/体力/配额四类拒绝、
 完整通关、节点重放返回同一战斗、重复结算幂等、重复奖池、战斗失败与超时退款。
+
+## 时序残响与祖灵支脉（v0.7）
+
+两条新的 `record_type=common` 记录继续由既有通用秘境引擎驱动，不新增仓储、表、命令或字段，
+合同见[v0.7 冒险内容](content-v0.7.md)：
+
+- `instance.secret_realm.time_garden_echo`（时序残响，别名 `时园残响`/`时序回声`）：
+  `cave.time_garden`、炼虚 L1、体力 25、每周 1 次、无凭证，四节点
+  `resource → encounter → choice → encounter`（`enemy.time_garden_keeper`）；
+  首通时痕草×2+灵石 200，再入按 2:1 权重抽时痕草×1 或空手。
+- `instance.secret_realm.ancestral_vein`（祖灵支脉，别名 `祖灵湖支脉`/`祖灵回声`）：
+  `beast.ancestral_lake`、化神 L1、体力 30、每周 1 次、无凭证，同构四节点
+  （`enemy.ancestral_spirit`）；首通兽血×2+三界贸易口名望 8+灵石 150，再入按 2:1 权重
+  抽兽血×1 或空手。它只读取境界与地点，不要求祖灵殿的妖界声望 3000 或血脉稳定 5000 bp，
+  也不写 `story.ancestral_hall`。
+
+预览层新增只读资格判断（地点、境界、体力、凭证、周期次数、进行中的秘境/长时行动），
+不创建运行、不扣资源；失败保留体力与周次数，过期返还门票与锁定体力，两条记录无门票，
+因此过期只返还体力。专项测试 `test/test_secret_realm_expansion.py` 覆盖内容合同与坏引用拒绝、
+预览可进入标记/单入口按钮/OneBot 降级、探索帮助列表、首通/周限/重复池/过期退款、
+祖灵支脉重启续跑与结算幂等。

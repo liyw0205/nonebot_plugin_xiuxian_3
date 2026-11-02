@@ -250,6 +250,9 @@ class XiuxianApplication:
             body = _HELP_PAGES[category]
             if category == "探索":
                 body += "\n\n" + self._exploration_mode_lines()
+                secret_lines = self._secret_realm_help_lines()
+                if secret_lines:
+                    body += "\n\n" + secret_lines
             elif category == "生活":
                 dispatch_lines = self._dispatch_help_lines()
                 if dispatch_lines:
@@ -335,6 +338,33 @@ class XiuxianApplication:
                     f"- {command_link(definition.label, f'接受派遣 {definition.label}')}"
                     f"（{realm_label} L{definition.required_layer}，"
                     f"{definition.duration_seconds // 60} 分钟，每日 {definition.daily_limit} 次）"
+                )
+            return "\n".join(lines)
+        except Exception:
+            return ""
+
+    def _secret_realm_help_lines(self) -> str:
+        """List active common secret realms with prefill links on the explore page."""
+
+        try:
+            from .adventures.secret_realm_rules import secret_realm_definitions
+
+            content = self.content or bundled_content()
+            definitions = list(secret_realm_definitions(content).values())
+            if not definitions:
+                return ""
+            lines: list[str] = [
+                "**当前开放秘境**",
+                "> 点选秘境名可预填进入指令；到达入口并满足境界、体力与凭证后可进入。",
+            ]
+            for definition in definitions:
+                realm_label = content.label("realm", definition.required_realm)
+                location_label = content.label("location", definition.location_key)
+                period = "日" if definition.quota_period == "day" else "周"
+                lines.append(
+                    f"- {command_link(definition.label, f'进入秘境 {definition.label}')}"
+                    f"（{location_label}，{realm_label} L{definition.required_layer}，"
+                    f"体力 {definition.stamina_cost}，每{period} {definition.quota_limit} 次）"
                 )
             return "\n".join(lines)
         except Exception:

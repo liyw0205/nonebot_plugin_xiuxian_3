@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ...contracts import CommandContext, CommandResult
+from ...contracts import CommandAction, CommandContext, CommandResult
 from ..repository import SQLitePlayerRepository
 from ..content import bundled_content
 from ..persistence.errors import (
@@ -20,7 +20,13 @@ from ..persistence.errors import (
     SecretRealmQuotaError,
     SecretRealmRequirementError,
 )
-from .secret_realm_rules import resolve_node, resolve_secret_realm
+from .secret_realm_rules import (
+    resolve_node,
+    resolve_secret_realm,
+    secret_realm_definition,
+    secret_realm_definitions,
+)
+from ..utils.text import command_link
 from .boundary_rift_rules import BOUNDARY_RIFT_KEY, resolve_boundary_rift_node
 from .boundary_rift_use_cases import BoundaryRiftApplication
 from .ancient_domain_use_cases import AncientDomainApplication
@@ -138,8 +144,18 @@ class SecretRealmApplication:
         return {"resource": "探寻灵机", "encounter": "迎战守护者", "choice": "择路前行"}.get(node, "秘境深处")
 
     async def preview(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) > 1:
+            return CommandResult(False, "INVALID_SECRET_REALM_COMMAND", "秘境预览最多接收一个秘境名。", context.request_id)
+        content = self.repository.content or bundled_content()
+        selected = None
         if context.command_args:
-            return CommandResult(False, "INVALID_SECRET_REALM_COMMAND", "秘境预览无需附加参数。", context.request_id)
+            resolved = resolve_secret_realm(context.command_args[0], content)
+            if resolved is None:
+                return CommandResult(False, "SECRET_REALM_NOT_FOUND", "没有找到这个秘境。", context.request_id)
+            try:
+                selected = secret_realm_definition(resolved, content)
+            except ValueError:
+                return CommandResult(False, "SECRET_REALM_NOT_FOUND", "这个秘境没有独立预览，请直接进入。", context.request_id)
         try:
             record = await self.repository.preview_secret_realms(platform=context.adapter, platform_user_id=context.user_id)
         except PlayerNotFoundError:
@@ -148,13 +164,24 @@ class SecretRealmApplication:
             return CommandResult(False, "PLAYER_SUSPENDED", "当前角色暂时不能查看秘境。", context.request_id)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, retryable=True)
-        content = self.repository.content or bundled_content()
-        lines = ["## 秘境试炼", "", f"**{self._display_name(record.player)}**，可循下列秘境探寻机缘：", ""]
+        definitions = (
+            record.definitions
+            if selected is None
+            else tuple(definition for definition in record.definitions if definition.key == selected.key)
+        )
+        if not definitions:
+            return CommandResult(False, "SECRET_REALM_NOT_FOUND", "没有找到这个秘境。", context.request_id)
+        if selected is None:
+            lines = ["## 秘境试炼", "", f"**{self._display_name(record.player)}**，可循下列秘境探寻机缘：", ""]
+        else:
+            lines = ["## 秘境试炼", "", f"**{self._display_name(record.player)}**，此间机缘如下：", ""]
         data = []
-        for definition in record.definitions:
+        actions: tuple[CommandAction, ...] = ()
+        for definition in definitions:
             realm_label = content.label("realm", definition.required_realm)
             location_label = content.label("location", definition.location_key)
             node_labels = tuple(self._node_label(node) for node in definition.node_keys)
+            eligible, missing = record.eligibility.get(definition.key, (True, ()))
             lines.extend(
                 [
                     f"### {definition.label}",
@@ -164,142 +191,177 @@ class SecretRealmApplication:
                     f"- **首通**：{self._reward_text(definition.first_reward, content)}",
                     f"- **再入所得**：{self._reward_pool_text(definition.repeat_reward_pool, content)}",
                     f"- **次数**：每{('日' if definition.quota_period == 'day' else '周')} {definition.quota_limit} 次",
-                    "",
                 ]
             )
-            data.append({"instance_key": definition.key, "label": definition.label, "desc": definition.description, "nodes": definition.node_keys, "stamina_cost": definition.stamina_cost, "ticket_key": definition.ticket_key, "first_reward": definition.first_reward, "repeat_reward_pool": [{"weight": weight, "rewards": rewards} for weight, rewards in definition.repeat_reward_pool], "quota_period": definition.quota_period, "quota_limit": definition.quota_limit})
-        data.append({
-            "instance_key": DEMON_ABYSS_KEY,
-            "label": DEMON_ABYSS_LABEL,
-            "nodes": DEMON_ABYSS_NODES,
-            "stamina_cost": DEMON_ABYSS_STAMINA_COST,
-            "first_reward": DEMON_ABYSS_FIRST_REWARD,
-            "repeat_reward": DEMON_ABYSS_REPEAT_REWARD,
-            "quota_period": "week",
-            "quota_limit": DEMON_ABYSS_QUOTA_LIMIT,
-        })
-        data.append({
-            "instance_key": ANCIENT_DOMAIN_KEY,
-            "label": "远古洞天秘境",
-            "nodes": ANCIENT_DOMAIN_NODES,
-            "stamina_cost": ANCIENT_DOMAIN_STAMINA_COST,
-            "first_reward": ANCIENT_DOMAIN_FIRST_REWARD,
-            "repeat_reward": ANCIENT_DOMAIN_REPEAT_REWARD,
-            "quota_period": "week",
-            "quota_limit": 1,
-            "party_size": 3,
-        })
-        data.append({
-            "instance_key": ANCESTRAL_HALL_KEY,
-            "label": "祖灵殿秘境",
-            "nodes": ANCESTRAL_HALL_NODES,
-            "stamina_cost": ANCESTRAL_HALL_STAMINA_COST,
-            "first_reward": {"story.ancestral_hall": 1},
-            "repeat_reward": {},
-            "quota_period": "week",
-            "quota_limit": 1,
-            "party_size": 1,
-        })
-        data.append({
-            "instance_key": VOID_RUINS_KEY,
-            "label": "虚空遗迹秘境",
-            "nodes": VOID_RUINS_NODES,
-            "stamina_cost": 50,
-            "anchor_lock_per_member": 1,
-            "first_reward": {"access.void.time_fort": 1, "codex.void.route_ruins": 1, "item.void_crystal": 1},
-            "repeat_reward": VOID_RUINS_REPEAT_REWARD,
-            "quota_period": "week",
-            "quota_limit": 1,
-            "party_size": "2-5",
-        })
-        data.append({
-            "instance_key": TIME_FORT_KEY,
-            "label": "时序堡垒秘境",
-            "nodes": TIME_FORT_NODES,
-            "stamina_cost": 40,
-            "first_reward": TIME_FORT_FIRST_REWARD,
-            "repeat_reward": TIME_FORT_REPEAT_REWARD,
-            "quota_period": "week",
-            "quota_limit": 1,
-            "party_size": "2-5",
-        })
-        if record.player.location_key == DAO_ORIGIN_LOCATION:
+            if eligible:
+                status = "- **状态**：可进入"
+                if selected is None:
+                    status += f" · {command_link('进入', f'进入秘境 {definition.label}')}"
+                else:
+                    actions = (CommandAction("进入此秘境", f"进入秘境 {definition.label}", enter=True),)
+            else:
+                status = f"- **状态**：不可进入：{'、'.join(missing)}"
+            lines.extend([status, ""])
+            data.append(
+                {
+                    "instance_key": definition.key,
+                    "label": definition.label,
+                    "desc": definition.description,
+                    "nodes": definition.node_keys,
+                    "stamina_cost": definition.stamina_cost,
+                    "ticket_key": definition.ticket_key,
+                    "first_reward": definition.first_reward,
+                    "repeat_reward_pool": [
+                        {"weight": weight, "rewards": rewards}
+                        for weight, rewards in definition.repeat_reward_pool
+                    ],
+                    "quota_period": definition.quota_period,
+                    "quota_limit": definition.quota_limit,
+                    "eligible": eligible,
+                    "missing": list(missing),
+                    "enter_command": f"进入秘境 {definition.label}" if eligible else None,
+                }
+            )
+        if selected is None:
             data.append({
-                "instance_key": DAO_ORIGIN_KEY,
-                "label": "道源秘境",
-                "nodes": DAO_ORIGIN_NODES,
-                "stamina_cost": 60,
-                "first_reward": DAO_ORIGIN_FIRST_REWARD,
+                "instance_key": DEMON_ABYSS_KEY,
+                "label": DEMON_ABYSS_LABEL,
+                "nodes": DEMON_ABYSS_NODES,
+                "stamina_cost": DEMON_ABYSS_STAMINA_COST,
+                "first_reward": DEMON_ABYSS_FIRST_REWARD,
+                "repeat_reward": DEMON_ABYSS_REPEAT_REWARD,
+                "quota_period": "week",
+                "quota_limit": DEMON_ABYSS_QUOTA_LIMIT,
+            })
+            data.append({
+                "instance_key": ANCIENT_DOMAIN_KEY,
+                "label": "远古洞天秘境",
+                "nodes": ANCIENT_DOMAIN_NODES,
+                "stamina_cost": ANCIENT_DOMAIN_STAMINA_COST,
+                "first_reward": ANCIENT_DOMAIN_FIRST_REWARD,
+                "repeat_reward": ANCIENT_DOMAIN_REPEAT_REWARD,
+                "quota_period": "week",
+                "quota_limit": 1,
+                "party_size": 3,
+            })
+            data.append({
+                "instance_key": ANCESTRAL_HALL_KEY,
+                "label": "祖灵殿秘境",
+                "nodes": ANCESTRAL_HALL_NODES,
+                "stamina_cost": ANCESTRAL_HALL_STAMINA_COST,
+                "first_reward": {"story.ancestral_hall": 1},
                 "repeat_reward": {},
-                "quota_period": "lifetime",
+                "quota_period": "week",
                 "quota_limit": 1,
                 "party_size": 1,
             })
-        if record.player.realm_key == "tribulation":
             data.append({
-                "instance_key": HEAVEN_ECHO_KEY,
-                "label": "天劫回音秘境",
-                "nodes": HEAVEN_ECHO_NODES,
-                "stamina_cost": 0,
-                "first_reward": {"story.heaven_echo": 1},
-                "repeat_reward": {},
-                "quota_period": "none",
-                "quota_limit": 0,
-                "party_size": 1,
+                "instance_key": VOID_RUINS_KEY,
+                "label": "虚空遗迹秘境",
+                "nodes": VOID_RUINS_NODES,
+                "stamina_cost": 50,
+                "anchor_lock_per_member": 1,
+                "first_reward": {"access.void.time_fort": 1, "codex.void.route_ruins": 1, "item.void_crystal": 1},
+                "repeat_reward": VOID_RUINS_REPEAT_REWARD,
+                "quota_period": "week",
+                "quota_limit": 1,
+                "party_size": "2-5",
             })
-        lines.extend(
-            [
-                "### 魔界深渊秘境",
-                "- **前置**：筑基 L1；位于 `demon.abyss_gate`；持有深渊门禁；魔界声望 >=200。",
-                "- **路线**：深渊门 → 污染渗流 → 残响守卫 → 深渊之心。",
-                f"- **消耗**：体力 {DEMON_ABYSS_STAMINA_COST}；每 UTC 周 {DEMON_ABYSS_QUOTA_LIMIT} 次；污染渗流风险 +{DEMON_ABYSS_RISK_MODIFIER_BP} bp。",
-                "- **首通/重复**：魔界声望 +20、深渊残响线索 / 魔核 ×1。",
-                "",
-                "### 界隙裂隙秘境",
-                "- **前置**：创建专用界隙裂隙队伍；队员 2–5 人，均需元婴 L1、三界主线完成并位于 `cave.boundary_realm`。",
-                "- **路线**：裂隙入口 → 破碎岔路 → 跨界哨卫 → 神魂潮汐 → 界隙守望者 → 裂隙封印。",
-                "- **消耗**：每人 30 体力、队长 1 枚神魂晶；每人每 UTC 周 1 次。",
-                "",
-                "### 远古洞天秘境",
-                "- **前置**：创建专用三人队伍；队员均需化神 L1、位于 `cave.ancient_domain` 且没有有效领域裂痕。",
-                "- **路线**：洞天入口 → 裂痕回廊 → 封印古藏 → 太初灵园 → 洞天灵泉 → 远古洞天之主 → 风化天阶 → 本源封印。",
-                "- **消耗**：队长支付全队 40 体力；每名队员每 UTC 周 1 次。",
-                "- **首通/重复**：每名首通队员发现 `codex.domain.ancient_domain` 并获得古果 ×2；重复通关获得古果 ×1。",
-                "",
-                "### 祖灵殿秘境",
-                "- **前置**：化神 L1；位于 `beast.ancestral_lake`；妖界声望 >=3000；血脉稳定 >=5000 bp。",
-                f"- **路线**：{' → '.join(ANCESTRAL_HALL_NODES)}；单人，体力 {ANCESTRAL_HALL_STAMINA_COST}；每角色每 UTC 周一次。",
-                "- **首通**：完成始祖祭坛后写入 `story.ancestral_hall`，无资产奖励。",
-                "",
-                "### 虚空遗迹秘境",
-                "- **前置**：2–5 人专用队伍；全员炼虚 L1、位于 `void.archive_ruins`，各托管虚空锚 1 枚。",
-                f"- **路线**：{' → '.join(VOID_RUINS_NODES)}；队长支付体力 50；每名成员每 UTC 周一次。",
-                "- **奖励**：首通逐成员解锁 `access.void.time_fort`、发现 `codex.void.route_ruins` 并获得虚空晶 ×1；重复通关获得虚空晶 ×1。",
-                "- **战斗**：裂隙哨卫与档案守卫为服务端自动队伍战；虚空不稳定在入场时冻结。",
-                "",
-                "### 时序堡垒秘境",
-                "- **前置**：2–5 人专用队伍；全员炼虚 L1、位于 `void.archive_ruins`，并持有 `access.void.time_fort`。",
-                "- **路线**：堡垒门庭 → 星时回廊 → 时间风暴 → 残破沙漏 → 守时者 → 编年出口。",
-                "- **消耗**：队长体力 40；每名成员每 UTC 周一次；守时者战斗每 3 回合触发时间风暴。",
-                "- **奖励**：首通逐成员阵砂 ×2 并写入 `story.mainline.void_archive.time_fort`；重复通关阵砂 ×1。",
-                "",
-                "### 道源秘境",
-                "- **前置**：合道 L1；位于 `dao.origin_gate`；持有 `access.dao.origin`。",
-                f"- **路线**：{' → '.join(DAO_ORIGIN_NODES)}；单人，体力 60；每角色仅一次。",
-                "- **首通**：写入 `story.dao_origin` 并发现 `codex.dao.service_origin`；不发终局资源。",
-                "",
-                "### 天劫回音秘境",
-                "- **前置**：渡劫 L1；非最终战进行中。",
-                f"- **路线**：{' → '.join(HEAVEN_ECHO_NODES)}；单人，体力 0；60 分钟。",
-                "- **首通**：写入 `story.heaven_echo` 结局旁线旗标；不改变天劫债、终局状态或飞升资源。",
-                "",
-            ]
+            data.append({
+                "instance_key": TIME_FORT_KEY,
+                "label": "时序堡垒秘境",
+                "nodes": TIME_FORT_NODES,
+                "stamina_cost": 40,
+                "first_reward": TIME_FORT_FIRST_REWARD,
+                "repeat_reward": TIME_FORT_REPEAT_REWARD,
+                "quota_period": "week",
+                "quota_limit": 1,
+                "party_size": "2-5",
+            })
+            if record.player.location_key == DAO_ORIGIN_LOCATION:
+                data.append({
+                    "instance_key": DAO_ORIGIN_KEY,
+                    "label": "道源秘境",
+                    "nodes": DAO_ORIGIN_NODES,
+                    "stamina_cost": 60,
+                    "first_reward": DAO_ORIGIN_FIRST_REWARD,
+                    "repeat_reward": {},
+                    "quota_period": "lifetime",
+                    "quota_limit": 1,
+                    "party_size": 1,
+                })
+            if record.player.realm_key == "tribulation":
+                data.append({
+                    "instance_key": HEAVEN_ECHO_KEY,
+                    "label": "天劫回音秘境",
+                    "nodes": HEAVEN_ECHO_NODES,
+                    "stamina_cost": 0,
+                    "first_reward": {"story.heaven_echo": 1},
+                    "repeat_reward": {},
+                    "quota_period": "none",
+                    "quota_limit": 0,
+                    "party_size": 1,
+                })
+            lines.extend(
+                [
+                    "### 魔界深渊秘境",
+                    "- **前置**：筑基 L1；位于 `demon.abyss_gate`；持有深渊门禁；魔界声望 >=200。",
+                    "- **路线**：深渊门 → 污染渗流 → 残响守卫 → 深渊之心。",
+                    f"- **消耗**：体力 {DEMON_ABYSS_STAMINA_COST}；每 UTC 周 {DEMON_ABYSS_QUOTA_LIMIT} 次；污染渗流风险 +{DEMON_ABYSS_RISK_MODIFIER_BP} bp。",
+                    "- **首通/重复**：魔界声望 +20、深渊残响线索 / 魔核 ×1。",
+                    "",
+                    "### 界隙裂隙秘境",
+                    "- **前置**：创建专用界隙裂隙队伍；队员 2–5 人，均需元婴 L1、三界主线完成并位于 `cave.boundary_realm`。",
+                    "- **路线**：裂隙入口 → 破碎岔路 → 跨界哨卫 → 神魂潮汐 → 界隙守望者 → 裂隙封印。",
+                    "- **消耗**：每人 30 体力、队长 1 枚神魂晶；每人每 UTC 周 1 次。",
+                    "",
+                    "### 远古洞天秘境",
+                    "- **前置**：创建专用三人队伍；队员均需化神 L1、位于 `cave.ancient_domain` 且没有有效领域裂痕。",
+                    "- **路线**：洞天入口 → 裂痕回廊 → 封印古藏 → 太初灵园 → 洞天灵泉 → 远古洞天之主 → 风化天阶 → 本源封印。",
+                    "- **消耗**：队长支付全队 40 体力；每名队员每 UTC 周 1 次。",
+                    "- **首通/重复**：每名首通队员发现 `codex.domain.ancient_domain` 并获得古果 ×2；重复通关获得古果 ×1。",
+                    "",
+                    "### 祖灵殿秘境",
+                    "- **前置**：化神 L1；位于 `beast.ancestral_lake`；妖界声望 >=3000；血脉稳定 >=5000 bp。",
+                    f"- **路线**：{' → '.join(ANCESTRAL_HALL_NODES)}；单人，体力 {ANCESTRAL_HALL_STAMINA_COST}；每角色每 UTC 周一次。",
+                    "- **首通**：完成始祖祭坛后写入 `story.ancestral_hall`，无资产奖励。",
+                    "",
+                    "### 虚空遗迹秘境",
+                    "- **前置**：2–5 人专用队伍；全员炼虚 L1、位于 `void.archive_ruins`，各托管虚空锚 1 枚。",
+                    f"- **路线**：{' → '.join(VOID_RUINS_NODES)}；队长支付体力 50；每名成员每 UTC 周一次。",
+                    "- **奖励**：首通逐成员解锁 `access.void.time_fort`、发现 `codex.void.route_ruins` 并获得虚空晶 ×1；重复通关获得虚空晶 ×1。",
+                    "- **战斗**：裂隙哨卫与档案守卫为服务端自动队伍战；虚空不稳定在入场时冻结。",
+                    "",
+                    "### 时序堡垒秘境",
+                    "- **前置**：2–5 人专用队伍；全员炼虚 L1、位于 `void.archive_ruins`，并持有 `access.void.time_fort`。",
+                    "- **路线**：堡垒门庭 → 星时回廊 → 时间风暴 → 残破沙漏 → 守时者 → 编年出口。",
+                    "- **消耗**：队长体力 40；每名成员每 UTC 周一次；守时者战斗每 3 回合触发时间风暴。",
+                    "- **奖励**：首通逐成员阵砂 ×2 并写入 `story.mainline.void_archive.time_fort`；重复通关阵砂 ×1。",
+                    "",
+                    "### 道源秘境",
+                    "- **前置**：合道 L1；位于 `dao.origin_gate`；持有 `access.dao.origin`。",
+                    f"- **路线**：{' → '.join(DAO_ORIGIN_NODES)}；单人，体力 60；每角色仅一次。",
+                    "- **首通**：写入 `story.dao_origin` 并发现 `codex.dao.service_origin`；不发终局资源。",
+                    "",
+                    "### 天劫回音秘境",
+                    "- **前置**：渡劫 L1；非最终战进行中。",
+                    f"- **路线**：{' → '.join(HEAVEN_ECHO_NODES)}；单人，体力 0；60 分钟。",
+                    "- **首通**：写入 `story.heaven_echo` 结局旁线旗标；不改变天劫债、终局状态或飞升资源。",
+                    "",
+                ]
+            )
+            if record.active_run_id:
+                lines.append(f"> 当前已有进行中的秘境：`{record.active_run_id}`。")
+            else:
+                lines.append("> 发送 `进入秘境 魔界深渊`、`雾隐秘境`、`灵泉小径`、`雾隐洞天二层秘境`、`云舟秘境`、`时序残响`、`祖灵支脉`、`界隙裂隙`、`远古洞天`、`祖灵殿`、`虚空遗迹`、`时序堡垒`、`道源秘境` 或 `天劫回音` 开始；组队秘境先创建专用队伍。")
+        return CommandResult(
+            True,
+            "SECRET_REALM_PREVIEW",
+            "\n".join(lines),
+            context.request_id,
+            data={"realms": data, "active_run_id": record.active_run_id},
+            actions=actions,
         )
-        if record.active_run_id:
-            lines.append(f"> 当前已有进行中的秘境：`{record.active_run_id}`。")
-        else:
-            lines.append("> 发送 `进入秘境 魔界深渊`、`雾隐秘境`、`灵泉小径`、`雾隐洞天二层秘境`、`云舟秘境`、`界隙裂隙`、`远古洞天`、`祖灵殿`、`虚空遗迹`、`时序堡垒`、`道源秘境` 或 `天劫回音` 开始；组队秘境先创建专用队伍。")
-        return CommandResult(True, "SECRET_REALM_PREVIEW", "\n".join(lines), context.request_id, data={"realms": data, "active_run_id": record.active_run_id})
 
     async def enter(self, context: CommandContext) -> CommandResult:
         content = self.repository.content
@@ -318,7 +380,16 @@ class SecretRealmApplication:
         if len(context.command_args) == 1 and resolve_demon_abyss(context.command_args[0]) == DEMON_ABYSS_KEY:
             return await self.demon_abyss.enter(context)
         if len(context.command_args) != 1 or not (instance_key := resolve_secret_realm(context.command_args[0], content)):
-            return CommandResult(False, "INVALID_SECRET_REALM_COMMAND", "请使用 `进入秘境 魔界深渊`、`雾隐秘境`、`灵泉小径`、`雾隐洞天二层秘境`、`云舟秘境` 或 `界隙裂隙`。", context.request_id)
+            labels = "、".join(
+                definition.label
+                for definition in secret_realm_definitions(content).values()
+            )
+            return CommandResult(
+                False,
+                "INVALID_SECRET_REALM_COMMAND",
+                f"请使用 `进入秘境 <秘境名>`：{labels}；专用秘境仍用各自入口。",
+                context.request_id,
+            )
         if instance_key == BOUNDARY_RIFT_KEY:
             return await self.boundary_rift.enter(context)
         operation_id = self._operation_id(context, "secret_realm.enter")
