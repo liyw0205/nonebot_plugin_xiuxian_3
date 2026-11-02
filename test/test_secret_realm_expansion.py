@@ -265,6 +265,24 @@ def test_secret_realm_preview_marks_eligibility_and_exposes_links_and_one_button
                 assert fallback.sent_format == "text" and fallback.degraded is True
                 assert str(bot.sent[0]).endswith("可发送：进入秘境 时序残响")
                 assert "command:" not in str(bot.sent[0])
+
+                class FakeQQBot(FakeBot):
+                    __module__ = "nonebot.adapters.qq.bot"
+
+                class FakeQQEvent:
+                    __module__ = "nonebot.adapters.qq.event"
+
+                qq_bot = FakeQQBot()
+                native = await send_markdown_message(
+                    qq_bot,
+                    FakeQQEvent(),
+                    single.message,
+                    capabilities=("markdown", "keyboard"),
+                    actions=single.actions,
+                )
+                assert native.sent_format == "markdown+keyboard", native
+                assert native.degraded is False
+                assert "keyboard" in str(qq_bot.sent[0])
             finally:
                 await runtime.close()
 
