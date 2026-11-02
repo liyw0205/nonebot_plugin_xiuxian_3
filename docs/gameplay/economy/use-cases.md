@@ -2,7 +2,7 @@
 
 ## 用例
 
-`credit_wallet`、`debit_wallet`、`create_market_order`、`buy_market_order`、`cancel_market_order`、`expire_market_order`、`create_service_order`、`settle_order`、`execute_cross_realm_trade`、`create_purchase_order`、`match_purchase_order`、`deliver_purchase_order`、`cancel_purchase_order`、`expire_purchase_order`、`create_auction`、`bid_auction`、`settle_auction`、`list_auctions`。
+`credit_wallet`、`debit_wallet`、`create_market_order`、`buy_market_order`、`cancel_market_order`、`expire_market_order`、`create_service_order`、`settle_order`、`execute_cross_realm_trade`、`preview_void_market`、`purchase_void_market_offer`、`create_purchase_order`、`match_purchase_order`、`deliver_purchase_order`、`cancel_purchase_order`、`expire_purchase_order`、`create_auction`、`bid_auction`、`settle_auction`、`list_auctions`。
 
 ## 错误码
 
@@ -11,6 +11,8 @@
 `TRADE_INPUT_INSUFFICIENT`、`ITEM_BINDING_ACTIVE`。
 限量拍卖另有 `AUCTION_SLOT_FULL`、`AUCTION_BID_TOO_LOW`、`AUCTION_SETTLEMENT_EXPIRED`、`AUCTION_STATE_CONFLICT`、
 `AUCTION_ITEM_LOCKED`。
+虚空集市另有 `VOID_MARKET_REQUIREMENT_MISSING`、`VOID_DAILY_PURCHASE_CAP`、`VOID_STOCK_SOLD_OUT`、
+`VOID_MARKET_OFFER_NOT_FOUND`、`INVALID_VOID_MARKET_COMMAND`。
 物品使用若数量全部由摆摊、求购或拍卖保留，返回 `ITEM_RESERVED`，不扣除背包物品。
 
 ## 风控
@@ -30,4 +32,7 @@
 求购还须覆盖物品改名后的跨 runtime 原 operation 重放、冻结名称、资产/订单唯一性、不同输入冲突、新请求按当前内容拒绝，
 并在 QQ 官方与 OneBot V11 实际命令路径验收。
 
+虚空集市须覆盖航道终点准入（炼虚 L1 或虚空功勋 500）、固定价扣费、周库存售罄、每 UTC 日 3 件上限、
+灵石不足零写、24 小时绑定、跨 UTC 日与跨周刷新、重启后库存/额度保持、同 operation 幂等与换输入冲突，
+并在 QQ 官方 Markdown 蓝字/单按钮与 OneBot V11 纯文本降级下验收。
 拍卖需在 QQ 官方与 OneBot V11 覆盖真实发布、竞价、被超价退款、成交、无竞价流拍和超恢复窗口退款。修改临时内容的槽位、时长、数量/起拍价门槛与加价幅度须影响新拍品，旧拍品仍按完整快照执行；物品或拍卖内容改名、关闭、移除后的列表、结算和原 operation 跨重启回放不受影响。换输入冲突、坏 JSON/快照、并发、流水或账本故障均原子拒绝并可沿原请求重试；不改变既有物品品质准入、手续费或跨交易库存保留规则。
