@@ -35,6 +35,7 @@ class FieldPlotRecord:
     required_maintenance: int = 0
     harvest: dict[str, int] = field(default_factory=dict)
     local_reputation_delta: int = 0
+    plot_index: int = 1
     already_completed: bool = False
 
 

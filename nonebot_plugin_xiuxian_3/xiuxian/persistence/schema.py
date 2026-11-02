@@ -225,6 +225,7 @@ CREATE TABLE IF NOT EXISTS field_plots (
     player_id INTEGER NOT NULL REFERENCES players(id),
     residence_id TEXT NOT NULL REFERENCES residences(residence_id),
     operation_id TEXT NOT NULL UNIQUE,
+    plot_index INTEGER NOT NULL DEFAULT 1 CHECK (plot_index >= 1),
     crop_key TEXT,
     status TEXT NOT NULL CHECK (status IN ('growing', 'harvestable', 'harvested', 'withered')),
     planted_at TEXT NOT NULL,
@@ -239,8 +240,6 @@ CREATE TABLE IF NOT EXISTS field_plots (
 
 CREATE INDEX IF NOT EXISTS idx_field_plots_player ON field_plots(player_id, business_date);
 CREATE INDEX IF NOT EXISTS idx_field_plots_residence ON field_plots(residence_id, status);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_field_plots_active
-    ON field_plots(residence_id) WHERE status IN ('growing', 'harvestable');
 
 CREATE TABLE IF NOT EXISTS town_commissions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

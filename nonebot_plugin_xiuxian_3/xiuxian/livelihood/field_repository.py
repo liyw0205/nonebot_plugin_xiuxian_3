@@ -17,6 +17,7 @@ from ..persistence.errors import (
     FieldPlotBusyError,
     FieldPlotNotFoundError,
     FieldPlotNotReadyError,
+    FieldPlotSlotError,
     FieldPlotWitheredError,
     ResidencePlotRequiredError,
     ResidenceRequiredError,
@@ -47,20 +48,37 @@ class FieldPlotRepositoryMixin:
         platform_user_id: str,
         crop_key: str,
         operation_id: str,
+        plot_index: int | None = None,
     ) -> FieldPlotRecord:
         await self.initialize()
         async with self._inflight:
             return await asyncio.to_thread(
-                self._plant_plot_once, platform, platform_user_id, crop_key, operation_id
+                self._plant_plot_once,
+                platform,
+                platform_user_id,
+                crop_key,
+                operation_id,
+                plot_index,
             )
 
-    def _plant_plot_once(self, platform: str, platform_user_id: str, crop_key: str, operation_id: str) -> FieldPlotRecord:
+    def _plant_plot_once(
+        self,
+        platform: str,
+        platform_user_id: str,
+        crop_key: str,
+        operation_id: str,
+        plot_index: int | None,
+    ) -> FieldPlotRecord:
         operation_name = "livelihood.plant"
         request_value = (crop_key or "").strip() or "<default>"
-        request_hash = self._request_hash(
-            operation_name,
-            {"platform": platform, "platform_user_id": platform_user_id, "crop_key": request_value},
-        )
+        request_fields: dict[str, Any] = {
+            "platform": platform,
+            "platform_user_id": platform_user_id,
+            "crop_key": request_value,
+        }
+        if plot_index is not None:
+            request_fields["plot_index"] = plot_index
+        request_hash = self._request_hash(operation_name, request_fields)
         now = self._now()
         now_text = serialize_datetime(now)
         business_date = now.date().isoformat()
@@ -83,19 +101,37 @@ class FieldPlotRepositoryMixin:
                 raise ResidencePlotRequiredError("the residence does not support this crop")
             if plot_count < 1:
                 raise ResidencePlotRequiredError("the residence has no field plot")
+            if plot_index is not None and (
+                isinstance(plot_index, bool)
+                or not isinstance(plot_index, int)
+                or plot_index < 1
+                or plot_index > plot_count
+            ):
+                raise FieldPlotSlotError("field plot slot is outside the residence")
             active = connection.execute(
                 "SELECT * FROM field_plots WHERE player_id = ? AND residence_id = ? "
                 "AND status IN ('growing', 'harvestable') ORDER BY id",
                 (row["id"], residence["residence_id"]),
             ).fetchall()
+            occupied: set[int] = set()
             for plot in active:
                 _, _, wither_at = self._field_window(plot)
                 if now <= wither_at:
+                    occupied.add(int(plot["plot_index"]))
+                else:
+                    connection.execute(
+                        "UPDATE field_plots SET status = 'withered', updated_at = ? WHERE id = ?",
+                        (now_text, plot["id"]),
+                    )
+            if plot_index is None:
+                for candidate in range(1, plot_count + 1):
+                    if candidate not in occupied:
+                        plot_index = candidate
+                        break
+                if plot_index is None:
                     raise FieldPlotBusyError("field plot is occupied")
-                connection.execute(
-                    "UPDATE field_plots SET status = 'withered', updated_at = ? WHERE id = ?",
-                    (now_text, plot["id"]),
-                )
+            elif plot_index in occupied:
+                raise FieldPlotBusyError("field plot is occupied")
             used = connection.execute(
                 "SELECT COUNT(*) AS count FROM field_plots WHERE player_id = ? AND crop_key = ? AND business_date = ?",
                 (row["id"], crop.key, business_date),
@@ -150,16 +186,17 @@ class FieldPlotRepositoryMixin:
             connection.execute(
                 """
                 INSERT INTO field_plots(
-                    plot_id, player_id, residence_id, operation_id, crop_key, status,
+                    plot_id, player_id, residence_id, operation_id, plot_index, crop_key, status,
                     planted_at, harvest_at, business_date, maintenance_count,
                     snapshot_json, result_json, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, 'growing', ?, ?, ?, 0, ?, '{}', ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, 'growing', ?, ?, ?, 0, ?, '{}', ?, ?)
                 """,
                 (
                     plot_id,
                     row["id"],
                     residence["residence_id"],
                     operation_id,
+                    plot_index,
                     crop.key,
                     now_text,
                     harvest_at,
@@ -184,24 +221,40 @@ class FieldPlotRepositoryMixin:
                 required_maintenance=crop.required_maintenance,
                 crop_label=crop.label,
                 harvest_labels=harvest_labels,
+                plot_index=int(plot_index),
             )
             record_operation(connection, operation_id, operation_name, row["id"], request_hash, payload, now_text)
             return self._field_from_payload(payload)
 
-    async def maintain_plot(self, *, platform: str, platform_user_id: str, operation_id: str) -> FieldPlotRecord:
+    async def maintain_plot(
+        self, *, platform: str, platform_user_id: str, operation_id: str, plot_index: int | None = None
+    ) -> FieldPlotRecord:
         await self.initialize()
         async with self._inflight:
-            return await asyncio.to_thread(self._maintain_plot_once, platform, platform_user_id, operation_id)
+            return await asyncio.to_thread(
+                self._maintain_plot_once, platform, platform_user_id, operation_id, plot_index
+            )
 
-    def _maintain_plot_once(self, platform: str, platform_user_id: str, operation_id: str) -> FieldPlotRecord:
+    def _maintain_plot_once(
+        self, platform: str, platform_user_id: str, operation_id: str, plot_index: int | None
+    ) -> FieldPlotRecord:
         operation_name = "livelihood.maintain_plot"
-        request_hash = self._request_hash(operation_name, {"platform": platform, "platform_user_id": platform_user_id})
-        return self._mutate_plot(operation_name, request_hash, platform, platform_user_id, operation_id, "maintain")
+        request_fields: dict[str, Any] = {"platform": platform, "platform_user_id": platform_user_id}
+        if plot_index is not None:
+            request_fields["plot_index"] = plot_index
+        request_hash = self._request_hash(operation_name, request_fields)
+        return self._mutate_plot(
+            operation_name, request_hash, platform, platform_user_id, operation_id, "maintain", plot_index
+        )
 
-    async def harvest_plot(self, *, platform: str, platform_user_id: str, operation_id: str) -> FieldPlotRecord:
+    async def harvest_plot(
+        self, *, platform: str, platform_user_id: str, operation_id: str, plot_index: int | None = None
+    ) -> FieldPlotRecord:
         await self.initialize()
         async with self._inflight:
-            return await asyncio.to_thread(self._harvest_plot_once, platform, platform_user_id, operation_id)
+            return await asyncio.to_thread(
+                self._harvest_plot_once, platform, platform_user_id, operation_id, plot_index
+            )
 
     async def get_field_plot(self, *, platform: str, platform_user_id: str) -> FieldPlotRecord:
         await self.initialize()
@@ -238,17 +291,102 @@ class FieldPlotRepositoryMixin:
                 harvest_labels=snapshot["harvest_labels"],
                 harvest=harvest,
                 local_reputation_delta=result["local_reputation_delta"] if status == "harvested" else 0,
+                plot_index=int(plot["plot_index"] or 1),
             )
             return self._field_from_payload(payload)
 
+    async def get_field_plots(
+        self, *, platform: str, platform_user_id: str
+    ) -> tuple[int, tuple[FieldPlotRecord, ...]]:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(self._get_field_plots_sync, platform, platform_user_id)
+
+    def _get_field_plots_sync(
+        self, platform: str, platform_user_id: str
+    ) -> tuple[int, tuple[FieldPlotRecord, ...]]:
+        now = self._now()
+        now_text = serialize_datetime(now)
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = self._require_player(connection, platform, platform_user_id, writable=False)
+            residence = self._active_residence(connection, int(row["id"]), now, now_text)
+            plot_count = (
+                int(self._residence_snapshot(residence)["plot_count"])
+                if residence is not None
+                else 0
+            )
+            plots = connection.execute(
+                "SELECT * FROM field_plots WHERE player_id = ? ORDER BY plot_index, id",
+                (row["id"],),
+            ).fetchall()
+            selected: dict[int, tuple[Any, str, dict[str, Any], dict[str, int], int]] = {}
+            for plot in plots:
+                snapshot, harvest_at, wither_at = self._field_window(plot)
+                status = str(plot["status"])
+                if status in {"growing", "harvestable"}:
+                    status = "withered" if now > wither_at else (
+                        "harvestable" if now >= harvest_at else "growing"
+                    )
+                    if status != str(plot["status"]):
+                        connection.execute(
+                            "UPDATE field_plots SET status = ?, updated_at = ? WHERE id = ?",
+                            (status, now_text, plot["id"]),
+                        )
+                result = decode_json_strict(plot["result_json"])
+                if not isinstance(result, dict):
+                    raise TypeError("field plot result must be an object")
+                harvest = dict(result["harvest"]) if status == "harvested" else {}
+                reputation_delta = (
+                    int(result["local_reputation_delta"]) if status == "harvested" else 0
+                )
+                slot = int(plot["plot_index"] or 1)
+                current = selected.get(slot)
+                if current is None or (
+                    status in {"growing", "harvestable"}
+                    and current[1] not in {"growing", "harvestable"}
+                ):
+                    selected[slot] = (plot, status, snapshot, harvest, reputation_delta)
+            records: list[FieldPlotRecord] = []
+            for slot in sorted(selected):
+                plot, status, snapshot, harvest, reputation_delta = selected[slot]
+                payload = self._field_payload(
+                    row,
+                    plot_id=str(plot["plot_id"]),
+                    residence_id=str(plot["residence_id"]),
+                    crop_key=str(plot["crop_key"]) if plot["crop_key"] else "",
+                    status=status,
+                    planted_at=str(plot["planted_at"]),
+                    harvest_at=str(plot["harvest_at"]),
+                    maintenance_count=int(plot["maintenance_count"]),
+                    required_maintenance=int(snapshot["required_maintenance"]),
+                    crop_label=str(snapshot["crop_label"]),
+                    harvest_labels=snapshot["harvest_labels"],
+                    harvest=harvest,
+                    local_reputation_delta=reputation_delta,
+                    plot_index=slot,
+                )
+                records.append(self._field_from_payload(payload))
+            return plot_count, tuple(records)
+
     def _select_field_plot(
-        self, connection: Any, player_id: int, now: datetime, action: str
+        self,
+        connection: Any,
+        player_id: int,
+        now: datetime,
+        action: str,
+        plot_index: int | None = None,
     ) -> tuple[Any, dict[str, Any], str]:
-        plots = connection.execute(
+        query = (
             "SELECT * FROM field_plots WHERE player_id = ? "
-            "AND status IN ('growing', 'harvestable') ORDER BY id",
-            (player_id,),
-        ).fetchall()
+            "AND status IN ('growing', 'harvestable')"
+        )
+        params: list[Any] = [player_id]
+        if plot_index is not None:
+            query += " AND plot_index = ?"
+            params.append(plot_index)
+        query += " ORDER BY id"
+        plots = connection.execute(query, tuple(params)).fetchall()
         candidates = []
         for plot in plots:
             snapshot, harvest_at, wither_at = self._field_window(plot)
@@ -276,10 +414,16 @@ class FieldPlotRepositoryMixin:
         if action != "profile" and (growing or ready):
             raise FieldPlotNotReadyError("no field plot is ready for this action")
 
-        latest = connection.execute(
-            "SELECT * FROM field_plots WHERE player_id = ? ORDER BY id DESC LIMIT 1", (player_id,)
-        ).fetchone()
+        latest_query = "SELECT * FROM field_plots WHERE player_id = ?"
+        latest_params: list[Any] = [player_id]
+        if plot_index is not None:
+            latest_query += " AND plot_index = ?"
+            latest_params.append(plot_index)
+        latest_query += " ORDER BY id DESC LIMIT 1"
+        latest = connection.execute(latest_query, tuple(latest_params)).fetchone()
         if latest is None:
+            if plot_index is not None:
+                raise FieldPlotSlotError("field plot slot has no record")
             raise FieldPlotNotFoundError("no field plot")
         snapshot = self._field_snapshot(latest)
         status = str(latest["status"])
@@ -301,10 +445,17 @@ class FieldPlotRepositoryMixin:
             raise ValueError("invalid field plot harvest window")
         return snapshot, harvest_at, wither_at
 
-    def _harvest_plot_once(self, platform: str, platform_user_id: str, operation_id: str) -> FieldPlotRecord:
+    def _harvest_plot_once(
+        self, platform: str, platform_user_id: str, operation_id: str, plot_index: int | None
+    ) -> FieldPlotRecord:
         operation_name = "livelihood.harvest"
-        request_hash = self._request_hash(operation_name, {"platform": platform, "platform_user_id": platform_user_id})
-        return self._mutate_plot(operation_name, request_hash, platform, platform_user_id, operation_id, "harvest")
+        request_fields: dict[str, Any] = {"platform": platform, "platform_user_id": platform_user_id}
+        if plot_index is not None:
+            request_fields["plot_index"] = plot_index
+        request_hash = self._request_hash(operation_name, request_fields)
+        return self._mutate_plot(
+            operation_name, request_hash, platform, platform_user_id, operation_id, "harvest", plot_index
+        )
 
     def _mutate_plot(
         self,
@@ -314,6 +465,7 @@ class FieldPlotRepositoryMixin:
         platform_user_id: str,
         operation_id: str,
         action: str,
+        plot_index: int | None,
     ) -> FieldPlotRecord:
         now = self._now()
         now_text = serialize_datetime(now)
@@ -323,7 +475,9 @@ class FieldPlotRepositoryMixin:
             if existing is not None:
                 return self._field_from_payload(existing, replay=True)
             row = self._require_player(connection, platform, platform_user_id)
-            plot, snapshot, _ = self._select_field_plot(connection, int(row["id"]), now, action)
+            plot, snapshot, _ = self._select_field_plot(
+                connection, int(row["id"]), now, action, plot_index
+            )
             if action == "maintain":
                 required = int(snapshot["required_maintenance"])
                 count = int(plot["maintenance_count"])
@@ -355,6 +509,7 @@ class FieldPlotRepositoryMixin:
                     required_maintenance=required,
                     crop_label=str(snapshot["crop_label"]),
                     harvest_labels=snapshot["harvest_labels"],
+                    plot_index=int(plot["plot_index"] or 1),
                 )
             else:
                 maintained = int(plot["maintenance_count"]) >= int(snapshot["required_maintenance"])
@@ -399,6 +554,7 @@ class FieldPlotRepositoryMixin:
                     harvest_labels=snapshot["harvest_labels"],
                     harvest=harvest,
                     local_reputation_delta=reputation_delta,
+                    plot_index=int(plot["plot_index"] or 1),
                 )
                 record_material_discoveries(
                     connection,
@@ -506,11 +662,12 @@ class FieldPlotRepositoryMixin:
                 raise ValueError("invalid field plot harvest")
         return labels
 
-    def _field_payload(self, player: Any, *, plot_id: str, residence_id: str, crop_key: str, status: str, planted_at: str, harvest_at: str, maintenance_count: int, required_maintenance: int, crop_label: str, harvest_labels: dict[str, str], harvest: dict[str, int] | None = None, local_reputation_delta: int = 0) -> dict[str, Any]:
+    def _field_payload(self, player: Any, *, plot_id: str, residence_id: str, crop_key: str, status: str, planted_at: str, harvest_at: str, maintenance_count: int, required_maintenance: int, crop_label: str, harvest_labels: dict[str, str], harvest: dict[str, int] | None = None, local_reputation_delta: int = 0, plot_index: int = 1) -> dict[str, Any]:
         return {
             "player": self._player_payload(self._row_to_player(player)),
             "plot_id": plot_id,
             "residence_id": residence_id,
+            "plot_index": plot_index,
             "crop_key": crop_key,
             "crop_label": crop_label,
             "harvest_labels": dict(harvest_labels),
@@ -525,9 +682,13 @@ class FieldPlotRepositoryMixin:
 
     def _field_from_payload(self, payload: dict[str, Any], *, replay: bool = False) -> FieldPlotRecord:
         labels = self._field_harvest_labels(payload, ("harvest",))
+        saved_plot_index = payload.get("plot_index", 1)
         if (
             payload["status"] not in {"growing", "harvestable", "harvested", "withered"}
             or not isinstance(payload["crop_label"], str) or not payload["crop_label"].strip()
+            or isinstance(saved_plot_index, bool)
+            or not isinstance(saved_plot_index, int)
+            or saved_plot_index < 1
             or any(
                 isinstance(payload[field], bool) or not isinstance(payload[field], int) or payload[field] < 0
                 for field in ("maintenance_count", "required_maintenance", "local_reputation_delta")
@@ -551,6 +712,7 @@ class FieldPlotRepositoryMixin:
             required_maintenance=int(payload["required_maintenance"]),
             harvest={str(key): int(value) for key, value in dict(payload["harvest"]).items()},
             local_reputation_delta=int(payload["local_reputation_delta"]),
+            plot_index=int(saved_plot_index),
             already_completed=replay,
         )
 

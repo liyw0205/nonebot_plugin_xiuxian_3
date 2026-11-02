@@ -836,6 +836,10 @@ class FieldPlotBusyError(RuntimeError):
     """The residence plot already contains a growing crop."""
 
 
+class FieldPlotSlotError(RuntimeError):
+    """The requested field plot slot is outside the residence capacity."""
+
+
 class FieldPlotNotFoundError(RuntimeError):
     """The player has no current field plot to operate on."""
 

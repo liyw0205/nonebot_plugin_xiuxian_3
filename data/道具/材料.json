@@ -1102,6 +1102,60 @@
       "requirements": [],
       "status": "active",
       "key": "item.clue.mist_cave_route"
+    },
+    {
+      "name": "云纹稻谷",
+      "desc": "灵圃小院两垄灵田养出的稻谷，颗粒上带着淡淡云纹，可蒸成灵米饭食。",
+      "aliases": [
+        "云纹米",
+        "cloud_rice_grain"
+      ],
+      "item_type": "food",
+      "quality": "common",
+      "stack_limit": 99,
+      "instance_mode": "stack",
+      "bind_type": "unbound",
+      "tradeable": true,
+      "effects": [
+        {
+          "type": "crafting_material",
+          "tags": [
+            "grain",
+            "food"
+          ]
+        }
+      ],
+      "requirements": [],
+      "status": "active",
+      "key": "item.grain.cloud_rice"
+    },
+    {
+      "name": "云纹灵米饭",
+      "desc": "以云纹稻谷文火慢蒸而成的饭食，米香里透着灵气，可补充体力或精力。",
+      "aliases": [
+        "云纹饭",
+        "cloud_rice_meal"
+      ],
+      "item_type": "food",
+      "quality": "common",
+      "stack_limit": 99,
+      "instance_mode": "stack",
+      "bind_type": "unbound",
+      "tradeable": true,
+      "effects": [
+        {
+          "type": "restore_choice",
+          "resources": [
+            "stamina",
+            "energy"
+          ],
+          "amount": 8,
+          "cooldown_seconds": 600
+        }
+      ],
+      "requirements": [],
+      "status": "active",
+      "key": "item.food.cloud_rice_meal"
     }
   ],
   "category": "材料",

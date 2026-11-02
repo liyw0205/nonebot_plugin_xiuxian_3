@@ -287,6 +287,7 @@ class SQLitePlayerRepository(
             self._migrate_economy_ledger_asset_kind(connection)
             self._migrate_facility_schema(connection)
             self._migrate_companion_schema(connection)
+            self._migrate_field_plot_schema(connection)
             self._migrate_sect_war_schema(connection)
             self._migrate_sect_alliance_schema(connection)
             ensure_social_recovery_schema(connection)
@@ -442,6 +443,22 @@ class SQLitePlayerRepository(
             connection.execute(
                 "ALTER TABLE companion_instances ADD COLUMN skill_slots INTEGER NOT NULL DEFAULT 0 CHECK (skill_slots >= 0)"
             )
+
+    @staticmethod
+    def _migrate_field_plot_schema(connection: sqlite3.Connection) -> None:
+        """Address each residence field plot by slot so multi-plot homes work."""
+
+        columns = {str(row["name"]) for row in connection.execute("PRAGMA table_info(field_plots)")}
+        if "plot_index" not in columns:
+            connection.execute(
+                "ALTER TABLE field_plots ADD COLUMN plot_index INTEGER NOT NULL DEFAULT 1 CHECK (plot_index >= 1)"
+            )
+        connection.execute("DROP INDEX IF EXISTS idx_field_plots_active")
+        connection.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_field_plots_slot "
+            "ON field_plots(residence_id, plot_index) "
+            "WHERE status IN ('growing', 'harvestable')"
+        )
 
     @staticmethod
     def _migrate_sect_alliance_schema(connection: sqlite3.Connection) -> None:

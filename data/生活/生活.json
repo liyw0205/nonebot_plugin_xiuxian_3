@@ -450,6 +450,31 @@
       "status": "active"
     },
     {
+      "name": "灵圃小院",
+      "desc": "带两垄灵田与静室的院落，适合长期栽种灵稻、打理灵圃。",
+      "aliases": ["灵圃", "双垄小院"],
+      "requirements": [
+        {
+          "type": "reputation",
+          "reputation_key": "local.xuantian.new_town",
+          "min": 60
+        }
+      ],
+      "rent": {
+        "currency_key": "currency.spirit_stone",
+        "amount": 150,
+        "period_days": 7
+      },
+      "capacity": {
+        "rest_slots": 2,
+        "plots": 2,
+        "storage_slots": 24
+      },
+      "key": "residence.herb_court",
+      "record_type": "residence",
+      "status": "active"
+    },
+    {
       "name": "止血草",
       "desc": "容易照料的常见药草，成熟后可采下止血草供炼药使用。",
       "aliases": ["血草", "blood_grass"],
@@ -530,6 +555,50 @@
       ],
       "daily_limit": 1,
       "key": "crop.spirit_leaf",
+      "record_type": "crop",
+      "status": "active"
+    },
+    {
+      "name": "云纹稻",
+      "desc": "灵圃中才养得住的灵稻，收割后可得云纹稻谷，再以文火慢蒸成饭。",
+      "aliases": ["云稻", "cloud_rice"],
+      "requirements": [
+        {
+          "type": "residence_key",
+          "value": "residence.herb_court"
+        }
+      ],
+      "seed": {
+        "item_key": "item.herb.spirit_leaf",
+        "quantity": 2
+      },
+      "growth_seconds": 21600,
+      "maintenance": {
+        "energy": 1,
+        "minimum_count": 2
+      },
+      "harvest": [
+        {
+          "item_key": "item.grain.cloud_rice",
+          "quantity": 4
+        },
+        {
+          "item_key": "item.herb.spirit_leaf",
+          "quantity": 1
+        }
+      ],
+      "unmaintained_harvest": [
+        {
+          "item_key": "item.grain.cloud_rice",
+          "quantity": 2
+        }
+      ],
+      "daily_limit": 2,
+      "reputation": {
+        "key": "local.xuantian.new_town",
+        "amount": 2
+      },
+      "key": "crop.cloud_rice",
       "record_type": "crop",
       "status": "active"
     },

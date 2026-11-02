@@ -1659,6 +1659,49 @@
       "aliases": [
         "时序锚定阵"
       ]
+    },
+    {
+      "key": "recipe.food.cloud_rice_meal",
+      "name": "云纹灵米饭",
+      "profession": "cooking",
+      "inputs": {
+        "item.grain.cloud_rice": 3
+      },
+      "energy_cost": 3,
+      "duration_seconds": 30,
+      "daily_limit": 8,
+      "tool_key": null,
+      "tool_cost_bp": 0,
+      "currency_cost": 0,
+      "outputs": {
+        "item.food.cloud_rice_meal": 2
+      },
+      "high_quality_bonus": {},
+      "failure_refunds": {
+        "item.grain.cloud_rice": 1
+      },
+      "min_realm_layer": 1,
+      "required_realm": "qi_sensing",
+      "additional_realms": [],
+      "proficiency_bp": 3000,
+      "required_location": [],
+      "teaching_allowed": false,
+      "required_path": null,
+      "required_paths": [],
+      "required_subprofession": [],
+      "success_threshold_bp": 4500,
+      "high_quality_threshold_bp": 8001,
+      "facility_kind": null,
+      "failure_refund_bp": null,
+      "binding_kind": null,
+      "binding_duration_seconds": 0,
+      "binding_slot_limit": 0,
+      "cross_realm_faction": null,
+      "status": "active",
+      "aliases": [
+        "云纹饭"
+      ],
+      "desc": "把云纹稻谷细细蒸熟，做成能补充体力或精力的灵米饭食。"
     }
   ]
 }
