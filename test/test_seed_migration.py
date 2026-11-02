@@ -318,13 +318,18 @@ MATERIAL_FILE = Path("道具/材料.json")
 
 
 def old_official_materials() -> bytes:
-    # The deployed blob before the time-garden slice: reverse only the
-    # time_trace item additions (the new record and its gathering_sources).
+    # The deployed blob before the time-garden slice: reverse the time_trace
+    # item additions and the later cloud-rice crop-chain items.
     document = json.loads((ROOT / "data" / MATERIAL_FILE).read_text(encoding="utf-8"))
     document["records"] = [
         record
         for record in document["records"]
-        if record["key"] != "item.herb.time_trace"
+        if record["key"]
+        not in {
+            "item.herb.time_trace",
+            "item.grain.cloud_rice",
+            "item.food.cloud_rice_meal",
+        }
     ]
     blob = (json.dumps(document, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
     rule = json.loads((ROOT / "scripts/seed_migrations.json").read_text(encoding="utf-8"))[
@@ -838,7 +843,14 @@ def old_official_companion_evolutions() -> bytes:
 
 def old_official_recipes() -> bytes:
     return _without_records(
-        RECIPE_FILE, frozenset({"recipe.pill.time_ward", "recipe.array.time_anchor"})
+        RECIPE_FILE,
+        frozenset(
+            {
+                "recipe.pill.time_ward",
+                "recipe.array.time_anchor",
+                "recipe.food.cloud_rice_meal",
+            }
+        ),
     )
 
 

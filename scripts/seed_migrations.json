@@ -40,10 +40,11 @@
     "old_sha256": {
       "a1d03eb055fe89b1a240e695589b40edaf1407202a0d5c5f09d722b6131d217e": "579c3ab277d90eafd9d267693be89e678b533282:data/道具/材料.json",
       "eaa2173340385e322c8f4f54339871869d9b42c0bf3b0009a3cbd5ac1f3a2a55": "eaed7115257db5a67933e8bdf833c003319d940d:data/道具/材料.json",
-      "677d37e35c44a4459738f2387b12f44ec1d762d184e3d3dc69e88347a12e7350": "c6005eed015ffd9262ff465a7809bd97120f6c02:data/道具/材料.json"
+      "677d37e35c44a4459738f2387b12f44ec1d762d184e3d3dc69e88347a12e7350": "c6005eed015ffd9262ff465a7809bd97120f6c02:data/道具/材料.json",
+      "a4afe7f516d5cffbec44d429bf080cfae2cde3a9fbfd90dd7280aa2a9874557c": "0aae79a013b2a1783a4d9a8bd172c81c3d5df126:data/道具/材料.json"
     },
-    "new_sha256": "a4afe7f516d5cffbec44d429bf080cfae2cde3a9fbfd90dd7280aa2a9874557c",
-    "new_commit": "d059905cea0a6a777f8a122394823076f59bed40"
+    "new_sha256": "9c60aa30b495be82ad940233ecc6f50e2ce810e1350e856646bbca93364e7692",
+    "new_commit": "6007d3198976b00329ba0205c9e676b7cf7c0044"
   },
   "道具/丹药.json": {
     "old_sha256": {
@@ -54,10 +55,11 @@
   },
   "生产/配方.json": {
     "old_sha256": {
-      "9ae47f249225e626fbdc5d3d507f1738dcf3f819cabef14ad85d7d1b306befd4": "d059905cea0a6a777f8a122394823076f59bed40:data/生产/配方.json"
+      "9ae47f249225e626fbdc5d3d507f1738dcf3f819cabef14ad85d7d1b306befd4": "d059905cea0a6a777f8a122394823076f59bed40:data/生产/配方.json",
+      "000ddc804017ead97d6422459d224400d999f1c4bab528cd2f55fe37281937db": "0aae79a013b2a1783a4d9a8bd172c81c3d5df126:data/生产/配方.json"
     },
-    "new_sha256": "000ddc804017ead97d6422459d224400d999f1c4bab528cd2f55fe37281937db",
-    "new_commit": "1d643e609fd01b0fccd33dbfbae08045811b0466"
+    "new_sha256": "4b230a8220a760a72688866f53a433c1ac6e2eeb5e68038b491215dad52cdbfd",
+    "new_commit": "6007d3198976b00329ba0205c9e676b7cf7c0044"
   },
   "剧情/主线.json": {
     "old_sha256": {
@@ -210,5 +212,12 @@
     },
     "new_sha256": "166354edb6cccf1f75810302bcf791967e8138703f2438a49f0313e54fb7aa41",
     "new_commit": "2c3c7100ba23684a54f1397cce5e439619193f85"
+  },
+  "生活/生活.json": {
+    "old_sha256": {
+      "79fc40e08fd466619addec23831128366a9f34fa367e9d956c4da2ae465f283d": "0aae79a013b2a1783a4d9a8bd172c81c3d5df126:data/生活/生活.json"
+    },
+    "new_sha256": "1a4587e0c77928b3ba77d23957170bd0fcb6b66da6625b8d8a1cb017029b6d8f",
+    "new_commit": "6007d3198976b00329ba0205c9e676b7cf7c0044"
   }
 }
