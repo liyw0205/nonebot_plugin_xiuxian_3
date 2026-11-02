@@ -562,7 +562,9 @@ quality 3.11/3.12 与 install-smoke 同样全部成功，release 按条件跳过
 `test_world.py`+`test_world_content.py`+`test_market_operation_integrity.py` 26 passed；
 `test_player_interaction.py` 1 项失败在未改动 HEAD（`8ce7750` 独立工作树）上同样失败，非本版引入。
 develop CI（Quality and Release `41524124150`，head `60c638b`）的 quality 3.11/3.12 与
-install-smoke 全部成功，release 按条件跳过。未跑全量/压测/部署，未验 QQ 真机，未发版。
+install-smoke 全部成功，release 按条件跳过。main CI（Quality and Release
+`41544148360`，head `a6cbab6`）的 quality 3.11/3.12 与 install-smoke 同样全部成功，
+release 按条件跳过。未跑全量/压测/部署，未验 QQ 真机，未发版。
 
 居所物资箱已在 `develop` 完成（业务提交 `3b17af7`、文档 `f2b4ce1`）：
 `capacity.storage_slots` 正式生效，客房/小院/灵圃小院分别提供 10/20/24 格；租约快照冻结容量，
