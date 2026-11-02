@@ -154,6 +154,8 @@ def _parse_dispatch(row: dict[str, Any], bundle: ContentBundle) -> DispatchDefin
         if isinstance(realm.get("min_layer"), bool) or not isinstance(realm.get("min_layer"), int) or realm["min_layer"] < 1:
             raise ContentError(f"dispatch {key} realm layer requirement is invalid")
         required_realm, required_layer = realm["key"], realm["min_layer"]
+        if bundle.get("realm", required_realm, include_locked=False) is None:
+            raise ContentError(f"dispatch {key} references unknown or locked realm {required_realm}")
     service_reputation = requirements.get("service_reputation")
     if service_reputation is not None and (
         isinstance(service_reputation, bool) or not isinstance(service_reputation, int) or service_reputation < 0

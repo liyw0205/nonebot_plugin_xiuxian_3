@@ -8,7 +8,10 @@ import pytest
 
 from nonebot_plugin_xiuxian_3.xiuxian.content import ContentBundle, ContentError
 from nonebot_plugin_xiuxian_3.xiuxian.rewards.rules import local_reputation_maximum
-from nonebot_plugin_xiuxian_3.xiuxian.specials.dispatch_rules import dispatch_definitions
+from nonebot_plugin_xiuxian_3.xiuxian.specials.dispatch_rules import (
+    dispatch_definitions,
+    resolve_dispatch,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 LIFE_FILE = Path("生活/生活.json")
@@ -71,6 +74,27 @@ def test_every_mid_high_realm_has_exactly_two_dispatches() -> None:
                 counts.get(definition.required_realm, 0) + 1
             )
     assert counts == EXPECTED_REALM_COVERAGE
+
+
+def test_mid_high_dispatches_have_playable_contracts_and_aliases() -> None:
+    bundle = ContentBundle.load(ROOT / "data")
+    definitions = dispatch_definitions(bundle)
+    for key in NEW_DISPATCHES:
+        definition = definitions[key]
+        assert 10 * 60 <= definition.duration_seconds <= 12 * 60 * 60
+        assert definition.daily_limit in (2, 3)
+        costs = dict(definition.costs)
+        assert set(costs) <= {"stamina", "energy"}
+        assert costs.get("stamina", 0) >= 4
+        assert set(dict(definition.failure_refunds)) <= set(costs)
+        assert sum(weight for _, weight in definition.risk_weights) == 10000
+        assert dict(definition.rewards).get("success", {})
+        assert "spirit_stones" in dict(definition.rewards)["success"]
+        assert definition.required_realm is not None
+        assert bundle.get("realm", definition.required_realm, include_locked=False) is not None
+        assert resolve_dispatch(definition.label, bundle).key == key
+        for alias in definition.aliases:
+            assert resolve_dispatch(alias, bundle).key == key
 
 
 def test_new_dispatch_rewards_reference_provenance_closed_items() -> None:
@@ -179,4 +203,14 @@ def test_content_rejects_invalid_dispatch_contracts(tmp_path: Path) -> None:
         lambda r: r["rewards"].update({"delayed": {"spirit_stones": 50}}),
     )
     with pytest.raises(ContentError, match="invalid delayed rewards"):
+        dispatch_definitions(ContentBundle.load(data_dir))
+
+    # Realm gate must reference an open realm.
+    data_dir = _copy_data(tmp_path, "realm")
+    _mutate(
+        data_dir,
+        "dispatch.foundation.patrol",
+        lambda r: r["requirements"]["realm"].update({"key": "realm.not_open"}),
+    )
+    with pytest.raises(ContentError, match="unknown or locked realm"):
         dispatch_definitions(ContentBundle.load(data_dir))

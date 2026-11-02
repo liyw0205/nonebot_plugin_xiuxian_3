@@ -93,9 +93,11 @@ class DispatchRepositoryMixin:
                 definition.required_realm,
                 definition.required_layer,
             )
-            if definition.required_service_reputation is None or (
-                service < definition.required_service_reputation and not meets_realm
-            ):
+            meets_service = (
+                definition.required_service_reputation is not None
+                and service >= definition.required_service_reputation
+            )
+            if not meets_realm and not meets_service:
                 missing.append("需要满足道统境界或服务信誉要求")
         elif definition.required_service_reputation is not None:
             service = player_reputation_state(connection, int(player["id"])).service

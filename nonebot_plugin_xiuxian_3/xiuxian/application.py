@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 
 from ..contracts import CommandContext, CommandResult, validate_command_identity
-from .content import ContentBundle
+from .content import ContentBundle, bundled_content
 from .player.use_cases import PlayerApplication
 from .production.use_cases import ProductionApplication
 from .production.facility_use_cases import FacilityApplication
@@ -128,7 +128,9 @@ _HELP_PAGES = {
         f"{command_link('我的灵田', '我的灵田')}可查看田间生长，成熟后{command_link('灵田收获', '灵田收获')}。"
         f"居所内可{command_link('休整', '休整')}恢复体力与精力，结束后{command_link('结算休整', '结算休整')}。"
         f"物资可{command_link('存入居所', '存入居所')}、{command_link('取回居所', '取回居所')}，"
-        f"用{command_link('我的物资箱', '我的物资箱')}查看格数与存量。",
+        f"用{command_link('我的物资箱', '我的物资箱')}查看格数与存量。\n\n"
+        f"想托人跑腿，可{command_link('派遣预览', '派遣预览')}查看各境界差事；"
+        f"选定后{command_link('接受派遣', '接受派遣')}填写任务名，到期再{command_link('结算派遣', '结算派遣')}。\n\n"
         f"{command_link('每日修行', '每日修行')}记下日常安排，"
         f"{command_link('道历问安', '道历问安')}领取当日问安所得。\n\n"
         f"{command_link('灵兽状态', '灵兽状态')}可查看同行灵兽与灵骑。"
@@ -248,6 +250,10 @@ class XiuxianApplication:
             body = _HELP_PAGES[category]
             if category == "探索":
                 body += "\n\n" + self._exploration_mode_lines()
+            elif category == "生活":
+                dispatch_lines = self._dispatch_help_lines()
+                if dispatch_lines:
+                    body += "\n\n" + dispatch_lines
             return CommandResult(
                 True,
                 "HELP_CATEGORY",
@@ -289,6 +295,47 @@ class XiuxianApplication:
                         f"- {definition.label}（{location_label}，{realm_text}，"
                         f"每日{definition.daily_limit}次）"
                     )
+            return "\n".join(lines)
+        except Exception:
+            return ""
+
+    def _dispatch_help_lines(self) -> str:
+        """List content-driven mid/high realm dispatches for the life page.
+
+        Help rendering stays best-effort: content failures fall back to the
+        static page body and never block command dispatch.
+        """
+
+        try:
+            from .specials.dispatch_rules import dispatch_definitions
+
+            definitions = [
+                definition
+                for definition in dispatch_definitions(self.content).values()
+                if definition.required_realm and definition.required_layer is not None
+            ]
+            if not definitions:
+                return ""
+            content = self.content or bundled_content()
+
+            def _rank(definition) -> tuple[int, int, str]:
+                realm = content.get("realm", definition.required_realm)
+                rank = int(realm.get("rank", 0)) if realm else 0
+                return (rank, definition.required_layer or 0, definition.key)
+
+            definitions.sort(key=_rank)
+            lines: list[str] = [
+                "**中高阶派遣**",
+                "> 点选差事名可预填接受指令；接受即冻结风险与奖励。",
+            ]
+            for definition in definitions:
+                realm_key = definition.required_realm or ""
+                realm_label = content.label("realm", realm_key)
+                lines.append(
+                    f"- {command_link(definition.label, f'接受派遣 {definition.label}')}"
+                    f"（{realm_label} L{definition.required_layer}，"
+                    f"{definition.duration_seconds // 60} 分钟，每日 {definition.daily_limit} 次）"
+                )
             return "\n".join(lines)
         except Exception:
             return ""

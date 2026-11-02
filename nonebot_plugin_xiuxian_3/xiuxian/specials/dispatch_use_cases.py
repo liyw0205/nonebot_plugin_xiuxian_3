@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from ...contracts import CommandContext, CommandResult
+from typing import Mapping
+
+from ...contracts import CommandAction, CommandContext, CommandResult
 from ..content import bundled_content
 from ..persistence.errors import (
     DispatchAlreadySettledError,
@@ -23,7 +25,22 @@ from .dispatch_models import (
     DispatchSettlementRecord,
 )
 from .dispatch_repository import DispatchRepositoryMixin
-from .dispatch_rules import resolve_dispatch
+from .dispatch_rules import DispatchDefinition, resolve_dispatch
+from ..utils.text import command_link
+
+
+_STAGE_LABELS = {
+    "new_user": "初入仙途",
+    "mortal": "凡人以上",
+    "seeker": "寻道期",
+    "cultivator": "入道后",
+}
+_RISK_LABELS = {
+    "success": "顺利",
+    "delayed": "耽搁",
+    "partial": "部分",
+    "failed": "失败",
+}
 
 
 class DispatchApplication:
@@ -83,6 +100,7 @@ class DispatchApplication:
             "costs": dict(record.costs),
             "ready": record.ready,
             "missing": list(record.missing),
+            "accept_command": f"接受派遣 {record.label}" if record.ready else None,
         }
 
     def _content(self):
@@ -104,11 +122,74 @@ class DispatchApplication:
             return content.label("location", key.removeprefix("local.")) + "名望"
         return key
 
+    def _realm_label(self, realm_key: str | None) -> str:
+        if not realm_key:
+            return "凡人"
+        try:
+            return self._content().label("realm", realm_key)
+        except Exception:
+            return realm_key
+
     def _cost_text(self, costs: dict[str, int]) -> str:
         return "、".join(f"{self._label(key)} {value}" for key, value in costs.items()) or "无成本"
 
     def _reward_text(self, rewards: dict[str, int]) -> str:
         return "、".join(f"{self._label(key)} +{value}" for key, value in rewards.items()) or "无产出"
+
+    def _reward_spec_text(self, rewards: Mapping[str, int | tuple[int, int]]) -> str:
+        parts: list[str] = []
+        for key, value in rewards.items():
+            if isinstance(value, tuple) and len(value) == 2:
+                amount = f"{int(value[0])}–{int(value[1])}"
+            else:
+                amount = str(int(value))  # type: ignore[arg-type]
+            parts.append(f"{self._label(str(key))} +{amount}")
+        return "、".join(parts) or "无产出"
+
+    def _requirement_text(self, definition: DispatchDefinition) -> str:
+        parts: list[str] = []
+        stage = _STAGE_LABELS.get(definition.required_stage or "")
+        if stage:
+            parts.append(stage)
+        if definition.required_realm and definition.required_layer is not None:
+            realm = f"{self._realm_label(definition.required_realm)} L{definition.required_layer}"
+            if definition.required_service_reputation is not None:
+                realm += f" 或服务信誉 {definition.required_service_reputation}"
+            parts.append(realm)
+        elif definition.required_service_reputation is not None:
+            parts.append(f"服务信誉 {definition.required_service_reputation}")
+        if definition.required_intro_flag:
+            parts.append("完成对应引导")
+        if definition.required_permit:
+            parts.append("持有有效贸易许可")
+        return "、".join(parts) or "无额外前置"
+
+    @staticmethod
+    def _risk_text(definition: DispatchDefinition) -> str:
+        total = sum(weight for _, weight in definition.risk_weights) or 1
+        return "、".join(
+            f"{_RISK_LABELS.get(outcome, outcome)} {weight * 100 / total:.0f}%"
+            for outcome, weight in definition.risk_weights
+        )
+
+    def _detail_lines(self, record: DispatchPreviewRecord, definition: DispatchDefinition) -> list[str]:
+        reward_map = dict(definition.rewards)
+        success = {str(key): value for key, value in dict(reward_map.get("success", {})).items()}
+        partial = {str(key): value for key, value in dict(reward_map.get("partial", {})).items()}
+        refunds = dict(definition.failure_refunds)
+        lines = [
+            f"### {record.label}",
+            record.description,
+            f"- **前置**：{self._requirement_text(definition)}",
+            f"- **耗时**：{record.duration_seconds // 60} 分钟 · 每日 {record.daily_limit} 次（今日已接 {record.daily_used} 次）",
+            f"- **成本**：{self._cost_text(record.costs)}",
+            f"- **风险**：{self._risk_text(definition)}",
+            f"- **顺利**：{self._reward_spec_text(success)}",
+        ]
+        if partial:
+            lines.append(f"- **部分**：{self._reward_spec_text(partial)}")
+        lines.append(f"- **失败返还**：{self._cost_text({key: value for key, value in refunds.items()}) if refunds else '无'}")
+        return lines
 
     @staticmethod
     def _assignment_data(record: DispatchAssignmentRecord) -> dict[str, object]:
@@ -128,9 +209,10 @@ class DispatchApplication:
     async def preview(self, context: CommandContext) -> CommandResult:
         if len(context.command_args) > 1:
             return CommandResult(False, "INVALID_DISPATCH_COMMAND", "派遣预览最多接收一个任务键。", context.request_id)
+        definition = None
         if context.command_args:
             try:
-                resolve_dispatch(context.command_args[0], self.repository.content)
+                definition = resolve_dispatch(context.command_args[0], self.repository.content)
             except ValueError:
                 return CommandResult(False, "DISPATCH_NOT_FOUND", "没有找到这条派遣任务。", context.request_id)
         try:
@@ -142,13 +224,38 @@ class DispatchApplication:
         except Exception as exc:
             return self._error(context, "", exc)
         data = {"dispatches": [self._preview_data(record) for record in records]}
-        lines = ["## 派遣任务", ""]
-        for record in records:
-            duration = record.duration_seconds // 60
-            state = "可接受" if record.ready else f"不可接受：{'、'.join(record.missing)}"
-            costs = self._cost_text(record.costs)
-            lines.append(f"- **{record.label}**：{record.description} · {duration} 分钟 · {costs} · {state}")
-        return CommandResult(True, "DISPATCH_PREVIEW", "\n".join(lines), context.request_id, data=data)
+        lines = [
+            "## 派遣任务",
+            "",
+            "> 选定差事后发送“接受派遣 任务名”；蓝字可直接预填，接受即冻结风险与收益。",
+            "",
+        ]
+        actions: tuple[CommandAction, ...] = ()
+        if len(records) == 1 and definition is not None:
+            record = records[0]
+            lines.extend(self._detail_lines(record, definition))
+            if record.ready:
+                lines.append("- **状态**：可接受")
+                actions = (CommandAction("接受此项派遣", f"接受派遣 {record.label}", enter=True),)
+            else:
+                lines.append(f"- **状态**：不可接受：{'、'.join(record.missing)}")
+        else:
+            for record in records:
+                duration = record.duration_seconds // 60
+                state = "可接受" if record.ready else f"不可接受：{'、'.join(record.missing)}"
+                costs = self._cost_text(record.costs)
+                accept = f" · {command_link('接受', f'接受派遣 {record.label}')}" if record.ready else ""
+                lines.append(
+                    f"- **{record.label}**：{record.description} · {duration} 分钟 · {costs} · {state}{accept}"
+                )
+        return CommandResult(
+            True,
+            "DISPATCH_PREVIEW",
+            "\n".join(lines),
+            context.request_id,
+            data=data,
+            actions=actions,
+        )
 
     async def accept(self, context: CommandContext) -> CommandResult:
         if len(context.command_args) != 1:
@@ -178,6 +285,11 @@ class DispatchApplication:
             context.request_id,
             operation_id,
             data=self._assignment_data(record),
+            actions=(
+                (CommandAction("取消派遣", "取消派遣", enter=True),)
+                if not record.already_completed
+                else ()
+            ),
         )
 
     @staticmethod
@@ -217,7 +329,7 @@ class DispatchApplication:
         return CommandResult(
             True,
             "DISPATCH_SETTLED",
-            f"派遣已结算，{outcome}；收益：{reward}{suffix}。",
+            f"派遣已结算，{outcome}；收益：{reward}{suffix}。\n\n> {command_link('再看派遣', '派遣预览')}",
             context.request_id,
             operation_id,
             data=self._settlement_data(record),
@@ -240,7 +352,7 @@ class DispatchApplication:
         return CommandResult(
             True,
             "DISPATCH_CANCELLED",
-            f"派遣已取消，全部成本已返还：{refund}。",
+            f"派遣已取消，全部成本已返还：{refund}。\n\n> {command_link('再看派遣', '派遣预览')}",
             context.request_id,
             operation_id,
             data={
