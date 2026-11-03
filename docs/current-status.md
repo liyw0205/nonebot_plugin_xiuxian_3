@@ -640,6 +640,34 @@ operation 重放与重启后状态、QQ Markdown+键盘与 OneBot 降级、帮�
 develop CI（`41649984150`，head `4684250`）quality 3.11/3.12 与 install-smoke 成功，release 按条件跳过。
 未跑全量/压测/部署，未验 QQ 真机，未发版。
 
+道统路线议事（`dao.choose_route` + `dao.council_vote`）已在 `develop` 完成（业务提交 `152387b`、
+种子 provenance `f50f46b`、文档 `ff67aeb`）：social v0.6 冻结的这套规则此前零数据、零表、零命令。
+新增 `data/社交/道统路线.json`（kind `dao_route`）：`route.dao_settlement.defaults` 承接
+宗门等级 6、公共功勋 1000、三票门槛、`dao_union` L1、7 天周期与 7 天锁定、允许同票沿用；
+三条路线 `guard_world`/`ascend`/`remain`（守界/飞升/留界）各带 `defense_event_bonus_bp 1000`、
+`dao_fruit_trial_bonus_bp 1000`、`hall_construction_bonus_bp 1500`，加载器要求恰好三条且加成键白名单、
+上限 3000 bp，缺失或多出都拒绝加载。加载器 `social/dao_route_content.py` 校验字段集、正数、境界与层区间、
+布尔项、别名唯一，非法抛 `ContentError` 并在导入期构建。新表 `dao_route_cycles`/`dao_route_votes`
+（`(cycle, sect, player)` 唯一）/`dao_route_state`，`DaoRouteRepositoryMixin` 的投票与结算均单事务 +
+`operations` 幂等：周期按 UTC ISO 周，投票前先结算该宗门最近一个已结束周期，满三票按多数定线、
+同票沿用上周并标记 `tie_carryover`、定线即扣 1000 `sect_merit` 并写 `locked_until = 结算时刻 + 7 天`；
+**票数不足的周期以「无路线」关闭**（扣 0、不写锁定），避免把后续每周投票永久卡死在一个永远无法通过的
+结算上，显式结算返回 `DAO_COUNCIL_QUORUM_MISSING`；本周未结束返回 `DAO_ROUTE_NOT_DUE`，
+锁定期内再次结算返回 `DAO_ROUTE_LOCKED`。命令 `道统`（别名 `道统议事`）、`道统投票 <守界|飞升|留界>`、
+`道统结算`，其余错误码 `DAO_ROUTE_REQUIREMENT`/`DAO_VOTE_ALREADY_CAST`/`DAO_ROUTE_NOT_FOUND`/
+`INVALID_DAO_ROUTE_COMMAND`/`LEDGER_CONFLICT` 全部零写；QQ 原生 Markdown 列出三线与加成并只挂一个
+投票按钮 + 蓝字预填，OneBot/纯文本降级为可读命令与「可发送：…」且不暴露稳定键，
+`修仙帮助 社交` 追加内容驱动段落。议事**不**触碰 `ascension_merit`、天劫债、道果进度与赛季三榜；
+三线加成对守界事件、飞升试炼与据点建设的消费端记录为后续项（据点建设为一次性成本，无可加速字段）。
+聚焦证据：`test_dao_route_content.py` 23 passed（合同数值、别名、ISO 周边界、多数与同票规则、
+资格与锁定窗口、九类 defaults 拒绝、七类路线拒绝、缺线拒绝）、`test_dao_route.py` 8 passed
+（非合道/无宗门/等级不足零写、每周一票与重复票拒绝、三票多数定线并扣 1000、
+平票沿用上周、票数不足关闭周期且不卡死后续投票、未到期与锁定期分别报错、
+操作重放与重启后状态、不改飞升/天劫/道果、QQ Markdown+键盘与 OneBot 降级、帮助段落）；
+回归 `test_content.py`+`test_m9_content_integrity.py`+`test_documentation.py`+`test_help.py` 22 passed、
+`test_seed_migration.py -k "targets_match or reverse or covers_every or manifest"` 10 passed。
+未跑全量/压测/部署，未验 QQ 真机，未发版。
+
 留界据点 `settlement.dao_hall` 已在 `develop` 完成（业务提交 `e21e2af`、种子 provenance `78f814a`、
 文档 `b520522`）：social v0.6 早已冻结准入（留界结局、世界功勋 2000、灵石 5000）、核心席位 30、
 周维护 5000 与 72h 重建期，economy v0.6 冻结建设只用世界功勋，但包内既无数据文件也无加载器、表、
