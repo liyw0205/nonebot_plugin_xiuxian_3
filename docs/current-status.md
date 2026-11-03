@@ -666,7 +666,8 @@ develop CI（`41649984150`，head `4684250`）quality 3.11/3.12 与 install-smok
 操作重放与重启后状态、不改飞升/天劫/道果、QQ Markdown+键盘与 OneBot 降级、帮助段落）；
 回归 `test_content.py`+`test_m9_content_integrity.py`+`test_documentation.py`+`test_help.py` 22 passed、
 `test_seed_migration.py -k "targets_match or reverse or covers_every or manifest"` 10 passed。
-未跑全量/压测/部署，未验 QQ 真机，未发版。
+develop CI（`41684641360`，head `a64fc10`）quality 3.11/3.12 与 install-smoke 成功，release 按条件跳过；
+main CI（`41688648724`，同 head）三项同样全部成功。未跑全量/压测/部署，未验 QQ 真机，未发版。
 
 留界据点 `settlement.dao_hall` 已在 `develop` 完成（业务提交 `e21e2af`、种子 provenance `78f814a`、
 文档 `b520522`）：social v0.6 早已冻结准入（留界结局、世界功勋 2000、灵石 5000）、核心席位 30、
