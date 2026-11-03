@@ -1,0 +1,30 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "void_material_market",
+  "records": [
+    {
+      "key": "market.void_material.defaults",
+      "name": "虚空物资寄售",
+      "desc": "虚空往返者把带出的物资寄在此处，六小时后未售出自动退回。",
+      "aliases": ["虚空寄售", "寄售行"],
+      "status": "active",
+      "listing_hours": 6,
+      "fee_bp": 800,
+      "expire_grace_minutes": 5,
+      "max_listings_per_player": 5,
+      "admission": {
+        "realm": "void_refining",
+        "min_layer": 1,
+        "merit_key": "void_merit",
+        "min_merit": 500
+      },
+      "allowed_item_keys": [
+        "item.void_crystal",
+        "item.void_anchor",
+        "item.soul_crystal",
+        "item.material.mist_core",
+        "item.spirit_water"
+      ]
+    }
+  ]
+}

@@ -2982,6 +2982,39 @@ CREATE TABLE IF NOT EXISTS dao_route_votes (
 CREATE INDEX IF NOT EXISTS idx_dao_route_votes_cycle
     ON dao_route_votes(cycle_id, sect_id, route_key);
 
+CREATE TABLE IF NOT EXISTS void_material_listings (
+    listing_id TEXT PRIMARY KEY,
+    seller_id INTEGER NOT NULL REFERENCES players(id),
+    item_key TEXT NOT NULL,
+    quantity INTEGER NOT NULL CHECK (quantity > 0),
+    unit_price INTEGER NOT NULL CHECK (unit_price > 0),
+    status TEXT NOT NULL CHECK (status IN ('listed', 'sold', 'cancelled', 'expired')),
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    closed_at TEXT,
+    buyer_id INTEGER REFERENCES players(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_void_material_listings_status
+    ON void_material_listings(status, expires_at);
+
+CREATE INDEX IF NOT EXISTS idx_void_material_listings_seller
+    ON void_material_listings(seller_id, status);
+
+CREATE TABLE IF NOT EXISTS void_material_trades (
+    trade_id TEXT PRIMARY KEY,
+    listing_id TEXT NOT NULL REFERENCES void_material_listings(listing_id),
+    seller_id INTEGER NOT NULL REFERENCES players(id),
+    buyer_id INTEGER NOT NULL REFERENCES players(id),
+    item_key TEXT NOT NULL,
+    quantity INTEGER NOT NULL CHECK (quantity > 0),
+    gross INTEGER NOT NULL CHECK (gross > 0),
+    fee INTEGER NOT NULL CHECK (fee >= 0),
+    net INTEGER NOT NULL CHECK (net >= 0),
+    operation_id TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS partner_tasks (
     task_id TEXT PRIMARY KEY,
     relation_id TEXT NOT NULL,

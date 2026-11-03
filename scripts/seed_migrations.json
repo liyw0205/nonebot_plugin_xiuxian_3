@@ -105,10 +105,11 @@
       "f43743c9c6f310c563b1807c75aebd4f2e1a8be22bc6214a2605f203775000f7": "6bc01a12f715f49ee42b4f9c11206d84b49fad5e:data/内容清单.json",
       "05d15b408f84f3098d5f5168dce4447cea703b78ff8a637d3555fc1b1bbe624d": "e21e2af61bc3e3d67331eb1ec1ae36feb3f0ca0d:data/内容清单.json",
       "832de1dbbfd62c4c0fb9a718ffee7e3b8a58f502c9ba40fe6283f595d4180904": "152387b2f96499ef8094838002e3969110ba1b7e:data/内容清单.json",
-      "b0ca5c85c3c76df22125961ea45124a7ee7339ece6fc8df4e735834edc50c36a": "215525ccb8d303dde77e7a17bb308feb203941cc:data/内容清单.json"
+      "b0ca5c85c3c76df22125961ea45124a7ee7339ece6fc8df4e735834edc50c36a": "215525ccb8d303dde77e7a17bb308feb203941cc:data/内容清单.json",
+      "261a0698c958b01aba3a5790fad3382e0a623183ee630c80dc3626f151b9127a": "936e6248ab540f758912c04887b52f68fc427c10:data/内容清单.json"
     },
-    "new_sha256": "261a0698c958b01aba3a5790fad3382e0a623183ee630c80dc3626f151b9127a",
-    "new_commit": "936e6248ab540f758912c04887b52f68fc427c10"
+    "new_sha256": "01cb9aeb8975940bdad2dbdb0f0a2d3b6e1db4494e9c7728784761d76911c240",
+    "new_commit": "PENDING"
   },
   "地图/地点.json": {
     "old_sha256": {
@@ -265,5 +266,10 @@
     "old_sha256": {},
     "new_sha256": "7f9e0c6319feecd59ddc12f613821b0c42d05439ee0bd1a4de6d8abd2208b444",
     "new_commit": "936e6248ab540f758912c04887b52f68fc427c10"
+  },
+  "经济/虚空物资寄售.json": {
+    "old_sha256": {},
+    "new_sha256": "1502c163dd45e3263c561efb0951c7a67b5134c3d36f3c0c2907a5aaf832c293",
+    "new_commit": "PENDING"
   }
 }

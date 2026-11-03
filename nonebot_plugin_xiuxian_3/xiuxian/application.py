@@ -56,6 +56,7 @@ from .social.dao_hall_use_cases import DaoHallApplication
 from .social.dao_route_use_cases import DaoRouteApplication
 from .events.ascension_day_use_cases import AscensionDayApplication
 from .social.partner_task_use_cases import PartnerTaskApplication
+from .economy.void_material_use_cases import VoidMaterialApplication
 from .economy.auction_use_cases import AuctionApplication
 from .economy.purchase_order_use_cases import PurchaseOrderApplication
 from .events.use_cases import EventsApplication
@@ -234,6 +235,7 @@ class XiuxianApplication:
         self.dao_route = DaoRouteApplication(repository)
         self.ascension_day = AscensionDayApplication(repository)
         self.partner_task = PartnerTaskApplication(repository)
+        self.void_material = VoidMaterialApplication(repository)
         self.auction = AuctionApplication(repository)
         self.purchase_orders = PurchaseOrderApplication(repository)
         self.purchase = self.purchase_orders
@@ -283,6 +285,9 @@ class XiuxianApplication:
                 device_lines = self._device_help_lines()
                 if device_lines:
                     body += "\n\n" + device_lines
+                consign_lines = self._void_material_help_lines()
+                if consign_lines:
+                    body += "\n\n" + consign_lines
             elif category == "社交":
                 hall_lines = self._dao_hall_help_lines()
                 if hall_lines:
@@ -438,6 +443,26 @@ class XiuxianApplication:
                     f"> 赛季落幕后 {definition.window_hours} 小时内可查看本届结局、三榜与新篇章入口；"
                     "只作展示，不改任何资产。",
                     f"- {command_link('飞升日', '飞升日')}查看结局与新篇章",
+                ]
+            )
+        except Exception:
+            return ""
+
+    def _void_material_help_lines(self) -> str:
+        """Describe the void-material consignment market on the life page."""
+
+        try:
+            from .economy.void_material_content import void_material_defaults
+
+            record = void_material_defaults(self.content)
+            admission = record["admission"]
+            return "\n".join(
+                [
+                    f"**{record['name']}**",
+                    f"> 炼虚 L{admission['min_layer']} 或 {admission['min_merit']} 虚空功勋可寄售"
+                    f"虚空物资：挂单 {record['listing_hours']} 小时，"
+                    f"成交手续费 {record['fee_bp'] / 100:.0f}%，到期自动退回。",
+                    f"- {command_link('虚空寄售', '虚空寄售')}查看在售物资与规则",
                 ]
             )
         except Exception:
@@ -2024,6 +2049,34 @@ class XiuxianApplication:
             context,
             lambda: self.void_market.purchase(context),
             write_message="当前事件不允许购买虚空物资。",
+        )
+
+    async def void_material_board(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.void_material.board(context),
+            require_write=False,
+        )
+
+    async def list_void_material(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.void_material.list_item(context),
+            write_message="当前事件不允许寄售物资。",
+        )
+
+    async def buy_void_material(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.void_material.buy(context),
+            write_message="当前事件不允许购入寄售。",
+        )
+
+    async def cancel_void_material(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.void_material.cancel(context),
+            write_message="当前事件不允许撤下寄售。",
         )
 
     async def partner_task_status(self, context: CommandContext) -> CommandResult:

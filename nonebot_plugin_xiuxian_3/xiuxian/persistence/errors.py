@@ -2435,3 +2435,35 @@ class PartnerTaskClaimedError(RuntimeError):
 
 class EndgamePartnerStateConflictError(RuntimeError):
     """One side already recorded an ending, so the pair can no longer cooperate."""
+
+
+class VoidMaterialAdmissionError(RuntimeError):
+    """The player neither reached the realm nor the void merit requirement."""
+
+
+class VoidMaterialItemError(RuntimeError):
+    """The item is not on the tradeable void-material whitelist."""
+
+
+class VoidMaterialLimitError(RuntimeError):
+    """The player already holds the maximum number of open listings."""
+
+
+class VoidMaterialStockError(RuntimeError):
+    """The seller does not hold enough of the item to list it."""
+
+
+class VoidMaterialNotFoundError(RuntimeError):
+    """The requested listing does not exist or is no longer open."""
+
+
+class VoidMaterialOwnListingError(RuntimeError):
+    """A seller cannot buy their own listing."""
+
+
+class VoidMaterialFundsError(RuntimeError):
+    """The buyer cannot pay the listing price."""
+
+
+class VoidMaterialStateError(RuntimeError):
+    """The listing is in a state that forbids the requested transition."""
