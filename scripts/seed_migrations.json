@@ -107,7 +107,7 @@
       "832de1dbbfd62c4c0fb9a718ffee7e3b8a58f502c9ba40fe6283f595d4180904": "152387b2f96499ef8094838002e3969110ba1b7e:data/内容清单.json"
     },
     "new_sha256": "b0ca5c85c3c76df22125961ea45124a7ee7339ece6fc8df4e735834edc50c36a",
-    "new_commit": "PENDING"
+    "new_commit": "215525ccb8d303dde77e7a17bb308feb203941cc"
   },
   "地图/地点.json": {
     "old_sha256": {
@@ -258,6 +258,6 @@
   "事件/飞升日.json": {
     "old_sha256": {},
     "new_sha256": "1140262ff648e7b2e5726712aaa0735ab697f41a000fcc2200ade2c60ed6eb3f",
-    "new_commit": "PENDING"
+    "new_commit": "215525ccb8d303dde77e7a17bb308feb203941cc"
   }
 }
