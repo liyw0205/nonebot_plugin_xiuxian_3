@@ -104,7 +104,7 @@
       "202567bc1a388957ecf3dd74df937e089abf55ae8dc77f04a570b4175e9de15b": "e9451c8c1635a2148e04ee288b194a4ea9571935:data/内容清单.json"
     },
     "new_sha256": "f43743c9c6f310c563b1807c75aebd4f2e1a8be22bc6214a2605f203775000f7",
-    "new_commit": "PENDING"
+    "new_commit": "6bc01a12f715f49ee42b4f9c11206d84b49fad5e"
   },
   "地图/地点.json": {
     "old_sha256": {
@@ -115,7 +115,7 @@
       "bff9e43057f4283774796a4e02b5d58c3c8db301d1a1378c9bba82ead772fe1d": "e9451c8c1635a2148e04ee288b194a4ea9571935:data/地图/地点.json"
     },
     "new_sha256": "4a7dc937d274f0824b650dacc0c4dc6a98693f474145d42ab4ff754a06784b9a",
-    "new_commit": "PENDING"
+    "new_commit": "6bc01a12f715f49ee42b4f9c11206d84b49fad5e"
   },
   "探索/模式.json": {
     "old_sha256": {
@@ -133,7 +133,7 @@
       "c12c85766491f9fe4601153406f920a8d2cc16bc77c28ccff69831d966705d45": "e9451c8c1635a2148e04ee288b194a4ea9571935:data/战斗/敌人.json"
     },
     "new_sha256": "400fa082d1e377c2bf2b29f62917717bbfff83a8a02924ad557a7410d021d82a",
-    "new_commit": "PENDING"
+    "new_commit": "6bc01a12f715f49ee42b4f9c11206d84b49fad5e"
   },
   "战斗/遭遇池.json": {
     "old_sha256": {
@@ -158,7 +158,7 @@
       "5ed8cdcef6474eab4a533a581f0b7ba46761a493956569a769e5eec01cd1fa90": "e9451c8c1635a2148e04ee288b194a4ea9571935:data/地图/区域.json"
     },
     "new_sha256": "8a2c517daef382a0930126d2f79bd4d3f520dbf652165825803a94f7437da42c",
-    "new_commit": "PENDING"
+    "new_commit": "6bc01a12f715f49ee42b4f9c11206d84b49fad5e"
   },
   "特殊/虚空塔.json": {
     "old_sha256": {
@@ -194,7 +194,7 @@
       "bb71dd2f6f3011a0cff66ee928f518c1aafd6036709d0d11e3282aa0d681ce50": "e9451c8c1635a2148e04ee288b194a4ea9571935:data/图鉴/条目.json"
     },
     "new_sha256": "c607893eeb33288e2f111f79d80a1c62ac6dfc438204b804741dca869786008d",
-    "new_commit": "PENDING"
+    "new_commit": "6bc01a12f715f49ee42b4f9c11206d84b49fad5e"
   },
   "图鉴/里程碑.json": {
     "old_sha256": {
@@ -233,6 +233,6 @@
       "8cae9342368e6feb4cb1ff052dab3e7b52784f38adf1bfeb5eef24b5a49d31a0": "e9451c8c1635a2148e04ee288b194a4ea9571935:data/道历/道号.json"
     },
     "new_sha256": "01fbc101e1b210e8773f08fe99046fc747e43d40a3d4eec1944e4b477795836e",
-    "new_commit": "PENDING"
+    "new_commit": "6bc01a12f715f49ee42b4f9c11206d84b49fad5e"
   }
 }
