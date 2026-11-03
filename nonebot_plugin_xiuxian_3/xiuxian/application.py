@@ -51,6 +51,7 @@ from .routine.wayfaring_use_cases import WayfaringApplication
 from .economy.use_cases import EconomyApplication
 from .economy.cross_realm_trade_use_cases import CrossRealmTradeApplication
 from .economy.void_market_use_cases import VoidMarketApplication
+from .device.entity_use_cases import DeviceApplication
 from .economy.auction_use_cases import AuctionApplication
 from .economy.purchase_order_use_cases import PurchaseOrderApplication
 from .events.use_cases import EventsApplication
@@ -224,6 +225,7 @@ class XiuxianApplication:
         self.economy = EconomyApplication(repository)
         self.cross_realm_trade = CrossRealmTradeApplication(repository)
         self.void_market = VoidMarketApplication(repository)
+        self.device = DeviceApplication(repository)
         self.auction = AuctionApplication(repository)
         self.purchase_orders = PurchaseOrderApplication(repository)
         self.purchase = self.purchase_orders
@@ -267,6 +269,9 @@ class XiuxianApplication:
                 market_lines = self._void_market_help_lines()
                 if market_lines:
                     body += "\n\n" + market_lines
+                device_lines = self._device_help_lines()
+                if device_lines:
+                    body += "\n\n" + device_lines
             return CommandResult(
                 True,
                 "HELP_CATEGORY",
@@ -376,6 +381,37 @@ class XiuxianApplication:
                     f"- {command_link(offer.label, f'购买虚空物资 {offer.label}')}"
                     f"（灵石 {offer.price_spirit_stones} / 件，每周 {offer.stock} 件）"
                 )
+            return "\n".join(lines)
+        except Exception:
+            return ""
+
+    def _device_help_lines(self) -> str:
+        """List the assembler devices on the life page.
+
+        Help rendering stays best-effort: content failures fall back to the
+        static page body and never block command dispatch.
+        """
+
+        try:
+            from .device.entity_rules import device_definitions
+
+            definitions = device_definitions(self.content)
+            if not definitions:
+                return ""
+            lines: list[str] = [
+                "**机关**",
+                "> 器修可组装一件机关随行出战；机关按行动消耗耐久，损坏后需维修。",
+            ]
+            for definition in definitions.values():
+                if definition.status != "active":
+                    continue
+                lines.append(
+                    f"- {command_link(definition.label, f'组装机关 {definition.label}')}"
+                    f"（攻击为自身的 {definition.attack_multiplier_bp / 100:.0f}%，"
+                    f"持续 {definition.duration_rounds} 回合）"
+                )
+            if len(lines) == 2:
+                return ""
             return "\n".join(lines)
         except Exception:
             return ""
@@ -1881,6 +1917,41 @@ class XiuxianApplication:
             context,
             lambda: self.void_market.purchase(context),
             write_message="当前事件不允许购买虚空物资。",
+        )
+
+    async def device_status(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.device.status(context),
+            require_write=False,
+        )
+
+    async def assemble_device(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.device.assemble(context),
+            write_message="当前事件不允许组装机关。",
+        )
+
+    async def deploy_device(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.device.deploy(context),
+            write_message="当前事件不允许部署机关。",
+        )
+
+    async def recall_device(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.device.recall(context),
+            write_message="当前事件不允许收回机关。",
+        )
+
+    async def repair_device(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.device.repair(context),
+            write_message="当前事件不允许维修机关。",
         )
 
     async def create_auction(self, context: CommandContext) -> CommandResult:

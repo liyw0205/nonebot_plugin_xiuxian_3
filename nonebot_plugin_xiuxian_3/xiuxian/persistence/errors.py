@@ -2339,3 +2339,27 @@ class FinalArenaAttemptCapError(RuntimeError):
 
 class FinalArenaChallengeNotFoundError(RuntimeError):
     """No running final arena challenge exists for the settlement request."""
+
+
+class DeviceNotFoundError(RuntimeError):
+    """The player does not own the requested device instance."""
+
+
+class DeviceLimitReachedError(RuntimeError):
+    """The player already owns the maximum number of this device."""
+
+
+class DeviceRequirementError(RuntimeError):
+    """The player does not meet the device path or realm requirement."""
+
+
+class DeviceMaterialError(RuntimeError):
+    """Spirit stones or materials cannot cover the assembly or repair cost."""
+
+
+class DeviceStateError(RuntimeError):
+    """The device is in a state that forbids the requested transition."""
+
+
+class DeviceBrokenError(RuntimeError):
+    """The device durability reached zero and must be repaired first."""

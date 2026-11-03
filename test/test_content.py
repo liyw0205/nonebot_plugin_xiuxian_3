@@ -21,7 +21,7 @@ def test_runtime_content_uses_normalized_records() -> None:
     assert bundle.get("item", "item.pill.foundation_guard", include_locked=False)
     assert bundle.label("realm", "soul_transformation") == "化神"
     assert bundle.label("item", "item.weapon.cloud_sword") == "云纹剑"
-    assert bundle.require("entity", "device.scout_doll")["status"] == "locked"
+    assert bundle.require("entity", "device.scout_doll")["status"] == "active"
     assert next_layer_threshold("soul_transformation", 1) == 28000
     assert realm_display_name("soul_transformation", 1) == "化神境一层"
     constitution = bundle.require("constitution", "constitution.iron_bone")

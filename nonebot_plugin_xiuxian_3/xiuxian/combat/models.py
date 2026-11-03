@@ -42,6 +42,7 @@ class BattleResolutionRecord:
     reward: dict[str, int] = field(default_factory=dict)
     reward_status: str = "none"
     already_completed: bool = False
+    device: dict[str, object] | None = None
 
 
 @dataclass(frozen=True, slots=True)

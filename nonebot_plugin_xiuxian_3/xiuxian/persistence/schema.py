@@ -2886,4 +2886,23 @@ CREATE TABLE IF NOT EXISTS final_arena_progress (
 CREATE INDEX IF NOT EXISTS idx_final_arena_progress_player
     ON final_arena_progress(player_id, season_id);
 
+CREATE TABLE IF NOT EXISTS device_instances (
+    instance_id TEXT PRIMARY KEY,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    entity_key TEXT NOT NULL,
+    durability_bp INTEGER NOT NULL CHECK (durability_bp >= 0),
+    max_durability_bp INTEGER NOT NULL CHECK (max_durability_bp > 0),
+    status TEXT NOT NULL CHECK (status IN ('active', 'broken')),
+    deployed INTEGER NOT NULL DEFAULT 0 CHECK (deployed IN (0, 1)),
+    assembly_operation_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_device_instances_player
+    ON device_instances(player_id, entity_key, status);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_device_instances_deployed
+    ON device_instances(player_id) WHERE deployed = 1;
+
 """

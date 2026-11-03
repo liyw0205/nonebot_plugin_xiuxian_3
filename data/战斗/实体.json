@@ -3,15 +3,38 @@
   "records": [
     {
       "name": "侦查机关",
+      "aliases": ["侦查傀儡", "机关傀儡"],
       "desc": "器修操控的小型机关，能在短时间内侦察战场并牵制对手。",
       "entity_type": "summoned_device",
-      "status": "locked",
+      "status": "active",
       "owner_path_key": "device",
       "max_instances": 1,
+      "required_realm": "qi_sensing",
+      "min_layer": 1,
+      "assembly": {
+        "spirit_stones": 120,
+        "items": {
+          "item.mat.wood": 2,
+          "item.ore.ironstone": 1
+        }
+      },
+      "maintenance": {
+        "spirit_stones": 20,
+        "items": {
+          "item.mat.wood": 1
+        }
+      },
+      "durability": {
+        "max_bp": 10000,
+        "loss_per_action_bp": 400,
+        "repair_bp_per_material": 2500
+      },
       "combat": {
         "attack_multiplier_bp": 5000,
-        "duration_rounds": 3
+        "duration_rounds": 3,
+        "max_actions_per_battle": 3
       },
+      "codex_entry_key": "codex.path.device",
       "key": "device.scout_doll"
     }
   ],

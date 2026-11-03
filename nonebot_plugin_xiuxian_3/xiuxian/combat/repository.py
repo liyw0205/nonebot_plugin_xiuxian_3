@@ -61,6 +61,7 @@ from .spectator_rules import (
 )
 from .tribulation_rules import PROFILE_KEY, phase_for_hp
 from ..specials.codex_projection import record_codex_discovery, record_material_discoveries
+from ..device.entity_rules import STRATEGY_KEY as DEVICE_STRATEGY_KEY, plan_actions
 from ..utils.player import grant_player_state, player_combat_values, player_realm_values
 from ..stats.rules import COMBAT_STAT_KEYS, frozen_combat_stats
 from ..utils.json_cache import decode_json_strict
@@ -444,6 +445,10 @@ class CombatRepositoryMixin:
                 if exploration is not None
                 else self.companion_battle_snapshot(connection, int(player["id"])).companions
             )
+            # A deployed device joins every battle, so it is frozen from the
+            # live instance row: the settlement then writes durability back
+            # from the snapshot without re-reading a possibly changed build.
+            device_snapshot = self._deployed_device_snapshot(connection, int(player["id"]))
             battle_id = uuid4().hex
             snapshot = {
                 "battle_type": battle_type,
@@ -460,6 +465,7 @@ class CombatRepositoryMixin:
                     "equipment": list(equipment),
                     "skills": skills,
                     "companions": [dict(item) for item in companion_snapshot],
+                    "device": dict(device_snapshot) if device_snapshot is not None else None,
                     "cross_realm_penalty_bp": int(exploration_snapshot["cross_realm_penalty_bp"]) if exploration is not None else 0,
                 },
                 "enemy": {
@@ -731,6 +737,9 @@ class CombatRepositoryMixin:
             snapshot = decode_json_strict(session["snapshot_json"])
             player_stats = frozen_combat_stats(snapshot["player"])
             enemy = dict(snapshot["enemy"])
+            device = snapshot["player"].get("device")
+            device = dict(device) if isinstance(device, dict) else None
+            device_actions = int(state.get("device_actions", 0)) if device is not None else 0
             is_tribulation_trial = str(snapshot.get("profile_key", "")) == PROFILE_KEY
             tribulation = self._json_object(snapshot.get("tribulation"), {})
             debt_shield_bp = int(tribulation.get("debt_shield_bp", 0)) if is_tribulation_trial else 0
@@ -980,6 +989,45 @@ class CombatRepositoryMixin:
                 if player_hp <= 0:
                     outcome, reason = "lost", "player_defeated"
                     break
+                if actor == "player" and device is not None and not timeout:
+                    if plan_actions(
+                        duration_rounds=int(device["duration_rounds"]),
+                        max_actions_per_battle=int(device["max_actions_per_battle"]),
+                        used_actions=device_actions,
+                        round_no=expected_round,
+                    ):
+                        strike = self._attack_action(
+                            battle_id=battle_id,
+                            round_no=expected_round,
+                            sequence=sequence + 1,
+                            actor_key="player",
+                            skill_key=str(device["entity_key"]),
+                            strategy_key=DEVICE_STRATEGY_KEY,
+                            attacker_attack=int(player_stats["attack"]),
+                            attacker_initiative=int(player_stats["initiative"]),
+                            defender_agility=int(enemy["agility"]),
+                            target_hp=enemy_hp,
+                            seed=f"{snapshot['random_seed']}:device",
+                            operation_id=operation_id,
+                            damage_multiplier_bp=int(device["attack_multiplier_bp"]),
+                            accuracy_bp=int(player_stats.get("accuracy_bp", 0)),
+                            crit_chance_bp=int(player_stats.get("crit_chance_bp", 0)),
+                            crit_damage_bp=int(player_stats.get("crit_damage_bp", 0)),
+                        )
+                        enemy_hp = max(0, enemy_hp - int(strike["damage"]))
+                        device_actions += 1
+                        sequence += 1
+                        strike["state"] = {
+                            "player_hp": player_hp,
+                            "player_mana": player_mana,
+                            "enemy_hp": enemy_hp,
+                            "device_instance_id": str(device["instance_id"]),
+                            "device_actions": device_actions,
+                        }
+                        actions.append(strike)
+                        if enemy_hp <= 0:
+                            outcome, reason = "won", "enemy_defeated"
+                            break
             if is_ancestral_spirit and shadow_at_round_start and timeout and bloodline_shadow:
                 recovery = max(1, int(enemy["max_hp"]) * 500 // 10_000)
                 recovery = recovery * (
@@ -1067,6 +1115,8 @@ class CombatRepositoryMixin:
                     state[key] = deepcopy(skill_state[key])
             if is_ancestral_spirit:
                 state["bloodline_shadow"] = bloodline_shadow
+            if device is not None:
+                state["device_actions"] = device_actions
             if is_tribulation_trial:
                 state.update(
                     {
@@ -1187,6 +1237,34 @@ class CombatRepositoryMixin:
                     "settled_at": now_text,
                 }
             )
+            # A frozen device charges one point of durability per strike it
+            # actually made.  Settlement is the only writer, so a replay of the
+            # same resolution cannot wear the device down twice.
+            device_state = snapshot["player"].get("device")
+            if isinstance(device_state, dict):
+                actions = int(decode_json_strict(session["state_json"]).get("device_actions", 0))
+                loss = actions * int(device_state.get("loss_per_action_bp", 0))
+                remaining = max(0, int(device_state.get("durability_bp", 0)) - loss)
+                status = "broken" if remaining <= 0 else "active"
+                connection.execute(
+                    "UPDATE device_instances SET durability_bp = ?, status = ?, "
+                    "deployed = CASE WHEN ? <= 0 THEN 0 ELSE deployed END, updated_at = ? "
+                    "WHERE instance_id = ? AND player_id = ?",
+                    (
+                        remaining,
+                        status,
+                        remaining,
+                        now_text,
+                        str(device_state["instance_id"]),
+                        int(player["id"]),
+                    ),
+                )
+                result["device"] = {
+                    "instance_id": str(device_state["instance_id"]),
+                    "actions": actions,
+                    "durability_bp": remaining,
+                    "status": status,
+                }
             enemy_record = (self.content or bundled_content()).get(
                 "enemy", str(session["enemy_key"]), include_locked=False
             )
@@ -1236,6 +1314,7 @@ class CombatRepositoryMixin:
                 "round_no": int(session["round_no"]),
                 "reward": reward,
                 "reward_status": reward_status,
+                "device": result.get("device"),
             }
             self._insert_operation(
                 connection,
@@ -1613,6 +1692,7 @@ class CombatRepositoryMixin:
             reward={str(key): int(value) for key, value in dict(payload.get("reward", {})).items()},
             reward_status=str(payload.get("reward_status", "none")),
             already_completed=replay,
+            device=payload.get("device"),
         )
 
     def _battle_reward_from_payload(
