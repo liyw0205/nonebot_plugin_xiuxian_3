@@ -54,3 +54,10 @@ QQ 官方与 OneBot V11 共用 application、迁移、operation ledger 和冻结
 - [事件状态机](workflow.md)
 - [用例与验收](use-cases.md)
 - [v0.1 事件内容](content-v0.1.md)
+
+## 飞升日内容合同（v0.7）
+
+`data/事件/飞升日.json`（kind `ascension_day`）承接 events v0.6 的 `event.ascension_day`：
+赛季冻结后 24 小时窗口内展示三榜名次、本人结局与新篇章入口，`allow_assets` 由加载器强制为 false。
+窗口为半开区间，只有 `open` 公布榜单；读取使用 `writable=False`，不写 `operations`、不改资产。
+命令为 `飞升日`。完整合同见 [content-v0.7.md](content-v0.7.md)。
