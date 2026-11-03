@@ -2905,4 +2905,54 @@ CREATE INDEX IF NOT EXISTS idx_device_instances_player
 CREATE UNIQUE INDEX IF NOT EXISTS idx_device_instances_deployed
     ON device_instances(player_id) WHERE deployed = 1;
 
+CREATE TABLE IF NOT EXISTS dao_halls (
+    hall_id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('active', 'rebuilding')),
+    founder_player_id INTEGER NOT NULL REFERENCES players(id),
+    core_capacity INTEGER NOT NULL CHECK (core_capacity >= 1),
+    treasury_spirit_stones INTEGER NOT NULL DEFAULT 0 CHECK (treasury_spirit_stones >= 0),
+    contributed_world_merit INTEGER NOT NULL DEFAULT 0 CHECK (contributed_world_merit >= 0),
+    rebuild_ends_at TEXT,
+    last_maintained_at TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS dao_hall_members (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    hall_id TEXT NOT NULL REFERENCES dao_halls(hall_id),
+    player_id INTEGER NOT NULL UNIQUE REFERENCES players(id),
+    role TEXT NOT NULL CHECK (role IN ('founder', 'core', 'guest')),
+    joined_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_dao_hall_members_hall
+    ON dao_hall_members(hall_id, role);
+
+CREATE TABLE IF NOT EXISTS dao_hall_projects (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    hall_id TEXT NOT NULL REFERENCES dao_halls(hall_id),
+    project_key TEXT NOT NULL,
+    world_merit INTEGER NOT NULL CHECK (world_merit > 0),
+    built_at TEXT NOT NULL,
+    UNIQUE (hall_id, project_key)
+);
+
+CREATE TABLE IF NOT EXISTS dao_hall_contributions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    contribution_id TEXT NOT NULL UNIQUE,
+    hall_id TEXT NOT NULL REFERENCES dao_halls(hall_id),
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    world_merit INTEGER NOT NULL DEFAULT 0 CHECK (world_merit >= 0),
+    spirit_stones INTEGER NOT NULL DEFAULT 0 CHECK (spirit_stones >= 0),
+    reason TEXT NOT NULL,
+    operation_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    CHECK (world_merit > 0 OR spirit_stones > 0)
+);
+
+CREATE INDEX IF NOT EXISTS idx_dao_hall_contributions_hall
+    ON dao_hall_contributions(hall_id, created_at);
+
 """

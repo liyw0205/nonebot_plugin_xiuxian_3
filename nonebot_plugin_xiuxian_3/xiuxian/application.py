@@ -52,6 +52,7 @@ from .economy.use_cases import EconomyApplication
 from .economy.cross_realm_trade_use_cases import CrossRealmTradeApplication
 from .economy.void_market_use_cases import VoidMarketApplication
 from .device.entity_use_cases import DeviceApplication
+from .social.dao_hall_use_cases import DaoHallApplication
 from .economy.auction_use_cases import AuctionApplication
 from .economy.purchase_order_use_cases import PurchaseOrderApplication
 from .events.use_cases import EventsApplication
@@ -226,6 +227,7 @@ class XiuxianApplication:
         self.cross_realm_trade = CrossRealmTradeApplication(repository)
         self.void_market = VoidMarketApplication(repository)
         self.device = DeviceApplication(repository)
+        self.dao_hall = DaoHallApplication(repository)
         self.auction = AuctionApplication(repository)
         self.purchase_orders = PurchaseOrderApplication(repository)
         self.purchase = self.purchase_orders
@@ -272,6 +274,10 @@ class XiuxianApplication:
                 device_lines = self._device_help_lines()
                 if device_lines:
                     body += "\n\n" + device_lines
+            elif category == "社交":
+                hall_lines = self._dao_hall_help_lines()
+                if hall_lines:
+                    body += "\n\n" + hall_lines
             return CommandResult(
                 True,
                 "HELP_CATEGORY",
@@ -382,6 +388,32 @@ class XiuxianApplication:
                     f"（灵石 {offer.price_spirit_stones} / 件，每周 {offer.stock} 件）"
                 )
             return "\n".join(lines)
+        except Exception:
+            return ""
+
+    def _dao_hall_help_lines(self) -> str:
+        """Describe the dao hall on the social page.
+
+        Help rendering stays best-effort: content failures fall back to the
+        static page body and never block command dispatch.
+        """
+
+        try:
+            from .social.dao_hall_rules import dao_hall_definition
+
+            definition = dao_hall_definition(self.content)
+            return "\n".join(
+                [
+                    f"**{definition.name}**",
+                    f"> 唯有留界者可开辟据点：世界功勋 {definition.required_world_merit}、"
+                    f"灵石 {definition.spirit_stones}（计入库房）。",
+                    f"- {command_link('据点', '据点')}查看状态、成员与建设进度",
+                    f"- 核心席位 {definition.core_capacity} 人，周维护 "
+                    f"{definition.maintenance_spirit_stones} 灵石；被毁后 "
+                    f"{definition.rebuild_hours} 小时内维护不收费",
+                    f"- {command_link('建设据点 太清殿', '建设据点 太清殿')}以世界功勋扩建核心席位",
+                ]
+            )
         except Exception:
             return ""
 
@@ -1917,6 +1949,48 @@ class XiuxianApplication:
             context,
             lambda: self.void_market.purchase(context),
             write_message="当前事件不允许购买虚空物资。",
+        )
+
+    async def dao_hall_status(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.dao_hall.status(context),
+            require_write=False,
+        )
+
+    async def found_dao_hall(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.dao_hall.found(context),
+            write_message="当前事件不允许开辟据点。",
+        )
+
+    async def join_dao_hall(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.dao_hall.join(context),
+            write_message="当前事件不允许加入据点。",
+        )
+
+    async def leave_dao_hall(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.dao_hall.leave(context),
+            write_message="当前事件不允许退出据点。",
+        )
+
+    async def build_dao_hall_project(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.dao_hall.build(context),
+            write_message="当前事件不允许建设据点。",
+        )
+
+    async def maintain_dao_hall(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.dao_hall.maintain(context),
+            write_message="当前事件不允许维护据点。",
         )
 
     async def device_status(self, context: CommandContext) -> CommandResult:

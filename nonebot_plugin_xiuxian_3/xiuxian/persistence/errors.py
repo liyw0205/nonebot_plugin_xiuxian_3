@@ -2363,3 +2363,35 @@ class DeviceStateError(RuntimeError):
 
 class DeviceBrokenError(RuntimeError):
     """The device durability reached zero and must be repaired first."""
+
+
+class DaoHallNotFoundError(RuntimeError):
+    """The player is not a member of any dao hall."""
+
+
+class DaoHallRequirementError(RuntimeError):
+    """The player does not meet the hall's founding requirement."""
+
+
+class DaoHallCapacityError(RuntimeError):
+    """The hall has no free core seat."""
+
+
+class DaoHallRebuildingError(RuntimeError):
+    """The hall is inside its rebuild window and cannot be expanded."""
+
+
+class DaoHallProjectLockedError(RuntimeError):
+    """A prerequisite construction project is not built yet."""
+
+
+class DaoHallMaterialError(RuntimeError):
+    """World merit or spirit stones cannot cover the requested cost."""
+
+
+class DaoHallMemberStateError(RuntimeError):
+    """The membership transition is not allowed for this role."""
+
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
