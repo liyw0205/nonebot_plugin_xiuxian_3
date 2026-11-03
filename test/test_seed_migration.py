@@ -522,6 +522,7 @@ def old_official_manifest() -> bytes:
             "道历/七日目标.json",
             "战斗/渡劫.json",
             "社交/道统据点.json",
+            "社交/道统路线.json",
         }
     ]
     blob = (json.dumps(document, ensure_ascii=False, indent=2) + "\n").encode("utf-8")

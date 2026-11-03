@@ -1,0 +1,44 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "dao_route",
+  "records": [
+    {
+      "key": "route.dao_settlement.defaults",
+      "name": "道统议事",
+      "desc": "合道修士每周议事一次，按多数定下宗门道统所行之路。",
+      "status": "active",
+      "required_sect_level": 6,
+      "required_sect_merit": 1000,
+      "required_voters": 3,
+      "required_realm": "dao_union",
+      "required_layer": 1,
+      "vote_period_days": 7,
+      "lock_days": 7,
+      "allow_tie_carryover": true
+    },
+    {
+      "key": "route.dao_settlement.guard_world",
+      "name": "守界",
+      "desc": "守三界门户，御外敌于界外。",
+      "aliases": ["守界路", "guard_world"],
+      "status": "active",
+      "bonus": {"key": "defense_event_bonus_bp", "value_bp": 1000}
+    },
+    {
+      "key": "route.dao_settlement.ascend",
+      "name": "飞升",
+      "desc": "争飞升之机，以道果叩天门。",
+      "aliases": ["飞升路", "ascend"],
+      "status": "active",
+      "bonus": {"key": "dao_fruit_trial_bonus_bp", "value_bp": 1000}
+    },
+    {
+      "key": "route.dao_settlement.remain",
+      "name": "留界",
+      "desc": "留驻此界，经营据点与传承。",
+      "aliases": ["留界路", "remain"],
+      "status": "active",
+      "bonus": {"key": "hall_construction_bonus_bp", "value_bp": 1500}
+    }
+  ]
+}

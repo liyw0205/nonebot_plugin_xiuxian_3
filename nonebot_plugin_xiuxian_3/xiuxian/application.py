@@ -53,6 +53,7 @@ from .economy.cross_realm_trade_use_cases import CrossRealmTradeApplication
 from .economy.void_market_use_cases import VoidMarketApplication
 from .device.entity_use_cases import DeviceApplication
 from .social.dao_hall_use_cases import DaoHallApplication
+from .social.dao_route_use_cases import DaoRouteApplication
 from .economy.auction_use_cases import AuctionApplication
 from .economy.purchase_order_use_cases import PurchaseOrderApplication
 from .events.use_cases import EventsApplication
@@ -228,6 +229,7 @@ class XiuxianApplication:
         self.void_market = VoidMarketApplication(repository)
         self.device = DeviceApplication(repository)
         self.dao_hall = DaoHallApplication(repository)
+        self.dao_route = DaoRouteApplication(repository)
         self.auction = AuctionApplication(repository)
         self.purchase_orders = PurchaseOrderApplication(repository)
         self.purchase = self.purchase_orders
@@ -278,6 +280,9 @@ class XiuxianApplication:
                 hall_lines = self._dao_hall_help_lines()
                 if hall_lines:
                     body += "\n\n" + hall_lines
+                route_lines = self._dao_route_help_lines()
+                if route_lines:
+                    body += "\n\n" + route_lines
             return CommandResult(
                 True,
                 "HELP_CATEGORY",
@@ -387,6 +392,29 @@ class XiuxianApplication:
                     f"- {command_link(offer.label, f'购买虚空物资 {offer.label}')}"
                     f"（灵石 {offer.price_spirit_stones} / 件，每周 {offer.stock} 件）"
                 )
+            return "\n".join(lines)
+        except Exception:
+            return ""
+
+    def _dao_route_help_lines(self) -> str:
+        """Describe the weekly dao-route council on the social page."""
+
+        try:
+            from .social.dao_route_rules import dao_route_definition, dao_route_option_list
+
+            definition = dao_route_definition(self.content)
+            options = dao_route_option_list(self.content)
+            if not options:
+                return ""
+            names = "、".join(option.name for option in options)
+            lines = [
+                f"**{definition.name}**",
+                f"> 宗门 {definition.required_sect_level} 级以上的合道修士每周可投一票，"
+                f"满 {definition.required_voters} 票按多数定线，"
+                f"结算耗公共功勋 {definition.required_sect_merit}，锁定 {definition.lock_days} 天。",
+                f"- {command_link('道统', '道统')}查看现行路线与本周票数",
+                f"- {command_link('道统投票 守界', '道统投票 守界')}投下一票（可选 {names}）",
+            ]
             return "\n".join(lines)
         except Exception:
             return ""
@@ -1949,6 +1977,27 @@ class XiuxianApplication:
             context,
             lambda: self.void_market.purchase(context),
             write_message="当前事件不允许购买虚空物资。",
+        )
+
+    async def dao_route_status(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.dao_route.status(context),
+            require_write=False,
+        )
+
+    async def cast_dao_route_vote(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.dao_route.vote(context),
+            write_message="当前事件不允许道统议事。",
+        )
+
+    async def settle_dao_route(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.dao_route.settle(context),
+            write_message="当前事件不允许道统结算。",
         )
 
     async def dao_hall_status(self, context: CommandContext) -> CommandResult:

@@ -91,6 +91,7 @@ from ..specials.void_spire_repository import VoidSpireRepositoryMixin
 from ..specials.final_arena_repository import FinalArenaRepositoryMixin
 from ..device.entity_repository import DeviceRepositoryMixin
 from ..social.dao_hall_repository import DaoHallRepositoryMixin
+from ..social.dao_route_repository import DaoRouteRepositoryMixin
 from ..specials.three_realms_tower_repository import ThreeRealmsTowerRepositoryMixin
 from ..specials.three_realms_tower_duo_repository import ThreeRealmsTowerDuoRepositoryMixin
 from ..specials.tower_migration import ensure_tower_schema
@@ -187,6 +188,7 @@ class SQLitePlayerRepository(
     FinalArenaRepositoryMixin,
     DeviceRepositoryMixin,
     DaoHallRepositoryMixin,
+    DaoRouteRepositoryMixin,
     ThreeRealmsTowerRepositoryMixin,
     ThreeRealmsTowerDuoRepositoryMixin,
     StoryRepositoryMixin,

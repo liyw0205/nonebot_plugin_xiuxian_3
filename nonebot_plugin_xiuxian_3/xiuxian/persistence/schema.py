@@ -2955,4 +2955,39 @@ CREATE TABLE IF NOT EXISTS dao_hall_contributions (
 CREATE INDEX IF NOT EXISTS idx_dao_hall_contributions_hall
     ON dao_hall_contributions(hall_id, created_at);
 
+CREATE TABLE IF NOT EXISTS dao_route_cycles (
+    cycle_id TEXT NOT NULL,
+    sect_id TEXT NOT NULL REFERENCES sects(sect_id),
+    starts_at TEXT NOT NULL,
+    ends_at TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('open', 'settled')),
+    winner_route_key TEXT,
+    tie_carryover INTEGER NOT NULL DEFAULT 0 CHECK (tie_carryover IN (0, 1)),
+    sect_merit_spent INTEGER NOT NULL DEFAULT 0 CHECK (sect_merit_spent >= 0),
+    settled_at TEXT,
+    PRIMARY KEY (cycle_id, sect_id)
+);
+
+CREATE TABLE IF NOT EXISTS dao_route_votes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    cycle_id TEXT NOT NULL,
+    sect_id TEXT NOT NULL REFERENCES sects(sect_id),
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    route_key TEXT NOT NULL,
+    operation_id TEXT NOT NULL,
+    cast_at TEXT NOT NULL,
+    UNIQUE (cycle_id, sect_id, player_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_dao_route_votes_cycle
+    ON dao_route_votes(cycle_id, sect_id, route_key);
+
+CREATE TABLE IF NOT EXISTS dao_route_state (
+    sect_id TEXT PRIMARY KEY REFERENCES sects(sect_id),
+    route_key TEXT,
+    cycle_id TEXT,
+    locked_until TEXT,
+    updated_at TEXT NOT NULL
+);
+
 """

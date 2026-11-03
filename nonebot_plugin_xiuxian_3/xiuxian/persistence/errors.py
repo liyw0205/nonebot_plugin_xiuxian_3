@@ -2395,3 +2395,23 @@ class DaoHallMemberStateError(RuntimeError):
     def __init__(self, code: str, message: str) -> None:
         super().__init__(message)
         self.code = code
+
+
+class DaoRouteRequirementError(RuntimeError):
+    """The player cannot vote: not a 合道 member of a level-6 sect."""
+
+
+class DaoVoteAlreadyCastError(RuntimeError):
+    """The player already voted in this weekly council cycle."""
+
+
+class DaoCouncilQuorumError(RuntimeError):
+    """The council cycle closed without the required number of voters."""
+
+
+class DaoRouteLockedError(RuntimeError):
+    """The current route is still locked after its settlement."""
+
+
+class DaoRouteNotDueError(RuntimeError):
+    """No council cycle has closed yet, so there is nothing to settle."""
