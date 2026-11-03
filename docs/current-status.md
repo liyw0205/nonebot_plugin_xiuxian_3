@@ -640,6 +640,35 @@ operation 重放与重启后状态、QQ Markdown+键盘与 OneBot 降级、帮�
 develop CI（`41649984150`，head `4684250`）quality 3.11/3.12 与 install-smoke 成功，release 按条件跳过。
 未跑全量/压测/部署，未验 QQ 真机，未发版。
 
+虚空物资寄售 `market.void_material` 已在 `develop` 完成（业务提交 `5d8493f`、种子 provenance `ac4736f`、
+文档 `0946bc8`）：economy v0.5 冻结的「炼虚或声望 500 准入、6h、手续费 800 bp、过期解锁」此前零数据、
+零表、零命令，通用摆摊与拍卖都不提供「寄售锁定 + 到期退还 + 8% 手续费」。新增
+`data/经济/虚空物资寄售.json`（kind `void_material_market`）：`listing_hours 6`、`fee_bp 800`、
+`expire_grace_minutes 5`、`max_listings_per_player 5`、`admission {realm: void_refining, min_layer 1,
+merit_key: void_merit, min_merit 500}`（境界**或**功勋满足其一）、以及**可寄售白名单**
+（虚空晶体/虚空锚/神魂晶/雾隐核心/灵泉水）——实测仓内物品没有任何 `void` 标签，按标签过滤会让市场空转，
+故改为逐键校验「存在 + `tradeable` + 非 `character_bound`」，并拒绝重复键。加载器
+`economy/void_material_content.py` 另校验字段集、1–72 小时、`fee_bp` 0–2000、宽限 0–60、
+上限 1–50、准入境界与层区间、`merit_key` 白名单、别名，非法抛 `ContentError` 并在导入期构建。
+新表 `void_material_listings`/`void_material_trades`；锁定由数据本身表达——挂单即从背包扣除并保存在
+listing 行，因此不可能一物两卖也不需要额外锁表；成交用**单次 delta 事务**同时付款与收货
+（早先两次调用会用过期行覆盖买家扣款，已由测试钉住），卖家得 `gross - fee`，手续费销毁不入任何账户；
+撤下仅限卖家且仅 `listed`，到期在读路径惰性推进并原样退还，不依赖后台任务。命令 `虚空寄售`
+（别名 `寄售列表`）、`寄售物资 <物品> <数量> <单价>`、`购入寄售 <序号>`、`撤下寄售 <序号>`，
+错误码 `VOID_MARKET_ADMISSION`/`VOID_MARKET_ITEM_FORBIDDEN`/`VOID_MARKET_LIMIT`/
+`VOID_MARKET_NOT_ENOUGH_ITEMS`/`VOID_MARKET_NOT_FOUND`/`VOID_MARKET_OWN_LISTING`/
+`VOID_MARKET_INSUFFICIENT`/`VOID_MARKET_STATE`/`INVALID_VOID_MARKET_COMMAND`/`LEDGER_CONFLICT`
+全部零写；QQ 原生 Markdown 每行给 `购入寄售 <序号>` 蓝字预填并有在售单时只挂一个按钮，
+OneBot/纯文本降级且不暴露稳定键，`修仙帮助 生活` 追加寄售段。
+聚焦证据：`test_void_material_content.py` 22 passed（合同数值、白名单可交易非绑定、手续费向下取整、
+准入二选一、挂单校验与到期边界、十七类非法拒绝）、`test_void_material.py` 7 passed
+（准入与白名单拒绝零写、功勋替代境界、挂单扣物即锁定、持有量与 5 单上限、成交 200/16/184 与双方余额、
+自购与余额不足拒绝且不影响挂单、撤下退还、过期惰性退还与状态、operation 重放与重启、
+QQ Markdown+键盘与 OneBot 降级、帮助段落）；回归 `test_content.py`+`test_m9_content_integrity.py`+
+`test_documentation.py`+`test_help.py`+`test_material_content.py` 43 passed、
+`test_seed_migration.py -k "targets_match or reverse or covers_every or manifest"` 10 passed。
+未跑全量/压测/部署，未验 QQ 真机，未发版。
+
 道侣终局协作 `partner.endgame_task` 已在 `develop` 完成（业务提交 `936e624`、种子 provenance `4135a6b`、
 文档 `f9da7d2`）：social v0.6 冻结的这套协作此前只有道侣关系生命周期与终局战贡献表，中间没有任何任务层。
 新增 `data/社交/道侣协作.json`（kind `partner_task`）：`required_ending_state: open`（双方终局未锁）、
