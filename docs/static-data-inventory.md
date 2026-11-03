@@ -29,6 +29,7 @@ data/
   道历/行卷.json
   经济/拍卖.json
   经济/虚空集市.json
+  特殊/终局天榜.json
   社交/玩家互动.json
   生活/生活.json
   灵兽/灵兽.json
@@ -188,6 +189,7 @@ data/
 | `生活/生活.json` | 居所、作物、城镇委托、运输和服务 | `gameplay/livelihood/content-v0.1.md` |
 | `经济/拍卖.json` | `auction.weekly`限量拍卖的在售槽、时限、数量、起价和加价规则；发布时冻结，后续按快照竞价与交割 | `gameplay/economy/workflow.md`、`content-data-contract.md` |
 | `经济/虚空集市.json` | `market.void.defaults` 周换库时段、20 槽共享库存、每日 3 件上限、24 小时绑定与准入；三条固定价报价（虚晶 12000／锚 5000／时痕草 3000 灵石） | `gameplay/economy/content-v0.7.md`、`content-data-contract.md` |
+| `特殊/终局天榜.json` | `arena.final_heaven.defaults` 的 UTC 四小时轮次与前两小时开放窗口、每轮 3 次挑战、渡劫 L6 门槛；三级守榜人 `tier.final_arena.1|2|3` 绑定同地点敌人与上阶展示称号 | `gameplay/specials/content-v0.7.md`、`content-data-contract.md` |
 | `社交/玩家互动.json` | 只读切磋、道侣与`social.mentor_graduation`出师门槛/奖励；出师成功时冻结规则与实得，邀请准入/名额/期限尚未内容化 | `gameplay/social/player-interactions.md`、`content-data-contract.md` |
 | `灵兽/灵兽.json` | 灵兽、灵骑及其装备定义 | `gameplay/companions/content-v0.1.md` |
 

@@ -42,6 +42,7 @@ v0.4 21–40 层要求化神 L1 或重建名望总值 500。QQ 官方与 OneBot 
 - [v0.4 内容包](content-v0.4.md)
 - [v0.5 内容包](content-v0.5.md)
 - [v0.6 内容包](content-v0.6.md)
+- [v0.7 终局天榜](content-v0.7.md)
 
 所有版本内容遵守[版本内容开发合同](../../content-development-contract.md)。所有写入经 Unit of Work 和 operation ledger 结算；文本、按钮和 Web 只能调用同一 application DTO。
 
