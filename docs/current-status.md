@@ -640,6 +640,38 @@ operation 重放与重启后状态、QQ Markdown+键盘与 OneBot 降级、帮�
 develop CI（`41649984150`，head `4684250`）quality 3.11/3.12 与 install-smoke 成功，release 按条件跳过。
 未跑全量/压测/部署，未验 QQ 真机，未发版。
 
+留界据点 `settlement.dao_hall` 已在 `develop` 完成（业务提交 `e21e2af`、种子 provenance `78f814a`、
+文档 `b520522`）：social v0.6 早已冻结准入（留界结局、世界功勋 2000、灵石 5000）、核心席位 30、
+周维护 5000 与 72h 重建期，economy v0.6 冻结建设只用世界功勋，但包内既无数据文件也无加载器、表、
+用例或命令。新增 `data/社交/道统据点.json`（kind `dao_hall`）：`hall.dao_settlement.defaults` 承接
+上述冻结数值与 `core_required_realms: tribulation|dao_union`（核心成员须渡劫或留界），
+三项建设 `project.dao_hall.main_hall` 太清殿（功勋 800，核心席位 +5）、`lecture_hall` 讲道台
+（600，维护 -1000 bp，即 4500）、`ward_array` 护界大阵（1200，重建 72h→48h），以「太清殿」为前置链，
+效果上限由加载器封顶。加载器 `social/dao_hall_content.py` 校验 kind/键前缀、字段集、结局与境界引用、
+1–720 窗口、效果白名单与上限、前置存在且无环、别名唯一，非法抛 `ContentError` 并在导入期构建。
+新表 `dao_halls`/`dao_hall_members`（`player_id` 唯一）/`dao_hall_projects`/`dao_hall_contributions`，
+`DaoHallRepositoryMixin` 的成立、加入、退出、建设、维护、重建全部单事务 + `operations` 幂等。
+成立扣 2000 功勋并把 5000 灵石**转入库房**（首周维护由此支付）；周维护先支库房、不足由经办成员补足，
+两段均入贡献账本；`damage_dao_hall` 置 `rebuilding` 并写 `rebuild_ends_at`，期间加入/建设被
+`DAO_HALL_REBUILDING` 拒绝而成员、库房、项目保留，到期后在任意读写路径幂等恢复为 `active`。
+命令 `据点 [留界据点|道统据点]`、`建立据点 [开辟据点]`、`加入据点`、`退出据点`、
+`建设据点 <项目名>`、`维护据点`，错误码 `DAO_HALL_NOT_FOUND`/`DAO_HALL_ALREADY_JOINED`/
+`DAO_HALL_REQUIREMENT`/`DAO_HALL_CAPACITY`/`DAO_HALL_REBUILDING`/`DAO_HALL_PROJECT_LOCKED`/
+`DAO_HALL_PROJECT_BUILT`/`DAO_HALL_MATERIAL_MISSING`/`DAO_HALL_FOUNDER_LOCKED`/
+`DAO_HALL_CORE_REQUIRED`/`DAO_HALL_MAINTENANCE_NOT_DUE`/`DAO_HALL_PROJECT_NOT_FOUND`/
+`INVALID_DAO_HALL_COMMAND`/`LEDGER_CONFLICT` 全部零写；QQ 原生 Markdown 据点页按状态只挂一个按钮，
+未成立时只给 `建立据点` 蓝字预填，OneBot/纯文本降级为可读命令与「可发送：…」且不暴露稳定键，
+`修仙帮助 社交` 追加内容驱动段落。据点**不**触碰 `ascension_merit`、天劫债、道果进度与赛季三榜
+（留界榜本就不要求据点）。聚焦证据：`test_dao_hall_content.py` 23 passed（合同、引用、别名、
+规则数值与首尾闭区间、九类 defaults 拒绝、九类 project 拒绝、环检测）、`test_dao_hall.py` 8 passed
+（无留界结局/功勋/灵石不足零写、成立扣款与库房入账、核心/访客席位与上限、创始者不可退出、
+前置未建拒绝、建设效果即时生效、周维护库房→成员两段、重建期免费且阻止增长、到期幂等恢复、
+operation 重放与重启后状态、不改飞升/天劫/道果/赛季、QQ Markdown+键盘与 OneBot 降级、帮助段落）；
+回归 `test_content.py`+`test_m9_content_integrity.py`+`test_documentation.py`+`test_help.py` 22 passed、
+`test_seed_migration.py -k "targets_match or reverse or covers_every"` 9 passed、
+`test_qq_capabilities.py`+`test_device_entity.py` 15 passed。
+develop CI（`41661489636`，head `b520522`）见下条。未跑全量/压测/部署，未验 QQ 真机，未发版。
+
 居所物资箱已在 `develop` 完成（业务提交 `3b17af7`、文档 `f2b4ce1`）：
 `capacity.storage_slots` 正式生效，客房/小院/灵圃小院分别提供 10/20/24 格；租约快照冻结容量，
 旧快照缺字段按当前居所定义回退。`存入居所`/`取回居所` 支持同格合并、满格拒绝新物品种类、
