@@ -106,9 +106,12 @@ class VoidMaterialApplication:
             actions = (CommandAction("购入第一单", f"{BUY_COMMAND} 1"),)
         elif record.qualified:
             lines.append("")
+            # Keep the nested quotes distinct: Python 3.11 rejects a same-quote
+            # nested f-string inside an f-string expression.
+            sample_label = self._label("item", record.allowed_item_keys[0])
+            sample_command = f"{LIST_COMMAND} {sample_label} 1 100"
             lines.append(
-                f"> 用{command_link(LIST_COMMAND, f'{LIST_COMMAND} {self._label('item', record.allowed_item_keys[0])} 1 100')}"
-                " 挂出第一单。"
+                f"> 用{command_link(LIST_COMMAND, sample_command)} 挂出第一单。"
             )
         return CommandResult(
             True,
