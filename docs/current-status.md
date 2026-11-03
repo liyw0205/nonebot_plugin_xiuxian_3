@@ -640,6 +640,29 @@ operation 重放与重启后状态、QQ Markdown+键盘与 OneBot 降级、帮�
 develop CI（`41649984150`，head `4684250`）quality 3.11/3.12 与 install-smoke 成功，release 按条件跳过。
 未跑全量/压测/部署，未验 QQ 真机，未发版。
 
+道侣终局协作 `partner.endgame_task` 已在 `develop` 完成（业务提交 `936e624`、种子 provenance `4135a6b`、
+文档 `f9da7d2`）：social v0.6 冻结的这套协作此前只有道侣关系生命周期与终局战贡献表，中间没有任何任务层。
+新增 `data/社交/道侣协作.json`（kind `partner_task`）：`required_ending_state: open`（双方终局未锁）、
+`window_days 7`、`target_kind: endgame_assist_wins`、`target_amount 1`、`reward_world_merit 20`、
+`reward_items {item.spirit_water: 1}`；加载器把飞升凭证、天劫令、天劫护符、道果碎片、领域核心列为
+**禁止发放**，并校验字段集、正数、枚举、物品存在与别名，非法抛 `ContentError` 并在导入期构建。
+新表 `partner_tasks`/`partner_task_claims`（`UNIQUE(task_id, player_id)`）；进度由既有
+`final_battle_members` 派生（任务创建后、`won|settled` 场次中双方作为 `helper` 的计数），任务自身不写进度；
+同一关系同时只允许一个 `open` 任务（`PARTNER_TASK_ACTIVE`），任一方已写结局即
+`ENDGAME_PARTNER_STATE_CONFLICT`；达成后双方各领一次，`world_merit` 走玩家数值而非背包，
+重复领取 `PARTNER_TASK_CLAIMED`，同一 operation 重放幂等。任务**不写** `endgame_endings`、
+不改 `ascension_merit`/天劫债/道果。命令 `道侣协作`（别名 `道侣终局协作`）、`开始道侣协作`、
+`领取道侣协作`，其余错误码 `PARTNER_TASK_NO_PARTNER`/`PARTNER_TASK_NOT_COMPLETE`/
+`INVALID_PARTNER_TASK_COMMAND`/`LEDGER_CONFLICT` 全部零写；QQ 原生 Markdown 按状态只挂一个按钮 +
+蓝字预填，OneBot/纯文本降级且不暴露稳定键，`修仙帮助 社交` 追加段。
+聚焦证据：`test_partner_task_content.py` 16 passed（合同数值、奖励白名单含五项终局资产禁发、
+十四类非法拒绝）、`test_partner_task.py` 5 passed（无道侣零写、开启与重复开启、未达成领取被拒、
+达成后双方各领一次且各自背包与功勋正确、重复领取 CLAIMED、结局冲突阻断、operation 重放与重启、
+不改结局/飞升/天劫/道果、QQ Markdown+键盘与 OneBot 降级、帮助段落）；
+回归 `test_content.py`+`test_m9_content_integrity.py`+`test_documentation.py`+`test_help.py`+
+两项新测试 43 passed、`test_seed_migration.py -k "targets_match or reverse or covers_every or manifest"`
+10 passed。未跑全量/压测/部署，未验 QQ 真机，未发版。
+
 飞升日 `event.ascension_day` 已在 `develop` 完成（业务提交 `215525c`、种子 provenance `116ac12`、
 文档 `c931383`）：events v0.6 冻结的「赛季后 24h 只展示结局与新篇章、不再改资产」此前零数据、零规则、
 零命令。新增 `data/事件/飞升日.json`（kind `ascension_day`）：`window_hours 24`、
