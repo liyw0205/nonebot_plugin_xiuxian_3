@@ -1,0 +1,19 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "partner_task",
+  "records": [
+    {
+      "key": "task.partner.endgame.defaults",
+      "name": "道侣协作",
+      "desc": "道侣二人共赴终局，彼此护持；任一方落下结局前皆可同行。",
+      "aliases": ["道侣终局协作", "双修协作"],
+      "status": "active",
+      "required_ending_state": "open",
+      "window_days": 7,
+      "target_kind": "endgame_assist_wins",
+      "target_amount": 1,
+      "reward_world_merit": 20,
+      "reward_items": {"item.spirit_water": 1}
+    }
+  ]
+}

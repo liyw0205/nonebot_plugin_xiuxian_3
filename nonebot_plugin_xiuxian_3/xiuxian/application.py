@@ -55,6 +55,7 @@ from .device.entity_use_cases import DeviceApplication
 from .social.dao_hall_use_cases import DaoHallApplication
 from .social.dao_route_use_cases import DaoRouteApplication
 from .events.ascension_day_use_cases import AscensionDayApplication
+from .social.partner_task_use_cases import PartnerTaskApplication
 from .economy.auction_use_cases import AuctionApplication
 from .economy.purchase_order_use_cases import PurchaseOrderApplication
 from .events.use_cases import EventsApplication
@@ -232,6 +233,7 @@ class XiuxianApplication:
         self.dao_hall = DaoHallApplication(repository)
         self.dao_route = DaoRouteApplication(repository)
         self.ascension_day = AscensionDayApplication(repository)
+        self.partner_task = PartnerTaskApplication(repository)
         self.auction = AuctionApplication(repository)
         self.purchase_orders = PurchaseOrderApplication(repository)
         self.purchase = self.purchase_orders
@@ -288,6 +290,9 @@ class XiuxianApplication:
                 route_lines = self._dao_route_help_lines()
                 if route_lines:
                     body += "\n\n" + route_lines
+                partner_lines = self._partner_task_help_lines()
+                if partner_lines:
+                    body += "\n\n" + partner_lines
             return CommandResult(
                 True,
                 "HELP_CATEGORY",
@@ -398,6 +403,25 @@ class XiuxianApplication:
                     f"（灵石 {offer.price_spirit_stones} / 件，每周 {offer.stock} 件）"
                 )
             return "\n".join(lines)
+        except Exception:
+            return ""
+
+    def _partner_task_help_lines(self) -> str:
+        """Describe the partner endgame task on the social page."""
+
+        try:
+            from .social.partner_task_content import partner_task_defaults
+
+            record = partner_task_defaults(self.content)
+            return "\n".join(
+                [
+                    f"**{record['name']}**",
+                    f"> 道侣双方终局未定时可共赴一次协作：助战胜利 "
+                    f"{record['target_amount']} 场，各得世界功勋 {record['reward_world_merit']}"
+                    "；协作不改任何一方的结局。",
+                    f"- {command_link('道侣协作', '道侣协作')}查看进度与领取",
+                ]
+            )
         except Exception:
             return ""
 
@@ -2000,6 +2024,27 @@ class XiuxianApplication:
             context,
             lambda: self.void_market.purchase(context),
             write_message="当前事件不允许购买虚空物资。",
+        )
+
+    async def partner_task_status(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.partner_task.status(context),
+            require_write=False,
+        )
+
+    async def start_partner_task(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.partner_task.start(context),
+            write_message="当前事件不允许开启道侣协作。",
+        )
+
+    async def claim_partner_task(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.partner_task.claim(context),
+            write_message="当前事件不允许领取道侣协作。",
         )
 
     async def ascension_day_overview(self, context: CommandContext) -> CommandResult:

@@ -2982,6 +2982,30 @@ CREATE TABLE IF NOT EXISTS dao_route_votes (
 CREATE INDEX IF NOT EXISTS idx_dao_route_votes_cycle
     ON dao_route_votes(cycle_id, sect_id, route_key);
 
+CREATE TABLE IF NOT EXISTS partner_tasks (
+    task_id TEXT PRIMARY KEY,
+    relation_id TEXT NOT NULL,
+    player_a_id INTEGER NOT NULL REFERENCES players(id),
+    player_b_id INTEGER NOT NULL REFERENCES players(id),
+    target_amount INTEGER NOT NULL CHECK (target_amount > 0),
+    status TEXT NOT NULL CHECK (status IN ('open', 'completed')),
+    created_at TEXT NOT NULL,
+    completed_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_partner_tasks_relation
+    ON partner_tasks(relation_id, status);
+
+CREATE TABLE IF NOT EXISTS partner_task_claims (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    task_id TEXT NOT NULL REFERENCES partner_tasks(task_id),
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    reward_json TEXT NOT NULL DEFAULT '{}',
+    operation_id TEXT NOT NULL,
+    claimed_at TEXT NOT NULL,
+    UNIQUE (task_id, player_id)
+);
+
 CREATE TABLE IF NOT EXISTS dao_route_state (
     sect_id TEXT PRIMARY KEY REFERENCES sects(sect_id),
     route_key TEXT,

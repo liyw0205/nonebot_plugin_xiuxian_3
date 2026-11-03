@@ -2415,3 +2415,23 @@ class DaoRouteLockedError(RuntimeError):
 
 class DaoRouteNotDueError(RuntimeError):
     """No council cycle has closed yet, so there is nothing to settle."""
+
+
+class PartnerTaskNoPartnerError(RuntimeError):
+    """The player has no active partner relation."""
+
+
+class PartnerTaskActiveError(RuntimeError):
+    """An unfinished partner task already exists for this pair."""
+
+
+class PartnerTaskNotCompleteError(RuntimeError):
+    """The partner task target has not been reached yet."""
+
+
+class PartnerTaskClaimedError(RuntimeError):
+    """The player already claimed this partner task."""
+
+
+class EndgamePartnerStateConflictError(RuntimeError):
+    """One side already recorded an ending, so the pair can no longer cooperate."""
