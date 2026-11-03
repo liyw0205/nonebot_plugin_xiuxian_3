@@ -566,6 +566,43 @@ install-smoke 全部成功，release 按条件跳过。main CI（Quality and Rel
 `41544148360`，head `a6cbab6`）的 quality 3.11/3.12 与 install-smoke 同样全部成功，
 release 按条件跳过。未跑全量/压测/部署，未验 QQ 真机，未发版。
 
+终局天榜（`location.final_arena`）已在 `develop` 完成（业务提交 `6bc01a1`、种子 provenance `fea83a7`、
+文档 `538315b`）：world v0.6 冻结的该地点行此前只有 `player/rules.py` 的展示名，没有地点、通路、轮次、
+敌人、用例或持久化。新增 `data/特殊/终局天榜.json`（kind `final_arena`）：`arena.final_heaven.defaults`
+承载地点、UTC 四小时轮次（`utc_block`，每轮**前两小时**开放，故窗口外确实存在）、每轮 3 次挑战、
+体力 15 与渡劫 L6 门槛；三级 `tier.final_arena.1|2|3`（天榜初阶/中阶/上阶，`required_best_tier` 0/1/2）
+各绑定一条同地点新敌人 `enemy.final_arena_guardian_1|2|3`（含 `combat_profile` 与 `agility`，量级对齐
+既有渡劫档敌人），上阶声明展示称号 `title.final_arena.summit`；中文别名随稳定键一同解析。
+`data/地图/地点.json` 新增该地点（渡劫 L6、`codex_entry_key: codex.place.final_arena`），
+`data/地图/区域.json` 的 `region.tribulation.sky` 增加成员与双向边（900 秒 / 15 体力，双边均带境界门，
+不挂凭证物品与每日次数），`data/图鉴/条目.json` 新增地点图鉴，`data/道历/道号.json` 新增展示称号。
+加载器 `specials/final_arena_content.py` 校验字段、地点/境界一致性、窗口形状（`24 % block_hours == 0`、
+整小时且不超过区块）、梯级从 0 连续、敌人与称号引用、别名唯一，非法抛 `ContentError` 并在导入期构建。
+运行时按 `preview_final_arena`/`start_final_arena_challenge`/`settle_final_arena_challenge` 分层：
+挑战开始时冻结层级/敌人/轮次/赛季/体力成本并扣体力，复用服务端权威自动战（`pve.final_arena`）结算；
+结算只推进本赛季最高层级、写 `activity_events`（`final_arena.challenge`）并在上阶首通时幂等发放称号，
+**不写** `endgame_status`、天劫债、道果进度、`ascension_merit`、灵石与背包物品；未结算挑战会阻止再次进入，
+重启后 `结算天榜` 可续算；无战斗的孤儿挑战按失败退款而非判胜。命令为 `终局天榜 [层级]`、`挑战天榜 <层级>`、
+`结算天榜`，错误码 `FINAL_ARENA_NOT_OPEN`、`FINAL_ARENA_LOCATION_REQUIRED`、`FINAL_ARENA_TIER_LOCKED`、
+`FINAL_ARENA_ATTEMPT_CAP`、`FINAL_ARENA_CHALLENGE_NOT_FOUND`、`INVALID_FINAL_ARENA_COMMAND` 全部零写；
+窗口外普通移动在预览缺项给出「天榜活动轮次」并拒绝启程（`EVENT_NOT_ACTIVE`）。呈现：QQ 原生 Markdown
+列表页附 `挑战天榜 <中文名>` 蓝字预填、单项可挑战时只附一个「挑战此层级」按钮、结算后只附一个
+「再看终局天榜」按钮；OneBot/纯文本降级为可读命令与「可发送：…」，不保留 `command:`、不暴露稳定键；
+`修仙帮助 探索` 追加数据驱动的天榜段落（无按钮）。种子账本为五个既有官方文件追加旧摘要并刷新目标摘要，
+`道历/道号.json` 首次登记；图鉴反向助手、区域/地点反向助手与清单宿主夹具同步更新。数据计数同步：
+地点 33→34、通路 61→63、敌人 61→64、敌人原型 39→43、遭遇 17→18、消耗池 15→16、敌人技能 14→16。
+聚焦证据：`test_final_arena_content.py` 26 passed、`test_final_arena.py` 6 passed（往返门槛、三级阶梯与
+前置门、每轮 3 次上限、失败零资产变化且 `endgame_status`/天劫债/道果/飞升功勋不变、上阶称号只发一次、
+重启续算与孤儿挑战退款、QQ Markdown+键盘与 OneBot 纯文本降级、探索帮助段落）；
+回归 `test_seed_migration.py` 定向 6 passed、`test_combat_content.py`+`test_m9_content_integrity.py`+
+`test_place_codex_content.py`+`test_world_transport_content.py`+`test_routine_content.py` 66 passed、
+`test_world_content.py` 11 passed、`test_world_travel_integrity.py` 34 passed、`test_content.py`+
+`test_m9_content_integrity.py` 19 passed、`test_documentation.py` 2 passed、`test_help.py` 1 passed；
+`test_endgame.py::test_public_ending_codex_is_frozen_across_content_closure_and_retries_atomically`
+1 项失败在未改动 HEAD（`e9451c8` 独立工作树）上同样失败，非本版引入。develop CI（Quality and Release
+`41583661305`，head `538315b`）的 quality 3.11/3.12 与 install-smoke 全部成功，release 按条件跳过。
+未跑全量/压测/部署，未验 QQ 真机，未发版。
+
 居所物资箱已在 `develop` 完成（业务提交 `3b17af7`、文档 `f2b4ce1`）：
 `capacity.storage_slots` 正式生效，客房/小院/灵圃小院分别提供 10/20/24 格；租约快照冻结容量，
 旧快照缺字段按当前居所定义回退。`存入居所`/`取回居所` 支持同格合并、满格拒绝新物品种类、
