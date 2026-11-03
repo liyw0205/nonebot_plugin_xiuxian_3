@@ -670,7 +670,8 @@ operation 重放与重启后状态、不改飞升/天劫/道果/赛季、QQ Mark
 回归 `test_content.py`+`test_m9_content_integrity.py`+`test_documentation.py`+`test_help.py` 22 passed、
 `test_seed_migration.py -k "targets_match or reverse or covers_every"` 9 passed、
 `test_qq_capabilities.py`+`test_device_entity.py` 15 passed。
-develop CI（`41661489636`，head `b520522`）见下条。未跑全量/压测/部署，未验 QQ 真机，未发版。
+develop CI（`41666596404`，head `a8a3f80`）quality 3.11/3.12 与 install-smoke 成功，release 按条件跳过；
+main CI（`41670943430`，head `a8a3f80`）同样三项全部成功。未跑全量/压测/部署，未验 QQ 真机，未发版。
 
 居所物资箱已在 `develop` 完成（业务提交 `3b17af7`、文档 `f2b4ce1`）：
 `capacity.storage_slots` 正式生效，客房/小院/灵圃小院分别提供 10/20/24 格；租约快照冻结容量，
