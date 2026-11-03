@@ -415,6 +415,7 @@ def register_core_commands(router: CommandRouter, application: XiuxianApplicatio
     router.register("道统", application.dao_route_status, aliases=("道统议事",))
     router.register("道统投票", application.cast_dao_route_vote)
     router.register("道统结算", application.settle_dao_route)
+    router.register("飞升日", application.ascension_day_overview, aliases=("飞升之日", "新篇章"))
     router.register("发布拍卖", application.create_auction)
     router.register("拍卖列表", application.list_auctions, aliases=("查看拍卖",))
     router.register("竞价", application.bid_auction)

@@ -1,0 +1,18 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "ascension_day",
+  "records": [
+    {
+      "key": "event.ascension_day.defaults",
+      "name": "飞升日",
+      "desc": "赛季落幕后的第一日，三界共览此届结局，并开启新的篇章。",
+      "aliases": ["飞升之日", "新篇章"],
+      "status": "active",
+      "window_hours": 24,
+      "display_boards": ["ascension", "dao", "cooperation"],
+      "chapter_entry_keys": ["lane.builder.chapter.01", "lane.witness.chapter.01", "lane.traveler.chapter.01"],
+      "require_frozen_season": true,
+      "allow_assets": false
+    }
+  ]
+}

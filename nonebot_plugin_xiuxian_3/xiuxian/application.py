@@ -54,6 +54,7 @@ from .economy.void_market_use_cases import VoidMarketApplication
 from .device.entity_use_cases import DeviceApplication
 from .social.dao_hall_use_cases import DaoHallApplication
 from .social.dao_route_use_cases import DaoRouteApplication
+from .events.ascension_day_use_cases import AscensionDayApplication
 from .economy.auction_use_cases import AuctionApplication
 from .economy.purchase_order_use_cases import PurchaseOrderApplication
 from .events.use_cases import EventsApplication
@@ -230,6 +231,7 @@ class XiuxianApplication:
         self.device = DeviceApplication(repository)
         self.dao_hall = DaoHallApplication(repository)
         self.dao_route = DaoRouteApplication(repository)
+        self.ascension_day = AscensionDayApplication(repository)
         self.auction = AuctionApplication(repository)
         self.purchase_orders = PurchaseOrderApplication(repository)
         self.purchase = self.purchase_orders
@@ -266,6 +268,9 @@ class XiuxianApplication:
                 arena_lines = self._final_arena_help_lines()
                 if arena_lines:
                     body += "\n\n" + arena_lines
+                ascension_lines = self._ascension_day_help_lines()
+                if ascension_lines:
+                    body += "\n\n" + ascension_lines
             elif category == "生活":
                 dispatch_lines = self._dispatch_help_lines()
                 if dispatch_lines:
@@ -393,6 +398,24 @@ class XiuxianApplication:
                     f"（灵石 {offer.price_spirit_stones} / 件，每周 {offer.stock} 件）"
                 )
             return "\n".join(lines)
+        except Exception:
+            return ""
+
+    def _ascension_day_help_lines(self) -> str:
+        """Describe the ascension day on the explore page."""
+
+        try:
+            from .events.ascension_day_rules import ascension_day_definition
+
+            definition = ascension_day_definition(self.content)
+            return "\n".join(
+                [
+                    f"**{definition.name}**",
+                    f"> 赛季落幕后 {definition.window_hours} 小时内可查看本届结局、三榜与新篇章入口；"
+                    "只作展示，不改任何资产。",
+                    f"- {command_link('飞升日', '飞升日')}查看结局与新篇章",
+                ]
+            )
         except Exception:
             return ""
 
@@ -1977,6 +2000,13 @@ class XiuxianApplication:
             context,
             lambda: self.void_market.purchase(context),
             write_message="当前事件不允许购买虚空物资。",
+        )
+
+    async def ascension_day_overview(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.ascension_day.preview(context),
+            require_write=False,
         )
 
     async def dao_route_status(self, context: CommandContext) -> CommandResult:
