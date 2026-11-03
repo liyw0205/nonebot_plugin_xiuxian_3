@@ -601,7 +601,8 @@ release 按条件跳过。未跑全量/压测/部署，未验 QQ 真机，未发
 `test_endgame.py::test_public_ending_codex_is_frozen_across_content_closure_and_retries_atomically`
 1 项失败在未改动 HEAD（`e9451c8` 独立工作树）上同样失败，非本版引入。develop CI（Quality and Release
 `41583661305`，head `538315b`）的 quality 3.11/3.12 与 install-smoke 全部成功，release 按条件跳过。
-未跑全量/压测/部署，未验 QQ 真机，未发版。
+main CI（Quality and Release `41587261541`，head `e0e3c24`）的 quality 3.11/3.12 与 install-smoke
+同样全部成功，release 按条件跳过。未跑全量/压测/部署，未验 QQ 真机，未发版。
 
 居所物资箱已在 `develop` 完成（业务提交 `3b17af7`、文档 `f2b4ce1`）：
 `capacity.storage_slots` 正式生效，客房/小院/灵圃小院分别提供 10/20/24 格；租约快照冻结容量，
