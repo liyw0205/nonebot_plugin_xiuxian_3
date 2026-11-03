@@ -604,6 +604,42 @@ release 按条件跳过。未跑全量/压测/部署，未验 QQ 真机，未发
 main CI（Quality and Release `41587261541`，head `e0e3c24`）的 quality 3.11/3.12 与 install-smoke
 同样全部成功，release 按条件跳过。未跑全量/压测/部署，未验 QQ 真机，未发版。
 
+器修机关 `device.scout_doll` 已在 `develop` 完成（业务提交 `c42d065`、种子 provenance `d6a2bcc`、
+文档 `4684250`）：`data/战斗/实体.json` 自首版起只有一条 `status: locked` 草稿，`entity` kind
+在包内**零消费者**（无加载器、无校验、无命令），而 `docs/gameplay/combat/content-v0.1.md` 与
+`docs/foundation/paths/content-v0.1.md` 早已冻结「一件机关、攻击为自身的 50%、三回合、耐久与维修」。
+本版把该行升为 `active` 完整合同：`qi_sensing` L1 准入、`max_instances: 1`、
+组装 灵石 120 + 木材 2 + 铁石 1、维修 灵石 20 + 木材 1/步、耐久 10000 与每次出手 400 bp 损耗、
+每步修复 2500 bp、战斗 5000 bp / 3 回合 / 每场至多 3 次，图鉴复用 `codex.path.device`，
+并附中文别名（侦查傀儡、机关傀儡）。
+加载器 `device/entity_content.py` 校验键前缀、字段集合、实体类型、状态、道途/境界/物品/图鉴引用、
+成本块形状、耐久上限与损耗/维修边界、回合 1–20（与 `MAX_TURNS` 对齐）、动作上限不超持续回合、
+别名唯一，非法抛 `ContentError` 并在导入期构建。`device/entity_rules.py` 为纯函数准入/耐久/维修/动作许可/
+快照冻结。新表 `device_instances` 以 `(player_id) WHERE deployed = 1` 唯一索引保证同时只部署一件，
+`DeviceRepositoryMixin` 的 `device_status`/`assemble_device`/`deploy_device`/`recall_device`/
+`repair_device` 均在单事务内完成并写 `operations`（重放返回原结果，输入不一致 `OperationConflictError`）。
+战斗接入：起手把已部署机关冻结进 `snapshot.player.device`，自动回合在玩家行动后追加一条玩家侧行动
+（`strategy_key: strategy.device.scout_doll`，伤害 = 玩家攻击 × 50%，命中/暴击沿用公共 roll，
+种子加 `:device` 后缀保持回放稳定），受三回合与三次双重限制，`state.device_actions` 入快照；
+`resolve_battle` 是耐久唯一写入点，按出手次数扣减、归零置 `broken` 并自动收回，重复结算不再扣耐久。
+命令 `机关 [机关名]`、`组装机关`、`部署机关`、`收回机关`、`维修机关`，错误码
+`DEVICE_NOT_FOUND`/`DEVICE_LIMIT_REACHED`/`DEVICE_REQUIREMENT`/`DEVICE_MATERIAL_MISSING`/
+`DEVICE_BROKEN`/`DEVICE_STATE`/`INVALID_DEVICE_COMMAND`/`LEDGER_CONFLICT` 全部零写；
+QQ 原生 Markdown 状态页按状态只挂一个按钮（待命→部署、已部署→收回、损坏→维修），未组装时只给
+`组装机关` 蓝字预填，OneBot/纯文本降级为可读命令与「可发送：…」且不暴露稳定键；
+`修仙帮助 生活` 追加内容驱动的机关段。**未**改动 `skill.device.scout_doll`（机弩穿云）、
+`domain.machine_city`、`fruit.machine_heaven`，不做机关交易/拆解。种子账本新增 `战斗/实体.json`
+一条规则（旧摘要 `5502336…`）。聚焦证据：`test_device_entity_content.py` 22 passed
+（合同、引用、别名与十七类拒绝）、`test_device_entity.py` 7 passed（组装/部署/收回/维修往返、
+成本与上限、准入与材料不足零写、三回合三次出手与耐久 8800、损坏自动收回并拒绝再部署、
+operation 重放与重启后状态、QQ Markdown+键盘与 OneBot 降级、帮助段落）；
+回归 `test_combat.py`+`test_device_entity_content.py` 35 passed、
+`test_content.py`+`test_m9_content_integrity.py` 19 passed、`test_qq_capabilities.py`+`test_world.py`
+13 passed、`test_final_arena.py`+`test_combat_content.py` 14 passed、`test_documentation.py`+
+`test_help.py` 3 passed、`test_seed_migration.py -k targets_match` 1 passed。
+develop CI（`41649984150`，head `4684250`）quality 3.11/3.12 与 install-smoke 成功，release 按条件跳过。
+未跑全量/压测/部署，未验 QQ 真机，未发版。
+
 居所物资箱已在 `develop` 完成（业务提交 `3b17af7`、文档 `f2b4ce1`）：
 `capacity.storage_slots` 正式生效，客房/小院/灵圃小院分别提供 10/20/24 格；租约快照冻结容量，
 旧快照缺字段按当前居所定义回退。`存入居所`/`取回居所` 支持同格合并、满格拒绝新物品种类、
