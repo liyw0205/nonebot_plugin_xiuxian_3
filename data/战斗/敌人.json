@@ -966,6 +966,102 @@
         "drop_pool_key": "reward_pool.enemy.three_realms"
       },
       "status": "active"
+    },
+    {
+      "name": "守榜人·初阶",
+      "desc": "终局天榜第一重守榜人，出手试探修士根基是否稳固。",
+      "location_key": "location.final_arena",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "tribulation",
+          "min_layer": 6
+        }
+      ],
+      "stats": {
+        "hp": 8000,
+        "attack": 450,
+        "initiative": 30,
+        "agility": 30
+      },
+      "skills": [
+        "enemy_skill.domain_suppress"
+      ],
+      "behavior": {
+        "can_critical": false,
+        "can_escape": false
+      },
+      "reward_refs": [],
+      "combat_profile": {
+        "random_pool_key": "battle.enemy.final_arena_guardian_1",
+        "reward": {}
+      },
+      "key": "enemy.final_arena_guardian_1",
+      "status": "active"
+    },
+    {
+      "name": "守榜人·中阶",
+      "desc": "终局天榜第二重守榜人，已把渡劫所悟融入守势。",
+      "location_key": "location.final_arena",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "tribulation",
+          "min_layer": 6
+        }
+      ],
+      "stats": {
+        "hp": 11000,
+        "attack": 620,
+        "initiative": 34,
+        "agility": 34
+      },
+      "skills": [
+        "enemy_skill.archive_rule_rewrite"
+      ],
+      "behavior": {
+        "can_critical": false,
+        "can_escape": false
+      },
+      "reward_refs": [],
+      "combat_profile": {
+        "random_pool_key": "battle.enemy.final_arena_guardian_2",
+        "reward": {}
+      },
+      "key": "enemy.final_arena_guardian_2",
+      "status": "active"
+    },
+    {
+      "name": "守榜人·上阶",
+      "desc": "终局天榜第三重守榜人，执掌终榜，只让真正的破关者留名。",
+      "location_key": "location.final_arena",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "tribulation",
+          "min_layer": 6
+        }
+      ],
+      "stats": {
+        "hp": 15000,
+        "attack": 820,
+        "initiative": 38,
+        "agility": 38
+      },
+      "skills": [
+        "enemy_skill.time_fort_strike"
+      ],
+      "behavior": {
+        "can_critical": false,
+        "can_escape": false
+      },
+      "reward_refs": [],
+      "combat_profile": {
+        "random_pool_key": "battle.enemy.final_arena_guardian_3",
+        "reward": {}
+      },
+      "key": "enemy.final_arena_guardian_3",
+      "status": "active"
     }
   ],
   "schema": "xiuxian.content"

@@ -153,10 +153,12 @@
       "desc": "渡劫修士准备并承受天劫的终局地点。",
       "world": "终局",
       "status": "open",
-      "location_keys": ["tribulation.sky_terrace"],
+      "location_keys": ["tribulation.sky_terrace", "location.final_arena"],
       "connections": [
         {"from": "dao.origin_gate", "to": "tribulation.sky_terrace", "duration_seconds": 1800, "stamina": 0, "spirit_stone": 0, "item_key": "item.tribulation_token", "item_quantity": 1},
-        {"from": "tribulation.sky_terrace", "to": "dao.origin_gate", "duration_seconds": 3600, "stamina": 20, "spirit_stone": 0, "item_key": "item.dao_fruit_fragment", "item_quantity": 2, "daily_start_limit": 1}
+        {"from": "tribulation.sky_terrace", "to": "dao.origin_gate", "duration_seconds": 3600, "stamina": 20, "spirit_stone": 0, "item_key": "item.dao_fruit_fragment", "item_quantity": 2, "daily_start_limit": 1},
+        {"from": "tribulation.sky_terrace", "to": "location.final_arena", "duration_seconds": 900, "stamina": 15, "spirit_stone": 0, "requirements": [{"type": "realm", "realm_key": "tribulation", "min_layer": 6}]},
+        {"from": "location.final_arena", "to": "tribulation.sky_terrace", "duration_seconds": 900, "stamina": 15, "spirit_stone": 0, "requirements": [{"type": "realm", "realm_key": "tribulation", "min_layer": 6}]}
       ]
     },
     {

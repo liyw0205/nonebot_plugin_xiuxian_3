@@ -415,6 +415,13 @@ def old_official_locations() -> bytes:
             + block.replace('"status": "open"', '"status": "locked"', 1)
             + text[end:]
         )
+    # The endgame-arena slice appended one terminal location; an old host does
+    # not know it, so the reversed blob must drop the whole record.
+    marker = ',\n    {\n      "name": "终局天榜"'
+    arena_start = text.index(marker)
+    arena_end = text.index('\n  ],\n  "schema"', arena_start)
+    text = text[:arena_start] + text[arena_end:]
+    assert "location.final_arena" not in text
     blob = text.encode("utf-8")
     rule = json.loads((ROOT / "scripts/seed_migrations.json").read_text(encoding="utf-8"))[
         LOCATION_FILE.as_posix()
@@ -508,6 +515,7 @@ def old_official_manifest() -> bytes:
             "生产/终局配方.json",
             "任务/跨界任务.json",
             "特殊/竞技场.json",
+            "特殊/终局天榜.json",
             "功业/功业.json",
             "道历/道号.json",
             "道历/道契.json",
@@ -539,6 +547,7 @@ def test_manifest_seed_migrates_when_the_trade_file_is_registered(host: Path) ->
     (host / "data" / "生产/终局配方.json").unlink()
     (host / "data" / "任务/跨界任务.json").unlink()
     (host / "data" / "特殊/竞技场.json").unlink()
+    (host / "data" / "特殊/终局天榜.json").unlink()
     (host / "data" / "功业/功业.json").unlink()
     (host / "data" / "道历/道号.json").unlink()
     (host / "data" / "道历/道契.json").unlink()
@@ -781,6 +790,7 @@ PLACE_CODEX_ADDED = frozenset(
         "codex.place.boundary_realm",
         "codex.place.floating_boat",
         "codex.place.mist_grotto_2",
+        "codex.place.final_arena",
     }
 )
 

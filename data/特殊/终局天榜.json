@@ -1,0 +1,66 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "final_arena",
+  "records": [
+    {
+      "key": "arena.final_heaven.defaults",
+      "name": "终局天榜",
+      "desc": "渡劫修士在终局天榜上依次挑战三级守榜人。天榜只在活动轮次内开放，每轮最多挑战三次；榜上名次只留展示与见闻，不影响飞升资格。",
+      "status": "active",
+      "location_key": "location.final_arena",
+      "schedule": {
+        "kind": "utc_block",
+        "block_hours": 4,
+        "duration_seconds": 7200,
+        "claim_window_seconds": 86400
+      },
+      "attempt_limit_per_round": 3,
+      "stamina_cost": 15,
+      "required_realm": "tribulation",
+      "required_layer": 6
+    },
+    {
+      "key": "tier.final_arena.1",
+      "name": "天榜初阶",
+      "desc": "守榜人意在试你根基是否稳固，出手留有余地，却不会让你轻易记名。",
+      "status": "active",
+      "label": "天榜初阶",
+      "enemy_key": "enemy.final_arena_guardian_1",
+      "required_best_tier": 0,
+      "aliases": [
+        "初阶",
+        "天榜初阶",
+        "一阶"
+      ]
+    },
+    {
+      "key": "tier.final_arena.2",
+      "name": "天榜中阶",
+      "desc": "中阶守榜人已把渡劫所悟融入守势，寻常攻势只会被原样送回。",
+      "status": "active",
+      "label": "天榜中阶",
+      "enemy_key": "enemy.final_arena_guardian_2",
+      "required_best_tier": 1,
+      "aliases": [
+        "中阶",
+        "天榜中阶",
+        "二阶"
+      ]
+    },
+    {
+      "key": "tier.final_arena.3",
+      "name": "天榜上阶",
+      "desc": "上阶守榜人执掌天榜终榜，破关者可在榜上留下自己的名号。",
+      "status": "active",
+      "label": "天榜上阶",
+      "enemy_key": "enemy.final_arena_guardian_3",
+      "required_best_tier": 2,
+      "title_key": "title.final_arena.summit",
+      "aliases": [
+        "上阶",
+        "天榜上阶",
+        "三阶"
+      ]
+    }
+  ]
+}

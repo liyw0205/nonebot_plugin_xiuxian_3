@@ -444,6 +444,11 @@ class TravelRepositoryMixin:
 
             if not public_event_is_open(DEMON_EVENT_KEY, now, self.content):
                 missing.append("活动窗口")
+        if destination == "location.final_arena":
+            from ..specials.final_arena_rules import arena_is_open
+
+            if not arena_is_open(now):
+                missing.append("天榜活动轮次")
         if player.stamina < definition.stamina_cost:
             missing.append("体力")
         if player.spirit_stones < definition.currency_cost:
@@ -581,6 +586,11 @@ class TravelRepositoryMixin:
 
                 if not public_event_is_open(DEMON_EVENT_KEY, now, travel_content):
                     raise EventNotActiveError("demon invasion war front is closed")
+            if destination == "location.final_arena":
+                from ..specials.final_arena_rules import arena_is_open
+
+                if not arena_is_open(now):
+                    raise EventNotActiveError("the final arena round is closed")
             if destination in {"cave.mist_grotto_2", "demon.abyss_gate"}:
                 raise LocationRequirementError("this destination can only be reached by a cloud boat")
             endgame_status = str(row["endgame_status"] or "none")

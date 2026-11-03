@@ -2319,3 +2319,23 @@ class VoidMarketStockError(RuntimeError):
 
 class VoidMarketDailyCapError(RuntimeError):
     """The player reached the void market daily purchase cap."""
+
+
+class FinalArenaNotOpenError(RuntimeError):
+    """The final arena activity round is closed."""
+
+
+class FinalArenaLocationRequiredError(RuntimeError):
+    """The player is not standing on the final arena location."""
+
+
+class FinalArenaTierLockedError(RuntimeError):
+    """The requested final arena tier has not been unlocked by a prior clear."""
+
+
+class FinalArenaAttemptCapError(RuntimeError):
+    """The player exhausted the per-round final arena attempts."""
+
+
+class FinalArenaChallengeNotFoundError(RuntimeError):
+    """No running final arena challenge exists for the settlement request."""

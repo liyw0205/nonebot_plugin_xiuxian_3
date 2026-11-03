@@ -100,20 +100,22 @@
       "dd4e5e6dff3bc10d60ce2e79ea95070b6d6952ab37d093f0e14669bbef131440": "89440093727e70f61a06774c61a1b15823088309:data/内容清单.json",
       "12ed228d748839bd62f3d6756d1970dd26b47da861d9a99ba81efb54bf4d22ec": "24ecef2d1912fd7d821c171445150fbc6e165a13:data/内容清单.json",
       "bf8e994fc4ece706978add7dfddeb7d83cb3aff2e253b7cc813c6c5691c548c1": "1f2d3da3f342b2ca30525e2f066410ebd46f6efd:data/内容清单.json",
-      "b8c13d57cc2897ebbd420ced18bd544e3ea0c35de32439e97c491266afa5ca25": "8ce77506fa9f6b5ed21b6e5e448c0cb412f4c164:data/内容清单.json"
+      "b8c13d57cc2897ebbd420ced18bd544e3ea0c35de32439e97c491266afa5ca25": "8ce77506fa9f6b5ed21b6e5e448c0cb412f4c164:data/内容清单.json",
+      "202567bc1a388957ecf3dd74df937e089abf55ae8dc77f04a570b4175e9de15b": "e9451c8c1635a2148e04ee288b194a4ea9571935:data/内容清单.json"
     },
-    "new_sha256": "202567bc1a388957ecf3dd74df937e089abf55ae8dc77f04a570b4175e9de15b",
-    "new_commit": "8d18d4a1f5d4cb95064394b889015c7c9d2ebcff"
+    "new_sha256": "f43743c9c6f310c563b1807c75aebd4f2e1a8be22bc6214a2605f203775000f7",
+    "new_commit": "PENDING"
   },
   "地图/地点.json": {
     "old_sha256": {
       "d2e8dcde2bc4fd9daa0bde5ba3ce2b024ffcf9aabf52b9a3732d27bec2694efa": "44be52139804523570ec1f2588b8f9bdf568c8a0:data/地图/地点.json",
       "206a98cbe488ef5130cc6dcec124de19667c7b233a2d0e79416894a52a1f7d43": "38133f2007e7cbf0bf69425517724c57c9668e58:data/地图/地点.json",
       "b775aa8bdd369b60efa638f944312593e2fbe4d588d73f0199ae5902ba1c0e4f": "2ee45a684fd6bb214374769c4fb8e6e48811c5b7:data/地图/地点.json",
-      "4252694487c80791ab766aef5a516bd45824ae6dd86b19ee5aae37c7a6b60988": "38a07cd4aa5a764672adb1faae3da250f2b093eb:data/地图/地点.json"
+      "4252694487c80791ab766aef5a516bd45824ae6dd86b19ee5aae37c7a6b60988": "38a07cd4aa5a764672adb1faae3da250f2b093eb:data/地图/地点.json",
+      "bff9e43057f4283774796a4e02b5d58c3c8db301d1a1378c9bba82ead772fe1d": "e9451c8c1635a2148e04ee288b194a4ea9571935:data/地图/地点.json"
     },
-    "new_sha256": "bff9e43057f4283774796a4e02b5d58c3c8db301d1a1378c9bba82ead772fe1d",
-    "new_commit": "8cd146b2222ec36ada0c34876346edb8119ce275"
+    "new_sha256": "4a7dc937d274f0824b650dacc0c4dc6a98693f474145d42ab4ff754a06784b9a",
+    "new_commit": "PENDING"
   },
   "探索/模式.json": {
     "old_sha256": {
@@ -127,10 +129,11 @@
   "战斗/敌人.json": {
     "old_sha256": {
       "e171189c111d361becd7f4907993e1dce35456d9ea061fa7565d212d86796726": "2ee45a684fd6bb214374769c4fb8e6e48811c5b7:data/战斗/敌人.json",
-      "501f749a4c716b2985e5302347dd2b1e430b0882ace6f09aae4097a3f752c650": "2f05ee4de43d2c983d2b1b94a573e64d9cfff79a:data/战斗/敌人.json"
+      "501f749a4c716b2985e5302347dd2b1e430b0882ace6f09aae4097a3f752c650": "2f05ee4de43d2c983d2b1b94a573e64d9cfff79a:data/战斗/敌人.json",
+      "c12c85766491f9fe4601153406f920a8d2cc16bc77c28ccff69831d966705d45": "e9451c8c1635a2148e04ee288b194a4ea9571935:data/战斗/敌人.json"
     },
-    "new_sha256": "c12c85766491f9fe4601153406f920a8d2cc16bc77c28ccff69831d966705d45",
-    "new_commit": "ae925b118070eb6295cbc2eebdfaf3c9bc6a7365"
+    "new_sha256": "400fa082d1e377c2bf2b29f62917717bbfff83a8a02924ad557a7410d021d82a",
+    "new_commit": "PENDING"
   },
   "战斗/遭遇池.json": {
     "old_sha256": {
@@ -151,10 +154,11 @@
   "地图/区域.json": {
     "old_sha256": {
       "cac9bb63828923b1faa1433b3a75e216efdcc037170461d805091761b1dbc2e2": "44be52139804523570ec1f2588b8f9bdf568c8a0:data/地图/区域.json",
-      "bb9075bd954d7f1da6ce60d9eb3ef35adfc56e89ba3252682ac8845e751f1370": "e71e52e2e6040365fa1ed57b15ca97c8583fe57c:data/地图/区域.json"
+      "bb9075bd954d7f1da6ce60d9eb3ef35adfc56e89ba3252682ac8845e751f1370": "e71e52e2e6040365fa1ed57b15ca97c8583fe57c:data/地图/区域.json",
+      "5ed8cdcef6474eab4a533a581f0b7ba46761a493956569a769e5eec01cd1fa90": "e9451c8c1635a2148e04ee288b194a4ea9571935:data/地图/区域.json"
     },
-    "new_sha256": "5ed8cdcef6474eab4a533a581f0b7ba46761a493956569a769e5eec01cd1fa90",
-    "new_commit": "8ccde33234cbefa5b89e12253f647d4430d9391a"
+    "new_sha256": "8a2c517daef382a0930126d2f79bd4d3f520dbf652165825803a94f7437da42c",
+    "new_commit": "PENDING"
   },
   "特殊/虚空塔.json": {
     "old_sha256": {
@@ -186,10 +190,11 @@
   },
   "图鉴/条目.json": {
     "old_sha256": {
-      "d51b99c168b22ca47776ae7c523b0c7dcf5e66e2104cf68eda8bf9043178f1ce": "44be52139804523570ec1f2588b8f9bdf568c8a0:data/图鉴/条目.json"
+      "d51b99c168b22ca47776ae7c523b0c7dcf5e66e2104cf68eda8bf9043178f1ce": "44be52139804523570ec1f2588b8f9bdf568c8a0:data/图鉴/条目.json",
+      "bb71dd2f6f3011a0cff66ee928f518c1aafd6036709d0d11e3282aa0d681ce50": "e9451c8c1635a2148e04ee288b194a4ea9571935:data/图鉴/条目.json"
     },
-    "new_sha256": "bb71dd2f6f3011a0cff66ee928f518c1aafd6036709d0d11e3282aa0d681ce50",
-    "new_commit": "2ea700721f9772dd0c8adfd13b67db0140a61805"
+    "new_sha256": "c607893eeb33288e2f111f79d80a1c62ac6dfc438204b804741dca869786008d",
+    "new_commit": "PENDING"
   },
   "图鉴/里程碑.json": {
     "old_sha256": {
@@ -222,5 +227,12 @@
     },
     "new_sha256": "0ae0c808cee854e55b9925b4449747b04b83c7c1615d7ee043dc3fd4399edd46",
     "new_commit": "ab63dd373a5c718d1deecef27766a2c1eeb5960a"
+  },
+  "道历/道号.json": {
+    "old_sha256": {
+      "8cae9342368e6feb4cb1ff052dab3e7b52784f38adf1bfeb5eef24b5a49d31a0": "e9451c8c1635a2148e04ee288b194a4ea9571935:data/道历/道号.json"
+    },
+    "new_sha256": "01fbc101e1b210e8773f08fe99046fc747e43d40a3d4eec1944e4b477795836e",
+    "new_commit": "PENDING"
   }
 }

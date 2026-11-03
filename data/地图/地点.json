@@ -546,6 +546,17 @@
       "actions": ["ascension.remain_in_world"],
       "codex_entry_key": "codex.place.left_world_hall",
       "key": "ascension.left_world_hall"
+    },
+    {
+      "name": "终局天榜",
+      "desc": "天劫台外的终榜擂台，渡劫六层以上的修士可在活动轮次内挑战三级守榜人，把名号留在榜上。",
+      "world": "终局",
+      "status": "open",
+      "requirements": [{"type": "realm", "realm_key": "tribulation", "min_layer": 6}],
+      "environment": {"risk": "high"},
+      "actions": ["final_arena.challenge"],
+      "codex_entry_key": "codex.place.final_arena",
+      "key": "location.final_arena"
     }
   ],
   "schema": "xiuxian.content"

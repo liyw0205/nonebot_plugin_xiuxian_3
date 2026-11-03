@@ -49,10 +49,10 @@ def test_every_location_is_wired_to_an_existing_place_codex() -> None:
         assert entry["name"].strip() and entry["desc"].strip()
 
 
-def test_place_codex_entries_cover_all_thirty_three_locations() -> None:
+def test_place_codex_entries_cover_every_location() -> None:
     bundle = ContentBundle.load(ROOT / "data")
     locations = bundle.list("location", include_locked=True)
-    assert len(locations) == 33
+    assert len(locations) == 34
     wired = {
         location["codex_entry_key"]
         for location in locations
@@ -66,7 +66,7 @@ def test_place_codex_entries_cover_all_thirty_three_locations() -> None:
     assert wired == place_entries, (
         "every place codex must be referenced by exactly its location"
     )
-    assert len(place_entries) == 33
+    assert len(place_entries) == 34
 
 
 def test_discovery_writes_the_wired_entry(tmp_path: Path) -> None:

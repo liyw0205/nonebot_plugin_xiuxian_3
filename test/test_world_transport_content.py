@@ -100,7 +100,7 @@ def test_world_content_requires_cloud_only_destinations_to_use_special_routes() 
         for edge in region["connections"]
     }
 
-    assert summary["connections"] == 61
+    assert summary["connections"] == 63
     assert "cave.mist_grotto_2" not in ordinary_targets
     demon_gate_sources = {
         edge["from"]

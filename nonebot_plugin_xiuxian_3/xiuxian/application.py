@@ -68,6 +68,7 @@ from .specials.tower_use_cases import TowerApplication
 from .specials.void_spire_use_cases import VoidSpireApplication
 from .specials.three_realms_tower_use_cases import ThreeRealmsTowerApplication
 from .specials.three_realms_tower_duo_use_cases import ThreeRealmsTowerDuoApplication
+from .specials.final_arena_use_cases import FinalArenaApplication
 from .specials.story_use_cases import StoryApplication
 from .quests.use_cases import QuestApplication
 from .repository import SQLitePlayerRepository
@@ -241,6 +242,7 @@ class XiuxianApplication:
         self.void_spire = VoidSpireApplication(repository)
         self.three_realms_tower = ThreeRealmsTowerApplication(repository)
         self.three_realms_tower_duo = ThreeRealmsTowerDuoApplication(repository)
+        self.final_arena = FinalArenaApplication(repository)
         self.story = StoryApplication(repository)
         self.quests = QuestApplication(repository)
 
@@ -255,6 +257,9 @@ class XiuxianApplication:
                 secret_lines = self._secret_realm_help_lines()
                 if secret_lines:
                     body += "\n\n" + secret_lines
+                arena_lines = self._final_arena_help_lines()
+                if arena_lines:
+                    body += "\n\n" + arena_lines
             elif category == "生活":
                 dispatch_lines = self._dispatch_help_lines()
                 if dispatch_lines:
@@ -370,6 +375,38 @@ class XiuxianApplication:
                 lines.append(
                     f"- {command_link(offer.label, f'购买虚空物资 {offer.label}')}"
                     f"（灵石 {offer.price_spirit_stones} / 件，每周 {offer.stock} 件）"
+                )
+            return "\n".join(lines)
+        except Exception:
+            return ""
+
+    def _final_arena_help_lines(self) -> str:
+        """List the endgame final arena tiers on the explore page.
+
+        Help rendering stays best-effort: content failures fall back to the
+        static page body and never block command dispatch.
+        """
+
+        try:
+            from .specials.final_arena_rules import final_arena_definition
+
+            definition = final_arena_definition(self.content)
+            if not definition.tiers:
+                return ""
+            from .content import bundled_content
+
+            content = self.content or bundled_content()
+            realm_label = content.label("realm", definition.required_realm)
+            lines: list[str] = [
+                "**终局天榜**",
+                f"> 活动轮次内开放（每个 UTC 四小时轮次最多 "
+                f"{definition.attempt_limit_per_round} 次）；需抵达终局天榜并达到 "
+                f"{realm_label} L{definition.required_layer}，榜上名次不影响飞升资格。",
+            ]
+            for tier in definition.tiers:
+                lines.append(
+                    f"- {command_link(tier.label, f'挑战天榜 {tier.label}')}"
+                    f"（第 {tier.tier_index} 重守榜人，体力 {definition.stamina_cost}）"
                 )
             return "\n".join(lines)
         except Exception:
@@ -1025,6 +1062,27 @@ class XiuxianApplication:
             context,
             lambda: self.void_archive_mainline.claim_reward(context),
             write_message="此刻无缘收取虚空档案主线所得。",
+        )
+
+    async def preview_final_arena(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.final_arena.preview(context),
+            require_write=False,
+        )
+
+    async def challenge_final_arena(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.final_arena.challenge(context),
+            write_message="当前事件不允许挑战终局天榜。",
+        )
+
+    async def settle_final_arena(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.final_arena.settle(context),
+            write_message="当前事件不允许结算终局天榜。",
         )
 
     async def preview_secret_realms(self, context: CommandContext) -> CommandResult:

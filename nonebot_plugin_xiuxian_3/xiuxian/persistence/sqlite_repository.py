@@ -88,6 +88,7 @@ from ..specials.codex_repository import CodexRepositoryMixin
 from ..specials.codex_migration import ensure_codex_schema
 from ..specials.tower_repository import TowerRepositoryMixin
 from ..specials.void_spire_repository import VoidSpireRepositoryMixin
+from ..specials.final_arena_repository import FinalArenaRepositoryMixin
 from ..specials.three_realms_tower_repository import ThreeRealmsTowerRepositoryMixin
 from ..specials.three_realms_tower_duo_repository import ThreeRealmsTowerDuoRepositoryMixin
 from ..specials.tower_migration import ensure_tower_schema
@@ -181,6 +182,7 @@ class SQLitePlayerRepository(
     CodexRepositoryMixin,
     TowerRepositoryMixin,
     VoidSpireRepositoryMixin,
+    FinalArenaRepositoryMixin,
     ThreeRealmsTowerRepositoryMixin,
     ThreeRealmsTowerDuoRepositoryMixin,
     StoryRepositoryMixin,

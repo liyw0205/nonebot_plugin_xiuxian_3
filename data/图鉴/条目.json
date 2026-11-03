@@ -1863,6 +1863,13 @@
       "desc": "精英巡守镇守的洞天二层。",
       "category": "place",
       "status": "active"
+    },
+    {
+      "key": "codex.place.final_arena",
+      "name": "终局天榜",
+      "desc": "天劫台外的终榜擂台，渡劫修士在此挑战守榜人并留下名号。",
+      "category": "place",
+      "status": "active"
     }
 
   ]

@@ -17,10 +17,10 @@ def test_world_content_has_complete_map_contract() -> None:
     summary = validate_world_content(ContentBundle.load(DATA))
 
     assert summary == {
-        "locations": 33,
+        "locations": 34,
         "regions": 10,
-        "connections": 61,
-        "covered_locations": 33,
+        "connections": 63,
+        "covered_locations": 34,
     }
 
 
@@ -64,7 +64,7 @@ def test_world_content_accepts_a_directed_route_without_a_reverse_edge(tmp_path:
     path.write_text(json.dumps(document, ensure_ascii=False), encoding="utf-8")
 
     summary = validate_world_content(ContentBundle.load(root))
-    assert summary["connections"] == 60
+    assert summary["connections"] == 62
 
 
 @pytest.mark.parametrize(

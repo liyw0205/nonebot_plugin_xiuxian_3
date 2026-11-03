@@ -120,6 +120,13 @@
       "source_event": null,
       "hint": "问道行卷付费线第 5 级（此后每 5 级）",
       "status": "active"
+    },
+    {
+      "key": "title.final_arena.summit",
+      "label": "终榜留名",
+      "source_event": null,
+      "hint": "在终局天榜上阶守榜人处取得首胜",
+      "status": "active"
     }
   ]
 }

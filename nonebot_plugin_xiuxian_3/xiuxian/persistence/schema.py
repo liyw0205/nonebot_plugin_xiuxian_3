@@ -2850,4 +2850,40 @@ CREATE TABLE IF NOT EXISTS void_market_item_bindings (
 CREATE INDEX IF NOT EXISTS idx_void_market_item_bindings_active
     ON void_market_item_bindings(player_id, item_key, bound_until);
 
+CREATE TABLE IF NOT EXISTS final_arena_challenges (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    challenge_id TEXT NOT NULL UNIQUE,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    round_id TEXT NOT NULL,
+    starts_at TEXT NOT NULL,
+    ends_at TEXT NOT NULL,
+    tier_key TEXT NOT NULL,
+    tier_no INTEGER NOT NULL CHECK (tier_no > 0),
+    enemy_key TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('open', 'won', 'lost', 'expired')),
+    battle_id TEXT,
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    result_json TEXT NOT NULL DEFAULT '{}',
+    operation_id TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL,
+    settled_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_final_arena_challenges_round
+    ON final_arena_challenges(player_id, round_id, status);
+
+CREATE TABLE IF NOT EXISTS final_arena_progress (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    season_id TEXT NOT NULL,
+    best_tier INTEGER NOT NULL DEFAULT 0 CHECK (best_tier >= 0),
+    summit_cleared INTEGER NOT NULL DEFAULT 0 CHECK (summit_cleared IN (0, 1)),
+    round_id TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (player_id, season_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_final_arena_progress_player
+    ON final_arena_progress(player_id, season_id);
+
 """
