@@ -24,3 +24,13 @@
 公共资产、关系赠送和队伍奖励必须有独立流水。
 
 跨服社交数据的备份、校验和恢复属于管理运维入口，不是玩家玩法；实现位于独立 `sect_social_recovery_*` 模块，权限、路径边界、恢复前快照和引用审计以[当前开发状态](../../current-status.md)及[测试策略](../../testing.md)为准。
+
+## 留界据点内容合同（v0.7）
+
+`data/社交/道统据点.json`（kind `dao_hall`）承接 social v0.6 冻结的 `settlement.dao_hall`：
+留界结局 + 世界功勋 2000 + 灵石 5000（计入库房）、核心席位 30、周维护 5000、72h 重建期。
+`social/dao_hall_content.py` 校验准入/境界/效果白名单与上限/项目前置无环/别名唯一；
+`dao_halls`、`dao_hall_members`、`dao_hall_projects`、`dao_hall_contributions` 四张表配合
+`operations` 幂等承载成立、加入、退出、建设、维护与重建恢复。命令为 `据点`、`建立据点`、
+`加入据点`、`退出据点`、`建设据点 <项目名>`、`维护据点`。据点不改飞升资格、天劫债、道果与赛季三榜。
+完整合同见 [content-v0.7.md](content-v0.7.md)。
