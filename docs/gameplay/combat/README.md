@@ -42,3 +42,15 @@
 `tribulation_rules.py` 由内容派生 `ENEMY_KEY`/`ENEMY_MAX_HP`/`ENEMY_ATTACK`/`ENEMY_INITIATIVE`/
 `ENEMY_AGILITY`/`PHASES` 并保留同名导出；`phase_for_hp()` 仍按 `hp/max_hp` 的万分之一比较，
 `stat_snapshot()` 与战斗会话快照语义不变。本版数值与旧硬编码表逐字段一致。
+
+## 器修机关内容合同（v0.8）
+
+`data/战斗/实体.json`（kind `entity`，`device.scout_doll`）从长期 `locked` 草稿升为 `active` 可玩合同：
+`device/entity_content.py` 校验键前缀、字段集合、实体类型、状态、道途/境界/物品/图鉴引用、成本块、
+耐久上限与损耗边界、回合 1–20、动作上限不超持续回合与别名唯一，非法抛 `ContentError` 并在导入期构建。
+运行时把已部署机关冻结进战斗快照，在玩家行动后追加一次玩家侧机关攻击（伤害为自身的 50%，
+仅前三个回合、每场至多三次），结算时按出手次数写回耐久、归零置 `broken` 并自动收回部署。
+组装/部署/收回/维修均为单事务 + `operations` 幂等；命令为 `机关`、`组装机关`、`部署机关`、
+`收回机关`、`维修机关`。与既有 `skill.device.scout_doll`（机弩穿云）保持分离，
+`domain.machine_city` 与 `fruit.machine_heaven` 仍按既有锁定语义处理。完整合同见
+[content-v0.8.md](content-v0.8.md)。
