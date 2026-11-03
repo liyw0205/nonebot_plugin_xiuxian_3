@@ -109,7 +109,7 @@
       "261a0698c958b01aba3a5790fad3382e0a623183ee630c80dc3626f151b9127a": "936e6248ab540f758912c04887b52f68fc427c10:data/内容清单.json"
     },
     "new_sha256": "01cb9aeb8975940bdad2dbdb0f0a2d3b6e1db4494e9c7728784761d76911c240",
-    "new_commit": "PENDING"
+    "new_commit": "5d8493f4b83bbcbe183744c249f465e08b63d73d"
   },
   "地图/地点.json": {
     "old_sha256": {
@@ -270,6 +270,6 @@
   "经济/虚空物资寄售.json": {
     "old_sha256": {},
     "new_sha256": "1502c163dd45e3263c561efb0951c7a67b5134c3d36f3c0c2907a5aaf832c293",
-    "new_commit": "PENDING"
+    "new_commit": "5d8493f4b83bbcbe183744c249f465e08b63d73d"
   }
 }
