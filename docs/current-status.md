@@ -640,6 +640,29 @@ operation 重放与重启后状态、QQ Markdown+键盘与 OneBot 降级、帮�
 develop CI（`41649984150`，head `4684250`）quality 3.11/3.12 与 install-smoke 成功，release 按条件跳过。
 未跑全量/压测/部署，未验 QQ 真机，未发版。
 
+飞升日 `event.ascension_day` 已在 `develop` 完成（业务提交 `215525c`、种子 provenance `116ac12`、
+文档 `c931383`）：events v0.6 冻结的「赛季后 24h 只展示结局与新篇章、不再改资产」此前零数据、零规则、
+零命令。新增 `data/事件/飞升日.json`（kind `ascension_day`）：`window_hours 24`、
+`display_boards ["ascension","dao","cooperation"]`（与 `season.final_heaven` 实际发布的三榜键一致）、
+`chapter_entry_keys` 指向已登记的 `lane.builder|witness|traveler.chapter.01`、
+`require_frozen_season: true`、`allow_assets: false`。加载器 `events/ascension_day_content.py` 强校验
+kind/键/字段集、窗口 1–168、`allow_assets` 必须为 false、`require_frozen_season` 必须为 true、
+榜单键必须是三榜子集且不重复、章节入口必须引用已存在 `mainline` 且不重复、别名非空，
+非法抛 `ContentError` 并在导入期构建。本事件是**纯投影**：取最近一个 `frozen` 赛季、按半开区间
+`[ends_at, ends_at+24h)` 判定 `pending|open|closed`、读本角色 `endgame_endings` 与冻结榜单快照，
+读取使用 `writable=False`、**不写 `operations`**、不改资产/结局/榜单/赛季；只有 `open` 公布三榜，
+窗口外只给状态与新篇章入口，避免窗口后继续展示过期名次。命令 `飞升日`（别名 `飞升之日`、`新篇章`），
+状态码 `ASCENSION_DAY_OPEN`/`ASCENSION_DAY_PENDING`/`ASCENSION_DAY_CLOSED`/`ASCENSION_DAY_NO_SEASON`，
+错误 `INVALID_ASCENSION_DAY_COMMAND`/`PLAYER_NOT_FOUND`/`REPOSITORY_BUSY`；页面不挂任何写操作按钮，
+QQ 原生 Markdown 直接渲染、OneBot/纯文本降级且不暴露稳定键，`修仙帮助 探索` 追加飞升日段。
+聚焦证据：`test_ascension_day_content.py` 16 passed（合同数值、窗口两端点与半开区间、榜单投影与容错、
+十三类非法拒绝）、`test_ascension_day.py` 5 passed（无冻结赛季、collecting 赛季不计入、窗口前/窗口内/
+窗口后状态、三榜与本人结局、**前后快照完全一致证明零写**、重启后一致、参数与未登记角色拒绝、
+QQ/OneBot 呈现与帮助段落）；回归 `test_content.py`+`test_m9_content_integrity.py`+
+`test_documentation.py`+`test_help.py` 22 passed、`test_seed_migration.py`
+`-k "targets_match or reverse or covers_every or manifest"` 10 passed。
+未跑全量/压测/部署，未验 QQ 真机，未发版。
+
 道统路线议事（`dao.choose_route` + `dao.council_vote`）已在 `develop` 完成（业务提交 `152387b`、
 种子 provenance `f50f46b`、文档 `ff67aeb`）：social v0.6 冻结的这套规则此前零数据、零表、零命令。
 新增 `data/社交/道统路线.json`（kind `dao_route`）：`route.dao_settlement.defaults` 承接
