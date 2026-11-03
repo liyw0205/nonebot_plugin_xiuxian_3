@@ -175,6 +175,7 @@ data/
 | `境界/晋升.json` | 同境晋升提示与条件里程碑的稳定键、玩家文案、触发境界/层数及资格门槛 | `foundation/progression/layers.md`、`content-data-contract.md` |
 | `道途/道途.json` | 六大道途、被动、主动技能和状态资源 | `foundation/paths/content-v0.1.md` |
 | `技能/技能.json` | 基础攻击、六大道途在九境各自的稳定攻势与战术备选（108 条）、敌方技能及天劫阶段技能；技能名按招式意象命名，战斗消费器结算爆发、辅御、持续、削弱、蓄力、中毒、灼烧和反伤，高阶备选要求悬赏可得的传承残卷 | `gameplay/combat/content-v0.1.md`、`gameplay/combat/workflow.md` |
+| `社交/道统路线.json` | 道统议事准入（宗门等级/合道/三票/公共功勋 1000）、周期与锁定期，以及守界/飞升/留界三线的加成键与数值 | `gameplay/social/content-v0.8.md` |
 | `社交/道统据点.json` | 留界据点准入、库房、核心席位、周维护与 72h 重建期，以及太清殿/讲道台/护界大阵三项建设的功勋成本与效果 | `gameplay/social/content-v0.7.md` |
 | `战斗/实体.json` | 器修机关 `device.scout_doll`：道途/境界准入、组装与维修成本、耐久与损耗、战斗倍率/回合/动作上限；组装、部署、收回、维修与战斗耐久结算均已接线 | `gameplay/combat/content-v0.8.md` |
 | `引导/引导.json` | 凡人世界阅读、教学采集和生产教学 | `foundation/player/content-v0.1.md` |

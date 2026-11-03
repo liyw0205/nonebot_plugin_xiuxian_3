@@ -34,3 +34,12 @@
 `operations` 幂等承载成立、加入、退出、建设、维护与重建恢复。命令为 `据点`、`建立据点`、
 `加入据点`、`退出据点`、`建设据点 <项目名>`、`维护据点`。据点不改飞升资格、天劫债、道果与赛季三榜。
 完整合同见 [content-v0.7.md](content-v0.7.md)。
+
+## 道统路线议事内容合同（v0.8）
+
+`data/社交/道统路线.json`（kind `dao_route`）承接 social v0.6 冻结的 `dao.choose_route` /
+`dao.council_vote`：宗门 6 级以上、至少 3 名合道投票、结算耗公共功勋 1000、三选一、
+7 天锁定、周日按多数定线、同票沿用上周。`social/dao_route_content.py` 校验字段、境界层区间、
+加成键白名单与上限、别名唯一与「路线恰好三条」；`dao_route_cycles`/`dao_route_votes`/`dao_route_state`
+三张表配合 `operations` 幂等承载投票、结算与锁定。票数不足的周期以「无路线」关闭，避免卡死后续投票。
+命令为 `道统`、`道统投票 <线名>`、`道统结算`。完整合同见 [content-v0.8.md](content-v0.8.md)。
