@@ -110,7 +110,7 @@
       "01cb9aeb8975940bdad2dbdb0f0a2d3b6e1db4494e9c7728784761d76911c240": "6585a160cdd760c8ffe91bde95bc7fe132968f5b:data/内容清单.json"
     },
     "new_sha256": "d66b5f5a78982d619ab0dfffe0eae1499b5a204eb44719481a464fbb07e17574",
-    "new_commit": "PENDING"
+    "new_commit": "bb3a31f6972773e33091ba783a1038bf84ada000"
   },
   "地图/地点.json": {
     "old_sha256": {
@@ -287,11 +287,11 @@
       "5777665363efa2ad73dc14b78e5a0be2797d2ae054a5125d9969bfab6efae1fc": "6585a160cdd760c8ffe91bde95bc7fe132968f5b:data/养成/体质.json"
     },
     "new_sha256": "6ce70394cd08ed04b648fa3bbfe627906a2321c5e61bb7b0d2216dc3b45d1574",
-    "new_commit": "PENDING"
+    "new_commit": "bb3a31f6972773e33091ba783a1038bf84ada000"
   },
   "灵兽/互动.json": {
     "old_sha256": {},
     "new_sha256": "8255e9b2663549a256cd9e0579ed7a3000a4ca6f6683898412291f208de04f1c",
-    "new_commit": "PENDING"
+    "new_commit": "bb3a31f6972773e33091ba783a1038bf84ada000"
   }
 }
