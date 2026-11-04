@@ -228,6 +228,7 @@ def _bounty_snapshot(raw_value: Any) -> dict[str, Any]:
         "production_completed",
         "exploration_battle_wins",
         "dispatch_successes",
+        "public_service_completions",
     }:
         raise ValueError("bounty snapshot contains an invalid target kind")
     if snapshot["target_key"] is not None and (
@@ -254,7 +255,8 @@ def _bounty_snapshot(raw_value: Any) -> dict[str, Any]:
         raise ValueError("bounty snapshot cannot consume a non-inventory target")
     if snapshot["target_kind"] == "production_completed" and snapshot["target_key"] is not None:
         raise ValueError("production bounty snapshot cannot have a target key")
-    if snapshot["target_kind"] != "production_completed" and snapshot["target_key"] is None:
+    keyless_kinds = {"production_completed", "public_service_completions"}
+    if snapshot["target_kind"] not in keyless_kinds and snapshot["target_key"] is None:
         raise ValueError("bounty snapshot target key is required")
     reward = snapshot["reward"]
     if not isinstance(reward, dict) or not reward:
@@ -689,6 +691,20 @@ class AdventuresRepositoryMixin:
             ).fetchone()
             baseline = int(snapshot["baseline_exploration_battle_wins"])
             return max(0, min(target_amount, int(current["count"]) - baseline))
+        if snapshot["target_kind"] == "public_service_completions":
+            # Count distinct public projects served *since this bounty was
+            # accepted*.  A baseline subtraction would double-count wrongly when
+            # the same project is served again after acceptance.
+            current = connection.execute(
+                """
+                SELECT COUNT(DISTINCT c.project_id) AS count
+                FROM livelihood_project_contributions c
+                WHERE c.player_id = ? AND c.contribution_kind = 'service'
+                  AND c.created_at > ?
+                """,
+                (row["id"], str(offer["accepted_at"])),
+            ).fetchone()
+            return max(0, min(target_amount, int(current["count"])))
         if snapshot["target_kind"] == "dispatch_successes":
             rows = connection.execute(
                 """

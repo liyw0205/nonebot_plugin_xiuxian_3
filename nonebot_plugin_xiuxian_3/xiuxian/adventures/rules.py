@@ -19,6 +19,7 @@ _TARGET_KINDS = frozenset(
         "production_completed",
         "exploration_battle_wins",
         "dispatch_successes",
+        "public_service_completions",
     }
 )
 _ACCESS_CONDITION_FIELDS = {
@@ -119,9 +120,10 @@ def bounty_definitions(content: ContentBundle | None = None) -> tuple[BountyDefi
         if "target_key" not in row:
             raise ContentError(f"bounty {key} requires target_key")
         target_key = row.get("target_key")
-        if target_kind == "production_completed":
+        keyless_kinds = {"production_completed", "public_service_completions"}
+        if target_kind in keyless_kinds:
             if target_key is not None:
-                raise ContentError(f"bounty {key} production target_key must be null")
+                raise ContentError(f"bounty {key} {target_kind} target_key must be null")
         else:
             if not isinstance(target_key, str) or not target_key:
                 raise ContentError(f"bounty {key} requires a target_key")
