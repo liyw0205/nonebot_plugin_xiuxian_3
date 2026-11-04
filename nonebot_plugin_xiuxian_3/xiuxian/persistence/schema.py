@@ -1088,6 +1088,43 @@ CREATE TABLE IF NOT EXISTS talent_point_events (
 CREATE INDEX IF NOT EXISTS idx_talent_point_events_player
     ON talent_point_events(player_id, created_at);
 
+CREATE TABLE IF NOT EXISTS talent_reset_plans (
+    plan_id TEXT PRIMARY KEY,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    preview_operation_id TEXT NOT NULL UNIQUE,
+    confirm_operation_id TEXT UNIQUE,
+    path_key TEXT NOT NULL,
+    tree_key TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('pending', 'confirmed', 'cancelled', 'expired')),
+    cost_json TEXT NOT NULL DEFAULT '{}',
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    expires_at TEXT NOT NULL,
+    confirmed_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_talent_reset_plans_player
+    ON talent_reset_plans(player_id, status, created_at);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_talent_reset_plans_pending
+    ON talent_reset_plans(player_id) WHERE status = 'pending';
+
+CREATE TABLE IF NOT EXISTS talent_reset_records (
+    record_id TEXT PRIMARY KEY,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    plan_id TEXT NOT NULL,
+    operation_id TEXT NOT NULL UNIQUE,
+    path_key TEXT NOT NULL,
+    tree_key TEXT NOT NULL,
+    refund_points INTEGER NOT NULL CHECK (refund_points >= 0),
+    node_snapshot_json TEXT NOT NULL DEFAULT '[]',
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_talent_reset_records_player
+    ON talent_reset_records(player_id, created_at);
+
 CREATE TABLE IF NOT EXISTS skill_masteries (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     mastery_id TEXT NOT NULL UNIQUE,

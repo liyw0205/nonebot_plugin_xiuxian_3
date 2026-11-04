@@ -529,6 +529,7 @@ def old_official_manifest() -> bytes:
             "灵兽/互动.json",
             "道具/转修令.json",
             "道途/切换.json",
+            "养成/道脉重置.json",
         }
     ]
     blob = (json.dumps(document, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
@@ -564,6 +565,7 @@ def test_manifest_seed_migrates_when_the_trade_file_is_registered(host: Path) ->
     (host / "data" / "灵兽/互动.json").unlink()
     (host / "data" / "道具/转修令.json").unlink()
     (host / "data" / "道途/切换.json").unlink()
+    (host / "data" / "养成/道脉重置.json").unlink()
     result = deploy(host)
     assert result.returncode == 0, result.stdout + result.stderr
     assert "matchers=1 handlers=1" in result.stdout
@@ -581,6 +583,9 @@ def test_manifest_seed_migrates_when_the_trade_file_is_registered(host: Path) ->
     ).read_bytes()
     assert (host / "data" / "道途/切换.json").read_bytes() == (
         ROOT / "data" / "道途/切换.json"
+    ).read_bytes()
+    assert (host / "data" / "养成/道脉重置.json").read_bytes() == (
+        ROOT / "data" / "养成/道脉重置.json"
     ).read_bytes()
     backup_root = host / ".xiuxian3/backups"
     backups = list(backup_root.glob("deploy-*"))

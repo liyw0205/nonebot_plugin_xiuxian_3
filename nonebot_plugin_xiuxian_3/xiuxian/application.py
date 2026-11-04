@@ -27,6 +27,7 @@ from .adventures.legacy_manor_use_cases import LegacyManorApplication
 from .advancement.use_cases import AdvancementApplication
 from .advancement.constitution_use_cases import ConstitutionApplication
 from .advancement.talent_use_cases import TalentApplication
+from .advancement.reset_use_cases import TalentResetApplication
 from .advancement.skill_use_cases import SkillApplication
 from .advancement.equipment_use_cases import EquipmentApplication
 from .stats.use_cases import StatsApplication
@@ -208,6 +209,7 @@ class XiuxianApplication:
         self.advancement = AdvancementApplication(repository)
         self.constitution = ConstitutionApplication(repository)
         self.talent = TalentApplication(repository)
+        self.talent_reset = TalentResetApplication(repository)
         self.skill = SkillApplication(repository)
         self.equipment = EquipmentApplication(repository)
         self.stats = StatsApplication(repository)
@@ -282,6 +284,9 @@ class XiuxianApplication:
                 path_lines = self._path_switch_help_lines()
                 if path_lines:
                     body += "\n\n" + path_lines
+                reset_lines = self._talent_reset_help_lines()
+                if reset_lines:
+                    body += "\n\n" + reset_lines
             elif category == "生活":
                 dispatch_lines = self._dispatch_help_lines()
                 if dispatch_lines:
@@ -578,6 +583,28 @@ class XiuxianApplication:
                 f"- {command_link('转修道途 法修', '转修道途 法修')}（先预览保留、冻结与清理项）",
                 f"- {command_link('确认转修', '确认转修')}",
                 f"- {command_link('取消转修', '取消转修')}",
+            ]
+            return "\n".join(lines)
+        except Exception:
+            return ""
+
+    def _talent_reset_help_lines(self) -> str:
+        """Describe the first-version talent reset on the cultivation page."""
+
+        try:
+            from .advancement.reset_content import talent_reset_definition
+
+            definition = talent_reset_definition(self.content)
+            content = self.content or bundled_content()
+            realm = content.label("realm", definition.min_realm)
+            lines = [
+                "**道脉重置**",
+                f"> {realm} {definition.min_layer} 层后可重置当前道脉；"
+                f"消耗灵石 {definition.spirit_stone_cost}，"
+                f"返还 {definition.refund_bp // 100}% 已用天赋点。",
+                f"- {command_link('道脉重置预览', '道脉重置预览')}",
+                f"- {command_link('确认道脉重置', '确认道脉重置')}",
+                f"- {command_link('取消道脉重置', '取消道脉重置')}",
             ]
             return "\n".join(lines)
         except Exception:
@@ -1843,6 +1870,27 @@ class XiuxianApplication:
             context,
             lambda: self.talent.unlock(context),
             write_message="当前事件不允许解锁道脉。",
+        )
+
+    async def preview_talent_reset(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.talent_reset.preview(context),
+            write_message="当前事件不允许预览道脉重置。",
+        )
+
+    async def confirm_talent_reset(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.talent_reset.confirm(context),
+            write_message="当前事件不允许确认道脉重置。",
+        )
+
+    async def cancel_talent_reset(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.talent_reset.cancel(context),
+            write_message="当前事件不允许取消道脉重置。",
         )
 
     async def preview_skills(self, context: CommandContext) -> CommandResult:

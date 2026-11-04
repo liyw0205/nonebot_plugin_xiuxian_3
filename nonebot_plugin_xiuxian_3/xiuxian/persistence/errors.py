@@ -2511,3 +2511,39 @@ class PathSwitchTokenMissingError(RuntimeError):
 
 class PathSwitchStateError(RuntimeError):
     """The plan or player state forbids the requested transition."""
+
+
+class TalentResetNotFoundError(RuntimeError):
+    """No pending talent-reset plan exists for the player."""
+
+
+class TalentResetRequirementError(RuntimeError):
+    """The player does not meet the reset stage or realm requirement."""
+
+
+class TalentResetEmptyError(RuntimeError):
+    """The current path has no learned talent nodes to reset."""
+
+
+class TalentResetBusyError(RuntimeError):
+    """A running long action prevents resetting the talent tree."""
+
+
+class TalentResetCooldownError(RuntimeError):
+    """The configured cooldown since the last confirmed reset is not over."""
+
+    def __init__(self, remaining_seconds: int, message: str = "talent reset cooldown") -> None:
+        super().__init__(message)
+        self.remaining_seconds = max(0, int(remaining_seconds))
+
+
+class TalentResetPreviewExpiredError(RuntimeError):
+    """The talent-reset preview expired before confirmation."""
+
+
+class TalentResetConflictError(RuntimeError):
+    """The path or learned nodes changed after the preview."""
+
+
+class TalentResetStateError(RuntimeError):
+    """The plan is in a state that forbids the requested transition."""

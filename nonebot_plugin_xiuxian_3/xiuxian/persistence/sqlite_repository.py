@@ -89,6 +89,7 @@ from ..specials.codex_migration import ensure_codex_schema
 from ..specials.tower_repository import TowerRepositoryMixin
 from ..specials.void_spire_repository import VoidSpireRepositoryMixin
 from ..specials.final_arena_repository import FinalArenaRepositoryMixin
+from ..advancement.reset_repository import TalentResetRepositoryMixin
 from ..device.entity_repository import DeviceRepositoryMixin
 from ..paths.switch_repository import PathSwitchRepositoryMixin
 from ..social.dao_hall_repository import DaoHallRepositoryMixin
@@ -192,6 +193,7 @@ class SQLitePlayerRepository(
     FinalArenaRepositoryMixin,
     DeviceRepositoryMixin,
     PathSwitchRepositoryMixin,
+    TalentResetRepositoryMixin,
     DaoHallRepositoryMixin,
     DaoRouteRepositoryMixin,
     AscensionDayRepositoryMixin,

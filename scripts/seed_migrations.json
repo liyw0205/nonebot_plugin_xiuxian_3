@@ -108,10 +108,11 @@
       "b0ca5c85c3c76df22125961ea45124a7ee7339ece6fc8df4e735834edc50c36a": "215525ccb8d303dde77e7a17bb308feb203941cc:data/内容清单.json",
       "261a0698c958b01aba3a5790fad3382e0a623183ee630c80dc3626f151b9127a": "936e6248ab540f758912c04887b52f68fc427c10:data/内容清单.json",
       "01cb9aeb8975940bdad2dbdb0f0a2d3b6e1db4494e9c7728784761d76911c240": "6585a160cdd760c8ffe91bde95bc7fe132968f5b:data/内容清单.json",
-      "d66b5f5a78982d619ab0dfffe0eae1499b5a204eb44719481a464fbb07e17574": "bb3a31f6972773e33091ba783a1038bf84ada000:data/内容清单.json"
+      "d66b5f5a78982d619ab0dfffe0eae1499b5a204eb44719481a464fbb07e17574": "bb3a31f6972773e33091ba783a1038bf84ada000:data/内容清单.json",
+      "525f2f68ff2ba33502b05e872743ea288562d5060d8014cac4b7b11d5b06af18": "0e9460daef418578253da2f31a3358abc551fd78:data/内容清单.json"
     },
-    "new_sha256": "525f2f68ff2ba33502b05e872743ea288562d5060d8014cac4b7b11d5b06af18",
-    "new_commit": "0e9460daef418578253da2f31a3358abc551fd78"
+    "new_sha256": "35e783428ccbc1ba0a704ce3026268ef5f48588302293af34cc8e8c2fe1cc34d",
+    "new_commit": "PENDING"
   },
   "地图/地点.json": {
     "old_sha256": {
@@ -304,5 +305,10 @@
     "old_sha256": {},
     "new_sha256": "01410d2c4e3487e84190ab7395301eae4579b3079d8e23cced15def66572a60c",
     "new_commit": "0e9460daef418578253da2f31a3358abc551fd78"
+  },
+  "养成/道脉重置.json": {
+    "old_sha256": {},
+    "new_sha256": "9ca44f9ae64ffcb841cda23d5797da132dc940c91200d42bc51c6d1474322d2a",
+    "new_commit": "PENDING"
   }
 }

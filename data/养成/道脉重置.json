@@ -1,0 +1,24 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "talent_reset",
+  "records": [
+    {
+      "key": "talent.reset.standard",
+      "name": "道脉重置",
+      "desc": "洗去当前道途已修的道脉节点，按原消耗返还天赋点，再从第一阶重新修习。",
+      "aliases": [
+        "重置道脉",
+        "洗脉"
+      ],
+      "status": "active",
+      "min_realm": "foundation",
+      "min_layer": 1,
+      "cost": {
+        "currency.spirit_stone": 300
+      },
+      "refund_bp": 10000,
+      "cooldown_seconds": 604800,
+      "preview_ttl_seconds": 900
+    }
+  ]
+}
