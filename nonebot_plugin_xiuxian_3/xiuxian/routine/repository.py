@@ -1213,6 +1213,44 @@ class RoutineRepositoryMixin:
         )
 
     @staticmethod
+    def _honor_counted_operation(
+        connection: sqlite3.Connection,
+        player_id: int,
+        source_event: str,
+        count_event_key: str | None,
+        required_count: int,
+    ) -> str | None:
+        """Return the latest operation once N matching events have accrued."""
+
+        rows = connection.execute(
+            """
+            SELECT source_operation_id, payload_json FROM activity_events
+            WHERE player_id = ? AND event_key = ?
+            ORDER BY occurred_at DESC, id DESC
+            """,
+            (player_id, source_event),
+        ).fetchall()
+        matched = 0
+        latest: str | None = None
+        for row in rows:
+            if count_event_key is not None:
+                try:
+                    payload = json.loads(row["payload_json"])
+                except (TypeError, ValueError):
+                    continue
+                if not isinstance(payload, dict) or payload.get("dispatch_key") != count_event_key:
+                    continue
+                # A settled dispatch that failed does not count as service.
+                if "outcome" in payload and payload.get("outcome") != "success":
+                    continue
+            if latest is None:
+                latest = str(row["source_operation_id"])
+            matched += 1
+        if matched < required_count:
+            return None
+        return latest
+
+    @staticmethod
     def _honor_source_operation(
         connection: sqlite3.Connection,
         player_id: int,
@@ -1454,9 +1492,18 @@ class RoutineRepositoryMixin:
                 raise AchievementAlreadyClaimedError("achievement was already claimed")
             if definition.closed:
                 raise HonorTitleClosedError("achievement content is closed")
-            source_operation_id = self._honor_source_operation(
-                connection, int(row["id"]), definition.source_event
-            )
+            if definition.required_count > 1:
+                source_operation_id = self._honor_counted_operation(
+                    connection,
+                    int(row["id"]),
+                    definition.source_event,
+                    definition.count_event_key,
+                    definition.required_count,
+                )
+            else:
+                source_operation_id = self._honor_source_operation(
+                    connection, int(row["id"]), definition.source_event
+                )
             if source_operation_id is None:
                 raise AchievementNotCompletedError("achievement is not completed")
             reward = achievement_reward(definition)

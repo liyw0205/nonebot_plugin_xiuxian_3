@@ -39,6 +39,7 @@ SHIPPED = (
     "achievement.codex_5",
     "achievement.tower_10",
     "achievement.three_day_checkin",
+    "achievement.dao_service",
 )
 
 
@@ -57,7 +58,7 @@ def test_achievement_content_matches_the_shipped_table() -> None:
     definitions = achievement_definitions(bundle)
     assert tuple(definition.key for definition in definitions) == SHIPPED
     assert definitions == ACHIEVEMENTS
-    assert len(definitions) == 6
+    assert len(definitions) == 7
 
     first = achievement("achievement.first_checkin")
     assert first.label == "首次道历问安"
@@ -129,7 +130,7 @@ def test_third_checkin_achievement_claims_once_after_three_days(tmp_path: Path) 
             status = await runtime.dispatch(_context(user, "honor-status"), "功业录")
             assert status.code == "HONOR_STATUS"
             views = {item["achievement_key"]: item for item in status.data["achievements"]}
-            assert len(status.data["achievements"]) == 6
+            assert len(status.data["achievements"]) == 7
             assert views["achievement.three_day_checkin"]["state"] == "pending"
 
             early = await runtime.dispatch(
@@ -239,6 +240,7 @@ def test_closed_achievement_keeps_claimed_history_and_numbering(
                 4,
                 5,
                 6,
+                7,
             ]
             assert views["achievement.first_checkin"]["state"] == "claimed"
             assert views["achievement.first_craft"]["state"] == "content_closed"

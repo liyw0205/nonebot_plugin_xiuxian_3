@@ -127,6 +127,13 @@
       "source_event": null,
       "hint": "在终局天榜上阶守榜人处取得首胜",
       "status": "active"
+    },
+    {
+      "key": "title.dao_service",
+      "label": "道统执事",
+      "source_event": "routine.claim_achievement",
+      "hint": "累计完成十次道统服务派单",
+      "status": "active"
     }
   ]
 }

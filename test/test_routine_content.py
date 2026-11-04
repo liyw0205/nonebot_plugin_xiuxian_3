@@ -60,6 +60,7 @@ SHIPPED_TITLES = (
     "title.wayfaring.wayfarer",
     "title.wayfaring.licensed",
     "title.final_arena.summit",
+    "title.dao_service",
 )
 
 

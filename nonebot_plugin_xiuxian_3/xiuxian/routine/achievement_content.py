@@ -13,7 +13,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing only, avoids an import cycle
 _NUMERIC_REWARDS = frozenset({"local_reputation", "service_reputation"})
 _REWARD_KEYS = _NUMERIC_REWARDS | {"title_key"}
 _RECORD_FIELDS = frozenset({"key", "label", "source_event", "reward", "status"})
-_OPTIONAL_FIELDS = frozenset({"local_reputation_key"})
+_OPTIONAL_FIELDS = frozenset({"local_reputation_key", "required_count", "count_event_key"})
 _CLAIMABLE_STATUSES = frozenset({"active", "open"})
 _CLOSED_STATUSES = frozenset({"closed"})
 _HIDDEN_STATUSES = frozenset({"locked", "planned"})
@@ -89,6 +89,18 @@ def _parse_achievement(
         raise ContentError(
             f"achievement {key} declares a reputation key without a local reward"
         )
+    required_count = row.get("required_count", 1)
+    if isinstance(required_count, bool) or not isinstance(required_count, int) or required_count < 1:
+        raise ContentError(f"achievement {key} required_count must be a positive integer")
+    count_event_key = row.get("count_event_key")
+    if required_count > 1:
+        # A counted achievement without a filter would count every event of
+        # that name, so the payload key is mandatory.
+        count_event_key = _text(count_event_key, f"count event key {key}")
+    elif count_event_key is not None:
+        raise ContentError(
+            f"achievement {key} declares a count event key without required_count"
+        )
     return AchievementDefinition(
         key=key,
         label=label,
@@ -96,6 +108,8 @@ def _parse_achievement(
         reward=reward,
         local_reputation_key=reputation_key,
         closed=closed,
+        required_count=required_count,
+        count_event_key=count_event_key,
     )
 
 

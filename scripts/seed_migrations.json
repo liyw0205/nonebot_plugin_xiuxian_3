@@ -236,10 +236,11 @@
   },
   "道历/道号.json": {
     "old_sha256": {
-      "8cae9342368e6feb4cb1ff052dab3e7b52784f38adf1bfeb5eef24b5a49d31a0": "e9451c8c1635a2148e04ee288b194a4ea9571935:data/道历/道号.json"
+      "8cae9342368e6feb4cb1ff052dab3e7b52784f38adf1bfeb5eef24b5a49d31a0": "e9451c8c1635a2148e04ee288b194a4ea9571935:data/道历/道号.json",
+      "01fbc101e1b210e8773f08fe99046fc747e43d40a3d4eec1944e4b477795836e": "1f0a93ef4b204a25866ed10ff79590fbea06cb36:data/道历/道号.json"
     },
-    "new_sha256": "01fbc101e1b210e8773f08fe99046fc747e43d40a3d4eec1944e4b477795836e",
-    "new_commit": "6bc01a12f715f49ee42b4f9c11206d84b49fad5e"
+    "new_sha256": "03114804ffbccfbca46b792bdb1605248e893e4b46a18b0d241b93b79374a5da",
+    "new_commit": "PENDING"
   },
   "战斗/实体.json": {
     "old_sha256": {
@@ -272,5 +273,12 @@
     "old_sha256": {},
     "new_sha256": "1502c163dd45e3263c561efb0951c7a67b5134c3d36f3c0c2907a5aaf832c293",
     "new_commit": "5d8493f4b83bbcbe183744c249f465e08b63d73d"
+  },
+  "功业/功业.json": {
+    "old_sha256": {
+      "0927c7ed3add17c2eaad6258de4cb4083d987b3cf37b663e4197fcb8762c88fb": "1f0a93ef4b204a25866ed10ff79590fbea06cb36:data/功业/功业.json"
+    },
+    "new_sha256": "238102202c17d586f865446ecd4ac83f4735e8c1cfd05ea6fd870ba8361e27be",
+    "new_commit": "PENDING"
   }
 }

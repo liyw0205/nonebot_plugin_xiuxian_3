@@ -61,6 +61,9 @@ class AchievementDefinition:
     reward: tuple[tuple[str, int | str], ...]
     local_reputation_key: str | None = None
     closed: bool = False
+    # Counted achievements require N matching events instead of a single one.
+    required_count: int = 1
+    count_event_key: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
