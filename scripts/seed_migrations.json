@@ -112,7 +112,7 @@
       "525f2f68ff2ba33502b05e872743ea288562d5060d8014cac4b7b11d5b06af18": "0e9460daef418578253da2f31a3358abc551fd78:data/内容清单.json"
     },
     "new_sha256": "35e783428ccbc1ba0a704ce3026268ef5f48588302293af34cc8e8c2fe1cc34d",
-    "new_commit": "PENDING"
+    "new_commit": "de47dd4453c9e1123f59ae566f7ff5d4789142db"
   },
   "地图/地点.json": {
     "old_sha256": {
@@ -309,6 +309,6 @@
   "养成/道脉重置.json": {
     "old_sha256": {},
     "new_sha256": "9ca44f9ae64ffcb841cda23d5797da132dc940c91200d42bc51c6d1474322d2a",
-    "new_commit": "PENDING"
+    "new_commit": "de47dd4453c9e1123f59ae566f7ff5d4789142db"
   }
 }
