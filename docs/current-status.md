@@ -640,6 +640,24 @@ operation 重放与重启后状态、QQ Markdown+键盘与 OneBot 降级、帮�
 develop CI（`41649984150`，head `4684250`）quality 3.11/3.12 与 install-smoke 成功，release 按条件跳过。
 未跑全量/压测/部署，未验 QQ 真机，未发版。
 
+计数型功业与「道统执事」称号（`achievement.dao_service` → `title.dao_service`）已在 `develop`
+完成（业务提交 `5e92252`、种子 provenance `b0fbe21`、文档 `881ff35`）：此前功业只有
+「某事件发生过一次」一种口径（`_honor_source_operation` 取该 `source_event` 的第一条记录即算完成），
+「累计十次道统服务」无法表达。本版给功业记录加两个可选字段——`required_count`（默认 1，即旧语义）
+与 `count_event_key`（计数时匹配的 `payload.dispatch_key`，`required_count > 1` 时必填）。校验：
+`required_count` 必须正整数（布尔不算）；>1 而无键视为内容错误（否则同名事件全被计入）；
+=1 却带键也视为错误（避免歧义）。领取路径按次数分流：=1 沿用旧判定，>1 由
+`_honor_counted_operation` 统计 `activity_events` 中该玩家、该 `event_key`、`payload.dispatch_key`
+匹配的行，且 payload 带 `outcome` 时只认 `success`——失败派单不算服务；达标后以**最近一次**
+事件的 `source_operation_id` 作为称号 provenance。内容：`achievement.dao_service`（道统十役，
+`specials.dispatch.settled` + `dispatch.dao_service` + 10 次）奖励 `title.dao_service`（道统执事）。
+聚焦证据：`test_achievement_dao_service.py` 3 passed（内容合同与其余六条保持单次口径；
+9 成功 + 其他派单键 + 1 失败被拒；第 10 次成功后领取得称号且重放幂等；15 次失败始终不可领）；
+回归 `test_achievement_content.py`+`test_routine_content.py`+`test_m9_content_integrity.py`+
+`test_documentation.py` 68 passed（功业 6→7、称号清单与序号钉值同步）、`test_help.py`+
+`test_qq_capabilities.py`+`test_content.py` 19 passed、`test_seed_migration.py
+-k "targets_match or reverse or covers_every"` 9 passed。未跑全量/压测/部署，未验 QQ 真机，未发版。
+
 道统起源服务悬赏 `bounty.dao_origin_service` 已在 `develop` 完成（业务提交 `13d86e2`、
 种子 provenance `cafadbd`、文档 `039165a`）：adventures v0.6 冻结的「完成公共服务 3、12h、
 道统名望 +20、故事图鉴」此前无口径可算——悬赏运行时只有 `inventory_gain`/`production_completed`/
