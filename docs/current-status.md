@@ -640,6 +640,28 @@ operation 重放与重启后状态、QQ Markdown+键盘与 OneBot 降级、帮�
 develop CI（`41649984150`，head `4684250`）quality 3.11/3.12 与 install-smoke 成功，release 按条件跳过。
 未跑全量/压测/部署，未验 QQ 真机，未发版。
 
+道统起源服务悬赏 `bounty.dao_origin_service` 已在 `develop` 完成（业务提交 `13d86e2`、
+种子 provenance `cafadbd`、文档 `039165a`）：adventures v0.6 冻结的「完成公共服务 3、12h、
+道统名望 +20、故事图鉴」此前无口径可算——悬赏运行时只有 `inventory_gain`/`production_completed`/
+`exploration_battle_wins`/`dispatch_successes` 四种进度。本版新增第五种
+`public_service_completions` 与对应记录（合道 L1、43200 秒、每日 1 次、目标 3、
+奖励池 `reward_pool.bounty.void_anchoring`、`local.dao_service` 名望）。进度语义：
+统计接取**之后**、`contribution_kind='service'` 的**不同公共项目数**——资源贡献不计、
+同一项目重复只计一次、接取前的历史服务不计（窗口 `created_at > accepted_at`，与
+`dispatch_successes` 一致）。刻意不用「基线相减」：distinct 计数配基线在「接取后再次服务同一项目」
+时会算少，实测已暴露并修正。`target_key` 刻意为空，校验器与运行时快照校验都把该种与
+`production_completed` 一并按 keyless 处理——实测公共项目只有 `project.town_well`/
+`project.market_road`/`project.herb_garden`/`project.domain_refuge`/`project.abyss_purification`/
+`project.ancestral_habitat` 六个，固定项目键会让其余服务无法计入，编造 `project.dao_settlement`
+则完全不可玩。聚焦证据：`test_bounty_origin_service_content.py` 9 passed（合同数值、
+未注册 kind 拒绝、`target_key` 必须为空、金额/时长/次数/名望/奖励池等八类拒绝）、
+`test_bounty_origin_service.py` 3 passed（接取目标 3 进度 0、资源贡献不计、同项目去重、
+接取前历史不计、三个不同项目后 3/3、未完成领取被拒、完成领取一次且重放幂等、非合道被拒）；
+回归 `test_bounty_batch.py`+`test_bounty_output_batch.py` 6 passed、
+`test_content.py`+`test_m9_content_integrity.py`+`test_documentation.py`+`test_help.py` 22 passed
+（悬赏钉值 41→42 已同步）、`test_seed_migration.py -k "targets_match or reverse or covers_every"`
+9 passed。未跑全量/压测/部署，未验 QQ 真机，未发版。
+
 虚空物资寄售 `market.void_material` 已在 `develop` 完成（业务提交 `5d8493f`、种子 provenance `ac4736f`、
 文档 `0946bc8`）：economy v0.5 冻结的「炼虚或声望 500 准入、6h、手续费 800 bp、过期解锁」此前零数据、
 零表、零命令，通用摆摊与拍卖都不提供「寄售锁定 + 到期退还 + 8% 手续费」。新增
