@@ -81,8 +81,10 @@ def test_constitution_preview_selection_and_profile_are_idempotent() -> None:
             user = "constitution-select"
             preview = await runtime.dispatch(_context(user, "preview"), "体质预览")
             assert preview.ok
-            assert all(label in preview.message for label in ("铁骨", "灵根", "风行", "巧手", "福缘"))
-            assert "御兽" not in preview.message
+            assert all(
+                label in preview.message
+                for label in ("铁骨", "灵根", "风行", "巧手", "福缘", "御兽")
+            )
 
             before = await runtime.dispatch(_context(user, "before"), "选择体质 铁骨")
             assert before.code == "PLAYER_NOT_FOUND"

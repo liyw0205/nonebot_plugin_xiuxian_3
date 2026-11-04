@@ -172,6 +172,80 @@ class CompanionApplication:
             data={"instance_id": record.companion.instance_id, "level": record.companion.level, "experience": record.companion.experience, "spent": record.spent, "idempotent_replay": record.already_completed},
         )
 
+    async def company(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) != 1:
+            return CommandResult(
+                False,
+                "INVALID_COMPANION_COMMAND",
+                "请指定要相伴的灵兽名称或编号。",
+                context.request_id,
+            )
+        operation_id = self._operation_id(context, "companion.company")
+        try:
+            record = await self.repository.company_companion(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                companion_ref=context.command_args[0],
+                operation_id=operation_id,
+            )
+        except CompanionNotFoundError:
+            return CommandResult(False, "COMPANION_NOT_FOUND", "没有找到这只灵兽。", context.request_id, operation_id)
+        except CompanionInjuredError:
+            return CommandResult(
+                False,
+                "COMPANION_RESTING",
+                "灵兽正在休养，暂不能相伴。",
+                context.request_id,
+                operation_id,
+            )
+        except CompanionRequirementError:
+            return CommandResult(
+                False,
+                "COMPANION_COMPANY_SPENT",
+                "今日已与灵兽相伴过了，明日再来。",
+                context.request_id,
+                operation_id,
+            )
+        except ResourceInsufficientError:
+            return CommandResult(
+                False,
+                "COMPANION_COMPANY_INSUFFICIENT",
+                "体力不足，未与灵兽相伴。",
+                context.request_id,
+                operation_id,
+            )
+        except (PlayerNotFoundError, PlayerSuspendedError):
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有可用的修仙角色。", context.request_id, operation_id)
+        except OperationConflictError:
+            return CommandResult(
+                False,
+                "OPERATION_CONFLICT",
+                "这次相伴请求已用于其他操作，请重新发起。",
+                context.request_id,
+                operation_id,
+            )
+        except Exception:
+            return CommandResult(
+                False,
+                "PERSISTENCE_ERROR",
+                "仙缘簿暂时不可用，请稍后再试。",
+                context.request_id,
+                operation_id,
+                retryable=True,
+            )
+        return CommandResult(
+            True,
+            "COMPANION_COMPANIED",
+            f"## 相伴有时\n\n**{record.companion.name}**的亲和来到 {record.companion.affinity}。",
+            context.request_id,
+            operation_id,
+            data={
+                "instance_id": record.companion.instance_id,
+                "affinity": record.companion.affinity,
+                "idempotent_replay": record.already_completed,
+            },
+        )
+
     async def rest(self, context: CommandContext) -> CommandResult:
         if len(context.command_args) != 1:
             return CommandResult(False, "INVALID_COMPANION_COMMAND", "请指定要休养的灵兽名称或编号。", context.request_id)

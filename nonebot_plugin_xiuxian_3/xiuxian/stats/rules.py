@@ -182,7 +182,7 @@ def _constitution_bonus(effect: Mapping[str, Any] | None) -> dict[str, int]:
     value = _nonnegative_integer(effect.get("value"), "constitution.value")
     if effect_type in _CONSTITUTION_STATS:
         return {_CONSTITUTION_STATS[effect_type]: value}
-    if effect_type not in {"production_quality_bp", "drop_weight_bp"}:
+    if effect_type not in {"production_quality_bp", "drop_weight_bp", "beast_affinity"}:
         raise ValueError("constitution effect is unsupported")
     return {}
 

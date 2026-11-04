@@ -141,7 +141,8 @@ _HELP_PAGES = {
         f"选定后{command_link('接受派遣', '接受派遣')}填写任务名，到期再{command_link('结算派遣', '结算派遣')}。\n\n"
         f"{command_link('每日修行', '每日修行')}记下日常安排，"
         f"{command_link('道历问安', '道历问安')}领取当日问安所得。\n\n"
-        f"{command_link('灵兽状态', '灵兽状态')}可查看同行灵兽与灵骑。"
+        f"{command_link('灵兽状态', '灵兽状态')}可查看同行灵兽与灵骑；"
+        f"{command_link('灵兽相伴', '灵兽相伴')}填写灵兽名或编号可与它静处，每日一次，御兽体质另有加成。"
         f"行囊和鞍具可先查{command_link('生产预览 小型灵兽行囊', '生产预览 小型灵兽行囊')}"
         f"或{command_link('生产预览 竹鹿鞍具', '生产预览 竹鹿鞍具')}；"
         f"制成后用{command_link('装备灵具', '装备灵具')}填写灵兽号与灵具名。\n\n"
@@ -1868,6 +1869,11 @@ class XiuxianApplication:
 
     async def feed_companion(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.companions.feed(context), write_message="当前事件不允许喂养灵兽。")
+
+    async def company_companion(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context, lambda: self.companions.company(context), write_message="当前事件不允许与灵兽相伴。"
+        )
 
     async def rest_companion(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.companions.rest(context), write_message="当前事件不允许休养灵兽。")

@@ -367,6 +367,9 @@ def register_core_commands(router: CommandRouter, application: XiuxianApplicatio
     router.register("灵兽状态", application.get_companion_status, aliases=("灵骑状态", "我的灵兽"))
     router.register("结缘灵兽", application.bond_companion, aliases=("结缘灵骑",))
     router.register("喂养灵兽", application.feed_companion, aliases=("喂灵兽",))
+    router.register(
+        "灵兽相伴", application.company_companion, aliases=("相伴灵兽", "陪伴灵兽")
+    )
     router.register("休养灵兽", application.rest_companion)
     router.register("装备灵具", application.equip_companion_gear)
     router.register("蜕变灵兽", application.evolve_companion, aliases=("灵兽蜕变",))

@@ -30,9 +30,19 @@ from ..utils.assets import (
     spend_player_assets,
     spend_player_items,
 )
+from ..advancement.constitution_effects import constitution_effect_snapshot
 from ..utils.json_cache import decode_json_strict
+from .interaction_content import (
+    affinity_gain,
+    companion_interaction_definition,
+)
 from ..utils.operations import operation_replay
-from ..utils.player import PLAYER_NUMERIC_FIELDS, player_field
+from ..utils.player import (
+    PLAYER_NUMERIC_FIELDS,
+    change_player_state,
+    player_field,
+    player_integer,
+)
 from .models import CompanionMutationRecord, CompanionSnapshot, CompanionStatusRecord, CompanionView
 from .rules import (
     CompanionDefinition,
@@ -334,6 +344,86 @@ class CompanionRepositoryMixin:
                 str(instance["instance_id"]),
                 now_text,
                 spent=spent,
+            )
+
+    async def company_companion(
+        self,
+        platform: str,
+        platform_user_id: str,
+        companion_ref: str,
+        operation_id: str,
+    ) -> CompanionMutationRecord:
+        return await asyncio.to_thread(
+            self._company_companion_sync,
+            platform,
+            platform_user_id,
+            companion_ref,
+            operation_id,
+        )
+
+    def _company_companion_sync(
+        self, platform: str, platform_user_id: str, companion_ref: str, operation_id: str
+    ) -> CompanionMutationRecord:
+        definition = companion_interaction_definition("interaction.companion.company", getattr(self, "content", None))
+        operation_name = "companion.company"
+        request_hash = self._request_hash(
+            operation_name,
+            {
+                "platform": platform,
+                "platform_user_id": platform_user_id,
+                "companion_ref": companion_ref,
+            },
+        )
+        now_text = serialize_datetime(self._now())
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            replay = self._companion_operation(connection, operation_id, operation_name, request_hash)
+            if replay is not None:
+                return self._mutation_from_payload(replay, replay=True)
+            player = self._require_player(connection, platform, platform_user_id)
+            instance = self._find_instance(connection, player["id"], companion_ref)
+            status = str(instance["status"])
+            if status == "retired":
+                raise CompanionNotFoundError("companion is retired")
+            if status in {"injured", "resting"}:
+                raise CompanionInjuredError("companion is resting")
+            used_today = int(
+                connection.execute(
+                    "SELECT COUNT(*) FROM operations WHERE player_id = ? AND operation_name = ? "
+                    "AND substr(created_at, 1, 10) = substr(?, 1, 10)",
+                    (player["id"], operation_name, now_text),
+                ).fetchone()[0]
+            )
+            if used_today >= definition.daily_limit:
+                raise CompanionRequirementError("companion company is already spent today")
+            if player_integer(player, "stamina") < definition.stamina_cost:
+                raise ResourceInsufficientError("stamina is insufficient")
+            effect = constitution_effect_snapshot(connection, int(player["id"]))
+            gain = affinity_gain(definition, effect)
+            current = int(instance["affinity"])
+            updated_affinity = min(definition.affinity_cap, current + gain)
+            granted = updated_affinity - current
+            if definition.stamina_cost:
+                change_player_state(
+                    connection,
+                    player,
+                    updated_at=now_text,
+                    value_delta={"stamina": -definition.stamina_cost},
+                )
+            connection.execute(
+                "UPDATE companion_instances SET affinity = ?, updated_at = ? WHERE id = ?",
+                (updated_affinity, now_text, instance["id"]),
+            )
+            return self._store_companion_operation(
+                connection,
+                operation_id,
+                operation_name,
+                request_hash,
+                player,
+                str(instance["instance_id"]),
+                now_text,
+                spent={},
+                outcome="companion_company" if granted else "companion_company_capped",
             )
 
     def _rest_companion_sync(

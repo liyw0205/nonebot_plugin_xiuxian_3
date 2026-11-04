@@ -1,0 +1,22 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "companion_interaction",
+  "records": [
+    {
+      "key": "interaction.companion.company",
+      "name": "灵兽相伴",
+      "desc": "陪灵兽静处一段时光，缓缓增进亲和；御兽体质会额外提升这份亲近。",
+      "aliases": [
+        "相伴灵兽",
+        "陪伴灵兽"
+      ],
+      "base_affinity": 3,
+      "constitution_effect": "beast_affinity",
+      "affinity_per_constitution_point": 1,
+      "affinity_cap": 100,
+      "stamina_cost": 10,
+      "daily_limit": 1,
+      "status": "active"
+    }
+  ]
+}

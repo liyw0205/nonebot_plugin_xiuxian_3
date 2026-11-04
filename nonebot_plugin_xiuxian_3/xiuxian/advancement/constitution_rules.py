@@ -14,6 +14,7 @@ CONSUMED_EFFECT_TYPES = frozenset(
         "initiative_bp",
         "production_quality_bp",
         "drop_weight_bp",
+        "beast_affinity",
     }
 )
 

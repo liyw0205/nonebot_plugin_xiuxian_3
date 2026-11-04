@@ -6,7 +6,10 @@
       "status": "active",
       "desc": "淬炼体魄，提升气血上限。",
       "quality": "common",
-      "effect": {"type": "max_hp_bp", "value": 300},
+      "effect": {
+        "type": "max_hp_bp",
+        "value": 300
+      },
       "selection": "single_main_constitution",
       "key": "constitution.iron_bone"
     },
@@ -15,7 +18,10 @@
       "status": "active",
       "desc": "灵力易感，提升灵力上限。",
       "quality": "common",
-      "effect": {"type": "max_mana_bp", "value": 300},
+      "effect": {
+        "type": "max_mana_bp",
+        "value": 300
+      },
       "selection": "single_main_constitution",
       "key": "constitution.spirit_root"
     },
@@ -24,7 +30,10 @@
       "status": "active",
       "desc": "身法轻灵，提升先手。",
       "quality": "common",
-      "effect": {"type": "initiative_bp", "value": 300},
+      "effect": {
+        "type": "initiative_bp",
+        "value": 300
+      },
       "selection": "single_main_constitution",
       "key": "constitution.wind_step"
     },
@@ -33,16 +42,22 @@
       "status": "active",
       "desc": "熟于火候，提升生产质量。",
       "quality": "common",
-      "effect": {"type": "production_quality_bp", "value": 300},
+      "effect": {
+        "type": "production_quality_bp",
+        "value": 300
+      },
       "selection": "single_main_constitution",
       "key": "constitution.craft_hand"
     },
     {
       "name": "御兽",
-      "status": "locked",
+      "status": "active",
       "desc": "亲近灵兽，提升灵兽亲和。",
       "quality": "common",
-      "effect": {"type": "beast_affinity", "value": 5},
+      "effect": {
+        "type": "beast_affinity",
+        "value": 5
+      },
       "selection": "single_main_constitution",
       "key": "constitution.beast_affinity"
     },
@@ -51,7 +66,10 @@
       "status": "active",
       "desc": "机缘相随，提升非保底掉落权重。",
       "quality": "common",
-      "effect": {"type": "drop_weight_bp", "value": 300},
+      "effect": {
+        "type": "drop_weight_bp",
+        "value": 300
+      },
       "selection": "single_main_constitution",
       "key": "constitution.fortune_seed"
     }
