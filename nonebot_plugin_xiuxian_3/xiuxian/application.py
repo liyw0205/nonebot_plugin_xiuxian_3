@@ -52,6 +52,7 @@ from .economy.use_cases import EconomyApplication
 from .economy.cross_realm_trade_use_cases import CrossRealmTradeApplication
 from .economy.void_market_use_cases import VoidMarketApplication
 from .device.entity_use_cases import DeviceApplication
+from .paths.switch_use_cases import PathSwitchApplication
 from .social.dao_hall_use_cases import DaoHallApplication
 from .social.dao_route_use_cases import DaoRouteApplication
 from .events.ascension_day_use_cases import AscensionDayApplication
@@ -232,6 +233,7 @@ class XiuxianApplication:
         self.cross_realm_trade = CrossRealmTradeApplication(repository)
         self.void_market = VoidMarketApplication(repository)
         self.device = DeviceApplication(repository)
+        self.path_switch = PathSwitchApplication(repository)
         self.dao_hall = DaoHallApplication(repository)
         self.dao_route = DaoRouteApplication(repository)
         self.ascension_day = AscensionDayApplication(repository)
@@ -276,6 +278,10 @@ class XiuxianApplication:
                 ascension_lines = self._ascension_day_help_lines()
                 if ascension_lines:
                     body += "\n\n" + ascension_lines
+            elif category == "修炼":
+                path_lines = self._path_switch_help_lines()
+                if path_lines:
+                    body += "\n\n" + path_lines
             elif category == "生活":
                 dispatch_lines = self._dispatch_help_lines()
                 if dispatch_lines:
@@ -545,6 +551,34 @@ class XiuxianApplication:
                 )
             if len(lines) == 2:
                 return ""
+            return "\n".join(lines)
+        except Exception:
+            return ""
+
+    def _path_switch_help_lines(self) -> str:
+        """Describe the first-stage path switch on the cultivation page.
+
+        Help rendering stays best-effort: content failures fall back to the
+        static page body and never block command dispatch.
+        """
+
+        try:
+            from .paths.switch_content import path_switch_definition
+
+            definition = path_switch_definition(self.content)
+            content = self.content or bundled_content()
+            realm = content.label("realm", definition.min_realm)
+            cost = f"灵石 {definition.spirit_stone_cost}"
+            token = content.label("item", definition.token_item_key)
+            lines = [
+                "**道途转修**",
+                f"> {realm} {definition.min_layer} 层后可重择首要道途；"
+                f"需 {cost} 与 {token} ×{definition.token_quantity}。",
+                f"- {command_link('领取转修令', '领取转修令')}（每名角色一次）",
+                f"- {command_link('转修道途 法修', '转修道途 法修')}（先预览保留、冻结与清理项）",
+                f"- {command_link('确认转修', '确认转修')}",
+                f"- {command_link('取消转修', '取消转修')}",
+            ]
             return "\n".join(lines)
         except Exception:
             return ""
@@ -2209,6 +2243,34 @@ class XiuxianApplication:
             context,
             lambda: self.device.repair(context),
             write_message="当前事件不允许维修机关。",
+        )
+
+    async def claim_path_switch_token(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.path_switch.claim_token(context),
+            write_message="当前事件不允许请领转修令。",
+        )
+
+    async def preview_path_switch(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.path_switch.preview(context),
+            write_message="当前事件不允许预览转修。",
+        )
+
+    async def confirm_path_switch(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.path_switch.confirm(context),
+            write_message="当前事件不允许确认转修。",
+        )
+
+    async def cancel_path_switch(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.path_switch.cancel(context),
+            write_message="当前事件不允许取消转修。",
         )
 
     async def create_auction(self, context: CommandContext) -> CommandResult:

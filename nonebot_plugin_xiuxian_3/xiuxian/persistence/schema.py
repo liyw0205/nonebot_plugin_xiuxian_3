@@ -3047,4 +3047,27 @@ CREATE TABLE IF NOT EXISTS dao_route_state (
     updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS path_switch_plans (
+    plan_id TEXT PRIMARY KEY,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    preview_operation_id TEXT NOT NULL UNIQUE,
+    confirm_operation_id TEXT UNIQUE,
+    from_path_key TEXT NOT NULL,
+    to_path_key TEXT NOT NULL,
+    to_subprofession_key TEXT,
+    status TEXT NOT NULL CHECK (status IN ('pending', 'confirmed', 'cancelled', 'expired')),
+    cost_json TEXT NOT NULL DEFAULT '{}',
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    expires_at TEXT NOT NULL,
+    confirmed_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_path_switch_plans_player
+    ON path_switch_plans(player_id, status, created_at);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_path_switch_plans_pending
+    ON path_switch_plans(player_id) WHERE status = 'pending';
+
 """

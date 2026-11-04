@@ -1,0 +1,28 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "path_switch",
+  "records": [
+    {
+      "key": "path.switch.standard",
+      "name": "道途转修",
+      "desc": "筑基之后重择首要道途：旧道脉、旧神通与旧装备保留留档，新道途下另起修行。",
+      "aliases": [
+        "转修道途",
+        "转修",
+        "道途转修"
+      ],
+      "status": "active",
+      "min_realm": "foundation",
+      "min_layer": 1,
+      "token_claim_realm": "foundation",
+      "token_claim_layer": 1,
+      "cost": {
+        "currency.spirit_stone": 500,
+        "item.token.path_respec": 1
+      },
+      "cooldown_seconds": 604800,
+      "preview_ttl_seconds": 900,
+      "status_label": "可转修"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "item",
+  "records": [
+    {
+      "key": "item.token.path_respec",
+      "name": "洗心转道令",
+      "desc": "洗去旧道痕迹的凭令。筑基之后，可凭此令与五百灵石重择首要道途；旧道脉与旧神通仍留档，回到旧道时方可再用。",
+      "item_type": "token",
+      "quality": "common",
+      "stack_limit": 1,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [],
+      "requirements": [],
+      "status": "active"
+    }
+  ]
+}

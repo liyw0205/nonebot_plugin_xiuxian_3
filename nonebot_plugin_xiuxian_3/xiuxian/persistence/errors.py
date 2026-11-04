@@ -2467,3 +2467,47 @@ class VoidMaterialFundsError(RuntimeError):
 
 class VoidMaterialStateError(RuntimeError):
     """The listing is in a state that forbids the requested transition."""
+
+
+class PathSwitchNotFoundError(RuntimeError):
+    """No pending path-switch plan exists for the player."""
+
+
+class PathSwitchRequirementError(RuntimeError):
+    """The player does not meet the switch realm or stage requirement."""
+
+
+class PathSwitchConflictError(RuntimeError):
+    """Endgame or long-action state forbids switching the primary path."""
+
+
+class PathSwitchBusyError(RuntimeError):
+    """A running long action prevents switching the primary path."""
+
+
+class PathSwitchCooldownError(RuntimeError):
+    """The configured cooldown since the last confirmed switch is not over."""
+
+    def __init__(self, remaining_seconds: int, message: str = "path switch cooldown") -> None:
+        super().__init__(message)
+        self.remaining_seconds = max(0, int(remaining_seconds))
+
+
+class PathSwitchPreviewExpiredError(RuntimeError):
+    """The preview plan expired before it was confirmed."""
+
+
+class PathSwitchTokenClaimedError(RuntimeError):
+    """The one-time switch token has already been claimed."""
+
+
+class PathSwitchInvalidError(RuntimeError):
+    """The requested target path or sub-profession is invalid."""
+
+
+class PathSwitchTokenMissingError(RuntimeError):
+    """The switch token is missing from the inventory."""
+
+
+class PathSwitchStateError(RuntimeError):
+    """The plan or player state forbids the requested transition."""

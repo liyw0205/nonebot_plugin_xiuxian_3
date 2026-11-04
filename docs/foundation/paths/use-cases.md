@@ -4,8 +4,11 @@
 
 - `select_path(player_id, path_key_or_name_or_alias, subprofession_key_or_name_or_alias, operation_id)` ->
   稳定道途/辅修键、当前内容名称和入门所得；辅修在入道事务中一并选择。
-- `preview_path_switch(player_id, new_path_key)` -> `SwitchPlan`，只读。
-- `confirm_path_switch(plan_id, operation_id)` -> 新道途和状态快照。
+- `preview_path_switch(player_id, target_path, subprofession, operation_id)` -> 冻结计划；
+  已接入首阶段转修，费用与期限见 `content-v0.7.md`。
+- `confirm_path_switch(plan_id, operation_id)` -> 扣除令牌与灵石后的新道途和状态快照；
+  同 operation 回放冻结结果。
+- `cancel_path_switch(operation_id)` -> 取消最新待确认计划，不扣资产。
 - 独立 `select_subprofession` 尚未接入；生产辅修记录仍由既有生产用例维护，不在本切片新增入口。
 - `settle_subprofession_action(order_id, operation_id)` -> 熟练度和生产结果。
 

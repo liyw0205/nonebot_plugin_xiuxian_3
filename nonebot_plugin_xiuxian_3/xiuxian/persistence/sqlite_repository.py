@@ -90,6 +90,7 @@ from ..specials.tower_repository import TowerRepositoryMixin
 from ..specials.void_spire_repository import VoidSpireRepositoryMixin
 from ..specials.final_arena_repository import FinalArenaRepositoryMixin
 from ..device.entity_repository import DeviceRepositoryMixin
+from ..paths.switch_repository import PathSwitchRepositoryMixin
 from ..social.dao_hall_repository import DaoHallRepositoryMixin
 from ..social.dao_route_repository import DaoRouteRepositoryMixin
 from ..events.ascension_day_repository import AscensionDayRepositoryMixin
@@ -190,6 +191,7 @@ class SQLitePlayerRepository(
     VoidSpireRepositoryMixin,
     FinalArenaRepositoryMixin,
     DeviceRepositoryMixin,
+    PathSwitchRepositoryMixin,
     DaoHallRepositoryMixin,
     DaoRouteRepositoryMixin,
     AscensionDayRepositoryMixin,

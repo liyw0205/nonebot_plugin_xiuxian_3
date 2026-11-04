@@ -2,7 +2,7 @@
 
 ## PathBuild
 
-`player_id`、`path_key`、`path_level`、`active_traits`、`state_payload`、`switch_count`、`last_switch_at`。
+`player_id`、`path_key`、`path_level`、`active_traits`、`state_payload`。
 
 `path_key` 首版取：`body` 体修、`spell` 法修、`device` 器修、`demonic` 魔修、`beast` 妖修、`support` 辅修。
 
@@ -19,9 +19,15 @@
 开放内容，锁定记录不参与新入道。
 
 公开的 `选择道途` 在同一 application 事务中解析稳定键、名称或别名，并在选择辅修时一并保存两个稳定键。
-入道回执和资料展示按当前内容读取名称，玩家记录不保存展示文案。当前未接入独立的辅修选择或道途切换用例，
-也不在本切片改变道途战斗效果。
+入道回执和资料展示按当前内容读取名称，玩家记录不保存展示文案。首阶段道途切换已接入：
+`path_switch_plans` 保存预览计划与确认结果，`players.path_key`/`subprofession_key` 是唯一
+生效状态，旧道脉/神通/装备作为历史保留并由各自消费者按当前路径过滤。独立 `select_subprofession`
+仍未接入，道途切换不改变战斗引擎或道途战斗效果。
 
 ## SwitchPlan
 
 保存旧道途、新道途、保留项、冻结项、转化项、清理项、费用、有效期、确认状态和 operation ID。
+
+首阶段实现使用 `path_switch_plans`：`plan_id`、`player_id`、预览/确认 operation、旧/新道途、
+目标辅修、`pending/confirmed/cancelled/expired` 状态、费用与快照 JSON、过期时间与确认时间。
+切换次数与最近切换时间由该表历史推导，不另加 `players` 列。
