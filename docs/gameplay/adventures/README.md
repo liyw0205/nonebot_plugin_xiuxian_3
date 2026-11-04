@@ -191,3 +191,11 @@ v0.6 `story.mainline.dao_echoes` 已开放玩家流程：炼虚 L10 后可查询
 因此过期只返还体力。专项测试 `test/test_secret_realm_expansion.py` 覆盖内容合同与坏引用拒绝、
 预览可进入标记/单入口按钮/OneBot 降级、探索帮助列表、首通/周限/重复池/过期退款、
 祖灵支脉重启续跑与结算幂等。
+
+## 道统起源服务悬赏（v0.7）
+
+`data/任务/悬赏.json` 的 `bounty.dao_origin_service` 承接 adventures v0.6：
+合道 L1、12 小时、每日一次，接取后对三个不同公共项目完成 `service` 贡献即达成，
+给既有道统向奖励与 `local.dao_service` 名望。进度口径 `public_service_completions` 为本版新增：
+只计接取之后、`contribution_kind='service'`、按项目去重。`target_key` 为空是刻意设计——
+公共项目有六个，固定一个会让其余服务无法计入。完整说明见 [content-v0.7.md](content-v0.7.md)。

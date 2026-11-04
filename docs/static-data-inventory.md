@@ -176,6 +176,7 @@ data/
 | `道途/道途.json` | 六大道途、被动、主动技能和状态资源 | `foundation/paths/content-v0.1.md` |
 | `技能/技能.json` | 基础攻击、六大道途在九境各自的稳定攻势与战术备选（108 条）、敌方技能及天劫阶段技能；技能名按招式意象命名，战斗消费器结算爆发、辅御、持续、削弱、蓄力、中毒、灼烧和反伤，高阶备选要求悬赏可得的传承残卷 | `gameplay/combat/content-v0.1.md`、`gameplay/combat/workflow.md` |
 | `事件/飞升日.json` | 飞升日展示口径：24 小时窗口、三榜键、新篇章入口，强制 `allow_assets: false` | `gameplay/events/content-v0.7.md` |
+| `任务/悬赏.json` | 悬赏定义（含本版新增 `bounty.dao_origin_service`：合道 L1、12 小时、三次公共服务、道统名望） | `gameplay/adventures/content-v0.7.md` |
 | `经济/虚空物资寄售.json` | 虚空物资寄售：炼虚/功勋准入、6 小时挂单、800 bp 手续费、可寄售白名单（须可交易且非绑定） | `gameplay/economy/content-v0.8.md` |
 | `社交/道侣协作.json` | 道侣终局协作：终局未锁准入、助战胜利计数、双方各领世界功勋与普通材料，终局资产禁发 | `gameplay/social/content-v0.9.md` |
 | `社交/道统路线.json` | 道统议事准入（宗门等级/合道/三票/公共功勋 1000）、周期与锁定期，以及守界/飞升/留界三线的加成键与数值 | `gameplay/social/content-v0.8.md` |
