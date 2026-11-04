@@ -661,6 +661,26 @@ develop CI（`41649984150`，head `4684250`）quality 3.11/3.12 与 install-smok
 `test_help.py`+`test_qq_capabilities.py` 9 passed、全库 `ast.parse(feature_version=(3,11))` 0 错误、
 种子最小用例 9 passed。未跑全量/压测/部署，未验 QQ 真机，未发版。
 
+道途转修首阶段（`path.switch.standard`）已在 `develop` 完成（业务提交 `0e9460d`、种子 provenance
+`2b2940a`、文档本行）：此前 v0.1 合同、`workflow.md` 与 `use-cases.md` 已冻结两阶段切换，
+`item.token.change_path` 只是 `admin_only` 占位，全包没有 `preview_path_switch`/
+`confirm_path_switch`/`SwitchPlan` 实现，首要道途选错后无法更改。本版补 `data/道途/切换.json`
+与 `data/道具/转修令.json`：筑基 L1 可 `领取转修令`（7 天领取冷却、同时最多 1 枚、绑定不可交易），
+`转修道途 <道途> [辅修]` 生成 15 分钟冻结预览，`确认转修` 同事务扣 500 灵石与 1 枚令并更新
+`path_key`/`subprofession_key`，`取消转修` 零扣；`path_switch_plans` 每角色只保留一个 pending 计划。
+旧道脉/神通/装备保留，新道途下由既有消费者按当前路径过滤，切回旧道途恢复；离开辅修清空
+`subprofession_key`，进入辅修须选采矿/烹饪/炼丹/炼器/布阵之一；已选领域或已得道果返回
+`PATH_SWITCH_CONFLICT`。缺令、灵石不足、计划过期、长动作、状态冲突、冷却分别零写；同 operation
+重放冻结结果，不同 operation 复用已确认计划返回 `PATH_SWITCH_STATE`。聚焦证据：
+`test_path_switch.py` 8 passed（内容合同与拒绝变体、领取/冷却、预览/确认/取消、回放、过期、
+灵石不足、领域冲突、辅修进入/离开、旧道脉/神通保留、重启、QQ 帮助）；回归
+`test_path_content.py`、`test_talent.py`、`test_help.py`、`test_documentation.py`、
+`test_content.py`、`test_m9_content_integrity.py` 35 passed，`test_qq_capabilities.py` 8 passed，
+种子受影响组 4 passed；`git diff --check` 与 3.11 ast 0 错误。develop CI `41913447412`
+（head `2b2940a`）的 quality 3.11/3.12 与 install-smoke 全部成功，release 按条件跳过；
+main 已先以 `--ff-only` 同步 `cb5d267` 并通过 CI `41909472659`。未跑全量/压测/部署，
+未验 QQ 真机，未发版。
+
 计数型功业与「道统执事」称号（`achievement.dao_service` → `title.dao_service`）已在 `develop`
 完成（业务提交 `5e92252`、种子 provenance `b0fbe21`、文档 `881ff35`）：此前功业只有
 「某事件发生过一次」一种口径（`_honor_source_operation` 取该 `source_event` 的第一条记录即算完成），
