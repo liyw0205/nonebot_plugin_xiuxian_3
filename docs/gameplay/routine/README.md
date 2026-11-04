@@ -149,3 +149,10 @@ operation 和唯一约束；图鉴五条首见、首次派遣及试炼塔十层�
 
 `WayfaringPass`：角色、行卷键、起止业务日、状态、规则快照、积分、日周计入量和两条奖励线的已领取等级。
 规则快照包含来源、奖励、展示名及地方名望上限，不保存内容或规则版本标识。
+
+## 计数型功业（v0.9）
+
+`data/功业/功业.json` 的 `achievement.dao_service` 是第一条按次数累积的功业：需要十次
+`dispatch.dao_service` **成功**结算，领取后授予 `title.dao_service`（道统执事）。
+记录用 `required_count` + `count_event_key` 表达，运行时只统计 `payload.dispatch_key`
+匹配且 `outcome == 'success'` 的事件。字段与校验细节见 [content-v0.9.md](content-v0.9.md)。
