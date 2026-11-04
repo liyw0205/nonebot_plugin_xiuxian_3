@@ -640,6 +640,27 @@ operation 重放与重启后状态、QQ Markdown+键盘与 OneBot 降级、帮�
 develop CI（`41649984150`，head `4684250`）quality 3.11/3.12 与 install-smoke 成功，release 按条件跳过。
 未跑全量/压测/部署，未验 QQ 真机，未发版。
 
+灵兽相伴与御兽体质（`interaction.companion.company` / `constitution.beast_affinity`）已在
+`develop` 完成（业务提交 `bb3a31f`、种子 provenance `19c12e1`、文档 `43ae56d`）：此前
+`companion_instances.affinity` 只被蜕变的 `required_affinity` 读取，全库**没有任何增长路径**，
+御兽体质也长期 `locked` 且效果无消费者，亲和这条链完全不可达。本版补 `data/灵兽/互动.json`
+（kind `companion_interaction`）：每日一次、体力 10、基础亲和 3、御兽每点 +1、上限 100；
+`affinity_gain = base + 体质值 × per_point`，仅当体质效果 `type == beast_affinity` 时计入，
+其它体质（如 `max_hp_bp`）加成 0；写入按 `min(cap, current + gain)` 封顶。每日上限复用
+`operations` 同名操作按 UTC 日计数（不新增表）；体力不足、休养中、已归隐分别在**未改状态**时
+返回 `COMPANION_COMPANY_INSUFFICIENT`/`COMPANION_RESTING`/`COMPANION_NOT_FOUND`，同日再试
+`COMPANION_COMPANY_SPENT`，`operation_id` 重放返回冻结结果。体质侧把
+`constitution.beast_affinity` 由 `locked` 改 `active` 并加入 `CONSUMED_EFFECT_TYPES`，
+且 `stats/rules._constitution_bonus` 对 `beast_affinity` 返回空加成（无战斗属性、不得报错）。
+命令 `灵兽相伴 <编号或键>`（别名 `相伴灵兽`/`陪伴灵兽`），帮助挂灵兽页。聚焦证据：
+`test_companion_company.py` 6 passed（合同数值与别名、御兽 +5 → 8 与无关体质 → 3、
+首次 +3 且体力 -10、同日再试被拒且状态不变、次日再 +3、御兽体质单次 +8、99 封顶到 100、
+体力不足与休养中均被拒且不扣不涨）；回归 `test_constitution.py`+`test_companions.py` 17 passed
+（体质预览由「御兽不得出现」改为「御兽可选」）、`test_content.py`+`test_m9_content_integrity.py`+
+`test_documentation.py`+`test_help.py` 28 passed（active 体质 5→6 钉值同步）、
+`test_help.py`+`test_qq_capabilities.py` 9 passed、全库 `ast.parse(feature_version=(3,11))` 0 错误、
+种子最小用例 9 passed。未跑全量/压测/部署，未验 QQ 真机，未发版。
+
 计数型功业与「道统执事」称号（`achievement.dao_service` → `title.dao_service`）已在 `develop`
 完成（业务提交 `5e92252`、种子 provenance `b0fbe21`、文档 `881ff35`）：此前功业只有
 「某事件发生过一次」一种口径（`_honor_source_operation` 取该 `source_event` 的第一条记录即算完成），
