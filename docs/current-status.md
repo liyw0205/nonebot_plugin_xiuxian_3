@@ -661,6 +661,23 @@ develop CI（`41649984150`，head `4684250`）quality 3.11/3.12 与 install-smok
 `test_help.py`+`test_qq_capabilities.py` 9 passed、全库 `ast.parse(feature_version=(3,11))` 0 错误、
 种子最小用例 9 passed。未跑全量/压测/部署，未验 QQ 真机，未发版。
 
+道脉重置首阶段（`talent.reset.standard`）已在 `develop` 完成（业务提交 `de47dd4`、种子 provenance
+`37bab36`、文档本行）：此前 `content-v0.1` 把 `talent.reset_tree` 登记为后续用例，但重置成本与
+返还规则未冻结，运行时没有命令、计划表或历史表，`talent_node_states` 只有 `learned` 状态。
+本版补 `data/养成/道脉重置.json`：筑基 L1、灵石 300、按已修节点 `cost_points` 100% 返还、
+7 天冷却、15 分钟预览；`道脉重置预览` 冻结当前树节点，`确认道脉重置` 同事务扣费、把节点快照
+写入 `talent_reset_records`、删除当前树节点、通过 `talent_point_events` 返还点数并写 operation，
+`取消道脉重置` 零扣。只作用于当前 `path_key` 的树，其它道途历史节点不删；重置降低当前树最高阶
+可能使尚未选择的领域资格重新不足，是明示代价，已选领域不受影响。空树、未筑基、长动作、冷却、
+灵石不足、计划过期、道途或节点集合变化分别零写并返回对应错误码；同 operation 重放冻结结果。
+聚焦证据：`test_talent_reset.py` 6 passed（内容合同与拒绝变体、空树/免费阶、返还 3 点与历史快照、
+灵石不足、过期、节点变化冲突、回放、冷却、重启、QQ 帮助）；回归 `test_talent.py`、
+`test_path_switch.py`、`test_help.py`、`test_documentation.py`、`test_content.py`、
+`test_m9_content_integrity.py` 41 passed，`test_installation_docs.py`+`test_qq_capabilities.py`
+35 passed，种子受影响组 4 passed；`git diff --check` 与 3.11 ast 0 错误。develop CI
+`41923054230`（head `37bab36`）的 quality 3.11/3.12 与 install-smoke 全部成功，release 按条件
+跳过。未跑全量/压测/部署，未验 QQ 真机，未发版。
+
 道途转修首阶段（`path.switch.standard`）已在 `develop` 完成（业务提交 `0e9460d`、种子 provenance
 `2b2940a`、文档本行）：此前 v0.1 合同、`workflow.md` 与 `use-cases.md` 已冻结两阶段切换，
 `item.token.change_path` 只是 `admin_only` 占位，全包没有 `preview_path_switch`/
