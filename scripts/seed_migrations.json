@@ -111,7 +111,7 @@
       "d66b5f5a78982d619ab0dfffe0eae1499b5a204eb44719481a464fbb07e17574": "bb3a31f6972773e33091ba783a1038bf84ada000:data/内容清单.json"
     },
     "new_sha256": "525f2f68ff2ba33502b05e872743ea288562d5060d8014cac4b7b11d5b06af18",
-    "new_commit": "PENDING"
+    "new_commit": "0e9460daef418578253da2f31a3358abc551fd78"
   },
   "地图/地点.json": {
     "old_sha256": {
@@ -298,11 +298,11 @@
   "道具/转修令.json": {
     "old_sha256": {},
     "new_sha256": "1e22e71016adcbe679a64eda6631c817363f8ed6139bb54dafab47632f612499",
-    "new_commit": "PENDING"
+    "new_commit": "0e9460daef418578253da2f31a3358abc551fd78"
   },
   "道途/切换.json": {
     "old_sha256": {},
     "new_sha256": "01410d2c4e3487e84190ab7395301eae4579b3079d8e23cced15def66572a60c",
-    "new_commit": "PENDING"
+    "new_commit": "0e9460daef418578253da2f31a3358abc551fd78"
   }
 }
