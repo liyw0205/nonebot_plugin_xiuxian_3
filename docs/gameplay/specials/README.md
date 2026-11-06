@@ -2,7 +2,7 @@
 
 特色玩法域提供六类可长期重复或累积的目标：闲居历练、派遣任务、图鉴收集、试炼塔、竞技场和多结局剧情线。它们是核心玩法，不属于已移除的媒体/小游戏/第三方娱乐系统。
 
-闲居历练四条路线、派遣十六条（六条基础任务与十条筑基至炼虚中高阶任务）、基础图鉴、雾隐试炼塔
+闲居历练八条路线（v0.1 四条基础，v0.8 四条中阶）、派遣十六条（六条基础任务与十条筑基至炼虚中高阶任务）、基础图鉴、雾隐试炼塔
 `tower.mist_trial` 1–45 层（v0.1 1–30，v0.2 扩至 45）、异步 `arena.spar`、`arena.practice`、`arena.rank`、
 `arena.three_realms`、`arena.team` 和 `story.xuantian.road` 三分支切片均已接通。
 试炼塔支持首通/练习、层段准入、每日/每周限额、特殊奖励、恢复和 operation 重放；QQ 官方与
@@ -43,6 +43,7 @@ v0.4 21–40 层要求化神 L1 或重建名望总值 500。QQ 官方与 OneBot 
 - [v0.5 内容包](content-v0.5.md)
 - [v0.6 内容包](content-v0.6.md)
 - [v0.7 终局天榜](content-v0.7.md)
+- [v0.8 闲居中阶路线](content-v0.8.md)
 
 所有版本内容遵守[版本内容开发合同](../../content-development-contract.md)。所有写入经 Unit of Work 和 operation ledger 结算；文本、按钮和 Web 只能调用同一 application DTO。
 

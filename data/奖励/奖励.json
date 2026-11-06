@@ -1705,6 +1705,103 @@
       ],
       "key": "reward_pool.exploration.cloud_city_patrol",
       "status": "active"
+    },
+    {
+      "name": "矿区看守所得",
+      "desc": "完成矿区看守后收得的云铁与灵石。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 1, "rewards": {"item.material.cloud_iron": 1, "spirit_stones": 30}},
+        {"weight": 1, "rewards": {"item.material.cloud_iron": 1, "spirit_stones": 38}},
+        {"weight": 1, "rewards": {"item.material.cloud_iron": 2, "spirit_stones": 42}},
+        {"weight": 1, "rewards": {"item.material.cloud_iron": 2, "spirit_stones": 50}},
+        {"weight": 1, "rewards": {"item.material.cloud_iron": 3, "spirit_stones": 36}},
+        {"weight": 1, "rewards": {"item.material.cloud_iron": 3, "spirit_stones": 45}}
+      ],
+      "key": "reward_pool.idle.cloud_mine_watch",
+      "status": "active"
+    },
+    {
+      "name": "矿区看守保底所得",
+      "desc": "逾时后仍可收取的一份云铁。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 1, "rewards": {"item.material.cloud_iron": 1}}
+      ],
+      "key": "reward_pool.idle.cloud_mine_watch.fallback",
+      "status": "active"
+    },
+    {
+      "name": "云城店铺所得",
+      "desc": "看顾云城店铺所得的灵石与云城名望。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 1, "rewards": {"spirit_stones": 60, "local.xuantian.cloud_city": 2}},
+        {"weight": 1, "rewards": {"spirit_stones": 68, "local.xuantian.cloud_city": 2}},
+        {"weight": 1, "rewards": {"spirit_stones": 75, "local.xuantian.cloud_city": 2}},
+        {"weight": 1, "rewards": {"spirit_stones": 82, "local.xuantian.cloud_city": 2}},
+        {"weight": 1, "rewards": {"spirit_stones": 90, "local.xuantian.cloud_city": 2}},
+        {"weight": 1, "rewards": {"spirit_stones": 100, "local.xuantian.cloud_city": 2}}
+      ],
+      "key": "reward_pool.idle.cloud_city_shop",
+      "status": "active"
+    },
+    {
+      "name": "云城店铺保底所得",
+      "desc": "逾时后仍可领取的少量灵石。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 1, "rewards": {"spirit_stones": 40}}
+      ],
+      "key": "reward_pool.idle.cloud_city_shop.fallback",
+      "status": "active"
+    },
+    {
+      "name": "魔界驿所所得",
+      "desc": "看守魔界驿所所得的灵石与魔渊集市名望。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 1, "rewards": {"spirit_stones": 80, "local.demon.abyss_market": 3}},
+        {"weight": 1, "rewards": {"spirit_stones": 92, "local.demon.abyss_market": 3}},
+        {"weight": 1, "rewards": {"spirit_stones": 104, "local.demon.abyss_market": 3}},
+        {"weight": 1, "rewards": {"spirit_stones": 116, "local.demon.abyss_market": 3}},
+        {"weight": 1, "rewards": {"spirit_stones": 130, "local.demon.abyss_market": 3}}
+      ],
+      "key": "reward_pool.idle.demon_trade_post",
+      "status": "active"
+    },
+    {
+      "name": "魔界驿所保底所得",
+      "desc": "逾时后仍可领取的少量灵石。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 1, "rewards": {"spirit_stones": 40}}
+      ],
+      "key": "reward_pool.idle.demon_trade_post.fallback",
+      "status": "active"
+    },
+    {
+      "name": "妖界栖地所得",
+      "desc": "照看妖界栖地所得灵米、灵叶与贸易口名望。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 1, "rewards": {"item.food.coarse_spirit_rice": 1, "item.herb.spirit_leaf": 1, "local.beast.three_realms_trade_port": 3}},
+        {"weight": 1, "rewards": {"item.food.coarse_spirit_rice": 1, "item.herb.spirit_leaf": 2, "local.beast.three_realms_trade_port": 3}},
+        {"weight": 1, "rewards": {"item.food.coarse_spirit_rice": 2, "item.herb.spirit_leaf": 1, "local.beast.three_realms_trade_port": 3}},
+        {"weight": 1, "rewards": {"item.food.coarse_spirit_rice": 2, "item.herb.spirit_leaf": 2, "local.beast.three_realms_trade_port": 3}}
+      ],
+      "key": "reward_pool.idle.beast_habitat_watch",
+      "status": "active"
+    },
+    {
+      "name": "妖界栖地保底所得",
+      "desc": "逾时后仍可收取的一份灵叶。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 1, "rewards": {"item.herb.spirit_leaf": 1}}
+      ],
+      "key": "reward_pool.idle.beast_habitat_watch.fallback",
+      "status": "active"
     }
   ],
   "schema": "xiuxian.content"

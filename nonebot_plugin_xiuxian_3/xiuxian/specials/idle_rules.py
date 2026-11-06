@@ -32,6 +32,9 @@ class IdleRouteDefinition:
     pool_key: str
     fallback_pool_key: str
     required_stage: str
+    required_realm: str | None
+    required_layer: int
+    required_permit: str | None
     required_location: str | None
     required_local_reputation: tuple[tuple[str, int], ...]
     required_residence: bool
@@ -137,6 +140,37 @@ def _parse_route(row: dict[str, Any], bundle: ContentBundle) -> IdleRouteDefinit
     required_stage = requirements.get("stage")
     if required_stage not in _STAGE_ORDER:
         raise ContentError(f"idle route {key} has an unsupported stage requirement")
+    realm_requirement = requirements.get("realm")
+    required_realm: str | None = None
+    required_layer = 0
+    if realm_requirement is not None:
+        if (
+            not isinstance(realm_requirement, dict)
+            or set(realm_requirement) != {"key", "min_layer"}
+        ):
+            raise ContentError(
+                f"idle route {key} requirements.realm requires key and min_layer"
+            )
+        realm_key = realm_requirement.get("key")
+        _require_active_record(bundle, "realm", realm_key, key, "requirements.realm.key")
+        layer = _positive_integer(
+            realm_requirement.get("min_layer"), key, "requirements.realm.min_layer"
+        )
+        if layer > 10:
+            raise ContentError(
+                f"idle route {key} requirements.realm.min_layer must be at most 10"
+            )
+        required_realm = str(realm_key)
+        required_layer = layer
+    required_permit = requirements.get("required_permit")
+    if required_permit is not None:
+        if not isinstance(required_permit, str) or not required_permit:
+            raise ContentError(
+                f"idle route {key} requirements.required_permit must be a stable key"
+            )
+        _require_active_record(
+            bundle, "trade_permit", required_permit, key, "requirements.required_permit"
+        )
     required_location = requirements.get("location_key")
     if required_location is not None:
         _require_active_record(bundle, "location", required_location, key, "requirements.location_key")
@@ -182,6 +216,9 @@ def _parse_route(row: dict[str, Any], bundle: ContentBundle) -> IdleRouteDefinit
         pool_key=pool_key,
         fallback_pool_key=fallback_pool_key,
         required_stage=str(required_stage),
+        required_realm=required_realm,
+        required_layer=required_layer,
+        required_permit=required_permit,
         required_location=required_location,
         required_local_reputation=tuple(required_reputation),
         required_residence=required_residence,

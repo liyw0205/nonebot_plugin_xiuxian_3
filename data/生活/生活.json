@@ -1034,6 +1034,107 @@
       "key": "project.ancestral_habitat",
       "record_type": "public_project",
       "status": "active"
+    },
+    {
+      "name": "矿区看守",
+      "desc": "替云铁矿区看守矿脉与工具，按期收得云铁与灵石。",
+      "aliases": [
+        "矿区看守",
+        "看守矿区"
+      ],
+      "duration_seconds": 21600,
+      "cost": {
+        "stamina": 0,
+        "energy": 2
+      },
+      "daily_limit": 1,
+      "requirements": {
+        "stage": "cultivator",
+        "realm": {
+          "key": "foundation",
+          "min_layer": 4
+        }
+      },
+      "reward_pool_key": "reward_pool.idle.cloud_mine_watch",
+      "fallback_reward_pool_key": "reward_pool.idle.cloud_mine_watch.fallback",
+      "durability_cost_bp": 0,
+      "key": "idle.cloud_mine_watch",
+      "record_type": "idle_route",
+      "status": "active"
+    },
+    {
+      "name": "云城店铺",
+      "desc": "在云城店铺中看顾往来生意，积攒灵石与云城名望。",
+      "aliases": [
+        "云城看店",
+        "店铺看守"
+      ],
+      "duration_seconds": 28800,
+      "cost": {
+        "stamina": 0,
+        "energy": 0
+      },
+      "daily_limit": 1,
+      "requirements": {
+        "stage": "cultivator",
+        "local_reputation": {
+          "local.xuantian.cloud_city": 200
+        }
+      },
+      "reward_pool_key": "reward_pool.idle.cloud_city_shop",
+      "fallback_reward_pool_key": "reward_pool.idle.cloud_city_shop.fallback",
+      "durability_cost_bp": 0,
+      "key": "idle.cloud_city_shop",
+      "record_type": "idle_route",
+      "status": "active"
+    },
+    {
+      "name": "魔界驿所",
+      "desc": "看守魔界驿所的货栈与契书，收得灵石与魔渊集市名望。",
+      "aliases": [
+        "魔界驿所看守",
+        "驿所值守"
+      ],
+      "duration_seconds": 28800,
+      "cost": {
+        "stamina": 2,
+        "energy": 0
+      },
+      "daily_limit": 1,
+      "requirements": {
+        "stage": "cultivator",
+        "required_permit": "permit.demon_trade"
+      },
+      "reward_pool_key": "reward_pool.idle.demon_trade_post",
+      "fallback_reward_pool_key": "reward_pool.idle.demon_trade_post.fallback",
+      "durability_cost_bp": 0,
+      "key": "idle.demon_trade_post",
+      "record_type": "idle_route",
+      "status": "active"
+    },
+    {
+      "name": "妖界栖地",
+      "desc": "在妖界栖地照看灵田与兽群，收得灵米、灵叶与贸易口名望。",
+      "aliases": [
+        "妖界栖地看守",
+        "栖地看护"
+      ],
+      "duration_seconds": 28800,
+      "cost": {
+        "stamina": 2,
+        "energy": 0
+      },
+      "daily_limit": 1,
+      "requirements": {
+        "stage": "cultivator",
+        "required_permit": "permit.beast_trade"
+      },
+      "reward_pool_key": "reward_pool.idle.beast_habitat_watch",
+      "fallback_reward_pool_key": "reward_pool.idle.beast_habitat_watch.fallback",
+      "durability_cost_bp": 0,
+      "key": "idle.beast_habitat_watch",
+      "record_type": "idle_route",
+      "status": "active"
     }
   ],
   "schema": "xiuxian.content"

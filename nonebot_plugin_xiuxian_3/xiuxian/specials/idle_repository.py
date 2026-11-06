@@ -36,6 +36,7 @@ from .idle_rules import (
     resolve_route,
 )
 from .codex_projection import record_codex_discovery, record_material_discoveries
+from ..adventures.rules import meets_realm
 from ..utils.assets import inventory_amount
 from ..utils.player import (
     grant_player_reward,
@@ -84,6 +85,19 @@ class IdleRepositoryMixin:
         for reputation_key, minimum in definition.required_local_reputation:
             if int(local_reputation.get(reputation_key, 0)) < minimum:
                 missing.append(f"地方名望不足（需要 {minimum}）")
+        if definition.required_realm is not None and not meets_realm(
+            str(player["realm_key"]),
+            player_integer(player, "realm_layer"),
+            definition.required_realm,
+            definition.required_layer,
+            self.content,
+        ):
+            missing.append("境界不足")
+        if definition.required_permit and connection.execute(
+            "SELECT 1 FROM trade_permits WHERE player_id = ? AND permit_key = ? AND expires_at > ? LIMIT 1",
+            (player["id"], definition.required_permit, serialize_datetime(now)),
+        ).fetchone() is None:
+            missing.append("需要有效的贸易许可")
         if definition.required_residence:
             residence = connection.execute(
                 "SELECT 1 FROM residences WHERE player_id = ? AND status = 'active' AND ends_at > ? LIMIT 1",
@@ -122,6 +136,9 @@ class IdleRepositoryMixin:
             ready=not missing,
             missing=tuple(missing),
             requirements={
+                "required_realm": definition.required_realm,
+                "required_layer": definition.required_layer,
+                "required_permit": definition.required_permit,
                 "required_location": definition.required_location,
                 "required_local_reputation": dict(definition.required_local_reputation),
                 "required_residence": definition.required_residence,
