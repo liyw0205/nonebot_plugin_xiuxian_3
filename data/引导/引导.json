@@ -240,6 +240,34 @@
         "key": "guide.seeker_sect_gate"
       },
       "key": "guide.seeker_sect_gate"
+    },
+    {
+      "name": "闲居指路",
+      "label": "闲居指路",
+      "desc": "了解挂机预览、开始挂机、领取挂机与取消挂机的流程，知道离线安排也要先满足路线门槛。",
+      "content": "闲居历练是把时间交给一条路线：先用 `挂机预览` 看清各条路线的门槛、耗时与所得，再用 `开始挂机` 填写路线名。\n\n安排开始后不能与其它长时行动并行；到时可 `领取挂机`，错过完整领取窗口仍能按逾时所得结算。开始后六十秒内可以 `取消挂机`，代价会退回。\n\n境界、贸易许可、地方名望与宗门道统都可能成为路线门槛，预览里的缺失项就是出发前要补齐的条件。",
+      "status": "active",
+      "operation": "guide.idle_entry",
+      "command": "闲居",
+      "aliases": [
+        "闲居",
+        "挂机",
+        "闲居指路",
+        "挂机指路"
+      ],
+      "requirements": [
+        {
+          "type": "stage",
+          "stage": "cultivator"
+        }
+      ],
+      "cost": {},
+      "repeatable": true,
+      "output": {
+        "type": "intro_flag",
+        "key": "guide.idle_entry"
+      },
+      "key": "guide.idle_entry"
     }
   ],
   "schema": "xiuxian.content"

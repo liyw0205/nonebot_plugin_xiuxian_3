@@ -685,6 +685,7 @@ def old_official_guides() -> bytes:
             "guide.secret_realm_entry",
             "guide.seeker_path_hint",
             "guide.seeker_sect_gate",
+            "guide.idle_entry",
         }
     ]
     for record in document["records"]:
