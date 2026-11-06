@@ -661,6 +661,23 @@ develop CI（`41649984150`，head `4684250`）quality 3.11/3.12 与 install-smok
 `test_help.py`+`test_qq_capabilities.py` 9 passed、全库 `ast.parse(feature_version=(3,11))` 0 错误、
 种子最小用例 9 passed。未跑全量/压测/部署，未验 QQ 真机，未发版。
 
+留界据点建造进度（`social-0.10.0`）已在 `develop` 完成（业务提交 `a1e039c`、种子 provenance
+`66aa326`、文档本行）：`docs/gameplay/social/content-v0.8.md` 记录 `hall_construction_bonus_bp`
+（留界线 1500 bp）尚未与据点接线，因为建设是一次性即时成本；本版补上建造进度模型。
+`data/社交/道统据点.json` 三项新增 `build_hours`（太清殿 24、讲道台 18、护界大阵 36），
+加载器校验 1–168；`建设据点` 扣世界功勋后写 `dao_hall_constructions` 并返回 `build_ends_at`，
+项目效果不立即生效；同一据点只允许一个建造中项目，重复开工返回
+`DAO_HALL_CONSTRUCTION_BUSY`。`据点`/`建立据点`/`加入据点`/`建设据点`/`维护据点`/`破坏据点`
+都会先执行幂等完成器：到期插入 `dao_hall_projects`、累加贡献、删除建造记录，效果从该次读写起
+生效；重启后建造记录保留。留界线存在时按 `build_hours * 3600 * 10000 // (10000 + 1500)`
+缩短工期，太清殿 24h → 75130 秒（20:52:10），加成只影响新开工项目。旧已建项目、
+`dao_hall_projects` 结构与 operation 回放语义不变；建造期间功勋已扣但项目未生效是明示等待成本。
+聚焦证据：`test_dao_hall.py` 11 passed（`build_hours` 合同与缺失拒绝、开工未生效、串行 busy、
+24h/18h 到期生效与维护费、留界线 75130 秒端到端、重启、旧即时项目回放）；回归
+`test_dao_route.py`、`test_help.py`、`test_content.py`、`test_m9_content_integrity.py`、
+`test_documentation.py` 41 passed；种子清单迁移子组 3 passed；`git diff --check` 与 3.11 ast
+0 错误。develop CI `42245836999`（head `66aa326`）的 quality 3.11/3.12 与 install-smoke
+全部成功，release 按条件跳过。未跑全量/压测/部署，未验 QQ 真机，未发版。
 独立辅修切换（`subprofession.switch.standard`）已在 `develop` 完成（业务提交 `59d2448`、种子
 provenance `8f8970d`、文档本行）：此前 `players.subprofession_key` 只在入道、转修和道途重构时
 写入，辅修玩家无法单独改修辅修，改辅修必须换整个道途并消耗洗心转道令。本版补
