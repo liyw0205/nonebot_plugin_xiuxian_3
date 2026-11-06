@@ -661,6 +661,23 @@ develop CI（`41649984150`，head `4684250`）quality 3.11/3.12 与 install-smok
 `test_help.py`+`test_qq_capabilities.py` 9 passed、全库 `ast.parse(feature_version=(3,11))` 0 错误、
 种子最小用例 9 passed。未跑全量/压测/部署，未验 QQ 真机，未发版。
 
+独立辅修切换（`subprofession.switch.standard`）已在 `develop` 完成（业务提交 `59d2448`、种子
+provenance `8f8970d`、文档本行）：此前 `players.subprofession_key` 只在入道、转修和道途重构时
+写入，辅修玩家无法单独改修辅修，改辅修必须换整个道途并消耗洗心转道令。本版补
+`data/道途/辅修切换.json`：仅 `support` 道途、筑基 L1、2000 灵石、7 天冷却、15 分钟预览。
+`辅修预览 <辅修>` 校验道途、境界、当前辅修、目标差异、长动作、冷却与灵石后生成冻结计划；
+`确认辅修` 同事务扣 2000 灵石、更新 `subprofession_key`、写 `subprofession_switches` 历史与
+`subprofession.confirm_switch` operation；`取消辅修` 零扣。旧生产订单按订单快照结算，
+新订单读新键；生产熟练度按辅修键保留，切回时恢复；不需要数据迁移，冷却由历史推导。
+非辅修、同目标、未知目标、缺当前辅修、灵石不足、冷却中、过期、取消/已确认计划分别零写并
+返回 `SUBPROFESSION_SWITCH_*`；同 operation 重放冻结结果。聚焦证据：
+`test_subprofession_switch.py` 6 passed；回归 `test_path_switch.py`、`test_talent_reset.py`、
+`test_path_rebuild.py`、`test_help.py`、`test_content.py`、`test_m9_content_integrity.py`、
+`test_documentation.py`、`test_path_content.py` 58 passed；
+`test_installation_docs.py`、`test_qq_capabilities.py` 35 passed；种子清单迁移子组 3 passed；
+`git diff --check` 与 3.11 ast 0 错误。develop CI `42232701172`（head `8f8970d`）的
+quality 3.11/3.12 与 install-smoke 全部成功，release 按条件跳过。未跑全量/压测/部署，
+未验 QQ 真机，未发版。
 元婴道途重构（`paths.rebuild.standard`）已在 `develop` 完成（业务提交 `39600bf`、种子 provenance
 `716d4f8`、文档本行）：`content-v0.3` 已冻结 `paths.rebuild` 的元婴、三界声望各 1000、主线完成、
 令牌、50000 灵石、24 小时预览与 `max(1, old_level-2)` 继承，但运行时没有内容定义、计划表、
