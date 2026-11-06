@@ -176,6 +176,7 @@ data/
 | `道途/道途.json` | 六大道途、被动、主动技能和状态资源 | `foundation/paths/content-v0.1.md` |
 | `道途/切换.json` | 首阶段道途转修：筑基 L1、500 灵石 + 洗心转道令、7 天冷却、15 分钟预览 | `foundation/paths/content-v0.7.md` |
 | `道途/重构.json` | 元婴道途重构：元婴 L1、三界声望各 1000、50000 灵石 + 道途重构令、24 小时预览、等级继承 `max(1, old-2)`、每角色一次 | `foundation/paths/content-v0.8.md` |
+| `道途/辅修切换.json` | 独立辅修切换：仅辅修、筑基 L1、2000 灵石、7 天冷却、15 分钟预览 | `foundation/paths/content-v0.9.md` |
 | `道具/重构令.json` | 道途重构令：绑定、不可交易、堆叠 1，重构确认时消耗 | `foundation/paths/content-v0.8.md` |
 | `养成/道脉重置.json` | 道脉重置：筑基 L1、300 灵石、100% 返还已花天赋点、7 天冷却、15 分钟预览 | `foundation/advancement/content-v0.7.md` |
 | `道具/转修令.json` | 洗心转道令：绑定、不可交易、堆叠 1，转修确认时消耗 | `foundation/paths/content-v0.7.md` |

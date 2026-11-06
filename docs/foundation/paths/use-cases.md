@@ -14,7 +14,11 @@
 - `confirm_path_rebuild(plan_id, operation_id)` -> 扣除资产的唯一一次重构，写 `path_rebuilds` 并
   继承 `max(1, old_level - 2)` 个目标树节点；同 operation 回放冻结结果。
 - `cancel_path_rebuild(operation_id)` -> 取消最新待确认计划，不扣资产。
-- 独立 `select_subprofession` 尚未接入；生产辅修记录仍由既有生产用例维护，不在本切片新增入口。
+- `preview_subprofession_switch(player_id, target_subprofession, operation_id)` -> 15 分钟预览；
+  仅 `support` 道途、筑基 L1、2000 灵石、7 天冷却。
+- `confirm_subprofession_switch(plan_id, operation_id)` -> 扣 2000 灵石并更新
+  `players.subprofession_key`，写 `subprofession_switches` 历史；同 operation 回放冻结结果。
+- `cancel_subprofession_switch(operation_id)` -> 取消最新待确认计划，不扣资产。
 - `settle_subprofession_action(order_id, operation_id)` -> 熟练度和生产结果。
 
 ## 错误码
@@ -32,3 +36,5 @@
 - 切换计划确认前不改变角色。
 - 魔修动作记录侵蚀来源。
 - 辅修熟练度只在生产成功结算后增加一次。
+
+`SUBPROFESSION_SWITCH_NOT_SUPPORT`、`SUBPROFESSION_SWITCH_INVALID`、`SUBPROFESSION_SWITCH_FUNDS`、`SUBPROFESSION_SWITCH_COOLDOWN`、`SUBPROFESSION_SWITCH_STATE`。

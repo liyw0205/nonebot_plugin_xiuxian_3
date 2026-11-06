@@ -111,8 +111,8 @@
       "d66b5f5a78982d619ab0dfffe0eae1499b5a204eb44719481a464fbb07e17574": "bb3a31f6972773e33091ba783a1038bf84ada000:data/内容清单.json",
       "525f2f68ff2ba33502b05e872743ea288562d5060d8014cac4b7b11d5b06af18": "0e9460daef418578253da2f31a3358abc551fd78:data/内容清单.json"
     },
-    "new_sha256": "0d1aeb5c845b688ed56664ba0551935acd8b9ee5f5462b7150f08f33f00b7925",
-    "new_commit": "39600bf30c905668a46387e0e428061a551c7806"
+    "new_sha256": "c4246fa9c525bc454c17e5a345c389b07d44c9526620e35c27a0a8d5f8853bd5",
+    "new_commit": "PENDING"
   },
   "地图/地点.json": {
     "old_sha256": {
@@ -320,5 +320,10 @@
     "old_sha256": {},
     "new_sha256": "1733c891ada1fc84eb9cc2542b908e86bc510bc609840a5d6e7be2a7b0d062a0",
     "new_commit": "39600bf30c905668a46387e0e428061a551c7806"
+  },
+  "道途/辅修切换.json": {
+    "old_sha256": {},
+    "new_sha256": "16adf1c966d7a70b225eee012c99e63467c3fc812796e1052ff08ff72a2587bc",
+    "new_commit": "PENDING"
   }
 }

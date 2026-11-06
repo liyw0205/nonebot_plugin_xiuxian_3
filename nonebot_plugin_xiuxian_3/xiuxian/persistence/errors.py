@@ -2587,3 +2587,35 @@ class PathRebuildStateError(RuntimeError):
 
 class PathRebuildInvalidError(RuntimeError):
     """The requested target path or sub-profession is invalid."""
+
+
+class SubprofessionSwitchNotSupportError(RuntimeError):
+    """Only the support path can switch its sub-profession."""
+
+
+class SubprofessionSwitchInvalidError(RuntimeError):
+    """The requested sub-profession is unknown, unchanged or missing."""
+
+
+class SubprofessionSwitchFundsError(RuntimeError):
+    """Spirit stones cannot cover the sub-profession switch."""
+
+
+class SubprofessionSwitchCooldownError(RuntimeError):
+    """The previous confirmed switch is still cooling down."""
+
+
+class SubprofessionSwitchNotFoundError(RuntimeError):
+    """No pending sub-profession switch plan exists."""
+
+
+class SubprofessionSwitchPreviewExpiredError(RuntimeError):
+    """The switch preview expired before confirmation."""
+
+
+class SubprofessionSwitchStateError(RuntimeError):
+    """The plan is in a state that forbids the requested transition."""
+
+
+class SubprofessionSwitchConflictError(RuntimeError):
+    """The player or path changed after the preview."""

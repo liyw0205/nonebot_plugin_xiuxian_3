@@ -55,6 +55,7 @@ from .economy.void_market_use_cases import VoidMarketApplication
 from .device.entity_use_cases import DeviceApplication
 from .paths.switch_use_cases import PathSwitchApplication
 from .paths.rebuild_use_cases import PathRebuildApplication
+from .paths.subprofession_switch_use_cases import SubprofessionSwitchApplication
 from .social.dao_hall_use_cases import DaoHallApplication
 from .social.dao_route_use_cases import DaoRouteApplication
 from .events.ascension_day_use_cases import AscensionDayApplication
@@ -238,6 +239,7 @@ class XiuxianApplication:
         self.device = DeviceApplication(repository)
         self.path_switch = PathSwitchApplication(repository)
         self.path_rebuild = PathRebuildApplication(repository)
+        self.subprofession_switch = SubprofessionSwitchApplication(repository)
         self.dao_hall = DaoHallApplication(repository)
         self.dao_route = DaoRouteApplication(repository)
         self.ascension_day = AscensionDayApplication(repository)
@@ -292,6 +294,9 @@ class XiuxianApplication:
                 rebuild_lines = self._path_rebuild_help_lines()
                 if rebuild_lines:
                     body += "\n\n" + rebuild_lines
+                switch_lines = self._subprofession_switch_help_lines()
+                if switch_lines:
+                    body += "\n\n" + switch_lines
             elif category == "生活":
                 dispatch_lines = self._dispatch_help_lines()
                 if dispatch_lines:
@@ -610,6 +615,28 @@ class XiuxianApplication:
                 f"- {command_link('道途重构预览 法修', '道途重构预览 法修')}",
                 f"- {command_link('确认道途重构', '确认道途重构')}",
                 f"- {command_link('取消道途重构', '取消道途重构')}",
+            ]
+            return "\n".join(lines)
+        except Exception:
+            return ""
+
+    def _subprofession_switch_help_lines(self) -> str:
+        """Describe the standalone support sub-profession switch."""
+
+        try:
+            from .paths.subprofession_switch_content import (
+                subprofession_switch_definition,
+            )
+
+            definition = subprofession_switch_definition(self.content)
+            realm = self.content.label("realm", definition.min_realm)
+            lines = [
+                "**辅修切换（辅修道途）**",
+                f"> {realm} L{definition.min_layer}、灵石 {definition.spirit_stone_cost}，"
+                f"可单独改修一门辅修；冷却 7 天，旧熟练度保留。",
+                f"- {command_link('辅修预览 炼丹', '辅修预览 炼丹')}",
+                f"- {command_link('确认辅修', '确认辅修')}",
+                f"- {command_link('取消辅修', '取消辅修')}",
             ]
             return "\n".join(lines)
         except Exception:
@@ -2367,6 +2394,27 @@ class XiuxianApplication:
             context,
             lambda: self.path_rebuild.cancel(context),
             write_message="当前事件不允许取消道途重构。",
+        )
+
+    async def preview_subprofession_switch(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.subprofession_switch.preview(context),
+            write_message="当前事件不允许预览辅修切换。",
+        )
+
+    async def confirm_subprofession_switch(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.subprofession_switch.confirm(context),
+            write_message="当前事件不允许确认辅修切换。",
+        )
+
+    async def cancel_subprofession_switch(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.subprofession_switch.cancel(context),
+            write_message="当前事件不允许取消辅修切换。",
         )
 
     async def create_auction(self, context: CommandContext) -> CommandResult:

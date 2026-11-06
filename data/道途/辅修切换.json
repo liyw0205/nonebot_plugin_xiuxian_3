@@ -1,0 +1,24 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "subprofession_switch",
+  "records": [
+    {
+      "key": "subprofession.switch.standard",
+      "name": "辅修切换",
+      "desc": "辅修道途可单独改修一门辅修；旧辅修的生产熟练度保留，切回时继续使用。",
+      "aliases": [
+        "切换辅修",
+        "改修辅修"
+      ],
+      "status": "active",
+      "path_key": "support",
+      "min_realm": "foundation",
+      "min_layer": 1,
+      "cost": {
+        "currency.spirit_stone": 2000
+      },
+      "cooldown_seconds": 604800,
+      "preview_ttl_seconds": 900
+    }
+  ]
+}

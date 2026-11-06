@@ -25,3 +25,7 @@ selected -> frozen -> selected
 `item.token.rebuild_path`、更新 `path_key`/`subprofession_key`、写 `path_rebuilds` 并为目标树继承
 `max(1, old_level - 2)` 个免费 `learned` 节点，`取消道途重构` 零扣取消。每名角色只允许一次；
 预览过期或旧树等级变化不扣资产。确认后旧树保留并冻结，目标树已有节点不重复写入。
+
+辅修切换同样采用两阶段：`辅修预览` 生成 15 分钟计划，`确认辅修` 扣 2000 灵石并更新
+`subprofession_key`、写 `subprofession_switches` 历史，`取消辅修` 零扣。仅 `support` 道途、
+筑基 L1；7 天冷却由历史推导；旧订单按快照结算，旧辅修熟练度保留。

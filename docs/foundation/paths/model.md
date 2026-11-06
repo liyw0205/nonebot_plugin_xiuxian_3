@@ -21,8 +21,7 @@
 公开的 `选择道途` 在同一 application 事务中解析稳定键、名称或别名，并在选择辅修时一并保存两个稳定键。
 入道回执和资料展示按当前内容读取名称，玩家记录不保存展示文案。首阶段道途切换已接入：
 `path_switch_plans` 保存预览计划与确认结果，`players.path_key`/`subprofession_key` 是唯一
-生效状态，旧道脉/神通/装备作为历史保留并由各自消费者按当前路径过滤。独立 `select_subprofession`
-仍未接入，道途切换不改变战斗引擎或道途战斗效果。
+生效状态，旧道脉/神通/装备作为历史保留并由各自消费者按当前路径过滤。辅修切换不改变战斗引擎或道途战斗效果。
 
 ## SwitchPlan
 
@@ -36,3 +35,8 @@
 唯一的一次性记录（旧/新道途、旧等级、继承等级、旧树节点快照）。继承等级不新增 `players` 列，
 由 `path_rebuilds.inherited_level` 与目标树 `talent_node_states` 的 `learned` 节点共同表达；
 旧树节点不删除，作为冻结历史保留。
+
+辅修切换使用 `subprofession_switch_plans` 保存 15 分钟预览与确认结果，使用
+`subprofession_switches` 保存已确认历史与 7 天冷却依据；只更新
+`players.subprofession_key`，不新增 `players` 列。旧生产订单按订单快照结算，新订单读新键；
+生产熟练度按辅修键保留，切回时恢复。
