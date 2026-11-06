@@ -205,6 +205,7 @@ def _bounty_snapshot(raw_value: Any) -> dict[str, Any]:
         "baseline_completed_orders",
         "baseline_exploration_battle_wins",
         "baseline_dispatch_assignment_ids",
+        "baseline_idle_assignment_ids",
         "selection",
     }
     missing = required - snapshot.keys()
@@ -229,6 +230,7 @@ def _bounty_snapshot(raw_value: Any) -> dict[str, Any]:
         "exploration_battle_wins",
         "dispatch_successes",
         "public_service_completions",
+        "idle_claims",
     }:
         raise ValueError("bounty snapshot contains an invalid target kind")
     if snapshot["target_key"] is not None and (
@@ -321,6 +323,11 @@ def _bounty_snapshot(raw_value: Any) -> dict[str, Any]:
         not isinstance(item, str) or not item for item in assignments
     ):
         raise ValueError("bounty snapshot dispatch baseline must be a string list")
+    idle_assignments = snapshot["baseline_idle_assignment_ids"]
+    if not isinstance(idle_assignments, list) or any(
+        not isinstance(item, str) or not item for item in idle_assignments
+    ):
+        raise ValueError("bounty snapshot idle baseline must be a string list")
     selection = snapshot["selection"]
     if (
         not isinstance(selection, dict)
@@ -722,6 +729,15 @@ class AdventuresRepositoryMixin:
                 str(item["assignment_id"]) not in baseline for item in rows
             )
             return max(0, min(target_amount, completed))
+        if snapshot["target_kind"] == "idle_claims":
+            baseline = set(snapshot["baseline_idle_assignment_ids"])
+            rows = connection.execute(
+                "SELECT assignment_id FROM idle_assignments "
+                "WHERE player_id = ? AND route_key = ? AND status IN ('claimed', 'expired')",
+                (row["id"], snapshot["target_key"]),
+            ).fetchall()
+            completed = sum(str(item["assignment_id"]) not in baseline for item in rows)
+            return max(0, min(target_amount, completed))
         raise ValueError("bounty snapshot has an unsupported target kind")
 
     async def accept_bounty(
@@ -851,6 +867,15 @@ class AdventuresRepositoryMixin:
                         (row["id"], definition.target_key),
                     ).fetchall()
                 ]
+            baseline_idle_ids: list[str] = []
+            if definition.target_kind == "idle_claims":
+                baseline_idle_ids = [
+                    str(item["assignment_id"])
+                    for item in connection.execute(
+                        "SELECT assignment_id FROM idle_assignments WHERE player_id=? AND route_key=? AND status IN ('claimed', 'expired')",
+                        (row["id"], definition.target_key),
+                    ).fetchall()
+                ]
             selection_seed = uuid4().hex
             selected_reward = reward_map(
                 definition,
@@ -907,6 +932,7 @@ class AdventuresRepositoryMixin:
                 "baseline_completed_orders": int(completed_orders["count"]),
                 "baseline_exploration_battle_wins": int(battle_wins["count"]),
                 "baseline_dispatch_assignment_ids": baseline_dispatch_ids,
+                "baseline_idle_assignment_ids": baseline_idle_ids,
                 "selection": {
                     "reward_seed": selection_seed,
                     "bounty_choice_seed": bounty_choice_seed,

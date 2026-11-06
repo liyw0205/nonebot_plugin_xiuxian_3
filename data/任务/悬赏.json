@@ -1009,6 +1009,75 @@
       "reputation_key": "local.dao_service",
       "consume_target": false,
       "reward_labels": {}
+    },
+    {
+      "key": "bounty.idle.mine_watch",
+      "name": "矿区看守差事",
+      "desc": "替云铁矿区看守矿脉，完成一次矿区看守的闲居安排。",
+      "quality": "uncommon",
+      "status": "open",
+      "aliases": [
+        "矿区闲居差事"
+      ],
+      "required_realm": "foundation",
+      "required_layer": 4,
+      "path_keys": [],
+      "weight": 70,
+      "duration_seconds": 43200,
+      "daily_limit": 1,
+      "target_kind": "idle_claims",
+      "target_key": "idle.cloud_mine_watch",
+      "target_amount": 1,
+      "reward_pool_key": "reward_pool.bounty.herb_supply",
+      "reputation_key": "local.xuantian.cloud_city",
+      "consume_target": false,
+      "reward_labels": {}
+    },
+    {
+      "key": "bounty.idle.demon_post",
+      "name": "魔界驿所差事",
+      "desc": "替魔界驿所看守货栈，完成一次驿所值守的闲居安排。",
+      "quality": "rare",
+      "status": "open",
+      "aliases": [
+        "驿所闲居差事"
+      ],
+      "required_realm": "nascent_soul",
+      "required_layer": 1,
+      "path_keys": [],
+      "weight": 60,
+      "duration_seconds": 43200,
+      "daily_limit": 1,
+      "target_kind": "idle_claims",
+      "target_key": "idle.demon_trade_post",
+      "target_amount": 1,
+      "reward_pool_key": "reward_pool.bounty.demon_relief",
+      "reputation_key": "local.demon.abyss_market",
+      "consume_target": false,
+      "reward_labels": {}
+    },
+    {
+      "key": "bounty.idle.dao_post",
+      "name": "道统据点差事",
+      "desc": "替已定道统的宗门看守据点，完成一次据点值守的闲居安排。",
+      "quality": "mythic",
+      "status": "open",
+      "aliases": [
+        "据点闲居差事"
+      ],
+      "required_realm": "dao_union",
+      "required_layer": 1,
+      "path_keys": [],
+      "weight": 50,
+      "duration_seconds": 43200,
+      "daily_limit": 1,
+      "target_kind": "idle_claims",
+      "target_key": "idle.dao_settlement_watch",
+      "target_amount": 1,
+      "reward_pool_key": "reward_pool.bounty.void_anchoring",
+      "reputation_key": "local.dao_service",
+      "consume_target": false,
+      "reward_labels": {}
     }
   ],
   "schema": "xiuxian.content"

@@ -199,3 +199,12 @@ v0.6 `story.mainline.dao_echoes` 已开放玩家流程：炼虚 L10 后可查询
 给既有道统向奖励与 `local.dao_service` 名望。进度口径 `public_service_completions` 为本版新增：
 只计接取之后、`contribution_kind='service'`、按项目去重。`target_key` 为空是刻意设计——
 公共项目有六个，固定一个会让其余服务无法计入。完整说明见 [content-v0.7.md](content-v0.7.md)。
+
+## 闲居差事悬赏（v0.8）
+
+`data/任务/悬赏.json` 新增三条 `idle_claims` 悬赏：矿区看守差事（筑基 L4）、魔界驿所差事
+（元婴 L1）、道统据点差事（合道 L1），分别对应 `idle.cloud_mine_watch`、
+`idle.demon_trade_post` 与 `idle.dao_settlement_watch`。进度只计接取之后该路线已结算
+（`claimed`/`expired`）的闲居安排，接取前的旧安排由接取快照的 `baseline_idle_assignment_ids`
+排除；目标路线必须解析到已开放的 `idle_route`，未知路线在验载期拒绝。完整说明见
+[content-v0.8.md](content-v0.8.md)。

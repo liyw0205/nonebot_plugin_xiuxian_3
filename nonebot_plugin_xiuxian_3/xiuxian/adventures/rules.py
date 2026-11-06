@@ -20,6 +20,7 @@ _TARGET_KINDS = frozenset(
         "exploration_battle_wins",
         "dispatch_successes",
         "public_service_completions",
+        "idle_claims",
     }
 )
 _ACCESS_CONDITION_FIELDS = {
@@ -150,6 +151,20 @@ def bounty_definitions(content: ContentBundle | None = None) -> tuple[BountyDefi
                     ) from exc
                 if resolved_dispatch.key != target_key:
                     raise ContentError(f"bounty {key} target must use a dispatch key")
+            elif target_kind == "idle_claims":
+                idle_route = next(
+                    (
+                        row
+                        for row in bundle.list("livelihood", include_locked=False)
+                        if row.get("key") == target_key
+                        and row.get("record_type") == "idle_route"
+                    ),
+                    None,
+                )
+                if idle_route is None:
+                    raise ContentError(
+                        f"bounty {key} references inactive idle route {target_key}"
+                    )
         if "consume_target" not in row or not isinstance(row["consume_target"], bool):
             raise ContentError(f"bounty {key} consume_target must be a boolean")
         if row["consume_target"] and target_kind != "inventory_gain":
