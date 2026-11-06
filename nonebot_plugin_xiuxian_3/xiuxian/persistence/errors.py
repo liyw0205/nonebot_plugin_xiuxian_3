@@ -2547,3 +2547,43 @@ class TalentResetConflictError(RuntimeError):
 
 class TalentResetStateError(RuntimeError):
     """The plan is in a state that forbids the requested transition."""
+
+
+class PathRebuildNotFoundError(RuntimeError):
+    """No pending path-rebuild plan exists for the player."""
+
+
+class PathRebuildRequirementError(RuntimeError):
+    """The player lacks the realm, reputation or story flag for a rebuild."""
+
+
+class PathRebuildQuestMissingError(PathRebuildRequirementError):
+    """The three-realms mainline story flag is missing."""
+
+
+class PathRebuildFundsError(RuntimeError):
+    """Spirit stones cannot cover the rebuild cost."""
+
+
+class PathRebuildTokenMissingError(RuntimeError):
+    """The rebuild token is missing from the inventory."""
+
+
+class PathRebuildLimitError(RuntimeError):
+    """The character has already completed the one-time rebuild."""
+
+
+class PathRebuildPreviewExpiredError(RuntimeError):
+    """The rebuild preview expired before confirmation."""
+
+
+class PathRebuildConflictError(RuntimeError):
+    """The path or learned-node level changed after the preview."""
+
+
+class PathRebuildStateError(RuntimeError):
+    """The plan is in a state that forbids the requested transition."""
+
+
+class PathRebuildInvalidError(RuntimeError):
+    """The requested target path or sub-profession is invalid."""

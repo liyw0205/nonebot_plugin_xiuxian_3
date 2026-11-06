@@ -20,3 +20,8 @@ selected -> frozen -> selected
 `path_key`/`subprofession_key`，`取消转修` 零扣取消。确认超时不扣资源；已应用切换不能通过
 重复确认回滚；管理员恢复必须使用独立恢复用例。污染、血脉和契约不能通过普通洗点删除。
 旧道脉、旧神通与旧装备不删除，新道途下按当前 `path_key` 冻结。
+
+元婴重构复用同一状态机：`道途重构预览` 生成 24 小时计划，`确认道途重构` 在单事务扣 50000 灵石与
+`item.token.rebuild_path`、更新 `path_key`/`subprofession_key`、写 `path_rebuilds` 并为目标树继承
+`max(1, old_level - 2)` 个免费 `learned` 节点，`取消道途重构` 零扣取消。每名角色只允许一次；
+预览过期或旧树等级变化不扣资产。确认后旧树保留并冻结，目标树已有节点不重复写入。

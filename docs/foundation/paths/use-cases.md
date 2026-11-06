@@ -9,12 +9,19 @@
 - `confirm_path_switch(plan_id, operation_id)` -> 扣除令牌与灵石后的新道途和状态快照；
   同 operation 回放冻结结果。
 - `cancel_path_switch(operation_id)` -> 取消最新待确认计划，不扣资产。
+- `preview_path_rebuild(player_id, target_path, subprofession, operation_id)` -> 24 小时重构预览；
+  元婴、三界声望各 1000、三界主线旗标、50000 灵石与重构令全部通过才生成计划。
+- `confirm_path_rebuild(plan_id, operation_id)` -> 扣除资产的唯一一次重构，写 `path_rebuilds` 并
+  继承 `max(1, old_level - 2)` 个目标树节点；同 operation 回放冻结结果。
+- `cancel_path_rebuild(operation_id)` -> 取消最新待确认计划，不扣资产。
 - 独立 `select_subprofession` 尚未接入；生产辅修记录仍由既有生产用例维护，不在本切片新增入口。
 - `settle_subprofession_action(order_id, operation_id)` -> 熟练度和生产结果。
 
 ## 错误码
 
 `PATH_NOT_FOUND`、`PATH_ALREADY_SELECTED`、`PATH_LOCKED`、`PATH_REQUIREMENT_MISSING`、`PATH_SWITCH_COOLDOWN`、`PATH_STATE_CONFLICT`、`SUBPROFESSION_NOT_FOUND`、`PROFICIENCY_LIMIT_REACHED`。
+
+`PATH_REBUILD_QUEST_MISSING`、`PATH_REBUILD_REQUIREMENT`、`PATH_REBUILD_FUNDS`、`PATH_REBUILD_TOKEN_MISSING`、`PATH_REBUILD_LIMIT_REACHED`、`PATH_REBUILD_PREVIEW_EXPIRED`、`PATH_REBUILD_STATE`、`PATH_REBUILD_INVALID`。
 
 ## 验收
 

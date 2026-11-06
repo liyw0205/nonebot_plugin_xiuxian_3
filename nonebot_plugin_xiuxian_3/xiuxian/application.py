@@ -54,6 +54,7 @@ from .economy.cross_realm_trade_use_cases import CrossRealmTradeApplication
 from .economy.void_market_use_cases import VoidMarketApplication
 from .device.entity_use_cases import DeviceApplication
 from .paths.switch_use_cases import PathSwitchApplication
+from .paths.rebuild_use_cases import PathRebuildApplication
 from .social.dao_hall_use_cases import DaoHallApplication
 from .social.dao_route_use_cases import DaoRouteApplication
 from .events.ascension_day_use_cases import AscensionDayApplication
@@ -236,6 +237,7 @@ class XiuxianApplication:
         self.void_market = VoidMarketApplication(repository)
         self.device = DeviceApplication(repository)
         self.path_switch = PathSwitchApplication(repository)
+        self.path_rebuild = PathRebuildApplication(repository)
         self.dao_hall = DaoHallApplication(repository)
         self.dao_route = DaoRouteApplication(repository)
         self.ascension_day = AscensionDayApplication(repository)
@@ -287,6 +289,9 @@ class XiuxianApplication:
                 reset_lines = self._talent_reset_help_lines()
                 if reset_lines:
                     body += "\n\n" + reset_lines
+                rebuild_lines = self._path_rebuild_help_lines()
+                if rebuild_lines:
+                    body += "\n\n" + rebuild_lines
             elif category == "生活":
                 dispatch_lines = self._dispatch_help_lines()
                 if dispatch_lines:
@@ -583,6 +588,28 @@ class XiuxianApplication:
                 f"- {command_link('转修道途 法修', '转修道途 法修')}（先预览保留、冻结与清理项）",
                 f"- {command_link('确认转修', '确认转修')}",
                 f"- {command_link('取消转修', '取消转修')}",
+            ]
+            return "\n".join(lines)
+        except Exception:
+            return ""
+
+    def _path_rebuild_help_lines(self) -> str:
+        """Describe the one-time nascent-soul rebuild on the cultivation page."""
+
+        try:
+            from .paths.rebuild_content import path_rebuild_definition
+
+            definition = path_rebuild_definition(self.content)
+            content = self.content or bundled_content()
+            realm = content.label("realm", definition.min_realm)
+            token = content.label("item", definition.token_item_key)
+            lines = [
+                "**道途重构（元婴）**",
+                f"> {realm} {definition.min_layer} 层、三界声望各 1000 且完成三界主线后，"
+                f"可消耗灵石 {definition.spirit_stone_cost} 与 {token} 重择首要道途；每角色一次。",
+                f"- {command_link('道途重构预览 法修', '道途重构预览 法修')}",
+                f"- {command_link('确认道途重构', '确认道途重构')}",
+                f"- {command_link('取消道途重构', '取消道途重构')}",
             ]
             return "\n".join(lines)
         except Exception:
@@ -2319,6 +2346,27 @@ class XiuxianApplication:
             context,
             lambda: self.path_switch.cancel(context),
             write_message="当前事件不允许取消转修。",
+        )
+
+    async def preview_path_rebuild(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.path_rebuild.preview(context),
+            write_message="当前事件不允许预览道途重构。",
+        )
+
+    async def confirm_path_rebuild(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.path_rebuild.confirm(context),
+            write_message="当前事件不允许确认道途重构。",
+        )
+
+    async def cancel_path_rebuild(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.path_rebuild.cancel(context),
+            write_message="当前事件不允许取消道途重构。",
         )
 
     async def create_auction(self, context: CommandContext) -> CommandResult:

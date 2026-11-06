@@ -1,0 +1,20 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "item",
+  "records": [
+    {
+      "key": "item.token.rebuild_path",
+      "name": "道途重构令",
+      "desc": "三界主线完成后留下的重构凭令。元婴之后，可凭此令与五万灵石重择首要道途，旧道途冻结留档。",
+      "item_type": "token",
+      "quality": "heaven",
+      "stack_limit": 1,
+      "instance_mode": "stack",
+      "bind_type": "character_bound",
+      "tradeable": false,
+      "effects": [],
+      "requirements": [],
+      "status": "active"
+    }
+  ]
+}

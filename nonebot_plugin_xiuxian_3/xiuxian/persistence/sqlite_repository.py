@@ -92,6 +92,7 @@ from ..specials.final_arena_repository import FinalArenaRepositoryMixin
 from ..advancement.reset_repository import TalentResetRepositoryMixin
 from ..device.entity_repository import DeviceRepositoryMixin
 from ..paths.switch_repository import PathSwitchRepositoryMixin
+from ..paths.rebuild_repository import PathRebuildRepositoryMixin
 from ..social.dao_hall_repository import DaoHallRepositoryMixin
 from ..social.dao_route_repository import DaoRouteRepositoryMixin
 from ..events.ascension_day_repository import AscensionDayRepositoryMixin
@@ -194,6 +195,7 @@ class SQLitePlayerRepository(
     DeviceRepositoryMixin,
     PathSwitchRepositoryMixin,
     TalentResetRepositoryMixin,
+    PathRebuildRepositoryMixin,
     DaoHallRepositoryMixin,
     DaoRouteRepositoryMixin,
     AscensionDayRepositoryMixin,

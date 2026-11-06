@@ -1,0 +1,30 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "path_rebuild",
+  "records": [
+    {
+      "key": "path.rebuild.standard",
+      "name": "道途重构",
+      "desc": "元婴之后重择首要道途：旧道途冻结留档，新道途继承部分道脉阶数，污染、血脉与契约保留。",
+      "aliases": [
+        "重构道途",
+        "道途重构"
+      ],
+      "status": "active",
+      "min_realm": "nascent_soul",
+      "min_layer": 1,
+      "required_reputation": {
+        "xuantian": 1000,
+        "demon": 1000,
+        "beast": 1000
+      },
+      "required_intro_flag": "story.mainline.three_realms",
+      "cost": {
+        "currency.spirit_stone": 50000,
+        "item.token.rebuild_path": 1
+      },
+      "level_deduction": 2,
+      "preview_ttl_seconds": 86400
+    }
+  ]
+}

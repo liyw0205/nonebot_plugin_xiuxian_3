@@ -111,8 +111,8 @@
       "d66b5f5a78982d619ab0dfffe0eae1499b5a204eb44719481a464fbb07e17574": "bb3a31f6972773e33091ba783a1038bf84ada000:data/内容清单.json",
       "525f2f68ff2ba33502b05e872743ea288562d5060d8014cac4b7b11d5b06af18": "0e9460daef418578253da2f31a3358abc551fd78:data/内容清单.json"
     },
-    "new_sha256": "35e783428ccbc1ba0a704ce3026268ef5f48588302293af34cc8e8c2fe1cc34d",
-    "new_commit": "de47dd4453c9e1123f59ae566f7ff5d4789142db"
+    "new_sha256": "0d1aeb5c845b688ed56664ba0551935acd8b9ee5f5462b7150f08f33f00b7925",
+    "new_commit": "PENDING"
   },
   "地图/地点.json": {
     "old_sha256": {
@@ -310,5 +310,15 @@
     "old_sha256": {},
     "new_sha256": "9ca44f9ae64ffcb841cda23d5797da132dc940c91200d42bc51c6d1474322d2a",
     "new_commit": "de47dd4453c9e1123f59ae566f7ff5d4789142db"
+  },
+  "道具/重构令.json": {
+    "old_sha256": {},
+    "new_sha256": "8b1d37645e4b03e376ffd68a947aa3de3464841abd9c9fae9863af3b9b0c6ed4",
+    "new_commit": "PENDING"
+  },
+  "道途/重构.json": {
+    "old_sha256": {},
+    "new_sha256": "1733c891ada1fc84eb9cc2542b908e86bc510bc609840a5d6e7be2a7b0d062a0",
+    "new_commit": "PENDING"
   }
 }

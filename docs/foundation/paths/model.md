@@ -31,3 +31,8 @@
 首阶段实现使用 `path_switch_plans`：`plan_id`、`player_id`、预览/确认 operation、旧/新道途、
 目标辅修、`pending/confirmed/cancelled/expired` 状态、费用与快照 JSON、过期时间与确认时间。
 切换次数与最近切换时间由该表历史推导，不另加 `players` 列。
+
+元婴重构使用 `path_rebuild_plans` 保存 24 小时预览与确认结果，使用 `path_rebuilds` 保存每名角色
+唯一的一次性记录（旧/新道途、旧等级、继承等级、旧树节点快照）。继承等级不新增 `players` 列，
+由 `path_rebuilds.inherited_level` 与目标树 `talent_node_states` 的 `learned` 节点共同表达；
+旧树节点不删除，作为冻结历史保留。
