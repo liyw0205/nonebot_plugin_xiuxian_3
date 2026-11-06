@@ -112,7 +112,7 @@
       "525f2f68ff2ba33502b05e872743ea288562d5060d8014cac4b7b11d5b06af18": "0e9460daef418578253da2f31a3358abc551fd78:data/内容清单.json"
     },
     "new_sha256": "c4246fa9c525bc454c17e5a345c389b07d44c9526620e35c27a0a8d5f8853bd5",
-    "new_commit": "PENDING"
+    "new_commit": "59d2448d87ddc13f9596de2938e4790fc45b7cd6"
   },
   "地图/地点.json": {
     "old_sha256": {
@@ -324,6 +324,6 @@
   "道途/辅修切换.json": {
     "old_sha256": {},
     "new_sha256": "16adf1c966d7a70b225eee012c99e63467c3fc812796e1052ff08ff72a2587bc",
-    "new_commit": "PENDING"
+    "new_commit": "59d2448d87ddc13f9596de2938e4790fc45b7cd6"
   }
 }
