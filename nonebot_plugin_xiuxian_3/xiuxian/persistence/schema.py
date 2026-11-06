@@ -2976,6 +2976,15 @@ CREATE TABLE IF NOT EXISTS dao_hall_projects (
     UNIQUE (hall_id, project_key)
 );
 
+CREATE TABLE IF NOT EXISTS dao_hall_constructions (
+    hall_id TEXT PRIMARY KEY REFERENCES dao_halls(hall_id),
+    project_key TEXT NOT NULL,
+    world_merit INTEGER NOT NULL CHECK (world_merit > 0),
+    started_at TEXT NOT NULL,
+    ends_at TEXT NOT NULL,
+    operation_id TEXT NOT NULL UNIQUE
+);
+
 CREATE TABLE IF NOT EXISTS dao_hall_contributions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     contribution_id TEXT NOT NULL UNIQUE,

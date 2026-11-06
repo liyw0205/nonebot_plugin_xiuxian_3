@@ -28,6 +28,8 @@ class DaoHallState:
     role: str | None
     qualified: bool
     missing: tuple[str, ...]
+    construction_project_key: str | None = None
+    construction_ends_at: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,4 +47,5 @@ class DaoHallOperationRecord:
     world_merit_spent: int = 0
     spirit_stones_spent: int = 0
     rebuild_ends_at: str | None = None
+    build_ends_at: str | None = None
     already_completed: bool = False

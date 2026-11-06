@@ -36,6 +36,7 @@ class DaoHallProject:
     name: str
     description: str
     world_merit: int
+    build_hours: int
     required_project_keys: tuple[str, ...]
     effects: dict[str, int] = field(default_factory=dict)
 
@@ -105,6 +106,7 @@ def dao_hall_project_list(content: ContentBundle) -> tuple[DaoHallProject, ...]:
             name=str(raw["name"]),
             description=str(raw["description"]),
             world_merit=int(raw["world_merit"]),
+            build_hours=int(raw["build_hours"]),
             required_project_keys=tuple(raw["required_project_keys"]),
             effects=dict(raw["effects"]),
         )

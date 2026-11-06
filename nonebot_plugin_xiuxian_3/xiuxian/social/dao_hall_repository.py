@@ -21,6 +21,7 @@ from ...contracts import serialize_datetime
 from ..content import ContentBundle, bundled_content
 from ..persistence.errors import (
     DaoHallCapacityError,
+    DaoHallConstructionBusyError,
     DaoHallMaterialError,
     DaoHallMemberStateError,
     DaoHallNotFoundError,
@@ -107,6 +108,13 @@ class DaoHallRepositoryMixin:
             hall = self._dao_hall_recover_if_due(
                 connection, hall, now_text=serialize_datetime(self._now())
             )
+            now_text = serialize_datetime(self._now())
+            self._dao_hall_complete_construction_if_due(
+                connection, str(hall["hall_id"]), now_text
+            )
+            construction = self._dao_hall_construction(
+                connection, str(hall["hall_id"])
+            )
             built = self._dao_hall_built_projects(connection, str(hall["hall_id"]))
             core_members = self._dao_hall_core_count(connection, str(hall["hall_id"]))
             now = self._now()
@@ -142,6 +150,12 @@ class DaoHallRepositoryMixin:
                 role=str(membership["role"]),
                 qualified=True,
                 missing=(),
+                construction_project_key=(
+                    str(construction["project_key"]) if construction is not None else None
+                ),
+                construction_ends_at=(
+                    str(construction["ends_at"]) if construction is not None else None
+                ),
             )
 
     # ---------------------------------------------------------------- founding
@@ -466,7 +480,8 @@ class DaoHallRepositoryMixin:
                 "project_key": project.key,
             },
         )
-        now_text = serialize_datetime(self._now())
+        now = self._now()
+        now_text = serialize_datetime(now)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             existing = self._dao_hall_operation(connection, operation_id, operation_name, request_hash)
@@ -487,6 +502,14 @@ class DaoHallRepositoryMixin:
             )
             if str(hall["status"]) == "rebuilding":
                 raise DaoHallRebuildingError("the dao hall is rebuilding")
+            self._dao_hall_complete_construction_if_due(
+                connection, hall_id, now_text
+            )
+            construction = self._dao_hall_construction(connection, hall_id)
+            if construction is not None:
+                raise DaoHallConstructionBusyError(
+                    "the dao hall already has a construction in progress"
+                )
             built = self._dao_hall_built_projects(connection, hall_id)
             if project_already_built(project=project, built=built):
                 raise DaoHallMemberStateError("DAO_HALL_PROJECT_BUILT", "project already built")
@@ -505,15 +528,28 @@ class DaoHallRepositoryMixin:
                 raise DaoHallMaterialError("project cost could not be fully paid")
 
             connection.execute(
-                "INSERT INTO dao_hall_projects(hall_id, project_key, world_merit, built_at) "
-                "VALUES (?, ?, ?, ?)",
-                (hall_id, project.key, project.world_merit, now_text),
+                "INSERT INTO dao_hall_constructions("
+                "hall_id, project_key, world_merit, started_at, ends_at, operation_id"
+                ") VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    hall_id,
+                    project.key,
+                    project.world_merit,
+                    now_text,
+                    serialize_datetime(
+                        now
+                        + timedelta(
+                            seconds=self._dao_hall_build_seconds(
+                                connection, player_id, project
+                            )
+                        )
+                    ),
+                    operation_id,
+                ),
             )
-            connection.execute(
-                "UPDATE dao_halls SET contributed_world_merit = contributed_world_merit + ?, "
-                "updated_at = ? WHERE hall_id = ?",
-                (project.world_merit, now_text, hall_id),
-            )
+            build_row = self._dao_hall_construction(connection, hall_id)
+            assert build_row is not None
+            build_ends_at = str(build_row["ends_at"])
             self._dao_hall_ledger(
                 connection,
                 hall_id=hall_id,
@@ -540,6 +576,7 @@ class DaoHallRepositoryMixin:
                 project_key=project.key,
                 world_merit_spent=project.world_merit,
                 spirit_stones_spent=0,
+                build_ends_at=build_ends_at,
             )
             self._insert_operation(
                 connection,
@@ -589,6 +626,7 @@ class DaoHallRepositoryMixin:
             hall = self._dao_hall_row(connection, hall_id)
             if hall is None:
                 raise DaoHallNotFoundError("dao hall row is missing")
+            self._dao_hall_complete_construction_if_due(connection, hall_id, now_text)
             built = self._dao_hall_built_projects(connection, hall_id)
             due_at = maintenance_due_at(
                 last_maintained_at=datetime.fromisoformat(str(hall["last_maintained_at"])),
@@ -697,6 +735,86 @@ class DaoHallRepositoryMixin:
         return tuple(str(row["project_key"]) for row in rows)
 
     @staticmethod
+    def _dao_hall_construction(
+        connection: sqlite3.Connection, hall_id: str
+    ) -> sqlite3.Row | None:
+        return connection.execute(
+            "SELECT * FROM dao_hall_constructions WHERE hall_id = ?", (hall_id,)
+        ).fetchone()
+
+    @staticmethod
+    def _dao_hall_construction_bonus_bp(
+        connection: sqlite3.Connection, player_id: int, content: ContentBundle
+    ) -> int:
+        sect = connection.execute(
+            "SELECT s.sect_id FROM sect_members m JOIN sects s ON s.sect_id = m.sect_id "
+            "WHERE m.player_id = ? AND m.status = 'active' AND s.status = 'active' "
+            "ORDER BY s.sect_id LIMIT 1",
+            (player_id,),
+        ).fetchone()
+        if sect is None:
+            return 0
+        state = connection.execute(
+            "SELECT route_key FROM dao_route_state WHERE sect_id = ?",
+            (str(sect["sect_id"]),),
+        ).fetchone()
+        if state is None or str(state["route_key"]) != "route.dao_settlement.remain":
+            return 0
+        route = content.get(
+            "dao_route", "route.dao_settlement.remain", include_locked=False
+        )
+        if route is None:
+            return 0
+        bonus = route.get("bonus")
+        if not isinstance(bonus, dict):
+            return 0
+        if bonus.get("key") != "hall_construction_bonus_bp":
+            return 0
+        value = bonus.get("value_bp")
+        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+            return 0
+        return int(value)
+
+    def _dao_hall_build_seconds(
+        self,
+        connection: sqlite3.Connection,
+        player_id: int,
+        project,
+    ) -> int:
+        base = int(project.build_hours) * 3600
+        bonus = self._dao_hall_construction_bonus_bp(
+            connection, player_id, self._dao_hall_content()
+        )
+        return max(60, base * 10000 // (10000 + bonus))
+
+    def _dao_hall_complete_construction_if_due(
+        self,
+        connection: sqlite3.Connection,
+        hall_id: str,
+        now_text: str,
+    ) -> str | None:
+        row = self._dao_hall_construction(connection, hall_id)
+        if row is None:
+            return None
+        if datetime.fromisoformat(str(row["ends_at"])) > datetime.fromisoformat(now_text):
+            return None
+        project_key = str(row["project_key"])
+        connection.execute(
+            "INSERT OR IGNORE INTO dao_hall_projects(hall_id, project_key, world_merit, built_at) "
+            "VALUES (?, ?, ?, ?)",
+            (hall_id, project_key, int(row["world_merit"]), now_text),
+        )
+        connection.execute(
+            "UPDATE dao_halls SET contributed_world_merit = contributed_world_merit + ?, "
+            "updated_at = ? WHERE hall_id = ?",
+            (int(row["world_merit"]), now_text, hall_id),
+        )
+        connection.execute(
+            "DELETE FROM dao_hall_constructions WHERE hall_id = ?", (hall_id,)
+        )
+        return project_key
+
+    @staticmethod
     def _dao_hall_core_count(connection: sqlite3.Connection, hall_id: str) -> int:
         return int(
             connection.execute(
@@ -759,6 +877,7 @@ class DaoHallRepositoryMixin:
         project_key: str | None,
         world_merit_spent: int,
         spirit_stones_spent: int,
+        build_ends_at: str | None = None,
     ) -> dict[str, Any]:
         return {
             "hall_id": hall_id,
@@ -772,6 +891,7 @@ class DaoHallRepositoryMixin:
             "project_key": project_key,
             "world_merit_spent": world_merit_spent,
             "spirit_stones_spent": spirit_stones_spent,
+            "build_ends_at": build_ends_at,
         }
 
     @staticmethod
@@ -808,6 +928,7 @@ class DaoHallRepositoryMixin:
             spirit_stones_after=int(payload["spirit_stones_after"]),
             world_merit_spent=int(payload.get("world_merit_spent", 0)),
             spirit_stones_spent=int(payload.get("spirit_stones_spent", 0)),
+            build_ends_at=payload.get("build_ends_at"),
             rebuild_ends_at=payload.get("rebuild_ends_at"),
             already_completed=replay,
         )
@@ -859,6 +980,7 @@ class DaoHallRepositoryMixin:
             hall = self._dao_hall_row(connection, hall_id)
             if hall is None:
                 raise DaoHallNotFoundError("dao hall row is missing")
+            self._dao_hall_complete_construction_if_due(connection, hall_id, now_text)
             built = self._dao_hall_built_projects(connection, hall_id)
             hours = rebuild_hours(definition=definition, built=built, content=content)
             ends_at = serialize_datetime(now + timedelta(hours=hours))
@@ -894,25 +1016,34 @@ class DaoHallRepositoryMixin:
             )
             return self._dao_hall_operation_from_payload(payload)
 
-    @staticmethod
     def _dao_hall_recover_if_due(
-        connection: sqlite3.Connection, hall: sqlite3.Row, *, now_text: str
+        self, connection: sqlite3.Connection, hall: sqlite3.Row, *, now_text: str
     ) -> sqlite3.Row:
-        """Restore a hall whose rebuild window has elapsed.
+        """Restore a hall whose rebuild window has elapsed and settle
+        construction that has reached its finish time.
 
         Recovery is idempotent and keeps every member and built project, which
         is exactly what social v0.6 froze ("重建完成后恢复原路线").
         """
 
         if str(hall["status"]) != "rebuilding":
+            self._dao_hall_complete_construction_if_due(
+                connection, str(hall["hall_id"]), now_text
+            )
             return hall
         ends_at = hall["rebuild_ends_at"]
         if ends_at is None or str(ends_at) > now_text:
+            self._dao_hall_complete_construction_if_due(
+                connection, str(hall["hall_id"]), now_text
+            )
             return hall
         connection.execute(
             "UPDATE dao_halls SET status = 'active', rebuild_ends_at = NULL, updated_at = ? "
             "WHERE hall_id = ?",
             (now_text, str(hall["hall_id"])),
+        )
+        self._dao_hall_complete_construction_if_due(
+            connection, str(hall["hall_id"]), now_text
         )
         return connection.execute(
             "SELECT * FROM dao_halls WHERE hall_id = ?", (str(hall["hall_id"]),)

@@ -43,6 +43,7 @@ PROJECT_FIELDS = {
     "desc",
     "status",
     "world_merit",
+    "build_hours",
     "required_project_keys",
     "effects",
 }
@@ -183,6 +184,9 @@ def dao_hall_projects(content: ContentBundle | None = None) -> dict[str, dict[st
             "description": _text(row, "desc", key),
             "status": str(row["status"]),
             "world_merit": _positive_int(row.get("world_merit"), f"{key} world_merit"),
+            "build_hours": _bounded_int(
+                row.get("build_hours"), f"{key} build_hours", low=1, high=168
+            ),
             "required_project_keys": tuple(normalised_requires),
             "effects": normalised_effects,
         }

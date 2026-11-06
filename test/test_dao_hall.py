@@ -3,11 +3,15 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+import shutil
 import sqlite3
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from urllib.parse import unquote
+
+import pytest
 
 from nonebot_plugin_xiuxian_3.adapters.message.markdown import (
     markdown_to_text,
@@ -15,6 +19,10 @@ from nonebot_plugin_xiuxian_3.adapters.message.markdown import (
 )
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
+from nonebot_plugin_xiuxian_3.xiuxian.content import ContentBundle, ContentError
+from nonebot_plugin_xiuxian_3.xiuxian.social.dao_hall_rules import dao_hall_project_list
+
+ROOT = Path(__file__).parents[1]
 
 MAIN_HALL = "project.dao_hall.main_hall"
 LECTURE = "project.dao_hall.lecture_hall"
@@ -212,19 +220,30 @@ def test_construction_needs_merit_and_unlocks_its_effects() -> None:
 
                 built = await _send(runtime, "builder", "建设据点 太清殿", "b-2")
                 assert built.ok and built.code == "DAO_HALL_BUILD"
-                assert built.data["core_capacity"] == 35
+                assert built.data["core_capacity"] == 30
+                assert built.data["build_ends_at"] is not None
                 assert built.data["world_merit_spent"] == 800
                 assert _player(runtime, "builder")[0] == 9000 - 2000 - 800
+                assert _built(runtime) == []
+
+                clock.advance(hours=24)
+                completed = await _send(runtime, "builder", "据点")
+                assert completed.ok
+                assert completed.data["core_capacity"] == 35
+                assert completed.data["built_project_keys"] == [MAIN_HALL]
+                assert completed.data["maintenance_due"] == 5000
 
                 again = await _send(runtime, "builder", "建设据点 正殿", "b-3")
                 assert not again.ok and again.code == "DAO_HALL_PROJECT_BUILT"
 
                 lecture = await _send(runtime, "builder", "建设据点 讲道台", "b-4")
                 assert lecture.ok and lecture.data["world_merit_spent"] == 600
+                assert lecture.data["build_ends_at"] is not None
 
                 unknown = await _send(runtime, "builder", "建设据点 不存在", "b-5")
                 assert not unknown.ok and unknown.code == "DAO_HALL_PROJECT_NOT_FOUND"
 
+                clock.advance(hours=18)
                 status = await _send(runtime, "builder", "据点")
                 assert set(status.data["built_project_keys"]) == {MAIN_HALL, LECTURE}
                 assert status.data["maintenance_due"] == 4500
@@ -330,8 +349,13 @@ def test_replay_is_idempotent_and_state_survives_a_restart() -> None:
                 assert built.ok
                 built_replay = await _send(runtime, "replayer", "建设据点 太清殿", "b-1")
                 assert built_replay.ok and built_replay.data["already_completed"] is True
-                assert _built(runtime) == [MAIN_HALL]
+                assert _built(runtime) == []
                 assert _player(runtime, "replayer") == (9000 - 2000 - 800, 25000)
+
+                clock.advance(hours=24)
+                status = await _send(runtime, "replayer", "据点")
+                assert status.ok
+                assert status.data["built_project_keys"] == [MAIN_HALL]
             finally:
                 await runtime.close()
 
@@ -435,6 +459,104 @@ def test_rendering_keeps_blue_links_one_action_and_onebot_fallback() -> None:
                 assert help_page.code == "HELP_CATEGORY"
                 assert "留界据点" in help_page.message
                 assert not help_page.actions
+            finally:
+                await runtime.close()
+
+    asyncio.run(run())
+
+def test_construction_hours_content_contract() -> None:
+    projects = {
+        project.key: project
+        for project in dao_hall_project_list(ContentBundle.load(ROOT / "data"))
+    }
+    assert projects[MAIN_HALL].build_hours == 24
+    assert projects[LECTURE].build_hours == 18
+    assert projects["project.dao_hall.ward_array"].build_hours == 36
+
+    with TemporaryDirectory() as data_dir:
+        shutil.copytree(ROOT / "data", data_dir, dirs_exist_ok=True)
+        path = Path(data_dir) / "社交" / "道统据点.json"
+        document = json.loads(path.read_text(encoding="utf-8"))
+        for record in document["records"]:
+            if record.get("key") == MAIN_HALL:
+                del record["build_hours"]
+        path.write_text(
+            json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
+        with pytest.raises(ContentError, match="build_hours"):
+            dao_hall_project_list(ContentBundle.load(data_dir))
+
+
+def test_construction_is_serialized_and_waits_for_completion() -> None:
+    async def run() -> None:
+        clock = MutableClock(datetime(2026, 11, 3, 5, 0, tzinfo=timezone.utc))
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir, clock=clock)
+            try:
+                await _create_player(runtime, "busy", merit=9000)
+                assert (await _send(runtime, "busy", "建立据点", "f-1")).ok
+                first = await _send(runtime, "busy", "建设据点 太清殿", "b-1")
+                assert first.ok and first.data["build_ends_at"]
+                assert _built(runtime) == []
+
+                blocked = await _send(runtime, "busy", "建设据点 讲道台", "b-2")
+                assert not blocked.ok and blocked.code == "DAO_HALL_CONSTRUCTION_BUSY"
+                assert _player(runtime, "busy")[0] == 9000 - 2000 - 800
+
+                status = await _send(runtime, "busy", "据点")
+                assert status.ok
+                assert status.data["construction_project_key"] == MAIN_HALL
+                assert status.data["built_project_keys"] == []
+
+                clock.advance(hours=24)
+                status = await _send(runtime, "busy", "据点")
+                assert status.data["built_project_keys"] == [MAIN_HALL]
+                assert status.data["construction_project_key"] is None
+            finally:
+                await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_settlement_route_shortens_construction_by_1500_bp() -> None:
+    async def run() -> None:
+        clock = MutableClock(datetime(2026, 11, 3, 5, 0, tzinfo=timezone.utc))
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir, clock=clock)
+            try:
+                player_id = await _create_player(runtime, "route", merit=9000)
+                assert (await _send(runtime, "route", "建立据点", "f-1")).ok
+                now_text = clock.value.isoformat()
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "INSERT INTO sects(sect_id, name, name_key, leader_id, status, level, "
+                        "max_members, warehouse_capacity, construction, spirit_stones, "
+                        "sect_merit, warehouse_json, created_at, updated_at) "
+                        "VALUES ('sect-test', '测试宗', 'test-sect', ?, 'active', 6, 80, "
+                        "100, 0, 0, 1000, '{}', ?, ?)",
+                        (player_id, now_text, now_text),
+                    )
+                    connection.execute(
+                        "INSERT INTO sect_members(sect_id, player_id, role, status, "
+                        "contribution, joined_at, last_action_at, created_at, updated_at) "
+                        "VALUES ('sect-test', ?, 'leader', 'active', 0, ?, ?, ?, ?)",
+                        (player_id, now_text, now_text, now_text, now_text),
+                    )
+                    connection.execute(
+                        "INSERT INTO dao_route_state(sect_id, route_key, cycle_id, "
+                        "locked_until, updated_at) VALUES "
+                        "('sect-test', 'route.dao_settlement.remain', 'route:test', ?, ?)",
+                        ((clock.value + timedelta(days=7)).isoformat(), now_text),
+                    )
+                started = clock.value
+                built = await _send(runtime, "route", "建设据点 太清殿", "b-1")
+                assert built.ok
+                ends_at = datetime.fromisoformat(built.data["build_ends_at"])
+                assert int((ends_at - started).total_seconds()) == 75130
+
+                clock.advance(hours=20, minutes=52, seconds=10)
+                status = await _send(runtime, "route", "据点")
+                assert status.data["built_project_keys"] == [MAIN_HALL]
             finally:
                 await runtime.close()
 

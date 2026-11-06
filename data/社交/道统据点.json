@@ -24,6 +24,7 @@
       "aliases": ["正殿"],
       "status": "active",
       "world_merit": 800,
+      "build_hours": 24,
       "required_project_keys": [],
       "effects": {"core_capacity_bonus": 5}
     },
@@ -34,6 +35,7 @@
       "aliases": ["讲堂"],
       "status": "active",
       "world_merit": 600,
+      "build_hours": 18,
       "required_project_keys": ["project.dao_hall.main_hall"],
       "effects": {"maintenance_discount_bp": 1000}
     },
@@ -44,6 +46,7 @@
       "aliases": ["护山大阵"],
       "status": "active",
       "world_merit": 1200,
+      "build_hours": 36,
       "required_project_keys": ["project.dao_hall.main_hall"],
       "effects": {"rebuild_hours_reduction": 24}
     }

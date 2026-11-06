@@ -11,6 +11,7 @@ from ...contracts import CommandAction, CommandContext, CommandResult
 from ..content import ContentBundle, bundled_content
 from ..repository import (
     DaoHallCapacityError,
+    DaoHallConstructionBusyError,
     DaoHallMaterialError,
     DaoHallMemberStateError,
     DaoHallNotFoundError,
@@ -86,6 +87,11 @@ class DaoHallApplication:
         lines.append(f"- **下次维护**：{record.next_maintenance_at}（{record.maintenance_due} 灵石）")
         if record.rebuild_ends_at:
             lines.append(f"- **重建完成**：{record.rebuild_ends_at}")
+        if record.construction_project_key:
+            lines.append(
+                f"- **建造中**：{self._project_name(record.construction_project_key)}，"
+                f"完成 {record.construction_ends_at}"
+            )
         projects = dao_hall_project_list(self._content())
         if projects:
             lines.append("")
@@ -281,6 +287,13 @@ class DaoHallApplication:
             return CommandResult(
                 False, "DAO_HALL_REBUILDING", "据点正在重建，暂不能建设或加入。", context.request_id
             )
+        except DaoHallConstructionBusyError:
+            return CommandResult(
+                False,
+                "DAO_HALL_CONSTRUCTION_BUSY",
+                "据点已有建造中的项目，等它完成后再开工。",
+                context.request_id,
+            )
         except DaoHallProjectLockedError:
             return CommandResult(
                 False, "DAO_HALL_PROJECT_LOCKED", "前置建设尚未完成。", context.request_id
@@ -330,9 +343,12 @@ class DaoHallApplication:
             actions = (CommandAction("查看据点", STATUS_COMMAND),)
         elif action == "build":
             name = self._project_name(project_key or "")
-            lines.append(f"{name} 已建成：投入世界功勋 {record.world_merit_spent}。")
+            lines.append(
+                f"{name} 已开工：投入世界功勋 {record.world_merit_spent}，"
+                f"预计 {record.build_ends_at} 完成，到期后自动生效。"
+            )
             lines.append(f"- **剩余世界功勋**：{record.world_merit_after}")
-            lines.append(f"- **核心席位上限**：{record.core_capacity}")
+            lines.append(f"- **当前核心席位上限**：{record.core_capacity}")
             actions = (CommandAction("查看据点", STATUS_COMMAND),)
         else:
             if record.spirit_stones_spent:
@@ -358,6 +374,7 @@ class DaoHallApplication:
                 "spirit_stones_spent": record.spirit_stones_spent,
                 "spirit_stones_after": record.spirit_stones_after,
                 "project_key": record.project_key,
+                "build_ends_at": record.build_ends_at,
                 "already_completed": record.already_completed,
             },
             actions=actions,
@@ -393,6 +410,8 @@ def _data(record) -> dict[str, object]:
         "contributed_world_merit": record.contributed_world_merit,
         "built_project_keys": list(record.built_project_keys),
         "rebuild_ends_at": record.rebuild_ends_at,
+        "construction_project_key": record.construction_project_key,
+        "construction_ends_at": record.construction_ends_at,
         "next_maintenance_at": record.next_maintenance_at,
         "maintenance_due": record.maintenance_due,
         "world_merit": record.world_merit,

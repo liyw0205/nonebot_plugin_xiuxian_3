@@ -188,7 +188,7 @@ data/
 | `经济/虚空物资寄售.json` | 虚空物资寄售：炼虚/功勋准入、6 小时挂单、800 bp 手续费、可寄售白名单（须可交易且非绑定） | `gameplay/economy/content-v0.8.md` |
 | `社交/道侣协作.json` | 道侣终局协作：终局未锁准入、助战胜利计数、双方各领世界功勋与普通材料，终局资产禁发 | `gameplay/social/content-v0.9.md` |
 | `社交/道统路线.json` | 道统议事准入（宗门等级/合道/三票/公共功勋 1000）、周期与锁定期，以及守界/飞升/留界三线的加成键与数值 | `gameplay/social/content-v0.8.md` |
-| `社交/道统据点.json` | 留界据点准入、库房、核心席位、周维护与 72h 重建期，以及太清殿/讲道台/护界大阵三项建设的功勋成本与效果 | `gameplay/social/content-v0.7.md` |
+| `社交/道统据点.json` | 留界据点准入、库房、核心席位、周维护、72h 重建期，以及太清殿/讲道台/护界大阵的功勋成本、`build_hours`（24/18/36）与效果；建造中记录到期自动完成 | `gameplay/social/content-v0.10.md` |
 | `战斗/实体.json` | 器修机关 `device.scout_doll`：道途/境界准入、组装与维修成本、耐久与损耗、战斗倍率/回合/动作上限；组装、部署、收回、维修与战斗耐久结算均已接线 | `gameplay/combat/content-v0.8.md` |
 | `引导/引导.json` | 凡人世界阅读、教学采集和生产教学 | `foundation/player/content-v0.1.md` |
 | `地图/地点.json` | 玄天起步区、洞天地点、准入、移动成本 | `gameplay/world/content-v0.1.md` |

@@ -2381,6 +2381,10 @@ class DaoHallRebuildingError(RuntimeError):
     """The hall is inside its rebuild window and cannot be expanded."""
 
 
+class DaoHallConstructionBusyError(RuntimeError):
+    """The hall already has a construction in progress."""
+
+
 class DaoHallProjectLockedError(RuntimeError):
     """A prerequisite construction project is not built yet."""
 
