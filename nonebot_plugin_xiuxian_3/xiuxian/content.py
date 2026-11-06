@@ -149,6 +149,15 @@ def _safe_child(root: Path, relative_path: str) -> Path:
     return candidate
 
 
+_BUNDLED_CONTENT_CACHE: dict[str, ContentBundle] = {}
+
+
+def clear_bundled_content_cache() -> None:
+    """Drop memoized bundled content so the next lookup re-reads the manifest."""
+
+    _BUNDLED_CONTENT_CACHE.clear()
+
+
 def bundled_content(data_dir: str | Path | None = None) -> ContentBundle:
     """Load host, package, or source-tree content in runtime priority order."""
 
@@ -163,7 +172,13 @@ def bundled_content(data_dir: str | Path | None = None) -> ContentBundle:
     candidates.extend((host_data, package_data, source_data))
     for root in candidates:
         if (root / "内容清单.json").is_file():
-            return ContentBundle.load(root)
+            resolved = root.resolve()
+            key = str(resolved)
+            cached = _BUNDLED_CONTENT_CACHE.get(key)
+            if cached is None:
+                cached = ContentBundle.load(resolved)
+                _BUNDLED_CONTENT_CACHE[key] = cached
+            return cached
     raise FileNotFoundError(
         f"content manifest not found in {package_data} or {source_data}"
     )
@@ -196,4 +211,10 @@ def resolve_content_key(
     return matches[0]
 
 
-__all__ = ["ContentBundle", "ContentError", "bundled_content", "resolve_content_key"]
+__all__ = [
+    "ContentBundle",
+    "ContentError",
+    "bundled_content",
+    "clear_bundled_content_cache",
+    "resolve_content_key",
+]
