@@ -661,6 +661,26 @@ develop CI（`41649984150`，head `4684250`）quality 3.11/3.12 与 install-smok
 `test_help.py`+`test_qq_capabilities.py` 9 passed、全库 `ast.parse(feature_version=(3,11))` 0 错误、
 种子最小用例 9 passed。未跑全量/压测/部署，未验 QQ 真机，未发版。
 
+元婴道途重构（`paths.rebuild.standard`）已在 `develop` 完成（业务提交 `39600bf`、种子 provenance
+`716d4f8`、文档本行）：`content-v0.3` 已冻结 `paths.rebuild` 的元婴、三界声望各 1000、主线完成、
+令牌、50000 灵石、24 小时预览与 `max(1, old_level-2)` 继承，但运行时没有内容定义、计划表、
+一次性记录或命令；三界主线只发放 `item.token.rebuild_path` 与 `story.mainline.three_realms` 旗标，
+令牌此前没有 `item` 定义。本版补 `data/道途/重构.json` 与 `data/道具/重构令.json`：
+`道途重构预览 <道途> [辅修]` 校验境界、旗标、三界声望、次数、终局状态、长动作、令牌与灵石，
+生成 24 小时冻结计划；`确认道途重构` 同事务扣 50000 灵石与 1 枚令、更新
+`path_key`/`subprofession_key`、写 `path_rebuilds` 并为目标树插入
+`tier <= max(1, old_level-2)` 的免费 `learned` 节点；`取消道途重构` 零扣。旧树节点不删除，
+旧道途冻结留档，切回旧道途仍可用；目标树已有节点不重复写入；每角色一次，唯一约束与
+`path_rebuilds` 永久保留。缺元婴、缺主线旗标、声望不足、缺令、灵石不足、过期、旧树等级变化、
+已选领域/道果、长动作分别零写并返回 `PATH_REBUILD_*`；同 operation 重放冻结结果，
+不同 operation 复用已确认计划返回 `PATH_REBUILD_STATE`。聚焦证据：`test_path_rebuild.py` 8 passed；
+回归 `test_path_switch.py`、`test_talent_reset.py`、`test_help.py`、`test_content.py`、
+`test_m9_content_integrity.py`、`test_documentation.py` 44 passed；
+`test_installation_docs.py`、`test_qq_capabilities.py`、`test_path_content.py` 43 passed；
+`test_documentation.py`、`test_path_switch.py`、`test_talent_reset.py` 16 passed；
+种子清单迁移子组 3 passed；`git diff --check` 与 3.11 ast 0 错误。develop CI `42223848720`
+（head `716d4f8`）quality 3.11/3.12 与 install-smoke 全部成功，release 按条件跳过。
+未跑全量/压测/部署，未验 QQ 真机，未发版。
 道脉重置首阶段（`talent.reset.standard`）已在 `develop` 完成（业务提交 `de47dd4`、种子 provenance
 `37bab36`、文档本行）：此前 `content-v0.1` 把 `talent.reset_tree` 登记为后续用例，但重置成本与
 返还规则未冻结，运行时没有命令、计划表或历史表，`talent_node_states` 只有 `learned` 状态。
