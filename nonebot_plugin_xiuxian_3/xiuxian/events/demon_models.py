@@ -21,6 +21,9 @@ class DemonInvasionEventRecord:
     total_contribution: int
     player_contribution: int
     success: bool | None
+    base_contribution: int = 0
+    route_bonus_bp: int = 0
+    applied_contribution: int = 0
     reward: dict[str, int] = field(default_factory=dict)
     already_completed: bool = False
 

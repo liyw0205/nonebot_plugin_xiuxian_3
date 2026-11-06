@@ -29,6 +29,7 @@ from .cross_realm_rules import (
     BOUNDARY_RIFT_EVENT_KEY,
 )
 from .presentation import public_event_reward_lines
+from ..utils.text import bonus_percent_label
 
 
 class EventsApplication:
@@ -76,6 +77,9 @@ class EventsApplication:
             "source_item_name",
             "event_name",
             "event_description",
+            "base_contribution",
+            "route_bonus_bp",
+            "applied_contribution",
         ):
             if hasattr(record, field):
                 data[field] = getattr(record, field)
@@ -381,10 +385,16 @@ class EventsApplication:
             )
         except Exception as exc:
             return self._error(context, operation_id, exc, event_label="魔界入侵")
+        bonus_line = ""
+        if record.route_bonus_bp:
+            bonus_line = (
+                f"- **本次入账**：{record.base_contribution} + 守界路线 "
+                f"{bonus_percent_label(record.route_bonus_bp)} = {record.applied_contribution}\n"
+            )
         return CommandResult(
             True,
             "EVENT_CONTRIBUTION_RECORDED",
-            f"## 魔界战场贡献已记录\n\n- **本轮贡献**：{record.player_contribution}/{record.minimum_contribution}（领取嘉奖所需）\n- **全服贡献**：{record.total_contribution}/{record.target_quantity}",
+            f"## 魔界战场贡献已记录\n\n{bonus_line}- **本轮贡献**：{record.player_contribution}/{record.minimum_contribution}（领取嘉奖所需）\n- **全服贡献**：{record.total_contribution}/{record.target_quantity}",
             context.request_id,
             operation_id,
             data=self._data(record),

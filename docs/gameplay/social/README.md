@@ -44,7 +44,8 @@
 三张表配合 `operations` 幂等承载投票、结算与锁定。票数不足的周期以「无路线」关闭，避免卡死后续投票。
 命令为 `道统`、`道统投票 <线名>`、`道统结算`。完整合同见 [content-v0.8.md](content-v0.8.md)；
 留界据点建造进度见 [content-v0.9.md](content-v0.9.md) 与 [content-v0.10.md](content-v0.10.md)，
-飞升路线试炼加成见 [content-v0.11.md](content-v0.11.md)。
+飞升路线试炼加成见 [content-v0.11.md](content-v0.11.md)，守界路线战事加成见
+[content-v0.12.md](content-v0.12.md)。
 
 ## 道侣终局协作内容合同（v0.9）
 

@@ -16,4 +16,13 @@ def command_link(label: str, command: str) -> str:
     return f"[{escape_markdown(label)}](command:{quote(command, safe='')})"
 
 
-__all__ = ["escape_markdown", "command_link"]
+def bonus_percent_label(bp: int) -> str:
+    """Render a basis-point bonus as compact player-facing percentage copy."""
+
+    whole, remainder = divmod(int(bp), 100)
+    if remainder == 0:
+        return f"{whole}%"
+    return f"{whole}.{remainder:02d}".rstrip("0") + "%"
+
+
+__all__ = ["bonus_percent_label", "escape_markdown", "command_link"]

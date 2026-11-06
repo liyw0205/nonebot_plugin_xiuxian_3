@@ -9,6 +9,7 @@ from typing import Any
 
 from ...contracts import serialize_datetime
 from ..adventures.rules import meets_realm
+from ..content import bundled_content
 from ..utils.player import player_integer
 from ..persistence.errors import (
     EventContributionInsufficientError,
@@ -154,7 +155,12 @@ class DemonInvasionRepositoryMixin:
                 (event["round_id"], player["id"]),
             ).fetchone()
             current_value = int(current["contribution"]) if current else 0
-            applied = quantity
+            route_bonus_bp = self._demon_defense_bonus_bp(connection, int(player["id"]))
+            applied = (
+                quantity * (10000 + route_bonus_bp) // 10000
+                if route_bonus_bp
+                else quantity
+            )
             connection.execute(
                 "INSERT INTO world_event_contribution_events(round_id, player_id, source_operation_id, quantity, applied_quantity, occurred_at) VALUES (?, ?, ?, ?, ?, ?)",
                 (event["round_id"], player["id"], source_id, quantity, applied, now_text),
@@ -176,7 +182,15 @@ class DemonInvasionRepositoryMixin:
                 (total, json.dumps(result, ensure_ascii=False, sort_keys=True), now_text, event["round_id"]),
             )
             event = connection.execute("SELECT * FROM world_event_rounds WHERE round_id=?", (event["round_id"],)).fetchone()
-            payload = self._demon_invasion_payload(connection, player["id"], event, applied + current_value)
+            payload = self._demon_invasion_payload(
+                connection,
+                player["id"],
+                event,
+                applied + current_value,
+                base_contribution=quantity,
+                route_bonus_bp=route_bonus_bp,
+                applied_contribution=applied,
+            )
             payload["action_key"] = action_key
             payload["source_operation_id"] = source_id
             self._demon_insert_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
@@ -288,6 +302,39 @@ class DemonInvasionRepositoryMixin:
             event = connection.execute("SELECT * FROM world_event_rounds WHERE round_id=?", (event["round_id"],)).fetchone()
         return event
 
+    def _demon_defense_bonus_bp(self, connection: Any, player_id: int) -> int:
+        """Read the guard-world route bonus for the player's active sect."""
+
+        sect = connection.execute(
+            "SELECT s.sect_id FROM sect_members m JOIN sects s ON s.sect_id = m.sect_id "
+            "WHERE m.player_id = ? AND m.status = 'active' AND s.status = 'active' "
+            "ORDER BY s.sect_id LIMIT 1",
+            (player_id,),
+        ).fetchone()
+        if sect is None:
+            return 0
+        state = connection.execute(
+            "SELECT route_key FROM dao_route_state WHERE sect_id = ?",
+            (str(sect["sect_id"]),),
+        ).fetchone()
+        if state is None or str(state["route_key"]) != "route.dao_settlement.guard_world":
+            return 0
+        route = getattr(self, "content", None)
+        if route is None:
+            route = bundled_content()
+        route = route.get(
+            "dao_route", "route.dao_settlement.guard_world", include_locked=False
+        )
+        if route is None:
+            return 0
+        bonus = route.get("bonus")
+        if not isinstance(bonus, dict) or bonus.get("key") != "defense_event_bonus_bp":
+            return 0
+        value = bonus.get("value_bp")
+        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+            return 0
+        return int(value)
+
     def _demon_find_source(
         self,
         connection: Any,
@@ -349,11 +396,21 @@ class DemonInvasionRepositoryMixin:
         row = connection.execute("SELECT contribution FROM world_event_contributions WHERE round_id=? AND player_id=?", (event["round_id"], player["id"])).fetchone()
         return self._demon_record_from_payload(self._demon_invasion_payload(connection, player["id"], event, int(row["contribution"]) if row else 0))
 
-    def _demon_invasion_payload(self, connection: Any, player_id: int, event: Any, contribution: int) -> dict[str, object]:
+    def _demon_invasion_payload(
+        self,
+        connection: Any,
+        player_id: int,
+        event: Any,
+        contribution: int,
+        *,
+        base_contribution: int = 0,
+        route_bonus_bp: int = 0,
+        applied_contribution: int = 0,
+    ) -> dict[str, object]:
         player = connection.execute("SELECT * FROM players WHERE id=?", (player_id,)).fetchone()
         result = self._json_object(event["result_json"], {})
         definition = public_event_snapshot(DEMON_EVENT_KEY, str(event["result_json"]))
-        return {"player": self._player_payload(self._row_to_player(player)), "round_id": str(event["round_id"]), "event_key": DEMON_EVENT_KEY, "status": str(event["status"]), "starts_at": str(event["starts_at"]), "ends_at": str(event["ends_at"]), "claim_expires_at": str(event["claim_expires_at"]), "target_quantity": int(event["target_quantity"]), "minimum_contribution": definition.minimum_contribution, "total_contribution": int(event["total_contribution"]), "player_contribution": contribution, "success": result.get("success"), "reward": {}}
+        return {"player": self._player_payload(self._row_to_player(player)), "round_id": str(event["round_id"]), "event_key": DEMON_EVENT_KEY, "status": str(event["status"]), "starts_at": str(event["starts_at"]), "ends_at": str(event["ends_at"]), "claim_expires_at": str(event["claim_expires_at"]), "target_quantity": int(event["target_quantity"]), "minimum_contribution": definition.minimum_contribution, "total_contribution": int(event["total_contribution"]), "player_contribution": contribution, "base_contribution": base_contribution, "route_bonus_bp": route_bonus_bp, "applied_contribution": applied_contribution, "success": result.get("success"), "reward": {}}
 
     @staticmethod
     def _demon_operation_replay(connection: Any, operation_id: str, operation_name: str, request_hash: str) -> dict[str, object] | None:
@@ -385,6 +442,9 @@ class DemonInvasionRepositoryMixin:
             total_contribution=int(payload["total_contribution"]),
             player_contribution=int(payload.get("player_contribution", 0)),
             success=payload.get("success"),
+            base_contribution=int(payload.get("base_contribution", 0)),
+            route_bonus_bp=int(payload.get("route_bonus_bp", 0)),
+            applied_contribution=int(payload.get("applied_contribution", 0)),
             reward={str(key): int(value) for key, value in dict(payload.get("reward", {})).items()},
             already_completed=replay,
         )
