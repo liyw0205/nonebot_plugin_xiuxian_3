@@ -70,5 +70,7 @@ QQ 原生 Markdown 的状态页列出三条路线与各自加成，可投票时�
 `hall_construction_bonus_bp` 已在社交 v0.10 接入留界据点：建设项新增 `build_hours`，
 开工写入 `dao_hall_constructions`，到期由任何据点读写幂等完成；留界线按 1500 bp 缩短工期
 （24 小时太清殿为 75130 秒）。完整合同见 [content-v0.10.md](content-v0.10.md)。
-投票对守界事件与飞升试炼的加成同理，需在对应事件/试炼域读取 `dao_route_state`，本版未改动
-这两个域。
+`dao_fruit_trial_bonus_bp` 已在社交 v0.11 接入渡劫试炼结算：飞升路线按 1000 bp 提高
+成功试炼的道果进度奖励，结算时读取路线且不冻结开始快照。完整合同见
+[content-v0.11.md](content-v0.11.md)。
+投票对守界事件的加成仍需在对应事件域读取 `dao_route_state`，本版未改动该域。

@@ -54,6 +54,8 @@ class TrialSettlementRecord:
     battle_id: str | None = None
     battle_outcome: str | None = None
     already_completed: bool = False
+    base_progress_reward: int = 0
+    route_bonus_bp: int = 0
 
 
 @dataclass(frozen=True, slots=True)

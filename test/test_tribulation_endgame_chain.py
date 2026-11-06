@@ -56,6 +56,53 @@ async def _create_trial_player(runtime, adapter: str, user: str, *, strong: bool
         )
 
 
+def _join_route_sect(
+    runtime,
+    clock,
+    adapter: str,
+    user: str,
+    route_key: str | None,
+    *,
+    sect_id: str = "sect-route",
+    sect_name: str = "试炼宗",
+) -> int:
+    """Attach a player to an active sect, optionally carrying one dao route."""
+
+    with sqlite3.connect(runtime.settings.database_path) as db:
+        player_id = int(
+            db.execute(
+                "SELECT id FROM players WHERE platform=? AND platform_user_id=?",
+                (adapter, user),
+            ).fetchone()[0]
+        )
+        now_text = clock.value.isoformat()
+        db.execute(
+            "INSERT INTO sects(sect_id, name, name_key, leader_id, status, level, "
+            "max_members, warehouse_capacity, construction, spirit_stones, "
+            "sect_merit, warehouse_json, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, 'active', 6, 80, 100, 0, 0, 1000, '{}', ?, ?)",
+            (sect_id, sect_name, f"{sect_id}:name", player_id, now_text, now_text),
+        )
+        db.execute(
+            "INSERT INTO sect_members(sect_id, player_id, role, status, contribution, "
+            "joined_at, last_action_at, created_at, updated_at) "
+            "VALUES (?, ?, 'leader', 'active', 0, ?, ?, ?, ?)",
+            (sect_id, player_id, now_text, now_text, now_text, now_text),
+        )
+        if route_key is not None:
+            db.execute(
+                "INSERT INTO dao_route_state(sect_id, route_key, cycle_id, locked_until, "
+                "updated_at) VALUES (?, ?, 'route:test', ?, ?)",
+                (
+                    sect_id,
+                    route_key,
+                    (clock.value + timedelta(days=7)).isoformat(),
+                    now_text,
+                ),
+            )
+        return player_id
+
+
 def test_qq_and_onebot_three_trials_isolated_and_replayable() -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:
@@ -458,6 +505,338 @@ def test_failed_trial_keeps_progress_isolated_and_allows_cooldown_retry() -> Non
                 ("trial.body_and_mind", "failed", 1),
                 ("trial.body_and_mind", "succeeded", 1),
             }
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_ascend_route_adds_1000_bp_to_trial_progress() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            clock = MutableClock()
+            runtime = create_runtime(data_dir=data_dir, clock=clock)
+            adapter = "onebot.v11"
+            user = "trial-ascend-route"
+            await _create_trial_player(runtime, adapter, user)
+            player_id = _join_route_sect(
+                runtime,
+                clock,
+                adapter,
+                user,
+                "route.dao_settlement.ascend",
+                sect_id="sect-ascend",
+                sect_name="飞升宗",
+            )
+            started = await runtime.dispatch(
+                _ctx(adapter, user, "route-trial-start"), "开始天劫试炼 身心劫"
+            )
+            assert started.code == "TRIAL_STARTED", started.message
+            assert started.data["battle_outcome"] == "won"
+            clock.advance(minutes=31)
+            settled = await runtime.dispatch(
+                _ctx(adapter, user, "route-trial-settle"), "结算天劫试炼"
+            )
+            assert settled.code == "TRIAL_SUCCEEDED", settled.message
+            assert settled.data["base_progress_reward"] == 100
+            assert settled.data["route_bonus_bp"] == 1000
+            assert settled.data["reward_progress"] == 110
+            assert settled.data["dao_fruit_progress"] == 390
+            assert (
+                "道果进度 +110（基础 100 + 飞升路线 10% = 110）"
+                in settled.message
+            )
+            with sqlite3.connect(runtime.settings.database_path) as db:
+                progress = db.execute(
+                    "SELECT dao_fruit_progress FROM players WHERE id=?", (player_id,)
+                ).fetchone()[0]
+            assert progress == 390
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_route_bonus_only_applies_to_an_active_sect_on_the_ascend_route() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            clock = MutableClock()
+            runtime = create_runtime(data_dir=data_dir, clock=clock)
+            adapter = "onebot.v11"
+            scenarios = (
+                ("route-no-sect", None, None),
+                ("route-no-route", "sect-no-route", None),
+                ("route-guard-world", "sect-guard", "route.dao_settlement.guard_world"),
+                ("route-remain", "sect-remain", "route.dao_settlement.remain"),
+                ("route-defaults-only", "sect-defaults", "route.dao_settlement.defaults"),
+            )
+            for user, sect_id, route_key in scenarios:
+                await _create_trial_player(runtime, adapter, user)
+                if sect_id is not None:
+                    _join_route_sect(
+                        runtime, clock, adapter, user, route_key, sect_id=sect_id
+                    )
+                started = await runtime.dispatch(
+                    _ctx(adapter, user, f"{user}-start"), "开始天劫试炼 身心劫"
+                )
+                assert started.code == "TRIAL_STARTED", started.message
+                assert started.data["battle_outcome"] == "won"
+                clock.advance(minutes=31)
+                settled = await runtime.dispatch(
+                    _ctx(adapter, user, f"{user}-settle"), "结算天劫试炼"
+                )
+                assert settled.code == "TRIAL_SUCCEEDED", settled.message
+                assert settled.data["base_progress_reward"] == 100, user
+                assert settled.data["route_bonus_bp"] == 0, user
+                assert settled.data["reward_progress"] == 100, user
+                assert settled.data["dao_fruit_progress"] == 380, user
+                assert "飞升路线" not in settled.message, user
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_route_bonus_is_resolved_when_the_trial_settles() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            clock = MutableClock()
+            runtime = create_runtime(data_dir=data_dir, clock=clock)
+            adapter = "qq.official"
+            user = "route-during-battle"
+            await _create_trial_player(runtime, adapter, user)
+            started = await runtime.dispatch(
+                _ctx(adapter, user, "route-during-start"), "开始天劫试炼 身心劫"
+            )
+            assert started.code == "TRIAL_STARTED", started.message
+            assert started.data["battle_outcome"] == "won"
+            _join_route_sect(
+                runtime,
+                clock,
+                adapter,
+                user,
+                "route.dao_settlement.ascend",
+                sect_id="sect-late-route",
+                sect_name="后立宗",
+            )
+            clock.advance(minutes=31)
+            settled = await runtime.dispatch(
+                _ctx(adapter, user, "route-during-settle"), "结算天劫试炼"
+            )
+            assert settled.code == "TRIAL_SUCCEEDED", settled.message
+            assert settled.data["base_progress_reward"] == 100
+            assert settled.data["route_bonus_bp"] == 1000
+            assert settled.data["reward_progress"] == 110
+            assert settled.data["dao_fruit_progress"] == 390
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_failed_trial_earns_no_ascend_route_bonus() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            clock = MutableClock()
+            runtime = create_runtime(data_dir=data_dir, clock=clock)
+            adapter, user = "qq.official", "route-failed"
+            await _create_trial_player(runtime, adapter, user, strong=False)
+            _join_route_sect(
+                runtime,
+                clock,
+                adapter,
+                user,
+                "route.dao_settlement.ascend",
+                sect_id="sect-failed",
+                sect_name="败试宗",
+            )
+            operation = next(
+                f"{user}-failed-{index}"
+                for index in range(1_000)
+                if trial_roll_bp(f"{user}-failed-{index}") >= 7_000
+            )
+            started = await runtime.dispatch(
+                _ctx(adapter, user, operation), "开始天劫试炼 身心劫"
+            )
+            assert started.code == "TRIAL_STARTED", started.message
+            assert started.data["battle_outcome"] == "lost"
+            clock.advance(minutes=31)
+            failed = await runtime.dispatch(
+                _ctx(adapter, user, f"{user}-failed-settle"), "结算天劫试炼"
+            )
+            assert failed.code == "TRIAL_FAILED", failed.message
+            assert failed.data["base_progress_reward"] == 0
+            assert failed.data["route_bonus_bp"] == 0
+            assert failed.data["reward_progress"] == 0
+            assert failed.data["dao_fruit_progress"] == 280
+            assert "飞升路线" not in failed.message
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_ascend_route_bonus_respects_the_fruit_progress_cap() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            clock = MutableClock()
+            runtime = create_runtime(data_dir=data_dir, clock=clock)
+            adapter, user = "onebot.v11", "route-capped"
+            await _create_trial_player(runtime, adapter, user)
+            player_id = _join_route_sect(
+                runtime,
+                clock,
+                adapter,
+                user,
+                "route.dao_settlement.ascend",
+                sect_id="sect-capped",
+                sect_name="满果宗",
+            )
+            with sqlite3.connect(runtime.settings.database_path) as db:
+                db.execute(
+                    "UPDATE players SET dao_fruit_progress=1290 WHERE id=?",
+                    (player_id,),
+                )
+            started = await runtime.dispatch(
+                _ctx(adapter, user, "route-capped-start"), "开始天劫试炼 身心劫"
+            )
+            assert started.code == "TRIAL_STARTED", started.message
+            assert started.data["battle_outcome"] == "won"
+            clock.advance(minutes=31)
+            settled = await runtime.dispatch(
+                _ctx(adapter, user, "route-capped-settle"), "结算天劫试炼"
+            )
+            assert settled.code == "TRIAL_SUCCEEDED", settled.message
+            assert settled.data["base_progress_reward"] == 100
+            assert settled.data["route_bonus_bp"] == 1000
+            assert settled.data["reward_progress"] == 10
+            assert settled.data["dao_fruit_progress"] == 1300
+            assert "道果进度 +10（基础 100 + 飞升路线 10% = 110" in settled.message
+            assert "已达道果进度上限" in settled.message
+            with sqlite3.connect(runtime.settings.database_path) as db:
+                progress = db.execute(
+                    "SELECT dao_fruit_progress FROM players WHERE id=?", (player_id,)
+                ).fetchone()[0]
+            assert progress == 1300
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_replay_and_restart_keep_the_settled_route_bonus() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            clock = MutableClock()
+            runtime = create_runtime(data_dir=data_dir, clock=clock)
+            adapter, user = "onebot.v11", "route-replay"
+            await _create_trial_player(runtime, adapter, user)
+            player_id = _join_route_sect(
+                runtime,
+                clock,
+                adapter,
+                user,
+                "route.dao_settlement.ascend",
+                sect_id="sect-replay",
+                sect_name="重放宗",
+            )
+            started = await runtime.dispatch(
+                _ctx(adapter, user, "route-replay-start"), "开始天劫试炼 身心劫"
+            )
+            assert started.code == "TRIAL_STARTED", started.message
+            assert started.data["battle_outcome"] == "won"
+            clock.advance(minutes=31)
+            settled = await runtime.dispatch(
+                _ctx(adapter, user, "route-replay-settle"), "结算天劫试炼"
+            )
+            assert settled.code == "TRIAL_SUCCEEDED", settled.message
+            assert settled.data["reward_progress"] == 110
+            assert settled.data["dao_fruit_progress"] == 390
+            replay = await runtime.dispatch(
+                _ctx(adapter, user, "route-replay-settle"), "结算天劫试炼"
+            )
+            assert replay.code == "TRIAL_SUCCEEDED"
+            assert replay.data["idempotent_replay"] is True
+            assert replay.data["base_progress_reward"] == 100
+            assert replay.data["route_bonus_bp"] == 1000
+            assert replay.data["reward_progress"] == 110
+            assert replay.data["dao_fruit_progress"] == 390
+            await runtime.close()
+
+            restarted = create_runtime(data_dir=data_dir, clock=clock)
+            try:
+                with sqlite3.connect(restarted.settings.database_path) as db:
+                    progress = db.execute(
+                        "SELECT dao_fruit_progress FROM players WHERE id=?",
+                        (player_id,),
+                    ).fetchone()[0]
+                    stored = json.loads(
+                        db.execute(
+                            "SELECT result_json FROM tribulation_trial_sessions "
+                            "WHERE player_id=? ORDER BY id DESC LIMIT 1",
+                            (player_id,),
+                        ).fetchone()[0]
+                    )
+                assert progress == 390
+                assert stored["base_progress_reward"] == 100
+                assert stored["route_bonus_bp"] == 1000
+                assert stored["reward_progress"] == 110
+                replay_after_restart = await restarted.dispatch(
+                    _ctx(adapter, user, "route-replay-settle"), "结算天劫试炼"
+                )
+                assert replay_after_restart.code == "TRIAL_SUCCEEDED"
+                assert replay_after_restart.data["idempotent_replay"] is True
+                assert replay_after_restart.data["reward_progress"] == 110
+                assert replay_after_restart.data["dao_fruit_progress"] == 390
+            finally:
+                await restarted.close()
+
+    asyncio.run(run())
+
+
+def test_legacy_settlement_payload_without_bonus_fields_replays_as_zero_bonus() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            clock = MutableClock()
+            runtime = create_runtime(data_dir=data_dir, clock=clock)
+            adapter, user = "onebot.v11", "route-legacy"
+            await _create_trial_player(runtime, adapter, user)
+            _join_route_sect(
+                runtime,
+                clock,
+                adapter,
+                user,
+                "route.dao_settlement.ascend",
+                sect_id="sect-legacy",
+                sect_name="旧案宗",
+            )
+            started = await runtime.dispatch(
+                _ctx(adapter, user, "route-legacy-start"), "开始天劫试炼 身心劫"
+            )
+            assert started.code == "TRIAL_STARTED", started.message
+            assert started.data["battle_outcome"] == "won"
+            clock.advance(minutes=31)
+            settled = await runtime.dispatch(
+                _ctx(adapter, user, "route-legacy-settle"), "结算天劫试炼"
+            )
+            assert settled.code == "TRIAL_SUCCEEDED", settled.message
+            with sqlite3.connect(runtime.settings.database_path) as db:
+                payload = json.loads(
+                    db.execute(
+                        "SELECT result_json FROM operations WHERE operation_id=?",
+                        ("route-legacy-settle",),
+                    ).fetchone()[0]
+                )
+                payload.pop("base_progress_reward")
+                payload.pop("route_bonus_bp")
+                db.execute(
+                    "UPDATE operations SET result_json=? WHERE operation_id=?",
+                    (json.dumps(payload, ensure_ascii=False, sort_keys=True), "route-legacy-settle"),
+                )
+            replay = await runtime.dispatch(
+                _ctx(adapter, user, "route-legacy-settle"), "结算天劫试炼"
+            )
+            assert replay.code == "TRIAL_SUCCEEDED"
+            assert replay.data["idempotent_replay"] is True
+            assert replay.data["base_progress_reward"] == 0
+            assert replay.data["route_bonus_bp"] == 0
+            assert replay.data["reward_progress"] == 110
+            assert replay.data["dao_fruit_progress"] == 390
+            assert "飞升路线" not in replay.message
             await runtime.close()
 
     asyncio.run(run())

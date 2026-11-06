@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
+from ..content import bundled_content
 from ..utils.assets import inventory_amount, spend_player_items
 from ..utils.player import grant_player_state, player_integer, player_inventory, player_object
 from ..advancement.constitution_effects import constitution_effect_snapshot
@@ -329,6 +330,37 @@ class TribulationTrialRepositoryMixin:
             battle_id = self._json_object(session["snapshot_json"], {}).get("battle_id")
             return str(battle_id) if battle_id else None
 
+    def _trial_route_bonus_bp(self, connection, player_id: int) -> int:
+        sect = connection.execute(
+            "SELECT s.sect_id FROM sect_members m JOIN sects s ON s.sect_id = m.sect_id "
+            "WHERE m.player_id = ? AND m.status = 'active' AND s.status = 'active' "
+            "ORDER BY s.sect_id LIMIT 1",
+            (player_id,),
+        ).fetchone()
+        if sect is None:
+            return 0
+        state = connection.execute(
+            "SELECT route_key FROM dao_route_state WHERE sect_id = ?",
+            (str(sect["sect_id"]),),
+        ).fetchone()
+        if state is None or str(state["route_key"]) != "route.dao_settlement.ascend":
+            return 0
+        content = getattr(self, "content", None)
+        if content is None:
+            content = bundled_content()
+        route = content.get(
+            "dao_route", "route.dao_settlement.ascend", include_locked=False
+        )
+        if route is None:
+            return 0
+        bonus = route.get("bonus")
+        if not isinstance(bonus, dict) or bonus.get("key") != "dao_fruit_trial_bonus_bp":
+            return 0
+        value = bonus.get("value_bp")
+        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+            return 0
+        return int(value)
+
     async def settle_tribulation_trial(
         self, *, platform: str, platform_user_id: str, operation_id: str
     ) -> TrialSettlementRecord:
@@ -395,6 +427,14 @@ class TribulationTrialRepositoryMixin:
             guard_used = bool(tribulation_snapshot["guard_used"])
             debt_delta = 0 if success else max(0, definition.debt_delta - (5 if guard_used else 0))
             progress = definition.progress_reward if success else 0
+            route_bonus_bp = (
+                self._trial_route_bonus_bp(connection, int(row["id"]))
+                if success
+                else 0
+            )
+            base_progress = progress
+            if route_bonus_bp:
+                progress = progress * (10000 + route_bonus_bp) // 10000
             merit = definition.merit_reward if success else 0
             world_merit = definition.world_merit_reward if success else 0
             reward_items = dict(definition.reward_items) if success else {}
@@ -413,7 +453,8 @@ class TribulationTrialRepositoryMixin:
             reward_assets = dict(reward_items)
             if guard_refund:
                 reward_assets["item.tribulation_guard"] = 1
-            grant_player_state(
+            progress_before = player_integer(row, "dao_fruit_progress")
+            state_change = grant_player_state(
                 connection,
                 row,
                 rewards=reward_assets,
@@ -427,12 +468,19 @@ class TribulationTrialRepositoryMixin:
                 maximums={"dao_fruit_progress": 1300},
                 player_values={"dao_fruit_key": fruit_key} if fruit_key else None,
             )
+            applied_progress = max(
+                0,
+                int(state_change.values.get("dao_fruit_progress", progress_before))
+                - progress_before,
+            )
             result = {
                 "success": success,
                 "battle_id": battle_id,
                 "battle_outcome": battle_outcome,
                 "debt_delta": debt_delta,
-                "reward_progress": progress,
+                "reward_progress": applied_progress,
+                "base_progress_reward": base_progress,
+                "route_bonus_bp": route_bonus_bp,
                 "reward_merit": merit,
                 "reward_world_merit": world_merit,
                 "reward_items": reward_items,
@@ -489,6 +537,8 @@ class TribulationTrialRepositoryMixin:
             battle_outcome=str(payload["battle_outcome"]) if payload.get("battle_outcome") else None,
             debt_delta=int(payload.get("debt_delta", 0)),
             reward_progress=int(payload.get("reward_progress", 0)),
+            base_progress_reward=int(payload.get("base_progress_reward", 0)),
+            route_bonus_bp=int(payload.get("route_bonus_bp", 0)),
             reward_merit=int(payload.get("reward_merit", 0)),
             reward_world_merit=int(payload.get("reward_world_merit", 0)),
             reward_items={str(key): int(value) for key, value in dict(payload.get("reward_items", {})).items()},

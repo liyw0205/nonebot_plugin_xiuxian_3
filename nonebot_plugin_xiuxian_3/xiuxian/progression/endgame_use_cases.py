@@ -30,6 +30,15 @@ from ..repository import (
 from .endgame_rules import ASCENSION_READY_STATUS, resolve_trial_key, trial_definition
 
 
+def _bonus_percent_label(bp: int) -> str:
+    """Render a basis-point bonus as a compact percentage for player copy."""
+
+    whole, remainder = divmod(int(bp), 100)
+    if remainder == 0:
+        return f"{whole}%"
+    return f"{whole}.{remainder:02d}".rstrip("0") + "%"
+
+
 class EndgameApplication:
     """Translate terminal progression commands into repository transactions."""
 
@@ -300,13 +309,25 @@ class EndgameApplication:
         label = record.trial_name
         status = "成功" if record.success else "失败"
         battle_line = f"自动战斗 `{'胜利' if record.battle_outcome == 'won' else '失败'}`，" if record.battle_outcome else ""
+        progress_line = f"道果进度 +{record.reward_progress}"
+        if record.route_bonus_bp:
+            expected_progress = (
+                record.base_progress_reward * (10000 + record.route_bonus_bp) // 10000
+            )
+            progress_line += (
+                f"（基础 {record.base_progress_reward} + 飞升路线 "
+                f"{_bonus_percent_label(record.route_bonus_bp)} = {expected_progress}"
+            )
+            if record.reward_progress < expected_progress:
+                progress_line += "，已达道果进度上限"
+            progress_line += "）"
         return CommandResult(
             True,
             "TRIAL_SUCCEEDED" if record.success else "TRIAL_FAILED",
-            f"## {label}结算{status}\n\n{battle_line}道果进度 +{record.reward_progress}，道源功勋 +{record.reward_merit}，世界功勋 +{record.reward_world_merit}，天劫债 +{record.debt_delta}。",
+            f"## {label}结算{status}\n\n{battle_line}{progress_line}，道源功勋 +{record.reward_merit}，世界功勋 +{record.reward_world_merit}，天劫债 +{record.debt_delta}。",
             context.request_id,
             operation_id,
-            data={"session_id": record.session_id, "battle_id": record.battle_id, "battle_outcome": record.battle_outcome, "trial_key": record.trial_key, "success": record.success, "roll_bp": record.roll_bp, "dao_fruit_progress": record.player.dao_fruit_progress, "ascension_merit": record.player.ascension_merit, "world_merit": record.player.world_merit, "reward_world_merit": record.reward_world_merit, "tribulation_debt": record.player.tribulation_debt, "dao_fruit_key": record.dao_fruit_key, "idempotent_replay": record.already_completed},
+            data={"session_id": record.session_id, "battle_id": record.battle_id, "battle_outcome": record.battle_outcome, "trial_key": record.trial_key, "success": record.success, "roll_bp": record.roll_bp, "reward_progress": record.reward_progress, "base_progress_reward": record.base_progress_reward, "route_bonus_bp": record.route_bonus_bp, "dao_fruit_progress": record.player.dao_fruit_progress, "ascension_merit": record.player.ascension_merit, "world_merit": record.player.world_merit, "reward_world_merit": record.reward_world_merit, "tribulation_debt": record.player.tribulation_debt, "dao_fruit_key": record.dao_fruit_key, "idempotent_replay": record.already_completed},
         )
 
     async def _run_trial_battle(self, battle_id: str):
