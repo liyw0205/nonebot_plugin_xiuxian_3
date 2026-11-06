@@ -35,6 +35,8 @@ class IdleRouteDefinition:
     required_realm: str | None
     required_layer: int
     required_permit: str | None
+    required_project_contribution: tuple[str, int] | None
+    required_dao_route: bool
     required_location: str | None
     required_local_reputation: tuple[tuple[str, int], ...]
     required_residence: bool
@@ -171,6 +173,37 @@ def _parse_route(row: dict[str, Any], bundle: ContentBundle) -> IdleRouteDefinit
         _require_active_record(
             bundle, "trade_permit", required_permit, key, "requirements.required_permit"
         )
+    project_requirement = requirements.get("project_contribution")
+    required_project_contribution: tuple[str, int] | None = None
+    if project_requirement is not None:
+        if (
+            not isinstance(project_requirement, dict)
+            or set(project_requirement) != {"project_key", "min_points"}
+        ):
+            raise ContentError(
+                f"idle route {key} requirements.project_contribution requires "
+                "project_key and min_points"
+            )
+        project_key = project_requirement.get("project_key")
+        if not isinstance(project_key, str) or not project_key:
+            raise ContentError(
+                f"idle route {key} requirements.project_contribution.project_key "
+                "must be a stable key"
+            )
+        project = bundle.get("livelihood", project_key, include_locked=False)
+        if project is None or project.get("record_type") != "public_project":
+            raise ContentError(
+                f"idle route {key} references inactive public project {project_key}"
+            )
+        min_points = _positive_integer(
+            project_requirement.get("min_points"),
+            key,
+            "requirements.project_contribution.min_points",
+        )
+        required_project_contribution = (project_key, min_points)
+    required_dao_route = requirements.get("dao_route", False)
+    if not isinstance(required_dao_route, bool):
+        raise ContentError(f"idle route {key} requirements.dao_route must be boolean")
     required_location = requirements.get("location_key")
     if required_location is not None:
         _require_active_record(bundle, "location", required_location, key, "requirements.location_key")
@@ -219,6 +252,8 @@ def _parse_route(row: dict[str, Any], bundle: ContentBundle) -> IdleRouteDefinit
         required_realm=required_realm,
         required_layer=required_layer,
         required_permit=required_permit,
+        required_project_contribution=required_project_contribution,
+        required_dao_route=required_dao_route,
         required_location=required_location,
         required_local_reputation=tuple(required_reputation),
         required_residence=required_residence,

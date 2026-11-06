@@ -98,6 +98,24 @@ class IdleRepositoryMixin:
             (player["id"], definition.required_permit, serialize_datetime(now)),
         ).fetchone() is None:
             missing.append("需要有效的贸易许可")
+        if definition.required_project_contribution is not None:
+            project_key, min_points = definition.required_project_contribution
+            points_row = connection.execute(
+                "SELECT COALESCE(SUM(c.contribution_points), 0) AS points "
+                "FROM livelihood_project_contributions c "
+                "JOIN livelihood_projects p ON p.project_id = c.project_id "
+                "WHERE c.player_id = ? AND p.project_key = ?",
+                (player["id"], project_key),
+            ).fetchone()
+            if int(points_row["points"]) < min_points:
+                missing.append(f"参与度不足（需要 {min_points} 点）")
+        if definition.required_dao_route and connection.execute(
+            "SELECT 1 FROM sect_members m JOIN sects s ON s.sect_id = m.sect_id "
+            "JOIN dao_route_state d ON d.sect_id = s.sect_id "
+            "WHERE m.player_id = ? AND m.status = 'active' AND s.status = 'active' LIMIT 1",
+            (player["id"],),
+        ).fetchone() is None:
+            missing.append("需要宗门已定道统")
         if definition.required_residence:
             residence = connection.execute(
                 "SELECT 1 FROM residences WHERE player_id = ? AND status = 'active' AND ends_at > ? LIMIT 1",
@@ -139,6 +157,12 @@ class IdleRepositoryMixin:
                 "required_realm": definition.required_realm,
                 "required_layer": definition.required_layer,
                 "required_permit": definition.required_permit,
+                "required_project_contribution": (
+                    list(definition.required_project_contribution)
+                    if definition.required_project_contribution
+                    else None
+                ),
+                "required_dao_route": definition.required_dao_route,
                 "required_location": definition.required_location,
                 "required_local_reputation": dict(definition.required_local_reputation),
                 "required_residence": definition.required_residence,

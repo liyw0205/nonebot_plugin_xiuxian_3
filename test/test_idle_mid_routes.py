@@ -41,7 +41,7 @@ def _context(adapter: str, user: str, request: str, operation: str = "") -> Comm
 
 def test_mid_routes_load_with_expected_gates_and_pools() -> None:
     definitions = idle_route_definitions()
-    assert len(definitions) == 8
+    assert set(ROUTES) <= set(definitions)
     for key, (realm, layer, permit, reputation, duration, daily) in ROUTES.items():
         definition = definitions[key]
         assert definition.required_realm == realm

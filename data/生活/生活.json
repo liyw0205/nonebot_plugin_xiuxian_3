@@ -1135,6 +1135,84 @@
       "key": "idle.beast_habitat_watch",
       "record_type": "idle_route",
       "status": "active"
+    },
+    {
+      "name": "领域避难所看守",
+      "desc": "在领域避难所照看物资与工事，收得灵石、建设券与领域前线的名望。",
+      "aliases": [
+        "避难所看守",
+        "据点看守"
+      ],
+      "duration_seconds": 36000,
+      "cost": {
+        "stamina": 3,
+        "energy": 0
+      },
+      "daily_limit": 1,
+      "requirements": {
+        "stage": "cultivator",
+        "project_contribution": {
+          "project_key": "project.domain_refuge",
+          "min_points": 10
+        }
+      },
+      "reward_pool_key": "reward_pool.idle.domain_refuge_watch",
+      "fallback_reward_pool_key": "reward_pool.idle.domain_refuge_watch.fallback",
+      "durability_cost_bp": 0,
+      "key": "idle.domain_refuge_watch",
+      "record_type": "idle_route",
+      "status": "active"
+    },
+    {
+      "name": "虚空补给看守",
+      "desc": "在虚空航道沿线看守补给与锚点，收得灵石与建设券。",
+      "aliases": [
+        "虚空补给看守",
+        "航道看守"
+      ],
+      "duration_seconds": 43200,
+      "cost": {
+        "stamina": 4,
+        "energy": 0
+      },
+      "daily_limit": 1,
+      "requirements": {
+        "stage": "cultivator",
+        "realm": {
+          "key": "void_refining",
+          "min_layer": 1
+        }
+      },
+      "reward_pool_key": "reward_pool.idle.void_supply_watch",
+      "fallback_reward_pool_key": "reward_pool.idle.void_supply_watch.fallback",
+      "durability_cost_bp": 0,
+      "key": "idle.void_supply_watch",
+      "record_type": "idle_route",
+      "status": "active"
+    },
+    {
+      "name": "道统据点看守",
+      "desc": "替已定道统的宗门看守据点事务，收得灵石、建设券与道统服务名望。",
+      "aliases": [
+        "道统据点看守",
+        "据点值守"
+      ],
+      "duration_seconds": 43200,
+      "cost": {
+        "stamina": 4,
+        "energy": 0
+      },
+      "daily_limit": 1,
+      "requirements": {
+        "stage": "cultivator",
+        "dao_route": true
+      },
+      "reward_pool_key": "reward_pool.idle.dao_settlement_watch",
+      "fallback_reward_pool_key": "reward_pool.idle.dao_settlement_watch.fallback",
+      "durability_cost_bp": 0,
+      "key": "idle.dao_settlement_watch",
+      "record_type": "idle_route",
+      "status": "active"
     }
   ],
   "schema": "xiuxian.content"

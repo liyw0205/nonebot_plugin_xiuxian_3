@@ -1802,6 +1802,78 @@
       ],
       "key": "reward_pool.idle.beast_habitat_watch.fallback",
       "status": "active"
+    },
+    {
+      "name": "领域避难所看守所得",
+      "desc": "看守领域避难所所得的灵石、建设券与前线名望。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 1, "rewards": {"spirit_stones": 100, "item.token.construction_coupon": 1, "local.xuantian.domain_front": 3}},
+        {"weight": 1, "rewards": {"spirit_stones": 115, "item.token.construction_coupon": 1, "local.xuantian.domain_front": 3}},
+        {"weight": 1, "rewards": {"spirit_stones": 130, "item.token.construction_coupon": 1, "local.xuantian.domain_front": 3}},
+        {"weight": 1, "rewards": {"spirit_stones": 145, "item.token.construction_coupon": 1, "local.xuantian.domain_front": 3}},
+        {"weight": 1, "rewards": {"spirit_stones": 160, "item.token.construction_coupon": 1, "local.xuantian.domain_front": 3}}
+      ],
+      "key": "reward_pool.idle.domain_refuge_watch",
+      "status": "active"
+    },
+    {
+      "name": "领域避难所看守保底所得",
+      "desc": "逾时后仍可领取的少量灵石。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 1, "rewards": {"spirit_stones": 50}}
+      ],
+      "key": "reward_pool.idle.domain_refuge_watch.fallback",
+      "status": "active"
+    },
+    {
+      "name": "虚空补给看守所得",
+      "desc": "看守虚空航道补给所得的灵石与建设券。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 1, "rewards": {"spirit_stones": 140, "item.token.construction_coupon": 1}},
+        {"weight": 1, "rewards": {"spirit_stones": 160, "item.token.construction_coupon": 1}},
+        {"weight": 1, "rewards": {"spirit_stones": 180, "item.token.construction_coupon": 1}},
+        {"weight": 1, "rewards": {"spirit_stones": 200, "item.token.construction_coupon": 1}},
+        {"weight": 1, "rewards": {"spirit_stones": 220, "item.token.construction_coupon": 1}}
+      ],
+      "key": "reward_pool.idle.void_supply_watch",
+      "status": "active"
+    },
+    {
+      "name": "虚空补给看守保底所得",
+      "desc": "逾时后仍可领取的少量灵石。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 1, "rewards": {"spirit_stones": 70}}
+      ],
+      "key": "reward_pool.idle.void_supply_watch.fallback",
+      "status": "active"
+    },
+    {
+      "name": "道统据点看守所得",
+      "desc": "看守道统据点所得的灵石、建设券与道统服务名望。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 1, "rewards": {"spirit_stones": 180, "item.token.construction_coupon": 2, "local.dao_service": 3}},
+        {"weight": 1, "rewards": {"spirit_stones": 205, "item.token.construction_coupon": 2, "local.dao_service": 3}},
+        {"weight": 1, "rewards": {"spirit_stones": 230, "item.token.construction_coupon": 2, "local.dao_service": 3}},
+        {"weight": 1, "rewards": {"spirit_stones": 255, "item.token.construction_coupon": 2, "local.dao_service": 3}},
+        {"weight": 1, "rewards": {"spirit_stones": 280, "item.token.construction_coupon": 2, "local.dao_service": 3}}
+      ],
+      "key": "reward_pool.idle.dao_settlement_watch",
+      "status": "active"
+    },
+    {
+      "name": "道统据点看守保底所得",
+      "desc": "逾时后仍可领取的少量灵石。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 1, "rewards": {"spirit_stones": 90}}
+      ],
+      "key": "reward_pool.idle.dao_settlement_watch.fallback",
+      "status": "active"
     }
   ],
   "schema": "xiuxian.content"
