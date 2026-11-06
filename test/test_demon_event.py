@@ -373,7 +373,7 @@ def test_demon_war_front_travel_and_battle_are_server_authoritative_on_qq_and_on
                 assert created.ok
                 with sqlite3.connect(runtime.settings.database_path) as connection:
                     connection.execute(
-                        "UPDATE players SET stage='cultivator', realm_key='nascent_soul', realm_layer=1, location_key='xuantian.outskirts', stamina=60, stamina_max=60, max_hp=10000, initiative=10000, qualification_json=? WHERE platform=? AND platform_user_id=?",
+                        "UPDATE players SET stage='cultivator', realm_key='nascent_soul', realm_layer=1, location_key='xuantian.new_town', stamina=60, stamina_max=60, max_hp=10000, initiative=10000, qualification_json=? WHERE platform=? AND platform_user_id=?",
                         (json.dumps(BALANCED_QUALIFICATION), adapter, user),
                     )
                 equip_damage_weapon(runtime, adapter, user, 500)

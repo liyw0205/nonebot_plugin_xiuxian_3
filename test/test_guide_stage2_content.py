@@ -1,7 +1,7 @@
 """Contracts for the staged onboarding guides.
 
 The guide table now carries its own tier, handles and presentation, so the
-suite pins two things at once: the data contract (six guides, two tiers, every
+suite pins two things at once: the data contract (nine guides, three tiers, every
 requirement/cost/reward closed) and the runtime behaviour (a mortal graduates
 on the mortal trio alone, a cultivator can actually finish the new guides, and
 replaying either tier neither re-charges resources nor re-grants rewards).
@@ -22,6 +22,7 @@ from nonebot_plugin_xiuxian_3.xiuxian.player.intro_rules import (
     INTRO_GUIDES,
     STAGE_CULTIVATOR,
     STAGE_MORTAL,
+    STAGE_SEEKER,
     guide_alias_map,
     guide_definitions,
     guides_for_stage,
@@ -40,8 +41,17 @@ TIER_OF = {
     "guide.mine_entry": STAGE_CULTIVATOR,
     "guide.dispatch_entry": STAGE_CULTIVATOR,
     "guide.secret_realm_entry": STAGE_CULTIVATOR,
+    "guide.idle_entry": STAGE_CULTIVATOR,
+    "guide.seeker_path_hint": STAGE_SEEKER,
+    "guide.seeker_sect_gate": STAGE_SEEKER,
 }
-CULTIVATOR_GUIDES = ("guide.mine_entry", "guide.dispatch_entry", "guide.secret_realm_entry")
+CULTIVATOR_GUIDES = (
+    "guide.mine_entry",
+    "guide.dispatch_entry",
+    "guide.secret_realm_entry",
+    "guide.idle_entry",
+)
+SEEKER_GUIDES = ("guide.seeker_path_hint", "guide.seeker_sect_gate")
 
 
 def _context(user: str, request: str, operation_id: str = "") -> CommandContext:
@@ -62,19 +72,19 @@ def test_guide_table_ships_two_tiers_with_closed_requirements() -> None:
     definitions = guide_definitions(_bundle())
     by_key = {definition["key"]: definition for definition in definitions}
 
-    assert len(definitions) == 6
+    assert len(definitions) == 9
     assert set(by_key) == set(TIER_OF)
     for key, tier in TIER_OF.items():
         assert by_key[key]["stage"] == tier, key
         # Exactly one stage requirement, and it names this record's own tier.
-        assert by_key[key]["stage"] in {STAGE_MORTAL, STAGE_CULTIVATOR}
+        assert by_key[key]["stage"] in {STAGE_MORTAL, STAGE_SEEKER, STAGE_CULTIVATOR}
     assert mortal_guides(_bundle()) == INTRO_GUIDES
     assert {definition["key"] for definition in guides_for_stage(STAGE_MORTAL, _bundle())} == set(
         INTRO_GUIDES
     )
     assert {definition["key"] for definition in guides_for_stage(STAGE_CULTIVATOR, _bundle())} == set(
         CULTIVATOR_GUIDES
-    )
+    ) | set(SEEKER_GUIDES)
 
 
 def test_guide_handles_and_rewards_stay_closed() -> None:
@@ -133,8 +143,9 @@ def test_stage_progress_is_filtered_per_tier() -> None:
     # A mortal is never measured against the realm-gated guides...
     assert cultivator_keys.isdisjoint(mortal_keys)
     assert mortal_keys == set(INTRO_GUIDES)
-    # ...and a cultivator is no longer measured against the onboarding trio.
-    assert cultivator_keys == set(CULTIVATOR_GUIDES)
+    # ...and a cultivator is measured against the seeker and cultivator tiers,
+    # never the onboarding trio.
+    assert cultivator_keys == set(CULTIVATOR_GUIDES) | set(SEEKER_GUIDES)
 
 
 def test_cultivator_guides_complete_and_replay_without_side_effects() -> None:
