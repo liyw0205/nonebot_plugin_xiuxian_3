@@ -218,10 +218,11 @@
     "old_sha256": {
       "b1c35b6dff6974518d4542af8e139f0d7eda3c335389085655e119bcbfcbb224": "1632af6c5da4dcfef8a936ddfad43db0f918a59a:data/任务/悬赏.json",
       "774124f445ea4c48ff41cfc33923ab04600676d2b777da3c77e5689b4de30aee": "e8a6f096bab464d61efe430159a315172bc52453:data/任务/悬赏.json",
-      "11ceee1e35febe288b31302a17337d97af7d5cb5c6b3d2e89e6f9e2b22f95b86": "3cabb64a2a98587c3a4db1ad6d5f18535e92784c:data/任务/悬赏.json"
+      "11ceee1e35febe288b31302a17337d97af7d5cb5c6b3d2e89e6f9e2b22f95b86": "3cabb64a2a98587c3a4db1ad6d5f18535e92784c:data/任务/悬赏.json",
+      "3a9ab571e24f6f6aebee3193e54c42f5bd5ec82245515a8e457a58e46c294eee": "13d86e2b4a47d528473704f3ce4e0c345279afd3:data/任务/悬赏.json"
     },
-    "new_sha256": "3a9ab571e24f6f6aebee3193e54c42f5bd5ec82245515a8e457a58e46c294eee",
-    "new_commit": "13d86e2b4a47d528473704f3ce4e0c345279afd3"
+    "new_sha256": "3931d33bf34afdee4f2e4493f4da59df0f1220ae83880c392d043d7a9134922d",
+    "new_commit": "ee560a3e137bcdf20184fbe7179d6196fd7f29f7"
   },
   "冒险/秘境.json": {
     "old_sha256": {
