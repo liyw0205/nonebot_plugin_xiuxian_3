@@ -1222,6 +1222,52 @@
       "reputation_key": "local.xuantian.floating_boat",
       "consume_target": false,
       "reward_labels": {}
+    },
+    {
+      "key": "bounty.market.demon_core_run",
+      "name": "魔渊契约回收",
+      "desc": "将魔渊契约集市秘境中取得的魔核交回集市，换取集市名望与佣金。",
+      "quality": "rare",
+      "status": "open",
+      "aliases": [
+        "魔渊契约回收悬赏"
+      ],
+      "required_realm": "nascent_soul",
+      "required_layer": 1,
+      "path_keys": [],
+      "weight": 55,
+      "duration_seconds": 21600,
+      "daily_limit": 1,
+      "target_kind": "inventory_gain",
+      "target_key": "item.demon_core",
+      "target_amount": 2,
+      "reward_pool_key": "reward_pool.bounty.demon_relief",
+      "reputation_key": "local.demon.abyss_market",
+      "consume_target": true,
+      "reward_labels": {}
+    },
+    {
+      "key": "bounty.market.beast_blood_run",
+      "name": "货栈私货验货",
+      "desc": "将三界货栈秘境中取得的兽血交给贸易口验货，换取贸易口名望与佣金。",
+      "quality": "rare",
+      "status": "open",
+      "aliases": [
+        "货栈私货验货悬赏"
+      ],
+      "required_realm": "nascent_soul",
+      "required_layer": 1,
+      "path_keys": [],
+      "weight": 50,
+      "duration_seconds": 21600,
+      "daily_limit": 1,
+      "target_kind": "inventory_gain",
+      "target_key": "item.beast_blood",
+      "target_amount": 2,
+      "reward_pool_key": "reward_pool.bounty.beast_habitat",
+      "reputation_key": "local.beast.three_realms_trade_port",
+      "consume_target": true,
+      "reward_labels": {}
     }
   ],
   "schema": "xiuxian.content"

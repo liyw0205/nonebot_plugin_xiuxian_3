@@ -107,4 +107,4 @@ def test_every_new_pool_has_distinct_weighted_outcomes_and_pays_out() -> None:
 
 def test_release_inventory_counts_the_new_records() -> None:
     summary = validate_content_references(_bundle())
-    assert summary["bounties"] == 51
+    assert summary["bounties"] == 53

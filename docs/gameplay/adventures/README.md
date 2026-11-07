@@ -218,6 +218,21 @@ v0.6 `story.mainline.dao_echoes` 已开放玩家流程：炼虚 L10 后可查询
 占位与接取快照，不改进度口径或结算事务。发布清单悬赏钉值 45→51。完整说明见
 [content-v0.9.md](content-v0.9.md)。
 
+## 贸易端点交付悬赏（v0.10）
+
+两条交付型悬赏把 v0.10 两处贸易端点秘境的**真实掉落**接回悬赏榜（发布清单悬赏钉值 51→53）：
+
+- `bounty.market.demon_core_run`（魔渊契约回收）：交付 `item.demon_core`×2（魔渊契约集市秘境
+  首通/重复奖池的实际产物），元婴 L1，日限 1，复用 `reward_pool.bounty.demon_relief`，名望键
+  `local.demon.abyss_market`，`consume_target: true`。
+- `bounty.market.beast_blood_run`（货栈私货验货）：交付 `item.beast_blood`×2（三界货栈秘境的实际产物），
+  元婴 L1，日限 1，复用 `reward_pool.bounty.beast_habitat`，名望键 `local.beast.three_realms_trade_port`，
+  `consume_target: true`。
+
+两条均无 `path_keys` 限制，沿用既有境界/层数与交付结算事务，未新增物品或奖池；目标物确由对应秘境
+的真实奖池产出。聚焦证据见 `test/test_trade_endpoint_bounties.py`；计数回归见
+`test_bounty_variety_content.py` 与 `test_m9_content_integrity.py`。
+
 ## 贸易口秘境（v0.10）
 
 两个此前已开放但**没有任何活动**的贸易端点各补上一条通用秘境，数据提交随本切片推送：

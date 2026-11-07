@@ -116,6 +116,16 @@ M5 最终当前树本地阶段验收、审查与提交推送已完成；保留�
 `test_story_rules.py` 合计 4 passed。`剧情/故事.json` 沿用既有先例不加迁移规则（该官方种子从未登记），
 由内容清单分发。未跑全量/压测/部署，未验 QQ 真机。
 
+贸易端点交付悬赏已在 `develop` 完成（P5）：`data/任务/悬赏.json` 51 → 53 条，新增两条交付型悬赏，
+目标物为 P1 两处贸易端点秘境的真实掉落——`bounty.market.demon_core_run`（交付 `item.demon_core`×2，
+`local.demon.abyss_market`）与 `bounty.market.beast_blood_run`（交付 `item.beast_blood`×2，
+`local.beast.three_realms_trade_port`），均元婴 L1、日限 1、`consume_target: true`，复用既有
+`reward_pool.bounty.demon_relief` / `reward_pool.bounty.beast_habitat`，未新增物品或奖池。聚焦证据：
+`test_trade_endpoint_bounties.py` 7 passed（合约、目标物确由对应秘境奖池产出、奖池付款与名望键闭合、
+四类坏记录拒绝）、`test_bounty_variety_content.py` 计数 51→53 更新后与 `test_m9_content_integrity.py`、
+`test_bounty_output_batch`/`test_bounty_batch`/`test_bounty_idle_claims` 合计 26 passed。
+未跑全量/压测/部署，未验 QQ 真机。
+
 `chapter.2.stage.2` 云城初见内容化切片已在 `develop` 完成：正文、`travel_arrival`
 目标（结算后的公开抵达 `xuantian.cloud_city`）、行动、首通状态事件、`next_stage_key`
 指向 `chapter.2.stage.3` 与失败重试规则均已落地，沿用现有 objective 消费者与
