@@ -38,7 +38,9 @@ def _active_exploration_pool_keys(bundle: ContentBundle) -> list[str]:
 def test_all_active_exploration_pools_have_at_least_two_distinct_outcomes() -> None:
     bundle = _bundle()
     pool_keys = _active_exploration_pool_keys(bundle)
-    assert len(pool_keys) == 25
+    # 25 shipped exploration pools + 2 foundation pools added by the
+    # foundation-coverage slice; both carry >=2 distinct outcomes as well.
+    assert len(pool_keys) == 27
     distinct_counts: dict[str, int] = {}
     for pool_key in pool_keys:
         outcomes = reward_pool_outcomes(pool_key, bundle)

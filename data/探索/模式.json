@@ -492,6 +492,44 @@
       "enemy_pool_key": "encounter.xuantian.cloud_city",
       "access_any": [],
       "status": "open"
+    },
+    {
+      "key": "explore.cloud_city_escort",
+      "name": "云城护送",
+      "desc": "护送云城商旅穿过街巷，顺路清剿滋事的劫修。",
+      "aliases": ["云城护送"],
+      "location_key": "xuantian.cloud_city",
+      "required_realm": "foundation",
+      "required_layer": 1,
+      "duration_seconds": 120,
+      "stamina_cost": 7,
+      "energy_cost": 0,
+      "daily_limit": 5,
+      "random_pool": "gather.cloud_city_escort",
+      "reward_pool_key": "reward_pool.exploration.cloud_city_escort",
+      "battle_chance_bp": 2500,
+      "enemy_pool_key": "encounter.cloud_city_escort",
+      "access_any": [],
+      "status": "open"
+    },
+    {
+      "key": "explore.spirit_field_tending",
+      "name": "灵田巡护",
+      "desc": "巡视灵泉谷田垄，照看灵谷并驱散扰乱灵气的水灵。",
+      "aliases": ["灵田巡护"],
+      "location_key": "xuantian.spirit_field",
+      "required_realm": "foundation",
+      "required_layer": 1,
+      "duration_seconds": 100,
+      "stamina_cost": 6,
+      "energy_cost": 0,
+      "daily_limit": 5,
+      "random_pool": "gather.spirit_field_tending",
+      "reward_pool_key": "reward_pool.exploration.spirit_field_tending",
+      "battle_chance_bp": 2000,
+      "enemy_pool_key": "encounter.spirit_field_tending",
+      "access_any": [],
+      "status": "open"
     }
   ]
 }

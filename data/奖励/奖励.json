@@ -1948,6 +1948,48 @@
       ],
       "key": "reward_pool.bounty.service_commission",
       "status": "active"
+    },
+    {
+      "name": "云城护送所得",
+      "desc": "护送商旅所得的修为、灵石与随身补给，按权重抽取。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {
+          "weight": 45,
+          "rewards": {"cultivation": 60, "spirit_stones": 20}
+        },
+        {
+          "weight": 35,
+          "rewards": {"cultivation": 75, "spirit_stones": 30, "item.food.coarse_spirit_rice": 1}
+        },
+        {
+          "weight": 20,
+          "rewards": {"cultivation": 90, "spirit_stones": 40, "item.mat.wood": 1}
+        }
+      ],
+      "key": "reward_pool.exploration.cloud_city_escort",
+      "status": "active"
+    },
+    {
+      "name": "灵田巡护所得",
+      "desc": "巡护灵田采得的灵叶、泉水与阵砂，按权重抽取。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {
+          "weight": 50,
+          "rewards": {"item.herb.spirit_leaf": 1, "item.spirit_water": 1}
+        },
+        {
+          "weight": 30,
+          "rewards": {"item.herb.spirit_leaf": 2, "item.spirit_water": 1, "item.mat.array_sand": 1}
+        },
+        {
+          "weight": 20,
+          "rewards": {"cultivation": 50, "item.herb.spirit_leaf": 1, "item.mat.array_sand": 1}
+        }
+      ],
+      "key": "reward_pool.exploration.spirit_field_tending",
+      "status": "active"
     }
   ],
   "schema": "xiuxian.content"

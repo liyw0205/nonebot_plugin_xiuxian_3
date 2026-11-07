@@ -1870,6 +1870,20 @@
       "desc": "天劫台外的终榜擂台，渡劫修士在此挑战守榜人并留下名号。",
       "category": "place",
       "status": "active"
+    },
+    {
+      "key": "codex.escort.cloud_city_escort",
+      "name": "云城护送记",
+      "desc": "完成云城商旅护送后，街巷间的见闻收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.escort.spirit_field_tending",
+      "name": "灵田巡护记",
+      "desc": "巡护灵泉谷田垄后，灵谷与水灵的见闻收入图鉴。",
+      "category": "challenge",
+      "status": "active"
     }
 
   ]

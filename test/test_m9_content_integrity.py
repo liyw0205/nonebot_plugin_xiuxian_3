@@ -41,7 +41,7 @@ def test_m9_content_references_are_closed() -> None:
     # slice adds records (this file is not run by CI, so it must be kept in
     # sync by the slice that grows the inventory).
     assert summary["locations"] == 34
-    assert summary["exploration_modes"] == 23
+    assert summary["exploration_modes"] == 25
     assert summary["bounties"] == 51
     assert summary["recipes"] == 36
     assert summary["sources"] == 14

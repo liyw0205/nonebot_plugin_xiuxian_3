@@ -832,6 +832,8 @@ PLACE_CODEX_ADDED = frozenset(
         "codex.place.floating_boat",
         "codex.place.mist_grotto_2",
         "codex.place.final_arena",
+        "codex.escort.cloud_city_escort",
+        "codex.escort.spirit_field_tending",
     }
 )
 
