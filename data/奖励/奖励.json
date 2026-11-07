@@ -599,10 +599,17 @@
       "pool_type": "weighted",
       "outcomes": [
         {
-          "weight": 1,
+          "weight": 1000,
           "rewards": {
             "item.soul_crystal": 1,
             "item.demon_core": 1
+          }
+        },
+        {
+          "weight": 30,
+          "rewards": {
+            "item.soul_crystal": 1,
+            "item.demon_core": 2
           }
         }
       ],
@@ -615,10 +622,17 @@
       "pool_type": "weighted",
       "outcomes": [
         {
-          "weight": 1,
+          "weight": 1000,
           "rewards": {
             "item.ancestral_blood": 1,
             "faction_reputation.beast": 30
+          }
+        },
+        {
+          "weight": 30,
+          "rewards": {
+            "item.ancestral_blood": 2,
+            "faction_reputation.beast": 20
           }
         }
       ],
