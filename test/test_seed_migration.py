@@ -330,6 +330,7 @@ def old_official_materials() -> bytes:
             "item.herb.time_trace",
             "item.grain.cloud_rice",
             "item.food.cloud_rice_meal",
+            "item.material.ward_plate",
         }
     ]
     blob = (json.dumps(document, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
@@ -404,6 +405,16 @@ def old_official_locations() -> bytes:
         (
             '      "actions": [\n        "economy.trade.three_realms",\n        "instance.secret_realm.trade_port_convoy"\n      ]',
             '      "actions": [\n        "economy.trade.three_realms"\n      ]',
+        ),
+        # The inert-location slice registered one exploration mode on the array
+        # hall and one on the war front, so the reversed blob drops both.
+        (
+            '      "actions": [\n        "progression.recover_foundation_shock",\n        "explore.array_hall_drill"\n      ]',
+            '      "actions": [\n        "progression.recover_foundation_shock"\n      ]',
+        ),
+        (
+            '      "actions": ["event.demon_invasion", "explore.war_front_patrol"]',
+            '      "actions": ["event.demon_invasion"]',
         ),
     )
     for new_line, old_line in action_reverts:
@@ -847,6 +858,13 @@ PLACE_CODEX_ADDED = frozenset(
         "codex.story.xuantian.road.wanderer",
         "codex.route.seeker_herb_tending",
         "codex.story.xuantian.road.sojourner",
+        "codex.escort.array_hall_drill",
+        "codex.escort.war_front_patrol",
+        "codex.creature.array_hall_sentry",
+        "codex.creature.war_front_vanguard",
+        "codex.creature.jade_rat",
+        "codex.creature.cloud_elk",
+        "codex.material.ward_plate",
     }
 )
 
@@ -893,9 +911,14 @@ def old_official_pills() -> bytes:
 
 def old_official_companions() -> bytes:
     # Reserialised by the companion-evolution slice; see old_official_daily_tasks.
-    return _registered_old_blob(
-        COMPANION_FILE, (SEED_FIXTURES / "companions.json").read_bytes()
-    )
+    # The evolution slice also appended two codex_entry_key properties (jade_rat,
+    # cloud_elk), so the reversed blob must strip those again.
+    text = (SEED_FIXTURES / "companions.json").read_text(encoding="utf-8")
+    for tail in ("jade_rat", "cloud_elk"):
+        pattern = f',\n      "codex_entry_key": "codex.creature.{tail}"'
+        assert pattern in text, tail
+        text = text.replace(pattern, "", 1)
+    return _registered_old_blob(COMPANION_FILE, text.encode("utf-8"))
 
 
 def old_official_companion_evolutions() -> bytes:
@@ -918,6 +941,7 @@ def old_official_recipes() -> bytes:
                 "recipe.pill.time_ward",
                 "recipe.array.time_anchor",
                 "recipe.food.cloud_rice_meal",
+                "recipe.array.war_front_ward",
             }
         ),
     )
