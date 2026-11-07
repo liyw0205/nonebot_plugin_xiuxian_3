@@ -1898,6 +1898,13 @@
       "desc": "亲自照看灵田灵草后记下的田园见闻。",
       "category": "route",
       "status": "active"
+    },
+    {
+      "key": "codex.story.xuantian.road.sojourner",
+      "name": "闲居岁月",
+      "desc": "以闲居安排安顿岁月后留下的玄天故事见闻。",
+      "category": "story",
+      "status": "active"
     }
 
   ]

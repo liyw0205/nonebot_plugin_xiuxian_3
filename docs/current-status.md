@@ -77,6 +77,45 @@ M5 最终当前树本地阶段验收、审查与提交推送已完成；保留�
 主线剧情与离线成长首个真实纵向切片已推送 `42d1772`；不扩成 84 条主线批量填充，
 不重做 M9 数据，不把现存 PvP 入口描述成完整开放世界竞技生态。
 
+贸易端点秘境与商路里程碑切片已在 `develop` 完成（P1+P2）：`data/冒险/秘境.json` 为
+两处此前已开放却无任何活动的贸易端点各补一条通用 `common` 秘境——`instance.secret_realm.abyss_market_run`
+（魔渊契约集市，别名 `魔渊集市秘境`，地点 `demon.abyss_market`，元婴 L1，体力 20，周限 2，无凭证，
+路线 资源→遭遇→选择，敌人 `enemy.abyss_market_warden`，首通魔核×2 + 集市名望 8，重复 2:1 权重池）
+与 `instance.secret_realm.trade_port_convoy`（三界货栈，别名 `贸易口秘境`，
+`beast.three_realms_trade_port`，敌人 `enemy.trade_port_smuggler`，首通兽血×2 + 贸易口名望 8）；
+`data/战斗/敌人.json` 新增两名同地点敌人，`data/地图/地点.json` 在两处端点 `actions` 各登记对应
+秘境键以保证可发现。两条记录为纯内容，由既有通用秘境引擎驱动，不新增命令/表/字段/物品/遭遇池
+（通用引擎不读遭遇池）。`data/图鉴/里程碑.json` 15 → 16 条，新增 `codex.place.markets_two`
+（双市通商：`codex.place.demon_market` + `codex.place.trade_port` → `local.demon.abyss_market` +6，
+`unlocks` 空）。聚焦证据：`test_trade_endpoint_realms.py` 8 passed、`test_trade_market_milestone.py`
+3 passed、`test_codex_milestone_content.py`/`test_codex_milestone_v09.py` 计数与顺序回归通过、
+受影响回归 `test_combat_content`/`test_secret_realm_expansion`/`test_secret_realm_intro`/
+`test_m9_content_integrity` 30 passed。三份被改官方种子的迁移清单 `new_sha256`/`old_sha256` 累计
+与地点反向助手在收尾统一提交后再并入，未跑全量/压测/部署，未验 QQ 真机。
+
+寻道期闲居与图鉴切片已在 `develop` 完成（P3）：`data/生活/生活.json` 由 11 条闲居路线扩到 13 条，
+补上此前整档缺失的 `seeker`（寻道期）路线——`idle.seeker_herb_tending`（灵田照看：有效居所、1 精力、
+4 小时、每日 1 次，完整/逾时所得均在全新 `codex.route.seeker_herb_tending` 图鉴条目上记下见闻）与
+`idle.seeker_town_inquiry`（镇中问询：青石镇名望 ≥10、1 体力、3 小时、每日 1 次，独立加权池）。
+`data/奖励/奖励.json` 新增四条 `reward_pool.idle.seeker_*`（含保底），`data/图鉴/条目.json` 新增一个
+`route` 类条目。消费者为零改动：`idle_rules` 从内容派生门槛、池与 `codex.*` 奖励，`idle_repository`
+已在领取事务内投影图鉴并幂等。聚焦证据：`test_idle_seeker_codex_routes.py` 3 passed（加载契约与门槛、
+居所门禁与拒绝、真实结算支付奖励并记录图鉴、保底、每日限次、回放）、`test_idle_endgame_routes.py`
+计数 11→13 更新后与 `test_idle_mid_routes`/`test_idle_content`/`test_idle` 合计 16 passed。
+未跑全量/压测/部署，未验 QQ 真机。
+
+玄天之路第五分支（闲居 / `idle_claims`）已在 `develop` 完成（P4）：`data/剧情/故事.json` 的四分支
+扩到五条，新增 `sojourner`（闲居，别名「闲居者」：结局 `ending.sojourner`、旗标 `flag.road.sojourner`、
+外观 `appearance.home.sojourner`、图鉴 `codex.story.xuantian.road.sojourner`，门槛两次已结算闲居安排），
+使用**新来源类型** `idle_claims`。`story_rules._SOURCE_KINDS` 增列该类型；`story_repository._story_evidence`
+新增该分支分支臂，按本人 `idle_assignments` 中 `status IN ('claimed','expired')` 且 `claim_operation_id`
+非空的真实结算操作计数，`harvest_or_dispatch` 之外的 `else` 收窄为显式 `elif`，避免新类型落入旧臂。
+`data/图鉴/条目.json` 新增一个 `story` 类条目。选路/领奖/名望/旗标/图鉴投影与 operation 幂等语义不变。
+聚焦证据：`test_story_fifth_branch.py` 2 passed（内容契约与解析、真实闲居结算就绪、门槛下拒绝、
+选择+领奖+回放、其他分支来源未受影响）、`test_story_fourth_branch.py` 计数 4→5 更新后与
+`test_story_rules.py` 合计 4 passed。`剧情/故事.json` 沿用既有先例不加迁移规则（该官方种子从未登记），
+由内容清单分发。未跑全量/压测/部署，未验 QQ 真机。
+
 `chapter.2.stage.2` 云城初见内容化切片已在 `develop` 完成：正文、`travel_arrival`
 目标（结算后的公开抵达 `xuantian.cloud_city`）、行动、首通状态事件、`next_stage_key`
 指向 `chapter.2.stage.3` 与失败重试规则均已落地，沿用现有 objective 消费者与

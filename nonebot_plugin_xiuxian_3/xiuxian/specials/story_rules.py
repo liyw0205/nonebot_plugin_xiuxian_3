@@ -11,7 +11,7 @@ from ..rewards.rules import RewardContentError, reward_definition
 
 STORY_KEY = "story.xuantian.road"
 CLAIM_OPERATION = "specials.claim_story_ending"
-_SOURCE_KINDS = {"commission", "battle", "harvest_or_dispatch"}
+_SOURCE_KINDS = {"commission", "battle", "harvest_or_dispatch", "idle_claims"}
 
 
 class StoryContentError(ContentError):

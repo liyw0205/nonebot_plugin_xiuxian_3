@@ -63,7 +63,9 @@ def test_fourth_story_branch_is_content_backed_and_resolves() -> None:
     bundle = ContentBundle.load(DATA)
     definition = story_definition(bundle)
     keys = [branch.key for branch in definition.branches]
-    assert len(keys) == 4
+    # Four branches through the wanderer slice, plus the sojourner branch
+    # added by the fifth-branch (idle_claims) slice.
+    assert len(keys) == 5
     assert keys.count(BRANCH) == 1
     branch = next(item for item in definition.branches if item.key == BRANCH)
     assert branch.required_source_count == REQUIRED

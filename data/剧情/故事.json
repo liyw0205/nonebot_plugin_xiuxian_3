@@ -68,6 +68,20 @@
           "codex_entry_key": "codex.story.xuantian.road.wanderer",
           "appearance_key": "appearance.home.wanderer",
           "completed_nodes": ["node.arrival", "node.wanderer.1", "node.wanderer.2"]
+        },
+        {
+          "key": "sojourner",
+          "name": "闲居",
+          "desc": "在青石镇的闲居安排中安顿岁月，积攒一段闲居见闻。",
+          "aliases": ["闲居者"],
+          "required_source_count": 2,
+          "source_kind": "idle_claims",
+          "source_label": "已结算闲居安排",
+          "ending_key": "ending.sojourner",
+          "flag_key": "flag.road.sojourner",
+          "codex_entry_key": "codex.story.xuantian.road.sojourner",
+          "appearance_key": "appearance.home.sojourner",
+          "completed_nodes": ["node.arrival", "node.sojourner.1"]
         }
       ]
     }

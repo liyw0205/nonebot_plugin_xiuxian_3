@@ -415,7 +415,7 @@ class StoryRepositoryMixin:
                         if len(wins) == branch.required_source_count:
                             break
                 evidence[branch.key] = wins
-            else:
+            elif branch.source_kind == "harvest_or_dispatch":
                 harvests: list[str] = []
                 for row in connection.execute(
                     "SELECT operation_id,result_json FROM operations "
@@ -444,6 +444,18 @@ class StoryRepositoryMixin:
                     if len(harvests) >= branch.required_source_count
                     else dispatches
                 )
+            elif branch.source_kind == "idle_claims":
+                claims: list[str] = []
+                for row in connection.execute(
+                    "SELECT claim_operation_id,result_json FROM idle_assignments "
+                    "WHERE player_id=? AND status IN ('claimed', 'expired') "
+                    "AND claim_operation_id IS NOT NULL ORDER BY id DESC",
+                    (player_id,),
+                ).fetchall():
+                    claims.append(str(row["claim_operation_id"]))
+                    if len(claims) == branch.required_source_count:
+                        break
+                evidence[branch.key] = claims
         return evidence
 
     def _story_record(
