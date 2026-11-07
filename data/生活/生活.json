@@ -1213,6 +1213,56 @@
       "key": "idle.dao_settlement_watch",
       "record_type": "idle_route",
       "status": "active"
+    },
+    {
+      "name": "灵田照看",
+      "desc": "在自家灵田照看灵草长势，收得灵草与一份灵田见闻。",
+      "aliases": [
+        "灵田照看",
+        "照看灵田"
+      ],
+      "duration_seconds": 14400,
+      "cost": {
+        "stamina": 0,
+        "energy": 1
+      },
+      "daily_limit": 1,
+      "requirements": {
+        "stage": "seeker",
+        "active_residence": true
+      },
+      "reward_pool_key": "reward_pool.idle.seeker_herb_tending",
+      "fallback_reward_pool_key": "reward_pool.idle.seeker_herb_tending.fallback",
+      "durability_cost_bp": 0,
+      "key": "idle.seeker_herb_tending",
+      "record_type": "idle_route",
+      "status": "active"
+    },
+    {
+      "name": "镇中问询",
+      "desc": "在青石镇中替乡邻问询杂务，积攒灵石与青石镇名望。",
+      "aliases": [
+        "镇中问询",
+        "问询杂务"
+      ],
+      "duration_seconds": 10800,
+      "cost": {
+        "stamina": 1,
+        "energy": 0
+      },
+      "daily_limit": 1,
+      "requirements": {
+        "stage": "seeker",
+        "local_reputation": {
+          "local.xuantian.new_town": 10
+        }
+      },
+      "reward_pool_key": "reward_pool.idle.seeker_town_inquiry",
+      "fallback_reward_pool_key": "reward_pool.idle.seeker_town_inquiry.fallback",
+      "durability_cost_bp": 0,
+      "key": "idle.seeker_town_inquiry",
+      "record_type": "idle_route",
+      "status": "active"
     }
   ],
   "schema": "xiuxian.content"

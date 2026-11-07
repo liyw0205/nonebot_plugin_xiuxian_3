@@ -1990,6 +1990,52 @@
       ],
       "key": "reward_pool.exploration.spirit_field_tending",
       "status": "active"
+    },
+    {
+      "name": "灵田照看所得",
+      "desc": "照看灵田所得的灵草，并记下一份灵田见闻。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 1, "rewards": {"item.herb.blood_grass": 2, "item.herb.spirit_leaf": 1, "codex.route.seeker_herb_tending": 1}},
+        {"weight": 1, "rewards": {"item.herb.blood_grass": 3, "item.herb.spirit_leaf": 1, "codex.route.seeker_herb_tending": 1}},
+        {"weight": 1, "rewards": {"item.herb.blood_grass": 2, "item.herb.spirit_leaf": 2, "codex.route.seeker_herb_tending": 1}},
+        {"weight": 1, "rewards": {"item.herb.blood_grass": 4, "item.herb.spirit_leaf": 1, "codex.route.seeker_herb_tending": 1}}
+      ],
+      "key": "reward_pool.idle.seeker_herb_tending",
+      "status": "active"
+    },
+    {
+      "name": "灵田照看保底所得",
+      "desc": "逾时后仍可领取的一份止血草与灵田见闻。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 1, "rewards": {"item.herb.blood_grass": 1, "codex.route.seeker_herb_tending": 1}}
+      ],
+      "key": "reward_pool.idle.seeker_herb_tending.fallback",
+      "status": "active"
+    },
+    {
+      "name": "镇中问询所得",
+      "desc": "在青石镇替乡邻问询杂务所得的灵石与青石镇名望。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 1, "rewards": {"spirit_stones": 30, "local.xuantian.new_town": 2}},
+        {"weight": 1, "rewards": {"spirit_stones": 34, "local.xuantian.new_town": 2}},
+        {"weight": 1, "rewards": {"spirit_stones": 38, "local.xuantian.new_town": 2}},
+        {"weight": 1, "rewards": {"spirit_stones": 42, "local.xuantian.new_town": 3}}
+      ],
+      "key": "reward_pool.idle.seeker_town_inquiry",
+      "status": "active"
+    },
+    {
+      "name": "镇中问询保底所得",
+      "desc": "逾时后仍可领取的少量灵石与青石镇名望。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 1, "rewards": {"spirit_stones": 15, "local.xuantian.new_town": 1}}
+      ],
+      "key": "reward_pool.idle.seeker_town_inquiry.fallback",
+      "status": "active"
     }
   ],
   "schema": "xiuxian.content"

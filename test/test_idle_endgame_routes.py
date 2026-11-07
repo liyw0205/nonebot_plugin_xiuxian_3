@@ -37,7 +37,9 @@ def _row(result, key: str):
 
 def test_endgame_routes_load_with_reachable_gates_and_pools() -> None:
     definitions = idle_route_definitions()
-    assert len(definitions) == 11
+    # 11 routes through the endgame slice, plus the two seeker-tier routes
+    # added by the idle seeker/codex slice.
+    assert len(definitions) == 13
 
     refuge = definitions["idle.domain_refuge_watch"]
     assert refuge.required_project_contribution == ("project.domain_refuge", 10)

@@ -1891,6 +1891,13 @@
       "desc": "数度历战归来，青石镇外的山水行脚见闻写入玄天故事。",
       "category": "story",
       "status": "active"
+    },
+    {
+      "key": "codex.route.seeker_herb_tending",
+      "name": "灵田照看见闻",
+      "desc": "亲自照看灵田灵草后记下的田园见闻。",
+      "category": "route",
+      "status": "active"
     }
 
   ]
