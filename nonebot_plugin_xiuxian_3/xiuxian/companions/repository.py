@@ -37,6 +37,7 @@ from .interaction_content import (
     companion_interaction_definition,
 )
 from ..utils.operations import operation_replay
+from ..specials.codex_projection import record_codex_discovery
 from ..utils.player import (
     PLAYER_NUMERIC_FIELDS,
     change_player_state,
@@ -590,6 +591,20 @@ class CompanionRepositoryMixin:
                         instance["id"],
                     ),
                 )
+                if target.codex_entry_key:
+                    record_codex_discovery(
+                        connection,
+                        player_id=int(player["id"]),
+                        entry_key=target.codex_entry_key,
+                        operation_id=operation_id,
+                        occurred_at=now_text,
+                        snapshot={
+                            "evolution_key": evolution.key,
+                            "source_key": evolution.source_key,
+                            "target_key": evolution.target_key,
+                        },
+                        content=getattr(self, "content", None),
+                    )
                 outcome = "evolved"
             else:
                 injury_until = (

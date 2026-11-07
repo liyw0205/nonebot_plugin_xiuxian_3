@@ -1702,6 +1702,53 @@
         "云纹饭"
       ],
       "desc": "把云纹稻谷细细蒸熟，做成能补充体力或精力的灵米饭食。"
+    },
+    {
+      "key": "recipe.array.war_front_ward",
+      "name": "战线护阵",
+      "profession": "formation",
+      "inputs": {
+        "item.material.ward_plate": 2,
+        "item.mat.array_sand": 2
+      },
+      "energy_cost": 12,
+      "duration_seconds": 240,
+      "daily_limit": 2,
+      "tool_key": null,
+      "tool_cost_bp": 0,
+      "currency_cost": 120,
+      "outputs": {
+        "item.array.war_front_ward": 1
+      },
+      "high_quality_bonus": {},
+      "failure_refunds": {
+        "item.material.ward_plate": 1,
+        "item.mat.array_sand": 1
+      },
+      "min_realm_layer": 1,
+      "required_realm": "nascent_soul",
+      "additional_realms": [],
+      "proficiency_bp": 5000,
+      "required_location": [
+        "xuantian.array_hall"
+      ],
+      "teaching_allowed": false,
+      "required_path": null,
+      "required_paths": [],
+      "required_subprofession": [],
+      "success_threshold_bp": 6000,
+      "high_quality_threshold_bp": 8000,
+      "facility_kind": "array",
+      "failure_refund_bp": null,
+      "binding_kind": null,
+      "binding_duration_seconds": 0,
+      "binding_slot_limit": 0,
+      "cross_realm_faction": null,
+      "status": "active",
+      "desc": "以阵盘残片重布护阵，在魔界战线展开后可压制越界之敌半天。",
+      "aliases": [
+        "战线护阵"
+      ]
     }
   ]
 }

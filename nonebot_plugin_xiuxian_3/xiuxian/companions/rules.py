@@ -28,6 +28,7 @@ class CompanionDefinition:
     effect: dict[str, Any] | None = None
     instance_mode: str | None = None
     durability_bp: int = 0
+    codex_entry_key: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -118,6 +119,7 @@ def companion_definitions(content: ContentBundle | None = None) -> dict[str, Com
             effect=dict(effect or {}),
             instance_mode=str(row["instance_mode"]) if row.get("instance_mode") else None,
             durability_bp=int(row.get("durability_bp", 0)),
+            codex_entry_key=str(row["codex_entry_key"]) if row.get("codex_entry_key") else None,
         )
     return result
 

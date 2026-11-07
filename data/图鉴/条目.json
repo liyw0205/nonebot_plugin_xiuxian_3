@@ -1452,6 +1452,13 @@
       "status": "active"
     },
     {
+      "key": "codex.material.ward_plate",
+      "name": "阵盘残片",
+      "desc": "魔界战线与阵堂回收的阵盘残片；首次获得后，材料来路与用途线索会收入图鉴。",
+      "category": "material",
+      "status": "active"
+    },
+    {
       "key": "codex.creature.cloud_beast",
       "name": "云铁矿兽",
       "desc": "栖居矿脉深处，以铁砂护体；战斗结算确认踪迹后，矿区异兽记录方可点亮。",
@@ -1904,6 +1911,48 @@
       "name": "闲居岁月",
       "desc": "以闲居安排安顿岁月后留下的玄天故事见闻。",
       "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.escort.array_hall_drill",
+      "name": "阵堂校阵记",
+      "desc": "在阵堂校验阵纹、击退失序试阵傀儡后，阵堂见闻收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.escort.war_front_patrol",
+      "name": "战线巡防记",
+      "desc": "沿魔界战线巡防、击退越界先锋后，前线见闻收入图鉴。",
+      "category": "challenge",
+      "status": "active"
+    },
+    {
+      "key": "codex.creature.array_hall_sentry",
+      "name": "试阵傀儡",
+      "desc": "阵堂中校验阵纹的木铁傀儡；战斗结算确认踪迹后，记录方可点亮。",
+      "category": "creature",
+      "status": "active"
+    },
+    {
+      "key": "codex.creature.war_front_vanguard",
+      "name": "魔界先锋军士",
+      "desc": "越界试探的魔界先锋；战斗结算确认踪迹后，记录方可点亮。",
+      "category": "creature",
+      "status": "active"
+    },
+    {
+      "key": "codex.creature.jade_rat",
+      "name": "玉背鼠",
+      "desc": "由铁背鼠蜕变而来的灵鼠；引导蜕变完成后，记录方可点亮。",
+      "category": "creature",
+      "status": "active"
+    },
+    {
+      "key": "codex.creature.cloud_elk",
+      "name": "云角鹿",
+      "desc": "由竹鹿蜕变而来的灵骑；引导蜕变完成后，记录方可点亮。",
+      "category": "creature",
       "status": "active"
     }
 

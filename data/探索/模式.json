@@ -530,6 +530,44 @@
       "enemy_pool_key": "encounter.spirit_field_tending",
       "access_any": [],
       "status": "open"
+    },
+    {
+      "key": "explore.array_hall_drill",
+      "name": "阵堂值守",
+      "desc": "在玄天阵堂替值守弟子校验阵纹，从失序的试阵傀儡手中夺回阵材。",
+      "aliases": ["阵堂值守", "校验阵纹"],
+      "location_key": "xuantian.array_hall",
+      "required_realm": "qi_gathering",
+      "required_layer": 1,
+      "duration_seconds": 120,
+      "stamina_cost": 6,
+      "energy_cost": 0,
+      "daily_limit": 5,
+      "random_pool": "gather.array_hall_drill",
+      "reward_pool_key": "reward_pool.exploration.array_hall_drill",
+      "battle_chance_bp": 2500,
+      "enemy_pool_key": "encounter.array_hall_drill",
+      "access_any": [],
+      "status": "open"
+    },
+    {
+      "key": "explore.war_front_patrol",
+      "name": "战线巡防",
+      "desc": "沿魔界战线巡防，清理越界的先锋军士，回收散落的阵盘残片。",
+      "aliases": ["战线巡防", "巡防战线"],
+      "location_key": "xuantian.war_front",
+      "required_realm": "nascent_soul",
+      "required_layer": 1,
+      "duration_seconds": 300,
+      "stamina_cost": 12,
+      "energy_cost": 0,
+      "daily_limit": 3,
+      "random_pool": "gather.war_front_patrol",
+      "reward_pool_key": "reward_pool.exploration.war_front_patrol",
+      "battle_chance_bp": 3000,
+      "enemy_pool_key": "encounter.war_front_patrol",
+      "access_any": [],
+      "status": "open"
     }
   ]
 }

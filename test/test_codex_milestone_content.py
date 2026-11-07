@@ -32,6 +32,7 @@ SHIPPED = (
     "codex.place.grotto_three",
     "codex.place.city_three",
     "codex.place.markets_two",
+    "codex.creature.evolutions_two",
 )
 
 
@@ -51,7 +52,7 @@ def test_milestones_cover_every_referenced_entry_with_a_real_reward() -> None:
     bundle = ContentBundle.load(DATA)
     milestones = codex_milestones(bundle)
     assert tuple(milestones) == SHIPPED
-    assert len(milestones) == 16
+    assert len(milestones) == 17
 
     for key, definition in milestones.items():
         assert definition.entry_keys, key

@@ -294,6 +294,23 @@
       },
       "unlocks": [],
       "status": "active"
+    },
+    {
+      "key": "codex.creature.evolutions_two",
+      "name": "蜕变双录",
+      "desc": "收录玉背鼠与云角鹿两条蜕变线的灵兽图鉴后领取。",
+      "entry_keys": [
+        "codex.creature.jade_rat",
+        "codex.creature.cloud_elk"
+      ],
+      "reward": {
+        "type": "local_reputation",
+        "reputation_key": "local.xuantian.new_town",
+        "name": "青石镇名望",
+        "amount": 6
+      },
+      "unlocks": [],
+      "status": "active"
     }
   ]
 }

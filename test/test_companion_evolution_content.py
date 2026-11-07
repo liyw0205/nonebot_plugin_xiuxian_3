@@ -142,6 +142,18 @@ def test_evolution_edges_fire_for_both_kinds() -> None:
                 ).fetchall()
             assert (rows[0][0], rows[0][1], rows[0][2]) == ("beast.jade_rat", "evolved", 2)
             assert (rows[1][0], rows[1][1], rows[1][2]) == ("mount.cloud_elk", "evolved", 1)
+            # The evolved creature is recorded in the codex, so the new
+            # creature entries are reachable from the evolution itself.
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                entries = {
+                    row[0]
+                    for row in connection.execute(
+                        "SELECT entry_key FROM codex_entries WHERE player_id="
+                        "(SELECT id FROM players WHERE platform_user_id=?)",
+                        (user,),
+                    ).fetchall()
+                }
+            assert {"codex.creature.jade_rat", "codex.creature.cloud_elk"} <= entries, entries
             # An evolved instance is pinned: evolving again is rejected even
             # with materials on hand.
             third = await runtime.dispatch(

@@ -2036,6 +2036,56 @@
       ],
       "key": "reward_pool.idle.seeker_town_inquiry.fallback",
       "status": "active"
+    },
+    {
+      "name": "阵堂校阵所得",
+      "desc": "校验阵纹时收得的阵砂与灵石，偶有阵堂残页；按权重抽取。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 40, "rewards": {"item.mat.array_sand": 1, "spirit_stones": 18}},
+        {"weight": 30, "rewards": {"item.mat.array_sand": 2, "spirit_stones": 26}},
+        {"weight": 20, "rewards": {"item.mat.array_sand": 2, "spirit_stones": 34, "item.herb.spirit_leaf": 1}},
+        {"weight": 10, "rewards": {"item.mat.array_sand": 3, "spirit_stones": 44, "item.material.ward_plate": 1}}
+      ],
+      "key": "reward_pool.exploration.array_hall_drill",
+      "status": "active"
+    },
+    {
+      "name": "战线巡防所得",
+      "desc": "巡防战线回收的阵盘残片、云铁与灵石；按权重抽取。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 35, "rewards": {"item.material.ward_plate": 1, "spirit_stones": 40}},
+        {"weight": 30, "rewards": {"item.material.ward_plate": 1, "item.material.cloud_iron": 1, "spirit_stones": 55}},
+        {"weight": 25, "rewards": {"item.material.ward_plate": 2, "item.herb.spirit_leaf": 2, "spirit_stones": 70}},
+        {"weight": 10, "rewards": {"item.material.ward_plate": 2, "item.material.cloud_iron": 2, "spirit_stones": 90}}
+      ],
+      "key": "reward_pool.exploration.war_front_patrol",
+      "status": "active"
+    },
+    {
+      "name": "试阵傀儡掉落",
+      "desc": "被击散的试阵傀儡留下的阵砂与阵堂残页。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 5, "rewards": {"item.mat.array_sand": 2, "spirit_stones": 30}},
+        {"weight": 3, "rewards": {"item.mat.array_sand": 1, "item.material.ward_plate": 1, "spirit_stones": 40}},
+        {"weight": 2, "rewards": {"item.mat.array_sand": 3, "spirit_stones": 50}}
+      ],
+      "key": "reward_pool.enemy.array_hall",
+      "status": "active"
+    },
+    {
+      "name": "魔界先锋掉落",
+      "desc": "击退越界先锋后缴获的高阶材料与阵盘残片。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 5, "rewards": {"item.material.ward_plate": 1, "spirit_stones": 140}},
+        {"weight": 3, "rewards": {"item.demon_core": 1, "spirit_stones": 170}},
+        {"weight": 2, "rewards": {"item.material.ward_plate": 2, "item.demon_core": 1, "spirit_stones": 200}}
+      ],
+      "key": "reward_pool.enemy.war_front",
+      "status": "active"
     }
   ],
   "schema": "xiuxian.content"

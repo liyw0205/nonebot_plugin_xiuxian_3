@@ -157,6 +157,28 @@
         {"operation": "bounty.claim", "reference": "reward_pool.bounty.void_anchoring"}
       ],
       "status": "active"
+    },
+    {
+      "key": "source.item.ward_plate",
+      "name": "阵盘残片来源",
+      "desc": "魔界战线巡防与阵堂回收取得，用于重布战线护阵。",
+      "asset_keys": ["item.material.ward_plate"],
+      "channels": [
+        {"operation": "exploration.settle", "reference": "reward_pool.exploration.war_front_patrol"},
+        {"operation": "battle.claim", "reference": "reward_pool.enemy.war_front"},
+        {"operation": "production.settle", "reference": "recipe.array.war_front_ward"}
+      ],
+      "status": "active"
+    },
+    {
+      "key": "source.item.war_front_ward",
+      "name": "战线护阵来源",
+      "desc": "由阵盘残片与阵砂在阵堂公开生产。",
+      "asset_keys": ["item.array.war_front_ward"],
+      "channels": [
+        {"operation": "production.settle", "reference": "recipe.array.war_front_ward"}
+      ],
+      "status": "active"
     }
   ]
 }

@@ -1132,6 +1132,78 @@
       },
       "key": "enemy.trade_port_smuggler",
       "status": "active"
+    },
+    {
+      "name": "试阵傀儡",
+      "desc": "阵堂中校验阵纹的木铁傀儡，阵纹失序时便会自行运转，撞见弟子就挥臂驱赶。",
+      "location_key": "xuantian.array_hall",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "qi_gathering",
+          "min_layer": 1
+        }
+      ],
+      "stats": {
+        "hp": 200,
+        "attack": 24,
+        "initiative": 11,
+        "agility": 9
+      },
+      "skills": [
+        "enemy_skill.charge"
+      ],
+      "behavior": {
+        "can_critical": false,
+        "can_escape": false
+      },
+      "reward_refs": [],
+      "combat_profile": {
+        "random_pool_key": "battle.enemy.array_hall_sentry",
+        "reward": {
+          "spirit_stones": 14
+        },
+        "drop_pool_key": "reward_pool.enemy.array_hall"
+      },
+      "codex_entry_key": "codex.creature.array_hall_sentry",
+      "key": "enemy.array_hall_sentry",
+      "status": "active"
+    },
+    {
+      "name": "魔界先锋军士",
+      "desc": "越界试探的魔界先锋，甲胄上还留着战线烟尘，出手狠厉而不留余地。",
+      "location_key": "xuantian.war_front",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "nascent_soul",
+          "min_layer": 1
+        }
+      ],
+      "stats": {
+        "hp": 560,
+        "attack": 48,
+        "initiative": 23,
+        "agility": 21
+      },
+      "skills": [
+        "enemy_skill.blade_wave"
+      ],
+      "behavior": {
+        "can_critical": true,
+        "can_escape": false
+      },
+      "reward_refs": [],
+      "combat_profile": {
+        "random_pool_key": "battle.enemy.war_front_vanguard",
+        "reward": {
+          "spirit_stones": 32
+        },
+        "drop_pool_key": "reward_pool.enemy.war_front"
+      },
+      "codex_entry_key": "codex.creature.war_front_vanguard",
+      "key": "enemy.war_front_vanguard",
+      "status": "active"
     }
   ],
   "schema": "xiuxian.content"

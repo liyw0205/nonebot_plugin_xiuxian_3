@@ -11,8 +11,14 @@ from typing import Any
 from ...contracts import serialize_datetime
 from ..utils.assets import inventory_amount, spend_player_assets, spend_sect_currency, player_currency
 from ..utils.player import player_inventory
+from ..items.rules import bound_order_duration_multiplier_bp
 from .facility_models import FacilityMaintenanceRecord, FacilitySlotRecord
-from .facility_rules import FACILITY_DURATION_BONUS_BP, FACILITY_MAINTENANCE_FEE, resolve_facility
+from .facility_rules import (
+    FACILITY_DURATION_BONUS_BP,
+    FACILITY_LOCATION,
+    FACILITY_MAINTENANCE_FEE,
+    resolve_facility,
+)
 from ..persistence.errors import (
     FacilityMaintenanceUnpaidError,
     FacilityOwnerRequirementError,
@@ -294,16 +300,29 @@ class FacilityRepositoryMixin:
             raise FacilityMaintenanceUnpaidError("facility maintenance is unpaid")
         raise FacilitySlotNotClaimedError("claim a facility slot before production")
 
-    @staticmethod
-    def _facility_duration_seconds(row: sqlite3.Row, recipe, *, base_seconds: int | None = None) -> int:
-        """Apply the non-stacking gathering-array speed bonus to a bound order."""
+    def _facility_duration_seconds(self, row: sqlite3.Row, recipe, *, base_seconds: int | None = None) -> int:
+        """Apply the strongest declared array speed bonus to a bound order.
+
+        The bonus comes from the held array item's own
+        ``production_duration_multiplier_bp`` effect, so a new array or a changed
+        declared value is honoured without touching this code. The default
+        distributed value stays ``FACILITY_DURATION_BONUS_BP`` (via the shipped
+        ``item.array.gathering_basic`` data).
+        """
 
         duration = int(base_seconds if base_seconds is not None else recipe.duration_seconds)
-        if getattr(recipe, "facility_kind", None) and str(row["location_key"]) == "cave.mist_grotto_2":
-            inventory = player_inventory(row)
-            if inventory_amount(inventory, "item.array.gathering_basic") > 0:
-                return max(1, duration * (10000 - FACILITY_DURATION_BONUS_BP) // 10000)
-        return duration
+        if not getattr(recipe, "facility_kind", None):
+            return duration
+        if str(row["location_key"]) != FACILITY_LOCATION:
+            return duration
+        multiplier = bound_order_duration_multiplier_bp(
+            player_inventory(row), getattr(self, "content", None)
+        )
+        if multiplier is None:
+            multiplier = FACILITY_DURATION_BONUS_BP
+            if inventory_amount(player_inventory(row), "item.array.gathering_basic") <= 0:
+                return duration
+        return max(1, duration * (10000 - multiplier) // 10000)
 
     @staticmethod
     def _facility_payload(row: sqlite3.Row) -> dict[str, Any]:

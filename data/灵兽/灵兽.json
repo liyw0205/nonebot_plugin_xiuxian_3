@@ -125,6 +125,7 @@
       },
       "capacity_per_player": 3,
       "key": "beast.jade_rat",
+      "codex_entry_key": "codex.creature.jade_rat",
       "status": "active"
     },
     {
@@ -147,6 +148,7 @@
       },
       "capacity_per_player": 2,
       "key": "mount.cloud_elk",
+      "codex_entry_key": "codex.creature.cloud_elk",
       "status": "active"
     }
   ],

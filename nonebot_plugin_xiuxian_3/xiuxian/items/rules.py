@@ -172,6 +172,46 @@ ITEM_ALIASES = item_aliases()
 ITEM_DEFINITIONS = _content_item_definitions()
 ITEM_LABELS = {key: definition.name for key, definition in ITEM_DEFINITIONS.items()}
 
+BOUND_ORDER_DURATION_EFFECT = "production_duration_multiplier_bp"
+
+
+def bound_order_duration_multiplier_bp(
+    inventory: dict[str, int], content: ContentBundle | None = None
+) -> int | None:
+    """Return the strongest *declared* bound-order duration multiplier held.
+
+    A held array item carries its own ``production_duration_multiplier_bp``
+    effect, so the facility order speed-up is read from the item's data rather
+    than a hardcoded key/value pair. Only effects scoped to a bound order (or
+    with no declared scope) apply; the strongest declared multiplier wins when
+    several arrays are held. Returns ``None`` when no array declares one.
+    """
+
+    records = item_records(content)
+    best: int | None = None
+    for raw_key, raw_quantity in inventory.items():
+        try:
+            quantity = int(raw_quantity)
+        except (TypeError, ValueError):
+            continue
+        if quantity <= 0:
+            continue
+        record = records.get(str(raw_key))
+        if record is None:
+            continue
+        for effect in record.effects:
+            if effect.get("type") != BOUND_ORDER_DURATION_EFFECT:
+                continue
+            if effect.get("scope") not in (None, "bound_order"):
+                continue
+            value = effect.get("value")
+            if isinstance(value, bool) or not isinstance(value, int):
+                continue
+            if not 0 < value < 10_000:
+                continue
+            best = value if best is None else min(best, value)
+    return best
+
 
 def resolve_item(value: str, content: ContentBundle | None = None) -> ItemDefinition:
     definitions = _content_item_definitions(content)
@@ -194,11 +234,13 @@ def resolve_item_record(value: str, content: ContentBundle | None = None) -> Ite
 
 
 __all__ = [
+    "BOUND_ORDER_DURATION_EFFECT",
     "ITEM_ALIASES",
     "ITEM_DEFINITIONS",
     "ITEM_LABELS",
     "ItemDefinition",
     "ItemRecord",
+    "bound_order_duration_multiplier_bp",
     "item_aliases",
     "item_records",
     "resolve_item",

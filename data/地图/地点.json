@@ -301,7 +301,8 @@
         "training_bp": 10500
       },
       "actions": [
-        "progression.recover_foundation_shock"
+        "progression.recover_foundation_shock",
+        "explore.array_hall_drill"
       ],
       "key": "xuantian.array_hall",
       "codex_entry_key": "codex.place.array_hall"
@@ -397,7 +398,7 @@
       "world": "玄天界",
       "status": "active",
       "requirements": [{"type": "realm", "realm_key": "nascent_soul", "min_layer": 1}],
-      "actions": ["event.demon_invasion"],
+      "actions": ["event.demon_invasion", "explore.war_front_patrol"],
       "aliases": ["魔界战场", "玄天魔界战场"],
       "key": "xuantian.war_front",
       "codex_entry_key": "codex.place.war_front"

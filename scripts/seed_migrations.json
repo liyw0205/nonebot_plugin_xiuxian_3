@@ -25,10 +25,11 @@
   },
   "灵兽/灵兽.json": {
     "old_sha256": {
-      "1702a0efb3369a4b9d1fc4133087f88af141c4de42c05acd288116a08656b3c4": "b3f5662b76857aeb410f29f28a4d6b13b190bfcd:data/灵兽/灵兽.json"
+      "1702a0efb3369a4b9d1fc4133087f88af141c4de42c05acd288116a08656b3c4": "b3f5662b76857aeb410f29f28a4d6b13b190bfcd:data/灵兽/灵兽.json",
+      "5910662572585ac5924d8e338b520df3b55484e434f7606731893ea376b5b16e": "f3dbdbdd770aad25b232f2c23c91b32f1a8ccb97:data/灵兽/灵兽.json"
     },
-    "new_sha256": "5910662572585ac5924d8e338b520df3b55484e434f7606731893ea376b5b16e",
-    "new_commit": "f3dbdbdd770aad25b232f2c23c91b32f1a8ccb97"
+    "new_sha256": "b1af669e19739b03a42b65833f190617478b43cc54ad34f170fa37c0a2e11e5d",
+    "new_commit": "PENDING"
   },
   "灵兽/蜕变.json": {
     "old_sha256": {
@@ -42,10 +43,11 @@
       "a1d03eb055fe89b1a240e695589b40edaf1407202a0d5c5f09d722b6131d217e": "579c3ab277d90eafd9d267693be89e678b533282:data/道具/材料.json",
       "eaa2173340385e322c8f4f54339871869d9b42c0bf3b0009a3cbd5ac1f3a2a55": "eaed7115257db5a67933e8bdf833c003319d940d:data/道具/材料.json",
       "677d37e35c44a4459738f2387b12f44ec1d762d184e3d3dc69e88347a12e7350": "c6005eed015ffd9262ff465a7809bd97120f6c02:data/道具/材料.json",
-      "a4afe7f516d5cffbec44d429bf080cfae2cde3a9fbfd90dd7280aa2a9874557c": "0aae79a013b2a1783a4d9a8bd172c81c3d5df126:data/道具/材料.json"
+      "a4afe7f516d5cffbec44d429bf080cfae2cde3a9fbfd90dd7280aa2a9874557c": "0aae79a013b2a1783a4d9a8bd172c81c3d5df126:data/道具/材料.json",
+      "9c60aa30b495be82ad940233ecc6f50e2ce810e1350e856646bbca93364e7692": "6007d3198976b00329ba0205c9e676b7cf7c0044:data/道具/材料.json"
     },
-    "new_sha256": "9c60aa30b495be82ad940233ecc6f50e2ce810e1350e856646bbca93364e7692",
-    "new_commit": "6007d3198976b00329ba0205c9e676b7cf7c0044"
+    "new_sha256": "f94230676682ce3d76a96692f630f2c0ecf3ae9051a75a079f1a6165fb1c484a",
+    "new_commit": "PENDING"
   },
   "道具/丹药.json": {
     "old_sha256": {
@@ -57,10 +59,11 @@
   "生产/配方.json": {
     "old_sha256": {
       "9ae47f249225e626fbdc5d3d507f1738dcf3f819cabef14ad85d7d1b306befd4": "d059905cea0a6a777f8a122394823076f59bed40:data/生产/配方.json",
-      "000ddc804017ead97d6422459d224400d999f1c4bab528cd2f55fe37281937db": "0aae79a013b2a1783a4d9a8bd172c81c3d5df126:data/生产/配方.json"
+      "000ddc804017ead97d6422459d224400d999f1c4bab528cd2f55fe37281937db": "0aae79a013b2a1783a4d9a8bd172c81c3d5df126:data/生产/配方.json",
+      "4b230a8220a760a72688866f53a433c1ac6e2eeb5e68038b491215dad52cdbfd": "6007d3198976b00329ba0205c9e676b7cf7c0044:data/生产/配方.json"
     },
-    "new_sha256": "4b230a8220a760a72688866f53a433c1ac6e2eeb5e68038b491215dad52cdbfd",
-    "new_commit": "6007d3198976b00329ba0205c9e676b7cf7c0044"
+    "new_sha256": "211b45efc2582f416e14d4969078993af6e205de0a3446f17430b80c4bcb2880",
+    "new_commit": "PENDING"
   },
   "剧情/主线.json": {
     "old_sha256": {
@@ -122,39 +125,43 @@
       "b775aa8bdd369b60efa638f944312593e2fbe4d588d73f0199ae5902ba1c0e4f": "2ee45a684fd6bb214374769c4fb8e6e48811c5b7:data/地图/地点.json",
       "4252694487c80791ab766aef5a516bd45824ae6dd86b19ee5aae37c7a6b60988": "38a07cd4aa5a764672adb1faae3da250f2b093eb:data/地图/地点.json",
       "bff9e43057f4283774796a4e02b5d58c3c8db301d1a1378c9bba82ead772fe1d": "e9451c8c1635a2148e04ee288b194a4ea9571935:data/地图/地点.json",
-      "4a7dc937d274f0824b650dacc0c4dc6a98693f474145d42ab4ff754a06784b9a": "0edda3bc1785e976ee8566a7bfd23d7d990511a6:data/地图/地点.json"
+      "4a7dc937d274f0824b650dacc0c4dc6a98693f474145d42ab4ff754a06784b9a": "0edda3bc1785e976ee8566a7bfd23d7d990511a6:data/地图/地点.json",
+      "577ca2e554fe3b5fb786ceeda611b5db3770bf5307de5f275dec4d59f35db9cd": "e6faa2d5b17ceccad9367522291bf813f2f313fa:data/地图/地点.json"
     },
-    "new_sha256": "577ca2e554fe3b5fb786ceeda611b5db3770bf5307de5f275dec4d59f35db9cd",
-    "new_commit": "e6faa2d5b17ceccad9367522291bf813f2f313fa"
+    "new_sha256": "b846681b227d0f9f260a6ac92eb6c79c1c9901b135f1da6e074673499d8987e8",
+    "new_commit": "PENDING"
   },
   "探索/模式.json": {
     "old_sha256": {
       "46b445e534f5e4778923ef2fa29505ecc7fd5212679840a2e89f625ab6655cdb": "2ee45a684fd6bb214374769c4fb8e6e48811c5b7:data/探索/模式.json",
       "2f5c61d8adc3b09c4c9759ff68731deb350fa7370560fbb7c6ae521c560eb472": "c35c1b78adf9c46393de8c3db0dc3606a572751b:data/探索/模式.json",
       "42bb4af46071bbb391cd309c8b1403bec642c3f3e681fe63f2f50679ac8aa6ad": "2f05ee4de43d2c983d2b1b94a573e64d9cfff79a:data/探索/模式.json",
-      "95a81877438ce59e1fefb4054b6eb19149e0354d6d362ce652e9f8db04f19669": "e280d3ae746d065c37b1d7a33512556837ffc43d:data/探索/模式.json"
+      "95a81877438ce59e1fefb4054b6eb19149e0354d6d362ce652e9f8db04f19669": "e280d3ae746d065c37b1d7a33512556837ffc43d:data/探索/模式.json",
+      "8f8e047263edb048abdc668b6e4d3f01b79eae1209c343326a9bb6f6e3b0caba": "721517927a382a0799638159cafbc40ba1504d68:data/探索/模式.json"
     },
-    "new_sha256": "8f8e047263edb048abdc668b6e4d3f01b79eae1209c343326a9bb6f6e3b0caba",
-    "new_commit": "ae925b118070eb6295cbc2eebdfaf3c9bc6a7365"
+    "new_sha256": "d4cebfbcab883232a20745cd9e0b603b35a408fca6356428fc8b62589eb990e4",
+    "new_commit": "PENDING"
   },
   "战斗/敌人.json": {
     "old_sha256": {
       "e171189c111d361becd7f4907993e1dce35456d9ea061fa7565d212d86796726": "2ee45a684fd6bb214374769c4fb8e6e48811c5b7:data/战斗/敌人.json",
       "501f749a4c716b2985e5302347dd2b1e430b0882ace6f09aae4097a3f752c650": "2f05ee4de43d2c983d2b1b94a573e64d9cfff79a:data/战斗/敌人.json",
       "c12c85766491f9fe4601153406f920a8d2cc16bc77c28ccff69831d966705d45": "e9451c8c1635a2148e04ee288b194a4ea9571935:data/战斗/敌人.json",
-      "400fa082d1e377c2bf2b29f62917717bbfff83a8a02924ad557a7410d021d82a": "0edda3bc1785e976ee8566a7bfd23d7d990511a6:data/战斗/敌人.json"
+      "400fa082d1e377c2bf2b29f62917717bbfff83a8a02924ad557a7410d021d82a": "0edda3bc1785e976ee8566a7bfd23d7d990511a6:data/战斗/敌人.json",
+      "b8e25f0ba6e894c52e63e9bb726678ff40bd38171befef8152c4e8e113bab0d8": "e6faa2d5b17ceccad9367522291bf813f2f313fa:data/战斗/敌人.json"
     },
-    "new_sha256": "b8e25f0ba6e894c52e63e9bb726678ff40bd38171befef8152c4e8e113bab0d8",
-    "new_commit": "e6faa2d5b17ceccad9367522291bf813f2f313fa"
+    "new_sha256": "4547b92d18038884075c0a0d2a2b3f074784bcffa220b13bd4cc93ad019446e8",
+    "new_commit": "PENDING"
   },
   "战斗/遭遇池.json": {
     "old_sha256": {
       "c82ddc6feb2621ca5da2da4063d0c286a563efa0736f09491789f003d6665a34": "2ee45a684fd6bb214374769c4fb8e6e48811c5b7:data/战斗/遭遇池.json",
       "3a07338f675db50afee396c3b23a42092843719997709f212f20c3b4c2a57f3a": "2f05ee4de43d2c983d2b1b94a573e64d9cfff79a:data/战斗/遭遇池.json",
-      "392b5b0d40c7f576366cdf165bdd6ccf0a814dee943faedd71690d9daf23c03d": "e280d3ae746d065c37b1d7a33512556837ffc43d:data/战斗/遭遇池.json"
+      "392b5b0d40c7f576366cdf165bdd6ccf0a814dee943faedd71690d9daf23c03d": "e280d3ae746d065c37b1d7a33512556837ffc43d:data/战斗/遭遇池.json",
+      "4277c18e5e383cd0eeedb24d0fcd7d18ec761daac5719cf3d83a6224ed9cc306": "721517927a382a0799638159cafbc40ba1504d68:data/战斗/遭遇池.json"
     },
-    "new_sha256": "4277c18e5e383cd0eeedb24d0fcd7d18ec761daac5719cf3d83a6224ed9cc306",
-    "new_commit": "ae925b118070eb6295cbc2eebdfaf3c9bc6a7365"
+    "new_sha256": "0a4798ee1a7c87b68afaba5fca67315a882ea92896e3d08af62a38253cb3d7bd",
+    "new_commit": "PENDING"
   },
   "奖励/奖励.json": {
     "old_sha256": {
@@ -163,10 +170,11 @@
       "ab3dda55aaffcf47646cdee8cc5ca13e3e49d504d1896216dd3441ce63b116c1": "81f28fa7c36574ef6cfe659a703fd3d63711c5b2:data/奖励/奖励.json",
       "ebd0c6ed2c80094fbb1f963f152795f9fc3141390da6bfe17349d61fb2e9a469": "f362de31047ddfbb86903fc87067f82e10415f42:data/奖励/奖励.json",
       "3dfcfb9669ec362b8170e14256c27acb778f35885349b430c619dff1c943fcfe": "e280d3ae746d065c37b1d7a33512556837ffc43d:data/奖励/奖励.json",
-      "cfe1e6770f2e1fa481a8a850fb54e2a73fb498f16d85fd76db7fc60bf2f76a90": "0edda3bc1785e976ee8566a7bfd23d7d990511a6:data/奖励/奖励.json"
+      "cfe1e6770f2e1fa481a8a850fb54e2a73fb498f16d85fd76db7fc60bf2f76a90": "0edda3bc1785e976ee8566a7bfd23d7d990511a6:data/奖励/奖励.json",
+      "22fedda642ce4847b1b14d12e240a36f6902856e6e3a4f6d9b9b15891d66d37c": "4b4e6e843d6789658e53efead106a7cd8918e907:data/奖励/奖励.json"
     },
-    "new_sha256": "22fedda642ce4847b1b14d12e240a36f6902856e6e3a4f6d9b9b15891d66d37c",
-    "new_commit": "4b4e6e843d6789658e53efead106a7cd8918e907"
+    "new_sha256": "f56860705a33689d66ae56f8f34d0f92bc22bf4f4e7143315e9cb60e03ef0474",
+    "new_commit": "PENDING"
   },
   "地图/区域.json": {
     "old_sha256": {
@@ -210,19 +218,21 @@
       "d51b99c168b22ca47776ae7c523b0c7dcf5e66e2104cf68eda8bf9043178f1ce": "44be52139804523570ec1f2588b8f9bdf568c8a0:data/图鉴/条目.json",
       "bb71dd2f6f3011a0cff66ee928f518c1aafd6036709d0d11e3282aa0d681ce50": "e9451c8c1635a2148e04ee288b194a4ea9571935:data/图鉴/条目.json",
       "c607893eeb33288e2f111f79d80a1c62ac6dfc438204b804741dca869786008d": "e280d3ae746d065c37b1d7a33512556837ffc43d:data/图鉴/条目.json",
-      "78ee20de1fb1a976d9877d2c2b01f45b03e993fb12f1927f8fb7269761eca1e7": "0edda3bc1785e976ee8566a7bfd23d7d990511a6:data/图鉴/条目.json"
+      "78ee20de1fb1a976d9877d2c2b01f45b03e993fb12f1927f8fb7269761eca1e7": "0edda3bc1785e976ee8566a7bfd23d7d990511a6:data/图鉴/条目.json",
+      "b109460a830c0bdbd200ad8ff04266a288e55764af352b7a5ac2e3a6036a9d65": "34b15a87b9078d86631972c87523f917489d9bef:data/图鉴/条目.json"
     },
-    "new_sha256": "b109460a830c0bdbd200ad8ff04266a288e55764af352b7a5ac2e3a6036a9d65",
-    "new_commit": "34b15a87b9078d86631972c87523f917489d9bef"
+    "new_sha256": "6628380beffeb5dca8239f493a1b8df3b8fc54e73f13d03c01ae7fdf3818733d",
+    "new_commit": "PENDING"
   },
   "图鉴/里程碑.json": {
     "old_sha256": {
       "4600f72d3197621a7cecbd8e913e297b40535272568b2697532b8103d1ad7db2": "1fa98bcbd5c4234e4d11dd2c927be84fde9fe43f:data/图鉴/里程碑.json",
       "f8e21cdf6e33331a984a2d3e93fc6631c87181487911e3b18aeb930414ec58fb": "d7c996e819cf7396a59bf49640714cdde1c6d7dd:data/图鉴/里程碑.json",
-      "63b95d54309a893591811eae17c1c71e6921bbc3f75f6b0342c03a7fd992a47e": "0edda3bc1785e976ee8566a7bfd23d7d990511a6:data/图鉴/里程碑.json"
+      "63b95d54309a893591811eae17c1c71e6921bbc3f75f6b0342c03a7fd992a47e": "0edda3bc1785e976ee8566a7bfd23d7d990511a6:data/图鉴/里程碑.json",
+      "421582dd16019c3672eae4d53a8d9c3b1c9bd09af1ba5c47ba35d4e26ec10b47": "0e6090c791f1966ac27cdd92ca5a7181e4cecdc6:data/图鉴/里程碑.json"
     },
-    "new_sha256": "421582dd16019c3672eae4d53a8d9c3b1c9bd09af1ba5c47ba35d4e26ec10b47",
-    "new_commit": "0e6090c791f1966ac27cdd92ca5a7181e4cecdc6"
+    "new_sha256": "cdd77461754e33dfde1f95363ea5f7dc5b2e5fddc36ccd56418625f908c24d3d",
+    "new_commit": "PENDING"
   },
   "任务/悬赏.json": {
     "old_sha256": {
@@ -346,5 +356,19 @@
     "old_sha256": {},
     "new_sha256": "16adf1c966d7a70b225eee012c99e63467c3fc812796e1052ff08ff72a2587bc",
     "new_commit": "59d2448d87ddc13f9596de2938e4790fc45b7cd6"
+  },
+  "来源/来源.json": {
+    "old_sha256": {
+      "dc90eaf0aedfb3f7f8df46d294469c3a02c9103817628327c5764a3cb28172a9": "d059905cea0a6a777f8a122394823076f59bed40:data/来源/来源.json"
+    },
+    "new_sha256": "3fe8407b4114484bde97dc4f8e91ed790e102b92c0622646d9d3883bbe4ea497",
+    "new_commit": "PENDING"
+  },
+  "阵法/阵法.json": {
+    "old_sha256": {
+      "f7a110ce1a830765ae692127408bac6b7c27d1b7fe3c39c3312020bb665084f0": "bc24d50210c8ade00450af103c45007b991c00cf:data/阵法/阵法.json"
+    },
+    "new_sha256": "c77e3bf21aa36a2e7611459a8a8b06646997d362a82d8fc4f0e20f7e292d6859",
+    "new_commit": "PENDING"
   }
 }

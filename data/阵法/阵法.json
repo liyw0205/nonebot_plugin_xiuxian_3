@@ -38,6 +38,22 @@
       "requirements": [],
       "status": "active",
       "key": "item.array.mist_barrier"
+    },
+    {
+      "name": "战线护阵",
+      "desc": "以阵盘残片重布的战线护阵，展开后可压制魔界战线的越界之敌。",
+      "aliases": ["战线护阵"],
+      "item_type": "array",
+      "quality": "rare",
+      "stack_limit": 1,
+      "instance_mode": "unique",
+      "bind_type": "time_bound",
+      "bind_duration_seconds": 43200,
+      "tradeable": false,
+      "effects": [{"type": "exploration_risk_reduction_bp", "value": 600, "location_key": "xuantian.war_front"}],
+      "requirements": [],
+      "status": "active",
+      "key": "item.array.war_front_ward"
     }
   ],
   "category": "阵法",

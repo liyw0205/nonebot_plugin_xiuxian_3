@@ -21,7 +21,9 @@
     {"key": "encounter.demon.abyss_depths", "name": "魔渊深层遭遇", "desc": "深层魔气中潜伏的猎手与散不去的怨影。", "status": "active", "candidates": [{"enemy_key": "enemy.abyss_depth_stalker", "weight": 55}, {"enemy_key": "enemy.abyss_pollution_wraith", "weight": 45}]},
     {"key": "encounter.xuantian.cloud_city", "name": "云城巡夜遭遇", "desc": "云城街巷与夜市边缘伏着的劫修与游荡妖兽。", "status": "active", "candidates": [{"enemy_key": "enemy.bandit_apprentice", "weight": 70}, {"enemy_key": "enemy.wood_rat", "weight": 30}]},
     {"key": "encounter.cloud_city_escort", "name": "云城护送遭遇", "desc": "云城商道旁伏着的劫修学徒。", "status": "active", "candidates": [{"enemy_key": "enemy.bandit_apprentice", "weight": 100}]},
-    {"key": "encounter.spirit_field_tending", "name": "灵田巡护遭遇", "desc": "灵泉谷田垄间扰灵的水灵。", "status": "active", "candidates": [{"enemy_key": "enemy.spring_wisp", "weight": 100}]}
+    {"key": "encounter.spirit_field_tending", "name": "灵田巡护遭遇", "desc": "灵泉谷田垄间扰灵的水灵。", "status": "active", "candidates": [{"enemy_key": "enemy.spring_wisp", "weight": 100}]},
+    {"key": "encounter.array_hall_drill", "name": "阵堂值守遭遇", "desc": "阵堂走神失序的试阵傀儡。", "status": "active", "candidates": [{"enemy_key": "enemy.array_hall_sentry", "weight": 100}]},
+    {"key": "encounter.war_front_patrol", "name": "战线巡防遭遇", "desc": "战线边缘越界的魔界先锋军士。", "status": "active", "candidates": [{"enemy_key": "enemy.war_front_vanguard", "weight": 100}]}
 
   ]
 }

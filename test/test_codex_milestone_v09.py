@@ -47,7 +47,7 @@ def test_v09_milestone_entries_and_reputations_resolve() -> None:
 
     bundle = ContentBundle.load(DATA)
     milestones = bundle.list("codex_milestone")
-    assert len(milestones) == 16, len(milestones)
+    assert len(milestones) == 17, len(milestones)
     seen_entry_sets: set[tuple[str, ...]] = set()
     for record in milestones:
         assert len(set(record["entry_keys"])) == len(record["entry_keys"]), record["key"]

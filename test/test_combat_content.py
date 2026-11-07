@@ -67,15 +67,16 @@ def _edit(root: Path, relative: str, key: str, **changes: object) -> None:
 def test_combat_content_closes_current_enemy_and_encounter_data() -> None:
     summary = validate_combat_content(ContentBundle.load(DATA))
 
-    # The exploration-mode file ships 18 encounter pools consumed by modes
-    # (16 from the M9 batch plus the two foundation pools added later).
-    expected_consumed_encounters = 18 if (DATA / "探索/模式.json").exists() else 0
+    # The exploration-mode file ships 20 encounter pools consumed by modes
+    # (16 from the M9 batch plus the two foundation pools, the two trade-endpoint
+    # realms' pools and the two inert-location modes added later).
+    expected_consumed_encounters = 20 if (DATA / "探索/模式.json").exists() else 0
     assert summary == {
-        "enemies": 66,
-        "enemy_profiles": 45,
-        "encounters": 20,
-        "candidates": 37,
-        "drop_pools": 6,
+        "enemies": 68,
+        "enemy_profiles": 47,
+        "encounters": 22,
+        "candidates": 39,
+        "drop_pools": 8,
         "consumed_encounters": expected_consumed_encounters,
         "enemy_skills": 16,
     }
