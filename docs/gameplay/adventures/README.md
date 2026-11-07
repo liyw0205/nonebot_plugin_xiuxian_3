@@ -208,3 +208,12 @@ v0.6 `story.mainline.dao_echoes` 已开放玩家流程：炼虚 L10 后可查询
 （`claimed`/`expired`）的闲居安排，接取前的旧安排由接取快照的 `baseline_idle_assignment_ids`
 排除；目标路线必须解析到已开放的 `idle_route`，未知路线在验载期拒绝。完整说明见
 [content-v0.8.md](content-v0.8.md)。
+
+## 悬赏目标与奖池多样化（v0.9）
+
+`data/任务/悬赏.json` 新增 6 条筑基至炼虚的悬赏，把 `production_completed`、
+`public_service_completions`、`dispatch_successes`、`exploration_battle_wins` 四类目标接入更多
+境界；`data/奖励/奖励.json` 新增 `reward_pool.bounty.craft_commission` 与
+`reward_pool.bounty.service_commission` 两个各含三条互异结果的加权奖池，沿用 `local_reputation`
+占位与接取快照，不改进度口径或结算事务。发布清单悬赏钉值 45→51。完整说明见
+[content-v0.9.md](content-v0.9.md)。

@@ -1874,6 +1874,66 @@
       ],
       "key": "reward_pool.idle.dao_settlement_watch.fallback",
       "status": "active"
+    },
+    {
+      "name": "坊市委托嘉奖",
+      "desc": "按生产与派遣委托结果抽取灵石与当地名望。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {
+          "weight": 100,
+          "rewards": {
+            "spirit_stones": 45,
+            "local_reputation": 3
+          }
+        },
+        {
+          "weight": 55,
+          "rewards": {
+            "spirit_stones": 65,
+            "local_reputation": 2
+          }
+        },
+        {
+          "weight": 20,
+          "rewards": {
+            "spirit_stones": 90,
+            "local_reputation": 1
+          }
+        }
+      ],
+      "key": "reward_pool.bounty.craft_commission",
+      "status": "active"
+    },
+    {
+      "name": "共建守望嘉奖",
+      "desc": "按公共事务与战斗守望结果抽取灵石与当地名望。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {
+          "weight": 100,
+          "rewards": {
+            "spirit_stones": 55,
+            "local_reputation": 4
+          }
+        },
+        {
+          "weight": 50,
+          "rewards": {
+            "spirit_stones": 80,
+            "local_reputation": 2
+          }
+        },
+        {
+          "weight": 25,
+          "rewards": {
+            "spirit_stones": 120,
+            "local_reputation": 1
+          }
+        }
+      ],
+      "key": "reward_pool.bounty.service_commission",
+      "status": "active"
     }
   ],
   "schema": "xiuxian.content"
