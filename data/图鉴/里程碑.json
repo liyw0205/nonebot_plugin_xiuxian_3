@@ -277,6 +277,23 @@
       },
       "unlocks": [],
       "status": "active"
+    },
+    {
+      "key": "codex.place.markets_two",
+      "name": "双市通商",
+      "desc": "收录魔渊集市与三界贸易口两处跨域贸易端点的图鉴后领取。",
+      "entry_keys": [
+      "codex.place.demon_market",
+      "codex.place.trade_port"
+      ],
+      "reward": {
+        "type": "local_reputation",
+        "reputation_key": "local.demon.abyss_market",
+        "name": "魔渊集市名望",
+        "amount": 6
+      },
+      "unlocks": [],
+      "status": "active"
     }
   ]
 }

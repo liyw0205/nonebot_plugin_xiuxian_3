@@ -76,3 +76,17 @@
 条目字段仍为 `key`/`name`/`desc`/`entry_keys`/`reward`/`unlocks`/`status`，`entry_keys` 是显式清单；
 `图鉴` 按文件顺序展示 12 条，`领取图鉴里程碑 <序号>` 的未完成/领取/回放/唯一约束语义不变。
 既有 6 条顺序与数值不变，新条目追加在末尾。
+
+## 商路里程碑（v0.10）
+
+`data/图鉴/里程碑.json` 由 15 条扩到 16 条，追加 `codex.place.markets_two`（双市通商）：
+
+- `entry_keys`：`codex.place.demon_market`（魔渊集市）与 `codex.place.trade_port`（三界贸易口）
+  两处跨域贸易端点的既有 `place` 类条目，本版不新增条目、物品或解锁；
+- `reward`：`local.demon.abyss_market` 名望 +6（上限 1000），`unlocks` 留空；
+- 语义不变：`我的图鉴` 按文件顺序展示 16 条，`领取图鉴里程碑 <序号|键>` 的未完成拒绝、
+  领取一次、同 operation 回放同一所得、重复领取拒绝与名望上限只记实际增量均沿用既有实现。
+
+该组只把两处已开放但此前无任何集合目标的贸易端点串成一赏，让「行遍双市」有真实可领取的
+名望回报。聚焦证据见 `test/test_trade_market_milestone.py`；计数与固定顺序回归见
+`test_codex_milestone_content.py` 与 `test_codex_milestone_v09.py`。
