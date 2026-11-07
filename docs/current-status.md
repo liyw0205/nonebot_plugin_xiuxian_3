@@ -126,6 +126,30 @@ M5 最终当前树本地阶段验收、审查与提交推送已完成；保留�
 `test_bounty_output_batch`/`test_bounty_batch`/`test_bounty_idle_claims` 合计 26 passed。
 未跑全量/压测/部署，未验 QQ 真机。
 
+阵堂/战线活化与阵法效果数据化已在 `develop` 完成（P1–P5）：`data/探索/模式.json` 25 → 27 条，
+为两处此前除单条入口动作外没有任何活动的地点各补一条通用探索模式——`explore.array_hall_drill`
+（阵堂值守，`xuantian.array_hall`，聚气 L1、120 秒、6 体力、每日 5 次、战斗率 25%）与
+`explore.war_front_patrol`（战线巡防，`xuantian.war_front`，元婴 L1、300 秒、12 体力、每日 3 次、
+战斗率 30%），各带 ≥3 档加权奖池。`data/战斗/敌人.json` 66 → 68 条，新增 `enemy.array_hall_sentry`
+与 `enemy.war_front_vanguard`（真实 `combat_profile`、`stats.agility`、与地点一致的 `location_key`、
+掉落池与图鉴条目），`data/战斗/遭遇池.json` 20 → 22 条；`data/地图/地点.json` 在两处各追加对应
+探索模式动作以保证可发现。`data/奖励/奖励.json` 新增四个加权池（两个探索、两个掉落）。
+`data/图鉴/条目.json` 新增两条 `challenge`、两条 `creature` 与一条 `material` 条目，并为两条蜕变
+产物（`beast.jade_rat`、`mount.cloud_elk`）补 `creature` 条目与 `codex_entry_key`；`data/图鉴/里程碑.json`
+16 → 17 条，新增 `codex.creature.evolutions_two`（蜕变双录 → 青石镇名望 +6，`unlocks` 空）。
+`data/道具/材料.json` 新增 `item.material.ward_plate`（战线采集来源），`data/阵法/阵法.json` 新增
+`item.array.war_front_ward`（战线 600 bp、12 小时绑定）与其配方 `recipe.array.war_front_ward`
+（元婴 L1、阵盘残片 2 + 阵砂 2），`data/来源/来源.json` 登记两条新公开来源。代码侧
+`items/rules.bound_order_duration_multiplier_bp` 改为从持有阵法自身声明的
+`production_duration_multiplier_bp` 读取绑定订单加速（硬编码键+常量仅作缺省回退，数值不变），
+`facility_repository._facility_duration_seconds` 消费之；`companions` 记录 `codex_entry_key` 并在
+蜕变成功的事务内投影 `codex.creature.*`。聚焦证据：`test_array_hall_war_front_exploration.py` 5 passed、
+`test_array_duration_effect.py` 4 passed、`test_war_front_ward_and_evolution_codex.py` 4 passed，
+`test_companion_evolution_content.py`、`test_codex_milestone_content.py`、`test_codex_milestone_v09.py`、
+`test_combat_content.py`、`test_m9_content_integrity.py` 计数与顺序更新后通过。十二份被改官方种子的
+迁移清单 `new_sha256`/`old_sha256`/`new_commit` 累计与地点/灵兽/材料/配方/图鉴反向助手同批提交。
+未跑全量/压测/部署，未验 QQ 真机。
+
 `chapter.2.stage.2` 云城初见内容化切片已在 `develop` 完成：正文、`travel_arrival`
 目标（结算后的公开抵达 `xuantian.cloud_city`）、行动、首通状态事件、`next_stage_key`
 指向 `chapter.2.stage.3` 与失败重试规则均已落地，沿用现有 objective 消费者与

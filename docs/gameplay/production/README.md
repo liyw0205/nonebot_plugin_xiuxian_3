@@ -10,5 +10,6 @@
 - [生产类型](professions.md)
 - [订单状态机](workflow.md)
 - [用例与验收](use-cases.md)
+- [v0.7 内容基线（阵法数据化与第三张护阵）](content-v0.7.md)
 
 资源锁定和物品结算使用 `foundation/items/`，报酬使用 `gameplay/economy/`。

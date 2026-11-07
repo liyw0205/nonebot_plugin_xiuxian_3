@@ -90,3 +90,19 @@
 该组只把两处已开放但此前无任何集合目标的贸易端点串成一赏，让「行遍双市」有真实可领取的
 名望回报。聚焦证据见 `test/test_trade_market_milestone.py`；计数与固定顺序回归见
 `test_codex_milestone_content.py` 与 `test_codex_milestone_v09.py`。
+
+## 蜕变双录与阵堂/战线见闻（v0.11）
+
+`data/图鉴/里程碑.json` 由 16 条扩到 17 条，追加 `codex.creature.evolutions_two`（蜕变双录）：
+
+- `entry_keys`：`codex.creature.jade_rat`（玉背鼠）与 `codex.creature.cloud_elk`（云角鹿），
+  即两条既有蜕变线（`beast.evolution.iron_rat_2`、`mount.evolution.bamboo_deer_1`）产物新登记的
+  `creature` 类条目；`reward`：`local.xuantian.new_town` 名望 +6，`unlocks` 留空。
+- 两条 `creature` 条目的生产者是蜕变事务本身：`data/灵兽/灵兽.json` 的两条产物记录新增
+  `codex_entry_key`，`companions/repository.evolve_companion` 在成功的同一事务内投影该条目，
+  因此条目由真实玩法点亮，不是只有 JSON。
+
+`data/图鉴/条目.json` 另新增 `codex.escort.array_hall_drill` 与 `codex.escort.war_front_patrol`
+（`challenge` 类，由探索结算按 `codex.escort.*` 既有投影点亮）与 `codex.material.ward_plate`
+（`material` 类，由首次获得投影点亮）。领取语义、未完成拒绝、一次领取、同 operation 回放与名望
+上限只记实际增量全部沿用既有实现。
