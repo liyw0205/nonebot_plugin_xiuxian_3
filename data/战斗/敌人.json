@@ -1062,6 +1062,76 @@
       },
       "key": "enemy.final_arena_guardian_3",
       "status": "active"
+    },
+    {
+      "name": "集市契约守卫",
+      "desc": "守着魔渊集市旧契约的守卫，收取契文时出手狠辣。",
+      "location_key": "demon.abyss_market",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "nascent_soul",
+          "min_layer": 1
+        }
+      ],
+      "stats": {
+        "hp": 560,
+        "attack": 48,
+        "initiative": 22,
+        "agility": 20
+      },
+      "skills": [
+        "enemy_skill.blade_wave"
+      ],
+      "behavior": {
+        "can_critical": true,
+        "can_escape": false
+      },
+      "reward_refs": [],
+      "combat_profile": {
+        "random_pool_key": "battle.enemy.abyss_market_warden",
+        "reward": {
+          "spirit_stones": 30
+        },
+        "drop_pool_key": "reward_pool.enemy.three_realms"
+      },
+      "key": "enemy.abyss_market_warden",
+      "status": "active"
+    },
+    {
+      "name": "货栈私贩",
+      "desc": "在三界货栈夹带私货的贩子，被撞破货单时拔刀相向。",
+      "location_key": "beast.three_realms_trade_port",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "nascent_soul",
+          "min_layer": 1
+        }
+      ],
+      "stats": {
+        "hp": 540,
+        "attack": 46,
+        "initiative": 23,
+        "agility": 20
+      },
+      "skills": [
+        "enemy_skill.blade_wave"
+      ],
+      "behavior": {
+        "can_critical": true,
+        "can_escape": false
+      },
+      "reward_refs": [],
+      "combat_profile": {
+        "random_pool_key": "battle.enemy.trade_port_smuggler",
+        "reward": {
+          "spirit_stones": 28
+        },
+        "drop_pool_key": "reward_pool.enemy.three_realms"
+      },
+      "key": "enemy.trade_port_smuggler",
+      "status": "active"
     }
   ],
   "schema": "xiuxian.content"

@@ -62,6 +62,8 @@ def test_qq_and_onebot_secret_realm_preview_are_isolated() -> None:
                 "instance.secret_realm.ancestral_hall",
                 "instance.secret_realm.void_ruins",
                 "instance.secret_realm.time_fort",
+                "instance.secret_realm.abyss_market_run",
+                "instance.secret_realm.trade_port_convoy",
             }
             demon_abyss = next(
                 item

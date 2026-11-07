@@ -195,6 +195,86 @@
       "quota_limit": 1,
       "expiry_seconds": 3600,
       "reputation_key": "local.beast.three_realms_trade_port"
+    },
+    {
+      "key": "instance.secret_realm.abyss_market_run",
+      "record_type": "common",
+      "name": "魔渊契约集市",
+      "desc": "魔渊边缘的集市暗巷里仍留着旧契约的回响，循着契文深入可寻得魔核与集市名望。",
+      "status": "active",
+      "aliases": ["魔渊集市秘境"],
+      "required_realm": "nascent_soul",
+      "required_layer": 1,
+      "location_key": "demon.abyss_market",
+      "stamina_cost": 20,
+      "ticket_key": null,
+      "ticket_quantity": 0,
+      "node_keys": [
+        "resource",
+        "encounter",
+        "choice"
+      ],
+      "enemy_key": "enemy.abyss_market_warden",
+      "first_reward": {
+        "item.demon_core": 2,
+        "local.demon.abyss_market": 8
+      },
+      "repeat_reward_pool": [
+        {
+          "weight": 2,
+          "rewards": {
+            "item.demon_core": 1
+          }
+        },
+        {
+          "weight": 1,
+          "no_reward": true
+        }
+      ],
+      "quota_period": "week",
+      "quota_limit": 2,
+      "expiry_seconds": 3600,
+      "reputation_key": "local.demon.abyss_market"
+    },
+    {
+      "key": "instance.secret_realm.trade_port_convoy",
+      "record_type": "common",
+      "name": "三界货栈",
+      "desc": "三界贸易口的旧货栈后仍堆着未验的妖界货箱，循栈道深入可寻得兽血与贸易口名望。",
+      "status": "active",
+      "aliases": ["贸易口秘境"],
+      "required_realm": "nascent_soul",
+      "required_layer": 1,
+      "location_key": "beast.three_realms_trade_port",
+      "stamina_cost": 20,
+      "ticket_key": null,
+      "ticket_quantity": 0,
+      "node_keys": [
+        "resource",
+        "encounter",
+        "choice"
+      ],
+      "enemy_key": "enemy.trade_port_smuggler",
+      "first_reward": {
+        "item.beast_blood": 2,
+        "local.beast.three_realms_trade_port": 8
+      },
+      "repeat_reward_pool": [
+        {
+          "weight": 2,
+          "rewards": {
+            "item.beast_blood": 1
+          }
+        },
+        {
+          "weight": 1,
+          "no_reward": true
+        }
+      ],
+      "quota_period": "week",
+      "quota_limit": 2,
+      "expiry_seconds": 3600,
+      "reputation_key": "local.beast.three_realms_trade_port"
     }
   ]
 }

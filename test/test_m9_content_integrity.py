@@ -45,7 +45,7 @@ def test_m9_content_references_are_closed() -> None:
     assert summary["bounties"] == 51
     assert summary["recipes"] == 36
     assert summary["sources"] == 14
-    assert summary["combat_enemies"] == 64
+    assert summary["combat_enemies"] == 66
 
 
 def test_exploration_rejects_missing_reward_pool(tmp_path: Path) -> None:

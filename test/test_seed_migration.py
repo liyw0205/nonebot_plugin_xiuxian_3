@@ -395,6 +395,16 @@ def old_official_locations() -> bytes:
         ('      "actions": ["world.intro.demon", "explore.demon_threshold"]', '      "actions": [\n        "world.intro.demon"\n      ]'),
         ('      "actions": ["progression.tribulation_trial", "explore.tribulation_echo"]', '      "actions": ["progression.tribulation_trial"]'),
         ('      "actions": ["world.enter_void_route"]', '      "actions": ["world.enter_void_route", "explore.void_route"]'),
+        # The trade-endpoint slice registered one secret realm on each trade
+        # location, so the reversed blob must drop those two entries again.
+        (
+            '      "actions": [\n        "economy.trade.xuantian_to_demon",\n        "production.demon_contract",\n        "instance.secret_realm.abyss_market_run"\n      ]',
+            '      "actions": [\n        "economy.trade.xuantian_to_demon",\n        "production.demon_contract"\n      ]',
+        ),
+        (
+            '      "actions": [\n        "economy.trade.three_realms",\n        "instance.secret_realm.trade_port_convoy"\n      ]',
+            '      "actions": [\n        "economy.trade.three_realms"\n      ]',
+        ),
     )
     for new_line, old_line in action_reverts:
         assert new_line in text, new_line

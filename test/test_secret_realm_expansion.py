@@ -138,7 +138,9 @@ def _mutate(data_dir: Path, key: str, mutate) -> None:
 def test_new_common_secret_realms_are_content_valid_and_source_closed() -> None:
     bundle = ContentBundle.load(ROOT / "data")
     definitions = secret_realm_definitions(bundle)
-    assert len(definitions) == 7
+    # 7 common realms through the v0.7 ironwood/ancestral slice, plus the two
+    # trade-endpoint realms added by the trade-endpoint slice.
+    assert len(definitions) == 9
     source = bundle.get("source", "source.item.void_materials", include_locked=True) or {}
     closed = set(source.get("asset_keys", ()))
     for item in bundle.list("item"):

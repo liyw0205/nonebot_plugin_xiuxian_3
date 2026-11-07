@@ -216,7 +216,8 @@
       },
       "actions": [
         "economy.trade.xuantian_to_demon",
-        "production.demon_contract"
+        "production.demon_contract",
+        "instance.secret_realm.abyss_market_run"
       ],
       "local_reputation_maximum": 1000,
       "codex_entry_key": "codex.place.demon_market",
@@ -245,7 +246,8 @@
         "non_beast_penalty_bp": -500
       },
       "actions": [
-        "economy.trade.three_realms"
+        "economy.trade.three_realms",
+        "instance.secret_realm.trade_port_convoy"
       ],
       "local_reputation_maximum": 1000,
       "key": "beast.three_realms_trade_port",
