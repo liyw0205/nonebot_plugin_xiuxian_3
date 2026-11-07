@@ -834,6 +834,7 @@ PLACE_CODEX_ADDED = frozenset(
         "codex.place.final_arena",
         "codex.escort.cloud_city_escort",
         "codex.escort.spirit_field_tending",
+        "codex.story.xuantian.road.wanderer",
     }
 )
 

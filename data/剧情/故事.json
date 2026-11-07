@@ -54,6 +54,20 @@
           "codex_entry_key": "codex.story.xuantian.road.gardener",
           "appearance_key": "appearance.home.gardener",
           "completed_nodes": ["node.arrival", "node.gardener.1", "node.gardener.2"]
+        },
+        {
+          "key": "wanderer",
+          "name": "游历",
+          "desc": "在青石镇外的历练中走遍山水，留下行脚见闻。",
+          "aliases": ["游历者"],
+          "required_source_count": 3,
+          "source_kind": "battle",
+          "source_label": "已结算战斗胜利",
+          "ending_key": "ending.wanderer",
+          "flag_key": "flag.road.wanderer",
+          "codex_entry_key": "codex.story.xuantian.road.wanderer",
+          "appearance_key": "appearance.home.wanderer",
+          "completed_nodes": ["node.arrival", "node.wanderer.1", "node.wanderer.2"]
         }
       ]
     }

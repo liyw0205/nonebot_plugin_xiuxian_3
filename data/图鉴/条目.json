@@ -1884,6 +1884,13 @@
       "desc": "巡护灵泉谷田垄后，灵谷与水灵的见闻收入图鉴。",
       "category": "challenge",
       "status": "active"
+    },
+    {
+      "key": "codex.story.xuantian.road.wanderer",
+      "name": "山水行脚",
+      "desc": "数度历战归来，青石镇外的山水行脚见闻写入玄天故事。",
+      "category": "story",
+      "status": "active"
     }
 
   ]

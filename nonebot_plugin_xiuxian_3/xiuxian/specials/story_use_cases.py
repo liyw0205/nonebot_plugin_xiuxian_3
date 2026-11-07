@@ -104,7 +104,10 @@ class StoryApplication:
         if record.status == "available":
             lines.extend(["", "> 发送 `开始剧情` 开启玄天之路。"])
         elif record.status == "active":
-            lines.extend(["", "> 发送 `选择剧情 <商路|守望|药圃>` 锁定一条路线。"])
+            route_labels = "|".join(branch.label for branch in record.branches)
+            lines.extend(
+                ["", f"> 发送 `选择剧情 <{route_labels}>` 锁定一条路线。"]
+            )
         elif record.status == "ending_pending":
             lines.extend(["", "> 发送 `领取剧情结局` 结算结局。"])
         return CommandResult(
