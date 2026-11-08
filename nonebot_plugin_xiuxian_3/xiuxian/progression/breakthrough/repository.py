@@ -653,7 +653,14 @@ class BreakthroughRepositoryMixin:
                 if str(row["location_key"]) not in {"void.first_route", "void.archive_ruins", "cave.time_garden"}:
                     raise VoidLocationRequiredError("void refining requires an approved void location")
                 flags = {str(item) for item in self._json_object(row["intro_json"], {}).get("flags", [])}
-                if "quest.break_void" not in flags:
+                # The permit is whatever quest declares `breakthrough_permission`
+                # for this realm; the record is the authority, not a fixed key.
+                from ...quests.rules import breakthrough_permissions
+
+                permit_quest = breakthrough_permissions(
+                    getattr(self, "content", None) or bundled_content()
+                ).get(target_realm)
+                if permit_quest and permit_quest not in flags:
                     raise VoidQuestMissingError("void refining quest is missing")
                 if player_integer(row, "world_merit") < 500 or player_integer(row, "domain_charge") < 100:
                     raise VoidResourceInsufficientError("void refining resources are insufficient")

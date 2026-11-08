@@ -46,6 +46,7 @@ from .rules import (
     dao_origin_task_definition,
     DAO_UNION_QUEST,
     meets_realm,
+    permit_rewards as declared_permit_rewards,
     utc_week_bounds,
 )
 from .cross_realm_rules import DEMON_MAINLINE
@@ -797,12 +798,15 @@ class QuestRepositoryMixin(EndgameQuestRepositoryMixin):
             }
             if existing_progress is not None and str(existing_progress["status"]) in {"completed", "claimed"}:
                 raise QuestAlreadyCompletedError("quest permit is already claimed")
-            permit_rewards = (
-                {"item.soul_seed": 1, "item.domain_core": 1}
-                if quest_key == SOUL_QUEST
-                else {"item.recipe.void_refinery": 1}
-                if quest_key == VOID_QUEST
-                else {}
+            # The quest record now declares its own payout.  The legacy soul
+            # items stay as a fallback for that record, which predates the
+            # declaration; the void refinery recipe is gone because the record
+            # grants the permit instead of an unconsumed item.
+            declared_items, _permission = declared_permit_rewards(
+                quest_key, self.content or bundled_content()
+            )
+            permit_rewards = declared_items or (
+                {"item.soul_seed": 1, "item.domain_core": 1} if quest_key == SOUL_QUEST else {}
             )
             flags_state = self._json_object(player["intro_json"], {})
             flags = [str(item) for item in flags_state.get("flags", [])]

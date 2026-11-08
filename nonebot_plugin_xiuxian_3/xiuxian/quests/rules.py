@@ -340,6 +340,80 @@ def meets_realm(realm_key: str, layer: int, required_realm: str, required_layer:
     return (realm_rank(realm_key), int(layer)) >= (realm_rank(required_realm), required_layer)
 
 
+_PERMIT_VALUE_KEYS = frozenset(
+    {"preparation_bp", "ascension_merit", "world_merit", "dao_fruit_progress"}
+)
+
+
+def permit_rewards(
+    quest_key: str, content: ContentBundle | None = None
+) -> tuple[dict[str, int], str | None]:
+    """Read the item rewards and breakthrough permit a quest record declares.
+
+    The record is the authority here: ``item.*`` entries are handed out as
+    items and ``breakthrough_permission`` names the realm whose breakthrough the
+    claim opens.  Anything else is rejected so a typo cannot silently pay
+    nothing or open the wrong gate.
+    """
+
+    bundle = content or bundled_content()
+    row = bundle.get("quest", quest_key, include_locked=False)
+    if row is None:
+        raise ContentError(f"permit quest is missing: {quest_key}")
+    reward = row.get("reward")
+    if not isinstance(reward, dict):
+        raise ContentError(f"permit quest {quest_key} requires a reward object")
+    items: dict[str, int] = {}
+    permission: str | None = None
+    for key, value in reward.items():
+        if not isinstance(key, str) or not key.strip():
+            raise ContentError(f"permit quest {quest_key} has an invalid reward key")
+        if key == "breakthrough_permission":
+            if not isinstance(value, str) or not value.strip():
+                raise ContentError(f"permit quest {quest_key} has an invalid breakthrough permission")
+            if not bundle.has("realm", value.strip(), include_locked=True):
+                raise ContentError(
+                    f"permit quest {quest_key} names unknown realm {value.strip()}"
+                )
+            permission = value.strip()
+        elif key == "permission":
+            if not isinstance(value, str) or not value.strip():
+                raise ContentError(f"permit quest {quest_key} has an invalid permission")
+        elif key in _PERMIT_VALUE_KEYS:
+            if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+                raise ContentError(f"permit quest {quest_key} has an invalid {key}")
+        elif key.startswith("item."):
+            if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+                raise ContentError(f"permit quest {quest_key} has an invalid item quantity")
+            if not bundle.has("item", key, include_locked=False):
+                raise ContentError(f"permit quest {quest_key} grants unknown item {key}")
+            items[key] = value
+        else:
+            raise ContentError(f"permit quest {quest_key} has an unsupported reward {key!r}")
+    return items, permission
+
+
+def breakthrough_permissions(content: ContentBundle | None = None) -> dict[str, str]:
+    """Map a target realm to the once-per-player quest that opens it."""
+
+    bundle = content or bundled_content()
+    mapping: dict[str, str] = {}
+    for row in bundle.list("quest", include_locked=False):
+        key = row.get("key")
+        reward = row.get("reward")
+        if not isinstance(key, str) or not isinstance(reward, dict):
+            continue
+        if row.get("claim_policy") != "once_per_player":
+            continue
+        _items, permission = permit_rewards(key, bundle)
+        if not permission:
+            continue
+        if permission in mapping:
+            raise ContentError(f"two quests declare the {permission} breakthrough permit")
+        mapping[permission] = key
+    return mapping
+
+
 __all__ = [
     "ANCIENT_DOMAIN_LINE",
     "ANCIENT_DOMAIN_TARGET",
