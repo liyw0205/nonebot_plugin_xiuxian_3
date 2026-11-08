@@ -865,6 +865,12 @@ PLACE_CODEX_ADDED = frozenset(
         "codex.creature.jade_rat",
         "codex.creature.cloud_elk",
         "codex.material.ward_plate",
+        "codex.material.recipe_basic",
+        "codex.material.manual_basic",
+        "codex.material.demon_contract",
+        "codex.material.demon_abyss_echo",
+        "codex.material.beast_bloodline",
+        "codex.material.mist_cave_route",
     }
 )
 
