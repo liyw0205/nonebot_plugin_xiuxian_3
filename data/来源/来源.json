@@ -179,6 +179,28 @@
         {"operation": "production.settle", "reference": "recipe.array.war_front_ward"}
       ],
       "status": "active"
+    },
+    {
+      "key": "source.item.clues",
+      "name": "线索来源",
+      "desc": "洞天与深渊探索可拾得路线与残响线索；机缘签同样开出配方、功法与血脉线索。",
+      "asset_keys": [
+        "item.clue.recipe_basic",
+        "item.clue.manual_basic",
+        "item.clue.demon_contract",
+        "item.clue.demon_abyss_echo",
+        "item.clue.beast_bloodline",
+        "item.clue.mist_cave_route"
+      ],
+      "channels": [
+        {"operation": "exploration.settle", "reference": "reward_pool.exploration.mist_grotto"},
+        {"operation": "exploration.settle", "reference": "reward_pool.exploration.demon_abyss"},
+        {"operation": "exploration.settle", "reference": "reward_pool.exploration.abyss_depths"},
+        {"operation": "exploration.settle", "reference": "reward_pool.exploration.beast_hunt"},
+        {"operation": "routine.roll_fate_pool", "reference": "reward.gacha.fate.basic"},
+        {"operation": "routine.roll_fate_pool", "reference": "reward.gacha.fate.dao_echo"}
+      ],
+      "status": "active"
     }
   ]
 }

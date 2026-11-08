@@ -516,7 +516,8 @@
         {"weight": 15000, "rewards": {"cultivation": 500, "item.mat.array_sand": 3}},
         {"weight": 28125, "rewards": {"cultivation": 500, "item.ore.ironstone": 1}},
         {"weight": 21875, "rewards": {"cultivation": 500, "item.ore.ironstone": 2}},
-        {"weight": 12500, "rewards": {"cultivation": 500, "item.ore.ironstone": 3}}
+        {"weight": 12500, "rewards": {"cultivation": 500, "item.ore.ironstone": 3}},
+        {"weight": 9000, "rewards": {"cultivation": 500, "item.clue.mist_cave_route": 1}}
       ],
       "key": "reward_pool.exploration.mist_grotto",
       "status": "active"
@@ -588,6 +589,7 @@
         {"weight": 45, "rewards": {"item.demon_core": 1}},
         {"weight": 30, "rewards": {"faction_reputation.demon": 15}},
         {"weight": 15, "rewards": {"item.clue.demon_contract": 1}},
+        {"weight": 8, "rewards": {"item.clue.demon_abyss_echo": 1}},
         {"weight": 10, "no_reward": true}
       ],
       "key": "reward_pool.exploration.demon_abyss",

@@ -1459,6 +1459,48 @@
       "status": "active"
     },
     {
+      "key": "codex.material.recipe_basic",
+      "name": "基础配方线索",
+      "desc": "拾得记有基础炼制手法的残页；首次获得后，配方线索收入图鉴。",
+      "category": "material",
+      "status": "active"
+    },
+    {
+      "key": "codex.material.manual_basic",
+      "name": "基础功法线索",
+      "desc": "拾得指向入门功法的旧卷残页；首次获得后，功法线索收入图鉴。",
+      "category": "material",
+      "status": "active"
+    },
+    {
+      "key": "codex.material.demon_contract",
+      "name": "魔界契约线索",
+      "desc": "拾得刻有魔界气息的残缺契文；首次获得后，契约线索收入图鉴。",
+      "category": "material",
+      "status": "active"
+    },
+    {
+      "key": "codex.material.demon_abyss_echo",
+      "name": "深渊残响线索",
+      "desc": "自魔界深渊残响中取得的线索；首次获得后，残响线索收入图鉴。",
+      "category": "material",
+      "status": "active"
+    },
+    {
+      "key": "codex.material.beast_bloodline",
+      "name": "妖界血脉线索",
+      "desc": "拾得留有妖族血脉痕迹的线索；首次获得后，血脉线索收入图鉴。",
+      "category": "material",
+      "status": "active"
+    },
+    {
+      "key": "codex.material.mist_cave_route",
+      "name": "雾隐洞天路线线索",
+      "desc": "在雾隐洞天寻得通行路线的残页；首次获得后，路线线索收入图鉴。",
+      "category": "material",
+      "status": "active"
+    },
+    {
       "key": "codex.creature.cloud_beast",
       "name": "云铁矿兽",
       "desc": "栖居矿脉深处，以铁砂护体；战斗结算确认踪迹后，矿区异兽记录方可点亮。",
