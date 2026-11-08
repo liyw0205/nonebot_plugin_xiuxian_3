@@ -32,6 +32,7 @@ from ..persistence.errors import (
     RouteNotFoundError,
     RouteNotReadyError,
     RouteQuotaError,
+    RouteUnlockRequiredError,
 )
 from .route_models import RoutePreviewRecord, RouteSettlementRecord, RouteStartRecord
 from .route_rules import (
@@ -175,6 +176,10 @@ class RouteRepositoryMixin:
             missing: list[str] = []
             if str(player["stage"]) not in definition.allowed_stages:
                 missing.append("修行阶段")
+            if definition.unlock_key and not self._has_codex_unlock(
+                connection, int(player["id"]), definition.unlock_key
+            ):
+                missing.append("图鉴见闻")
             if str(player["location_key"]) != definition.source_location:
                 missing.append(definition.source_name)
             stamina_cost = mount_stamina_cost or definition.stamina_cost
@@ -287,6 +292,10 @@ class RouteRepositoryMixin:
             player = self._require_player(connection, platform, platform_user_id)
             if str(player["stage"]) not in definition.allowed_stages:
                 raise PlayerStageConflictError("player is not ready for transport")
+            if definition.unlock_key and not self._has_codex_unlock(
+                connection, int(player["id"]), definition.unlock_key
+            ):
+                raise RouteUnlockRequiredError("route codex unlock is not claimed")
             if str(player["location_key"]) != definition.source_location:
                 raise RouteLocationRequirementError("route source location is not valid")
             mount = self._route_mount(connection, int(player["id"]), mount_ref, definition) if mount_ref else None
@@ -707,6 +716,27 @@ class RouteRepositoryMixin:
         for table, status_clause in checks:
             if connection.execute(f"SELECT 1 FROM {table} WHERE player_id = ? AND {status_clause} LIMIT 1", (player_id,)).fetchone() is not None:
                 raise RouteBusyError("another player session is active")
+
+    @staticmethod
+    def _has_codex_unlock(connection: Any, player_id: int, unlock_key: str) -> bool:
+        """Return True when a claimed codex milestone granted this unlock.
+
+        Reads the same claim source the commission gate uses, so a milestone with
+        empty ``unlocks`` never gates a route and a claimed milestone really opens
+        the transport it promises.
+        """
+
+        for row in connection.execute(
+            "SELECT unlocks_json FROM codex_milestone_claims WHERE player_id = ?",
+            (player_id,),
+        ).fetchall():
+            try:
+                unlocks = json.loads(str(row["unlocks_json"]))
+            except (TypeError, json.JSONDecodeError):
+                continue
+            if isinstance(unlocks, list) and unlock_key in unlocks:
+                return True
+        return False
 
     @staticmethod
     def _route_operation(connection: Any, operation_id: str, operation_name: str, request_hash: str) -> dict[str, Any] | None:

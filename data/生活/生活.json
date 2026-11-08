@@ -1263,6 +1263,99 @@
       "key": "idle.seeker_town_inquiry",
       "record_type": "idle_route",
       "status": "active"
+    },
+    {
+      "name": "青石镇至百草坡短途运输",
+      "desc": "沿药圃路线把草药运往百草坡，途中可能遇上天气或山路耽搁。",
+      "aliases": [
+        "百草运输",
+        "青石镇百草坡运输"
+      ],
+      "source_location": "xuantian.new_town",
+      "destination_location": "xuantian.herb_vale",
+      "allowed_stages": [
+        "mortal",
+        "seeker",
+        "cultivator"
+      ],
+      "random_pool": "route.herb_vale",
+      "cost": {
+        "stamina": 3
+      },
+      "duration_seconds": 900,
+      "reward": {
+        "currency_key": "currency.spirit_stone",
+        "amount": 18,
+        "reputation_key": "local.xuantian.new_town",
+        "reputation": 3
+      },
+      "cargo": {
+        "default_item_key": "item.herb.spirit_leaf",
+        "max_value": 120,
+        "unit_values": {
+          "item.herb.spirit_leaf": 18,
+          "item.herb.blood_grass": 10,
+          "item.mat.array_sand": 20
+        },
+        "aliases": {
+          "灵叶": "item.herb.spirit_leaf",
+          "止血草": "item.herb.blood_grass",
+          "血草": "item.herb.blood_grass",
+          "阵砂": "item.mat.array_sand"
+        }
+      },
+      "daily_limit": 2,
+      "delay_chance_bp": 1000,
+      "delay_seconds": 600,
+      "unlock_key": "hint.herb_route",
+      "key": "route.town_herb_vale",
+      "record_type": "route",
+      "status": "active"
+    },
+    {
+      "name": "云城至魔界深渊门商路",
+      "desc": "自云城启程，沿战线外缘的商路把货物押送到魔界深渊门。",
+      "aliases": [
+        "深渊商路",
+        "云城深渊运输"
+      ],
+      "source_location": "xuantian.cloud_city",
+      "destination_location": "demon.abyss_gate",
+      "allowed_stages": [
+        "cultivator"
+      ],
+      "random_pool": "route.cloud_abyss",
+      "cost": {
+        "stamina": 6
+      },
+      "duration_seconds": 1800,
+      "reward": {
+        "currency_key": "currency.spirit_stone",
+        "amount": 45,
+        "reputation_key": "local.xuantian.cloud_city",
+        "reputation": 4
+      },
+      "cargo": {
+        "default_item_key": "item.material.cloud_iron",
+        "max_value": 200,
+        "unit_values": {
+          "item.material.cloud_iron": 40,
+          "item.mat.array_sand": 20,
+          "item.herb.spirit_leaf": 18
+        },
+        "aliases": {
+          "云铁": "item.material.cloud_iron",
+          "阵砂": "item.mat.array_sand",
+          "灵叶": "item.herb.spirit_leaf"
+        }
+      },
+      "daily_limit": 1,
+      "delay_chance_bp": 1500,
+      "delay_seconds": 900,
+      "unlock_key": "encyclopedia.domain_tactics",
+      "key": "route.cloud_to_abyss_gate",
+      "record_type": "route",
+      "status": "active"
     }
   ],
   "schema": "xiuxian.content"

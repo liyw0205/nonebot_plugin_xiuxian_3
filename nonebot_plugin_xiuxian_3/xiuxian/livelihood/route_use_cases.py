@@ -21,6 +21,7 @@ from ..repository import (
     RouteNotFoundError,
     RouteNotReadyError,
     RouteQuotaError,
+    RouteUnlockRequiredError,
     SQLitePlayerRepository,
 )
 from .route_rules import (
@@ -201,6 +202,8 @@ class RouteApplication:
             )
         except RouteContentClosedError:
             return CommandResult(False, "LIVELIHOOD_CONTENT_CLOSED", "该运输路线或货物暂未开放。", context.request_id, operation_id)
+        except RouteUnlockRequiredError:
+            return CommandResult(False, "ROUTE_UNLOCK_REQUIRED", "这条商路需要先在图鉴领取对应见闻里程碑。", context.request_id, operation_id)
         except RouteCargoRequirementError:
             return CommandResult(False, "ROUTE_CARGO_LOCKED", "货物不足或货值超过路线限制，未扣除任何资源。", context.request_id, operation_id)
         except PlayerNotFoundError:

@@ -968,6 +968,10 @@ class RouteContentClosedError(RuntimeError):
     """The requested livelihood route or cargo is not open."""
 
 
+class RouteUnlockRequiredError(RuntimeError):
+    """The route is gated behind a codex milestone unlock the player has not claimed."""
+
+
 class RouteCargoRequirementError(RuntimeError):
     """The route cargo is invalid, unavailable or over the route value limit."""
 

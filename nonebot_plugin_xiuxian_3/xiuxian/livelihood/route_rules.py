@@ -37,6 +37,7 @@ class RouteDefinition:
     allowed_stages: tuple[str, ...]
     random_pool: str
     aliases: tuple[str, ...] = ()
+    unlock_key: str | None = None
 
 
 @lru_cache(maxsize=1)
@@ -169,6 +170,13 @@ def route_definitions(content: ContentBundle | None = None) -> dict[str, RouteDe
         random_pool = row.get("random_pool")
         if not isinstance(random_pool, str) or not random_pool:
             raise ContentError(f"route {key} has invalid random_pool")
+        unlock_key = row.get("unlock_key")
+        if unlock_key is not None and (
+            not isinstance(unlock_key, str)
+            or not unlock_key.strip()
+            or not bundle.has("codex_unlock", unlock_key, include_locked=False)
+        ):
+            raise ContentError(f"route {key} references an unknown codex unlock")
         selectors_for_row = {key, label.strip(), *(alias.strip() for alias in aliases)}
         if selectors & selectors_for_row:
             raise ContentError(f"route {key} has a duplicate name or alias")
@@ -195,6 +203,7 @@ def route_definitions(content: ContentBundle | None = None) -> dict[str, RouteDe
             allowed_stages=tuple(allowed_stages),
             random_pool=random_pool,
             aliases=tuple(alias.strip() for alias in aliases),
+            unlock_key=unlock_key.strip() if isinstance(unlock_key, str) else None,
         )
     if not result:
         raise ContentError("no active route content records")
