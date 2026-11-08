@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 from ..content import ContentBundle, ContentError, bundled_content
@@ -152,11 +153,111 @@ def three_realms_record(content: ContentBundle | None = None) -> dict[str, Any]:
     }
 
 
+def _reward_map(
+    value: Any, field: str, key: str, bundle: ContentBundle, reputation_key: str
+) -> dict[str, int]:
+    """Validate a flat rank reward: stones, the record's local reputation, items.
+
+    Local reputation is one shared amount routed to the record's
+    ``local_reputation_key``, matching how other content declares it.
+    """
+
+    if not isinstance(value, dict) or not value:
+        raise ContentError(f"{key} {field} must be a non-empty object")
+    cleaned: dict[str, int] = {}
+    for reward_key, amount in value.items():
+        if not isinstance(reward_key, str) or not reward_key:
+            raise ContentError(f"{key} {field} has an invalid key")
+        if isinstance(amount, bool) or not isinstance(amount, int) or amount <= 0:
+            raise ContentError(f"{key} {field} {reward_key} must be a positive integer")
+        if reward_key == "spirit_stones" or reward_key == "local_reputation":
+            cleaned[reward_key] = amount
+        elif reward_key.startswith("item."):
+            try:
+                bundle.require("item", reward_key, include_locked=False)
+            except KeyError as exc:
+                raise ContentError(
+                    f"{key} {field} references unavailable item {reward_key}"
+                ) from exc
+            cleaned[reward_key] = amount
+        else:
+            raise ContentError(f"{key} {field} has an unsupported reward {reward_key!r}")
+    if "local_reputation" in cleaned and not reputation_key:
+        raise ContentError(f"{key} {field} grants reputation without a reputation key")
+    return cleaned
+
+
+def season_record(content: ContentBundle | None = None) -> dict[str, Any]:
+    """The local weekly ladder contract: window anchor, board and rank payouts."""
+
+    key = "arena.season"
+    bundle = _bundle(content)
+    try:
+        row = bundle.require(KIND, key, include_locked=False)
+    except KeyError as exc:
+        raise ContentError(f"missing {KIND} content: {key}") from exc
+    if row.get("status") != "active":
+        raise ContentError(f"{key} status is not active")
+    for field in ("name", "desc"):
+        if not isinstance(row.get(field), str) or not row[field].strip():
+            raise ContentError(f"{key} requires a {field}")
+
+    anchor_text = row.get("week_anchor")
+    if not isinstance(anchor_text, str) or not anchor_text.strip():
+        raise ContentError(f"{key} week_anchor must be an ISO timestamp")
+    try:
+        anchor = datetime.fromisoformat(anchor_text)
+    except ValueError as exc:
+        raise ContentError(f"{key} week_anchor is not an ISO timestamp") from exc
+    if anchor.tzinfo is None:
+        raise ContentError(f"{key} week_anchor must carry a timezone")
+
+    board_size = _positive(row.get("board_size"), "board_size", key)
+    reputation_key = _text(row.get("local_reputation_key"), "local_reputation_key", key)
+    if not reputation_key.startswith("local."):
+        raise ContentError(f"{key} local_reputation_key must be a local reputation key")
+    from ..rewards.rules import local_reputation_maximum
+
+    local_reputation_maximum(reputation_key, bundle)
+    title_key = _text(row.get("title_key"), "title_key", key)
+    if not bundle.has("honor_title", title_key, include_locked=False):
+        raise ContentError(f"{key} references unknown title {title_key}")
+
+    rewards_value = row.get("rank_rewards")
+    if not isinstance(rewards_value, list) or not rewards_value:
+        raise ContentError(f"{key} rank_rewards must be a non-empty list")
+    rank_rewards: list[dict[str, Any]] = []
+    seen: set[int] = set()
+    for index, entry in enumerate(rewards_value):
+        if not isinstance(entry, dict) or set(entry) != {"rank", "reward"}:
+            raise ContentError(f"{key} rank_rewards[{index}] must be a rank/reward object")
+        rank = _positive(entry.get("rank"), f"rank_rewards[{index}].rank", key)
+        if rank > board_size:
+            raise ContentError(f"{key} rank_rewards[{index}] rank exceeds board_size")
+        if rank in seen:
+            raise ContentError(f"{key} rank_rewards has a duplicate rank {rank}")
+        seen.add(rank)
+        rank_rewards.append(
+            {"rank": rank, "reward": _reward_map(entry.get("reward"), f"rank_rewards[{index}].reward", key, bundle, reputation_key)}
+        )
+    default_reward = _reward_map(row.get("default_rank_reward"), "default_rank_reward", key, bundle, reputation_key)
+    return {
+        "key": key,
+        "week_anchor": anchor,
+        "board_size": board_size,
+        "local_reputation_key": reputation_key,
+        "title_key": title_key,
+        "rank_rewards": tuple(rank_rewards),
+        "default_rank_reward": default_reward,
+    }
+
+
 __all__ = [
     "DEFAULTS_KEY",
     "FACTIONS",
     "KIND",
     "arena_defaults",
+    "season_record",
     "spar_record",
     "team_record",
     "three_realms_record",

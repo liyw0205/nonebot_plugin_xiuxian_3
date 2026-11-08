@@ -77,6 +77,21 @@ M5 最终当前树本地阶段验收、审查与提交推送已完成；保留�
 主线剧情与离线成长首个真实纵向切片已推送 `42d1772`；不扩成 84 条主线批量填充，
 不重做 M9 数据，不把现存 PvP 入口描述成完整开放世界竞技生态。
 
+本轮在 `develop` 完成“探索模式可发现 + 敌人声明技能生效 + 天劫相位开关 + 突破许可内容化 +
+竞技场周赛季结算”一组闭环：
+
+- 探索：`explore.spirit_field_tending`、`explore.cloud_city_escort` 已由灵泉谷/云城 `actions` 列出，
+  并补 `test_open_modes_are_reachable.py` 与地点 seed 迁移登记，消除“open 但无入口”。
+- 战斗：`combat/enemy_skills.py` 解析并在快照冻结敌人声明技能（护盾/吸伤/状态），回合引擎按冻结值结算；
+  未知 effect 类型在内容加载期报错；回放把护盾与状态渲染为散文而非裸 key。
+- 天劫与突破：`automatic_phase_selection` 从运行期内容包读取并冻入试炼快照；
+  突破许可与发放改由 `quests/rules.py` 的 `permit_rewards()`/`breakthrough_permissions()` 解析，
+  既有 `VOID_QUEST_MISSING` 门槛数据驱动，不再硬编码 `item.recipe.void_refinery`、`quest.break_void`。
+- 竞技场周赛季：新增 `竞技场赛季`/`领取竞技场赛季奖励`（别名 `竞技场周榜`/`领取周榜奖励`）。
+  名次只从不可变 `arena_matches` 重建并首次冻结进 `arena_season_settlements`，领取只读冻结行，
+  `arena_season_claims` 双唯一约束保证幂等；`players.arena_rating`/`arena_wins` 不参与结算。
+  单场对局与 `领取竞技场结果` 仍不转移任何资产；领奖窗口为结算后 7 天，逾期仅保留展示名次。
+
 贸易端点秘境与商路里程碑切片已在 `develop` 完成（P1+P2）：`data/冒险/秘境.json` 为
 两处此前已开放却无任何活动的贸易端点各补一条通用 `common` 秘境——`instance.secret_realm.abyss_market_run`
 （魔渊契约集市，别名 `魔渊集市秘境`，地点 `demon.abyss_market`，元婴 L1，体力 20，周限 2，无凭证，
@@ -1594,6 +1609,14 @@ B1 缺规则/来源、B2 真实平台、B3 外部环境仍阻断完整产品或�
 无相关代码、证据或条件变化时不重复扫描，不扩展为无限新玩法任务。
 
 ## 5. 当前验收证据与局限
+
+- 本轮竞技场周赛季与前述修复的定向证据：`test_arena_season_content.py` 17、`test_arena_season_settlement.py` 7、
+  `test_arena_season_commands.py` 2、`test_enemy_skill_effects.py` 7、`test_tribulation_phase_flag.py` 4、
+  `test_breakthrough_permission_gate.py` 8、`test_open_modes_are_reachable.py` 2，均 0 failed。
+  冻结门槛用例覆盖：同周再加对局、直接 `UPDATE players` 改积分/胜场、以及重放同一 operation 后，
+  已结束周的 `arena_season_settlements` 行与领取结果逐字段不变；单场对局前后 `spirit_stones`/`inventory_json`
+  完全一致。领奖窗口逾期后不再发放且不写 claim。
+  未部署、未发真实 QQ、未运行全量/仿真/压测，不据此宣称完整游戏或真实平台验收。
 
 - M8 仅修改帮助、角色/生产/悬赏呈现及消息发送合同，命令注册、repository、数据与玩法规则不变。
   19 文件白名单已审查、提交为 `f4f43886e2e004542dadd81039f63b26b4827839`，普通

@@ -169,8 +169,10 @@ def test_tribulation_actions_replay_after_restart_and_settlement_is_idempotent()
             )
             assert replay.code == "BATTLE_REPLAY"
             assert "三劫天尊" in replay.message
-            assert "雷劫" not in replay.message
-            assert "（thunder阶段）" in replay.message
+            # The replay names each phase in prose: the raw phase key must not leak.
+            assert "（雷劫阶段）" in replay.message
+            assert "（thunder阶段）" not in replay.message
+            assert "（心魔阶段）" in replay.message and "（道劫阶段）" in replay.message
             action_count_before = len(replay.data["actions"])
             repeated_turn = await runtime.repository.run_battle_turn(
                 battle_id=battle_id, expected_round=1

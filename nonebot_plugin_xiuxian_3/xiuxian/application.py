@@ -162,6 +162,8 @@ _HELP_PAGES = {
         f"掌门可用{command_link('审批入宗', '审批入宗')}填写申请号与同意或拒绝，处理入宗申请。\n\n"
         f"与道友结伴，可用{command_link('邀请结为道侣', '邀请结为道侣')}填写对方道号；"
         f"想交流身手，用{command_link('切磋', '切磋')}填写对方道号。\n\n"
+        f"竞技场按周结算：先{command_link('竞技场赛季', '竞技场赛季')}查看本周名次与段位，\n"
+        f"周榜结束后用{command_link('领取竞技场赛季奖励', '领取竞技场赛季奖励')}按冻结名次领取；对战本身不转移资产。\n\n"
         f"宗门立稳后，可用{command_link('道统', '道统')}查看三条路线；"
         f"合道议事时{command_link('道统投票', '道统投票')}填写路线名，届时{command_link('道统结算', '道统结算')}定线。"
         f"留界宗门可{command_link('建立据点', '建立据点')}，再用{command_link('据点', '据点')}查看已建项目与建设进度。"
@@ -2625,6 +2627,16 @@ class XiuxianApplication:
             context,
             lambda: self.arena.claim_result(context),
             write_message="当前事件不允许确认竞技场结果。",
+        )
+
+    async def arena_season(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.arena.season(context), require_write=False)
+
+    async def claim_arena_season(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.arena.claim_season(context),
+            write_message="当前事件不允许领取竞技场赛季奖励。",
         )
 
     async def spar_players(self, context: CommandContext) -> CommandResult:

@@ -79,6 +79,7 @@ from ..events.three_realms_repository import ThreeRealmsSeasonRepositoryMixin
 from ..specials.arena_repository import ArenaRepositoryMixin
 from ..specials.team_arena_repository import TeamArenaRepositoryMixin
 from ..specials.arena_recovery_repository import ArenaRecoveryRepositoryMixin
+from ..specials.arena_season_repository import ArenaSeasonRepositoryMixin
 from ..specials.arena_projection import project_arena_result
 from ..specials.idle_repository import IdleRepositoryMixin
 from ..specials.idle_migration import ensure_idle_schema
@@ -187,6 +188,7 @@ class SQLitePlayerRepository(
     ArenaRepositoryMixin,
     TeamArenaRepositoryMixin,
     ArenaRecoveryRepositoryMixin,
+    ArenaSeasonRepositoryMixin,
     IdleRepositoryMixin,
     DispatchRepositoryMixin,
     CodexRepositoryMixin,

@@ -65,6 +65,31 @@
         "demon",
         "beast"
       ]
+    },
+    {
+      "key": "arena.season",
+      "name": "竞技场周赛季",
+      "desc": "本地竞技场按 UTC 周结算的榜单、段位与名次奖励契约；对战本身不转移资产，奖励只在周榜结算时按冻结名次发放。",
+      "status": "active",
+      "week_anchor": "2026-01-05T00:00:00+00:00",
+      "board_size": 20,
+      "local_reputation_key": "local.xuantian.new_town",
+      "title_key": "title.arena.season_champion",
+      "rank_rewards": [
+        {
+          "rank": 1,
+          "reward": {"spirit_stones": 800, "local_reputation": 20}
+        },
+        {
+          "rank": 2,
+          "reward": {"spirit_stones": 500, "local_reputation": 12}
+        },
+        {
+          "rank": 3,
+          "reward": {"spirit_stones": 300, "local_reputation": 8}
+        }
+      ],
+      "default_rank_reward": {"spirit_stones": 100, "local_reputation": 3}
     }
   ]
 }

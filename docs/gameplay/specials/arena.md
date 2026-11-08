@@ -57,6 +57,19 @@
 同阵营与跨阵营只改变服务端自动战的战术环境，匹配不修改阵营声望、背包、灵石、修为或装备。
 三人以上个人 PvP 与跨服匹配仍关闭。
 
+周赛季结算已接通（`specials/arena_season.py` 纯规则、`specials/arena_season_repository.py` 事务）：
+
+- 入口为 `竞技场赛季 [周次]`（别名 `竞技场周榜`）与 `领取竞技场赛季奖励 [周次]`（别名 `领取周榜奖励`）。
+- 名次只从不可变战绩 `arena_matches` 重建：积分取基础分加窗口结束前的全部积分增量，胜负平取窗口内计分对局；
+  排序按积分 desc、胜率 desc、首次得分时间 asc、player ID asc。**不读** `players.arena_rating` / `arena_wins`，
+  因此后续对局、玩家改号或内容改动都不会移动已结束周的名次。
+- 首次领取时把前 N 名冻结进 `arena_season_settlements`（`UNIQUE(week_key, player_id)`，另含 `reward_json`、
+  `frozen_at` 与周索引）；之后读榜与领取都只读冻结行，重复结算不覆盖。
+- 领取写入 `arena_season_claims`（`UNIQUE(week_key, player_id)` 与 `UNIQUE(operation_id)`），
+  称号只给第 1 名；同一 operation 重放返回同一 `reward`。
+- 领奖窗口为结算后 7 天：逾期返回 `ARENA_SEASON_CLAIM_EXPIRED`，名次仅作为展示记录，不补发。
+- 单场对局与 `领取竞技场结果` 依旧不发任何玩家资产（反互刷）：资产只在周榜领取时按冻结名次发放一次。
+
 `arena.team` 只接受已确认的 `party.exploration_pair` 或 `party.arena_trio` 队伍；双方队伍人数可以相同，也可以组成 2v3，队长发布快照并发起挑战，成员属性和装备在快照中固定。
 战斗由服务端自动选择行动，结果写入独立的 `arena_team_matches` / `arena_team_actions`，不复用单人
 `battle_sessions` 或队伍 PVE 会话，也不发生灵石、修为、装备等玩家资产转移。

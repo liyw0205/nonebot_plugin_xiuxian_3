@@ -4,6 +4,20 @@
 
 ### Added
 
+- Arena weekly ladder: `竞技场赛季` / `领取竞技场赛季奖励` (aliases `竞技场周榜` / `领取周榜奖励`)
+  rebuild each closed week's board from immutable `arena_matches` history, freeze the top ranks
+  into `arena_season_settlements` on first claim, and pay once per player per week from that frozen
+  row. `players.arena_rating` / `arena_wins` never feed a settled week, later matches and player
+  edits cannot move it, a per-match result still pays nothing, and the seven-day claim window leaves
+  an expired week as a display record.
+- Enemy declared skills actually shape a fight: shield/absorb/status effects are parsed, frozen into
+  the battle snapshot and resolved by the turn engine; unknown effect types fail at content load.
+- Exploration modes `explore.spirit_field_tending` and `explore.cloud_city_escort` are now listed by
+  their own places, with seed-migration provenance for the edited location seed.
+- Tribulation `automatic_phase_selection` is read from the runtime content pack and frozen into the
+  trial snapshot; the breakthrough permit and its payout are parsed from quest content instead of
+  hard-coded item/quest keys.
+
 - P0/P1 implementation plan covering dependencies, acceptance commands and rollback points.
 - Minimal standard-library runtime package with typed configuration and data-root boundaries.
 - Side-effect-free composition root, lifecycle state, feature manifest registry and health report.

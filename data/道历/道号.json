@@ -129,6 +129,13 @@
       "status": "active"
     },
     {
+      "key": "title.arena.season_champion",
+      "label": "周榜魁首",
+      "source_event": null,
+      "hint": "竞技场周赛季结算位列榜首",
+      "status": "active"
+    },
+    {
       "key": "title.dao_service",
       "label": "道统执事",
       "source_event": "routine.claim_achievement",
