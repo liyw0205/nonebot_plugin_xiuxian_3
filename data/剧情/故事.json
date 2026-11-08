@@ -67,7 +67,7 @@
           "flag_key": "flag.road.wanderer",
           "codex_entry_key": "codex.story.xuantian.road.wanderer",
           "appearance_key": "appearance.home.wanderer",
-          "completed_nodes": ["node.arrival", "node.wanderer.1", "node.wanderer.2"]
+          "completed_nodes": ["node.arrival", "node.wanderer.1", "node.wanderer.2", "node.wanderer.3"]
         },
         {
           "key": "sojourner",
@@ -81,7 +81,7 @@
           "flag_key": "flag.road.sojourner",
           "codex_entry_key": "codex.story.xuantian.road.sojourner",
           "appearance_key": "appearance.home.sojourner",
-          "completed_nodes": ["node.arrival", "node.sojourner.1"]
+          "completed_nodes": ["node.arrival", "node.sojourner.1", "node.sojourner.2"]
         }
       ]
     }

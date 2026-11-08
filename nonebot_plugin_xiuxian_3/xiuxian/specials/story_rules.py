@@ -106,6 +106,22 @@ def story_definition(
         nodes = _text_list(raw.get("completed_nodes"), "completed_nodes", label)
         if len(nodes) < required_count or len(set(nodes)) != len(nodes):
             raise StoryContentError(f"{label} completed_nodes must cover its source requirement")
+        if nodes and nodes[0] == entry_node:
+            # A branch that starts at the story's entry node still needs one beat
+            # per required source; without them the branch ends on a single beat
+            # while requiring several claims.
+            beats = nodes[1:]
+            expected = tuple(f"node.{key}.{index}" for index in range(1, required_count + 1))
+            if beats != expected:
+                raise StoryContentError(
+                    f"{label} completed_nodes must declare beats {expected} after {entry_node}"
+                )
+        else:
+            expected = tuple(f"node.{key}.{index}" for index in range(1, required_count + 1))
+            if nodes != expected:
+                raise StoryContentError(
+                    f"{label} completed_nodes must declare beats {expected}"
+                )
 
         ending_key = _required_text(raw, "ending_key", label)
         flag_key = _required_text(raw, "flag_key", label)
