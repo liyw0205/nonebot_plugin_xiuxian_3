@@ -247,3 +247,8 @@ v0.6 `story.mainline.dao_echoes` 已开放玩家流程：炼虚 L10 后可查询
 两条记录为纯内容，由既有通用秘境引擎驱动；两处端点的 `actions` 各登记对应秘境键以保证可发现，
 `秘境预览`/`修仙帮助 探索` 自动收录。通用引擎不读遭遇池，故本版不新增遭遇池。完整说明见
 [content-v0.10.md](content-v0.10.md)。
+
+主线在第八章之后不再终止：`chapter.9.stage.1`–`.3`（云城受讬、街巷护送、雾中旧账）把玄天卷接到云城
+与雾隐洞天的旧账上，分别要求抵达云城、在 `explore.cloud_city_escort` 取胜、在 `explore.mist_grotto`
+结算中取得灵叶。三关均为金丹 L1–L3、`keep_running` 重试、各带首通与重复奖励，最后一关收束链路。
+完整说明见 [content-v0.11.md](content-v0.11.md)。

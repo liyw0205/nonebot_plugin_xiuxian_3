@@ -1398,6 +1398,26 @@ name/desc/label 非空、探索模式引用须为开放模式（锁定模式与�
 回归 `test_cross_realm_events.py`/`test_cross_realm_event_snapshot_integrity.py` 29 passed、`test_void_frontier.py` 10 passed。
 未跑全量/压测/部署，未验 QQ 真机。
 
+战斗战利与主线续章已在 `develop` 完成（P1–P5）：`combat_content.py` 一直校验 `enemy.reward_refs` 却按
+模块自述"等待后续消费者显式采纳"，导致四条声明了 `reward.battle.*` 的敌人（木鼠、铁鬃野猪、劫修学徒、
+雾隐守卫）运行时 `reward={}`、击败后分文不得。`EnemyDefinition` 新增 `reward_refs`，战斗开始时按声明的
+战利表掷定并冻结进快照（种子取 `battle operation_id`，重放一致），未声明者仍用内联
+`combat_profile.reward`；代码内敌人也会读取内容声明的表，故无 `combat_profile` 的铁鬃野猪同样生效。
+`rewards/rules.py` 新增 `battle_reward_tables()`/`roll_bp()`，条目级 `chance_bp`（劫修学徒凝神丹 2000 bp）
+与记录级 `material_pool`（雾隐守卫灵叶45/阵砂30/铁石25，数量 1–3，`one_weighted`）首次真正结算，
+未知 kind/缺键/越界一律抛 `RewardContentError`；`enemy.bandit_apprentice` 与声明表冲突的内联
+`{"spirit_stones": 6}` 已清空，改为单一来源。主线在 `chapter.8.stage.3`（`next_stage_key` 为空）之后原本
+终止，现接上 `chapter.9.stage.1`–`.3`（云城受讬/街巷护送/雾中旧账，金丹 L1–L3，各带首通/重复奖励与
+`keep_running` 重试，末关收束），关卡 24 → 27，两场目标分别落在 `explore.cloud_city_escort` 与
+`explore.mist_grotto`。`story_rules` 把节拍校验由"数量够"改为"每个来源一次节拍"，据此补齐
+`sojourner`（闲居，2 次结算）与 `wanderer`（游历，3 次战斗）各缺的一拍。
+聚焦证据：新增 `test_battle_reward_refs.py` 13 passed、`test_mainline_chapter_nine.py` 4 passed、
+`test_story_branch_beats.py` 4 passed；`test_combat.py` 的实 PvE 用例原先把"胜利却无奖励"钉成契约，
+现改为木鼠首通修为 10 且领取成功。回归：combat/rewards/combat_content/spar 241 passed、
+mainline 第五至第八章 10 passed、story rules 与第四/第五分支 9 passed、种子迁移 manifest 与反向助手 10 passed。
+该阶段改动 `战斗/敌人.json`、`剧情/主线.json`、`剧情/故事.json` 三份官方种子，迁移清单已同批登记。
+未跑全量/压测/部署，未验 QQ 真机。
+
 本轮有限任务已完成：`chapter.1.stage.3` 雾中守门与 `chapter.2.stage.1` 城镇委托两关的正文、人物/场景、
 可执行目标、来源/奖励/后续引用、失败重试规则及现有战斗/委托、快照、事务、幂等消费者已落地。
 沿用本轮已确认的 `19 passed`、`lastfailed={}` 聚焦证据；不重跑全量、不扩展 travel/world，不重开 M9，

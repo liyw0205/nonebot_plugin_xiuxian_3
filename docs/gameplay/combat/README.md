@@ -54,3 +54,8 @@
 `收回机关`、`维修机关`。与既有 `skill.device.scout_doll`（机弩穿云）保持分离，
 `domain.machine_city` 与 `fruit.machine_heaven` 仍按既有锁定语义处理。完整合同见
 [content-v0.8.md](content-v0.8.md)。
+
+战斗胜负的战利改由内容声明表结算：声明了 `enemy.reward_refs` 的敌人在战斗开始时按该表掷定并冻结进
+快照，条目级 `chance_bp` 与记录级 `material_pool`（`one_weighted`）都真正生效，未声明者仍用内联
+`combat_profile.reward`。木鼠、铁鬃野猪、劫修学徒、雾隐守卫四者此前 `reward={}` 因而击败后分文不得。
+完整说明见 [content-v0.9.md](content-v0.9.md)。
