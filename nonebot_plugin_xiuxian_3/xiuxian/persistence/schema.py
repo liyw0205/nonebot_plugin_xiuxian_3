@@ -1645,6 +1645,36 @@ CREATE TABLE IF NOT EXISTS arena_season_snapshots (
 CREATE INDEX IF NOT EXISTS idx_arena_season_snapshots_rank
     ON arena_season_snapshots(season_key, shard_key, rating DESC, wins DESC, player_id);
 
+CREATE TABLE IF NOT EXISTS arena_season_settlements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    week_key TEXT NOT NULL,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    rank INTEGER NOT NULL CHECK (rank >= 1),
+    rating INTEGER NOT NULL CHECK (rating >= 0),
+    wins INTEGER NOT NULL CHECK (wins >= 0),
+    losses INTEGER NOT NULL CHECK (losses >= 0),
+    draws INTEGER NOT NULL CHECK (draws >= 0),
+    tier INTEGER NOT NULL CHECK (tier >= 0),
+    reward_json TEXT NOT NULL DEFAULT '{}',
+    frozen_at TEXT NOT NULL,
+    UNIQUE (week_key, player_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_arena_season_settlements_week
+    ON arena_season_settlements(week_key, rank);
+
+CREATE TABLE IF NOT EXISTS arena_season_claims (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    week_key TEXT NOT NULL,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    operation_id TEXT NOT NULL,
+    rank INTEGER NOT NULL,
+    reward_json TEXT NOT NULL DEFAULT '{}',
+    claimed_at TEXT NOT NULL,
+    UNIQUE (week_key, player_id),
+    UNIQUE (operation_id)
+);
+
 CREATE TABLE IF NOT EXISTS arena_audit_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     event_key TEXT NOT NULL,

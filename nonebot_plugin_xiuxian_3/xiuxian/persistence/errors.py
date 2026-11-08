@@ -1729,6 +1729,26 @@ class ArenaRewardNotAvailableError(RuntimeError):
     """The player has no pending arena result to acknowledge."""
 
 
+class ArenaSeasonNotClosedError(RuntimeError):
+    """The requested arena week has not closed yet."""
+
+
+class ArenaSeasonNotFoundError(RuntimeError):
+    """The requested arena week key is unknown or malformed."""
+
+
+class ArenaSeasonRankOutOfBoardError(RuntimeError):
+    """The player did not place inside the rewarded board for that week."""
+
+
+class ArenaSeasonAlreadyClaimedError(RuntimeError):
+    """The player already claimed that week's arena reward."""
+
+
+class ArenaSeasonClaimExpiredError(RuntimeError):
+    """The post-settlement claim window for that arena week has passed."""
+
+
 class TeamArenaSnapshotRequirementError(RuntimeError):
     """The party cannot publish a usable team arena snapshot."""
 
