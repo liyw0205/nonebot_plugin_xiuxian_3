@@ -48,6 +48,13 @@ from ..utils.player import (
     spend_player_state,
 )
 
+_STAGE_REQUIREMENT_TEXT = {
+    "new_user": "需要完成入道前的引导",
+    "mortal": "需要凡人角色",
+    "seeker": "需要寻道期角色",
+    "cultivator": "需要入道后的角色",
+}
+
 
 class DispatchRepositoryMixin:
     async def preview_dispatch(
@@ -80,8 +87,12 @@ class DispatchRepositoryMixin:
     ) -> DispatchPreviewRecord:
         missing: list[str] = []
         stage_order = {"new_user": 0, "mortal": 1, "seeker": 2, "cultivator": 3, "suspended": -1}
-        if stage_order.get(str(player["stage"]), 0) < stage_order["mortal"]:
-            missing.append("需要凡人角色")
+        # The declared stage is honoured, the same way idle routes and transport
+        # gates compare it. Shipped records declare "mortal", whose rank equals
+        # the previous hardcoded minimum, so existing behaviour is unchanged.
+        required_stage = definition.required_stage or "mortal"
+        if stage_order.get(str(player["stage"]), 0) < stage_order.get(required_stage, 1):
+            missing.append(_STAGE_REQUIREMENT_TEXT.get(required_stage, "需要凡人角色"))
         intro_flags = set(player_intro_flags(player))
         if definition.required_intro_flag and definition.required_intro_flag not in intro_flags:
             missing.append("需要完成对应引导")

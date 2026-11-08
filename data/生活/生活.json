@@ -1356,6 +1356,87 @@
       "key": "route.cloud_to_abyss_gate",
       "record_type": "route",
       "status": "active"
+    },
+    {
+      "name": "寻道问诊",
+      "desc": "替镇中药铺奔走问诊，寻道期弟子才能接下这份跑腿。",
+      "aliases": [
+        "问诊",
+        "镇中问诊"
+      ],
+      "duration_seconds": 3600,
+      "daily_limit": 2,
+      "cost": {
+        "stamina": 2
+      },
+      "risk_pool": "dispatch.seeker",
+      "requirements": {
+        "stage": "seeker"
+      },
+      "risk": {
+        "weights": {
+          "success": 8000,
+          "delayed": 1200,
+          "partial": 800
+        }
+      },
+      "rewards": {
+        "success": {
+          "spirit_stones": 45,
+          "item.herb.blood_grass": 2,
+          "local.xuantian.new_town": 4
+        },
+        "partial": {
+          "spirit_stones": 20,
+          "local.xuantian.new_town": 1
+        }
+      },
+      "key": "dispatch.seeker.clinic_run",
+      "record_type": "dispatch",
+      "status": "active"
+    },
+    {
+      "name": "入道后药圃督运",
+      "desc": "入道修士才能押运的药圃物资，需以灵力护持沿途灵植。",
+      "aliases": [
+        "药圃督运",
+        "督运"
+      ],
+      "duration_seconds": 5400,
+      "daily_limit": 2,
+      "cost": {
+        "stamina": 4
+      },
+      "risk_pool": "dispatch.cultivator",
+      "requirements": {
+        "stage": "cultivator"
+      },
+      "risk": {
+        "weights": {
+          "success": 7000,
+          "delayed": 1200,
+          "partial": 1200,
+          "failed": 600
+        }
+      },
+      "failure_refunds": {
+        "stamina": 2
+      },
+      "rewards": {
+        "success": {
+          "spirit_stones": 90,
+          "item.herb.spirit_leaf": 3,
+          "item.mat.array_sand": 1,
+          "local.xuantian.new_town": 6
+        },
+        "partial": {
+          "spirit_stones": 40,
+          "item.herb.spirit_leaf": 1
+        }
+      },
+      "key": "dispatch.cultivator.herb_convoy",
+      "record_type": "dispatch",
+      "status": "active"
     }
   ],
   "schema": "xiuxian.content"
