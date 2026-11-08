@@ -57,7 +57,8 @@ class Flow:
     def context(self, **values):
         # Short tests replace accumulated realm/location/capacity only, never item sources or progress.
         assert set(values) <= {"realm_key", "realm_layer", "location_key", "carry_capacity",
-                               "void_power", "void_power_max", "max_hp", "initiative", "qualification_json"}
+                               "void_power", "void_power_max", "max_hp", "stamina_max", "initiative",
+                               "qualification_json"}
         with self.runtime.repository._connect() as db:
             db.execute(f"UPDATE players SET {', '.join(key + '=?' for key in values)} WHERE platform_user_id='player'",
                        tuple(values.values()))
@@ -198,9 +199,13 @@ def test_public_mining_permit_tools_bounty_and_gear_consumption(tmp_path):
                 await flow.gather()
             await flow.send("返回新手城")
             await flow.send("开始主线 1")
+            # chapter.1.stage.1 asks for an arrival after the stage started, so
+            # the public travel chain is part of the loop, not an assumption.
+            await flow.send("前往 近郊")
+            flow.now += timedelta(seconds=31)
+            assert (await flow.send("结算移动")).code == "TRAVEL_COMPLETED"
             await flow.send("领取主线奖励 1")
             mount = await flow.send("结缘灵骑 竹鹿")
-            await flow.send("前往近郊")
             beast = await flow.send("结缘灵兽 木鼠")
             await flow.produce("矿区登记", operation="permit-start")
             before = flow.dump()
@@ -285,10 +290,16 @@ def test_public_mining_permit_tools_bounty_and_gear_consumption(tmp_path):
             assert flow.dump() == before
 
             # Replace only accumulated realm; the permit, tools, mine items and bounty remain public.
-            flow.context(realm_key="foundation", realm_layer=4)
+            # 云城 is gated at 金丹一层, so the lawful road to the mine starts there.
+            flow.context(realm_key="golden_core", realm_layer=1, stamina_max=60)
             flow.now += timedelta(days=1)
             await flow.send("恢复状态")
             await flow.send("返回新手城")
+            # 云铁矿区 is only reachable through 云城, so the loop uses the two
+            # public hops instead of a direct route that does not exist.
+            await flow.send("前往 云城")
+            flow.now += timedelta(seconds=181)
+            assert (await flow.send("结算移动")).code == "TRAVEL_COMPLETED"
             await flow.send("前往 云铁矿区")
             flow.now += timedelta(minutes=3)
             await flow.send("结算移动")
@@ -296,9 +307,6 @@ def test_public_mining_permit_tools_bounty_and_gear_consumption(tmp_path):
             assert accepted.code == "BOUNTY_ACCEPTED"
             assert (await flow.send("领取悬赏", ok=False)).code == "BOUNTY_NOT_COMPLETE"
             for index in range(3):
-                if index == 2:
-                    flow.now += timedelta(minutes=40)
-                    await flow.send("恢复状态")
                 operation = next(f"mine:{index}:{i}" for i in range(1000) if battle_roll_bp(f"mine:{index}:{i}:battle") >= 3000)
                 await flow.send("开始探索 云铁矿区采集", operation)
                 flow.now += timedelta(minutes=11)
@@ -335,8 +343,30 @@ def test_public_cooking_and_mining_entry_rewards(tmp_path):
             assert flow.dump() == before
             await flow.send("返回新手城")
             await flow.send("开始主线 1")
+            await flow.send("前往 近郊")
+            flow.now += timedelta(seconds=31)
+            assert (await flow.send("结算移动")).code == "TRAVEL_COMPLETED"
             await flow.send("领取主线奖励 1")
+            # chapter.1.stage.2 requires a settled 灵泉采集 at 感气二层, both of
+            # which are public actions: travel back, grow, then gather.
+            await flow.send("返回新手城")
+            flow.context(realm_key="qi_sensing", realm_layer=2)
             await flow.send("开始主线 2")
+            await flow.send("前往 灵泉谷")
+            flow.now += timedelta(seconds=91)
+            assert (await flow.send("结算移动")).code == "TRAVEL_COMPLETED"
+            operation = next(
+                f"spring:{index}"
+                for index in range(10000)
+                if settlement_result(
+                    "explore.spring_gather", f"spring:{index}", content=flow.runtime.content
+                ).get("item.herb.spirit_leaf", 0) >= 1
+            )
+            await flow.send("开始探索 灵泉采集", operation)
+            flow.now += timedelta(seconds=91)
+            settled = await flow.send("结算探索")
+            assert settled.code == "EXPLORATION_SETTLED"
+            assert settled.data["result"]["item.herb.spirit_leaf"] >= 1
             await flow.send("领取主线奖励 2")
             flow.context(realm_key="qi_gathering", realm_layer=1, location_key="xuantian.spirit_field")
             _, tea = await flow.produce("云灵茶")

@@ -110,6 +110,9 @@ def test_first_two_story_stages_use_settled_player_actions_and_retry_in_place(tm
             second_incomplete = await send("stage2-early-claim", "领取主线奖励 2")
             assert second_incomplete.code == "MAINLINE_OBJECTIVES_INCOMPLETE"
 
+            # 近郊 has no direct lane to 灵泉谷; the public road back through the
+            # town is part of the loop, so walk it instead of asserting a route.
+            assert (await send("spirit-back-to-town", "返回新手城")).ok
             spirit_travel = await send("spirit-travel-start", "前往 灵泉谷")
             assert spirit_travel.code == "TRAVEL_STARTED", spirit_travel.message
             clock.advance(hours=1)
