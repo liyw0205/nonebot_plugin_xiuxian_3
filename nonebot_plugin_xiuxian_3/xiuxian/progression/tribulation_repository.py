@@ -15,6 +15,7 @@ from ..advancement.constitution_effects import constitution_effect_snapshot
 from ..combat.rules import MAX_TURNS, TURN_TIMEOUT_SECONDS
 from ..stats.rules import apply_constitution_combat_effect
 from ..combat.tribulation_rules import (
+    AUTOMATIC_PHASE_SELECTION,
     ENEMY_AGILITY,
     ENEMY_ATTACK,
     ENEMY_INITIATIVE,
@@ -196,6 +197,16 @@ class TribulationTrialRepositoryMixin:
             session_id = uuid4().hex
             battle_id = uuid4().hex
             shield_bp = debt_shield_bp(player_integer(row, "tribulation_debt"))
+            # Freeze the behaviour the running content declares, not a constant
+            # captured at import: a data pack may switch the trial's own phase
+            # selection off and the battle must honour it.
+            from ..combat.tribulation_content import tribulation_trial as _trial_content
+
+            trial_content = getattr(self, "content", None) or bundled_content()
+            frozen_trial = _trial_content(trial_content)
+            automatic_phase_selection = bool(
+                frozen_trial.get("automatic_phase_selection", AUTOMATIC_PHASE_SELECTION)
+            )
             snapshot = {
                 "profile_key": PROFILE_KEY,
                 "battle_type": "pve.tribulation_trial",
@@ -243,6 +254,7 @@ class TribulationTrialRepositoryMixin:
                     "debt_before": player_integer(row, "tribulation_debt"),
                     "difficulty_bp": shield_bp,
                     "debt_shield_bp": shield_bp,
+                    "automatic_phase_selection": automatic_phase_selection,
                     "guard_used": guard_used,
                     "fate_roll_bp": fate_bp,
                     "fate_rule": "battle_pressure",

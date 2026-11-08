@@ -769,6 +769,11 @@ class CombatRepositoryMixin:
             device_actions = int(state.get("device_actions", 0)) if device is not None else 0
             is_tribulation_trial = str(snapshot.get("profile_key", "")) == PROFILE_KEY
             tribulation = self._json_object(snapshot.get("tribulation"), {})
+            # Frozen from the trial's declared behaviour; older snapshots keep
+            # the historical auto-advance.
+            automatic_phase = (
+                bool(tribulation.get("automatic_phase_selection", True)) if is_tribulation_trial else True
+            )
             debt_shield_bp = int(tribulation.get("debt_shield_bp", 0)) if is_tribulation_trial else 0
             player_skills = list(snapshot.get("player", {}).get("skills", []))
             player_mana = int(state.get("player_mana", player_stats.get("max_mana", 0)))
@@ -794,7 +799,11 @@ class CombatRepositoryMixin:
             outcome: str | None = None
             reason = ""
             for actor in actor_order:
-                phase = phase_for_hp(enemy_hp, int(enemy["max_hp"])) if is_tribulation_trial else None
+                phase = (
+                    phase_for_hp(enemy_hp, int(enemy["max_hp"]), automatic=automatic_phase)
+                    if is_tribulation_trial
+                    else None
+                )
                 shield_absorbed = 0
                 status_applied = None
                 if actor == "player" and bloodline_shadow and not timeout:
@@ -941,7 +950,7 @@ class CombatRepositoryMixin:
                     bloodline_shadow = True
                 else:
                     if actor == "enemy" and is_tribulation_trial:
-                        phase = phase_for_hp(enemy_hp, int(enemy["max_hp"]))
+                        phase = phase_for_hp(enemy_hp, int(enemy["max_hp"]), automatic=automatic_phase)
                     enemy_attack = (
                         phase.attack
                         if phase is not None
@@ -1192,7 +1201,7 @@ class CombatRepositoryMixin:
             if is_tribulation_trial:
                 state.update(
                     {
-                        "tribulation_phase": phase_for_hp(enemy_hp, int(enemy["max_hp"])).key,
+                        "tribulation_phase": phase_for_hp(enemy_hp, int(enemy["max_hp"]), automatic=automatic_phase).key,
                         "debt_shield_bp": debt_shield_bp,
                     }
                 )

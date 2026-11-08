@@ -67,12 +67,25 @@ def tribulation_trial(content: ContentBundle | None = None) -> dict[str, Any]:
         raise ContentError("tribulation phases must descend strictly")
     if parsed[-1]["min_hp_bp"] != 0:
         raise ContentError("the final tribulation phase must start at 0 bp")
+    enemy_key = _text(row.get("enemy_key"), "enemy key")
+    enemy_row = bundle.get("enemy", enemy_key, include_locked=False)
+    if enemy_row is None:
+        raise ContentError(f"tribulation trial references unavailable enemy {enemy_key}")
+    behavior = enemy_row.get("behavior")
+    if not isinstance(behavior, dict) or set(behavior) != {
+        "can_critical", "can_escape", "automatic_phase_selection"
+    }:
+        raise ContentError("tribulation trial enemy behavior is invalid")
+    for field in ("can_critical", "can_escape", "automatic_phase_selection"):
+        if not isinstance(behavior[field], bool):
+            raise ContentError(f"tribulation trial enemy behavior.{field} must be a boolean")
     return {
         "key": TRIAL_KEY,
-        "enemy_key": _text(row.get("enemy_key"), "enemy key"),
+        "enemy_key": enemy_key,
         "battle_profile_key": _text(row.get("battle_profile_key"), "profile key"),
         "enemy": dict(enemy),
         "phases": parsed,
+        "automatic_phase_selection": behavior["automatic_phase_selection"],
     }
 
 

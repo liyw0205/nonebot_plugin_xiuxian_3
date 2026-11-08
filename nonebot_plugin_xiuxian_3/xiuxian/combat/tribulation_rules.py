@@ -30,9 +30,18 @@ class TribulationPhase:
 
 
 PHASES: tuple[TribulationPhase, ...] = tribulation_phases()
+# The trial's declared behaviour: when it is off, the heaven does not advance
+# its own phase by HP and the fight keeps the entry phase's numbers.
+AUTOMATIC_PHASE_SELECTION = bool(_TRIAL["automatic_phase_selection"])
 
 
-def phase_for_hp(enemy_hp: int, enemy_max_hp: int = ENEMY_MAX_HP) -> TribulationPhase:
+def phase_for_hp(
+    enemy_hp: int, enemy_max_hp: int = ENEMY_MAX_HP, *, automatic: bool | None = None
+) -> TribulationPhase:
+    if automatic is None:
+        automatic = AUTOMATIC_PHASE_SELECTION
+    if not automatic:
+        return PHASES[0]
     hp_bp = max(0, int(enemy_hp)) * 10_000 // max(1, int(enemy_max_hp))
     return next(phase for phase in PHASES if hp_bp >= phase.min_hp_bp)
 
