@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -202,6 +204,157 @@ def reward_pool_map(
             for weight, rewards in outcomes
         )
     return dict(deterministic_weighted_choice(weighted_outcomes, seed))
+
+
+_BATTLE_REWARD_KINDS = {"item": "item_key", "currency": "currency_key", "resource": "resource_key"}
+
+
+def roll_bp(seed: str) -> int:
+    """Return a stable 0..9999 roll derived from a seed string."""
+
+    if not isinstance(seed, str):
+        raise ValueError("roll seed must be a string")
+    digest = hashlib.blake2b(seed.encode("utf-8"), digest_size=8).digest()
+    return int.from_bytes(digest, "big") % 10_000
+
+
+def battle_reward_tables(
+    refs: Iterable[str], content: ContentBundle | None = None, *, seed: str
+) -> dict[str, int]:
+    """Resolve official ``reward.battle.*`` tables into one flat reward map.
+
+    ``seed`` keeps the roll stable so a frozen battle settles identically on
+    replay. Unknown kinds, missing keys and impossible weights raise instead of
+    silently dropping the payout.
+    """
+
+    if not isinstance(seed, str) or not seed:
+        raise RewardContentError("battle reward tables require a seed")
+    bundle = content or _DEFAULT_CONTENT
+    total: dict[str, int] = {}
+    for index, ref in enumerate(refs):
+        if not isinstance(ref, str) or not ref:
+            raise RewardContentError("battle reward references must be strings")
+        for target, quantity in _battle_reward_entries(
+            ref, bundle, seed=f"{seed}:{index}"
+        ).items():
+            if quantity:
+                total[target] = total.get(target, 0) + quantity
+    return total
+
+
+def _battle_reward_entries(
+    key: str, bundle: ContentBundle, *, seed: str
+) -> dict[str, int]:
+    try:
+        row = bundle.require("reward", key, include_locked=False)
+    except KeyError as exc:
+        raise RewardContentError(f"battle reward is not active: {key}") from exc
+    entries = row.get("entries")
+    if not isinstance(entries, list) or not entries:
+        raise RewardContentError(f"battle reward {key} requires entries")
+    rewards: dict[str, int] = {}
+    for index, entry in enumerate(entries):
+        if not isinstance(entry, dict):
+            raise RewardContentError(f"battle reward {key} entry {index} must be an object")
+        kind = entry.get("kind")
+        field_name = _BATTLE_REWARD_KINDS.get(kind) if isinstance(kind, str) else None
+        if field_name is None:
+            raise RewardContentError(
+                f"battle reward {key} entry {index} has an unsupported kind {kind!r}"
+            )
+        target = entry.get(field_name)
+        if not isinstance(target, str) or not target:
+            raise RewardContentError(f"battle reward {key} entry {index} requires {field_name}")
+        if kind == "currency":
+            if target != "currency.spirit_stone":
+                raise RewardContentError(
+                    f"battle reward {key} entry {index} uses unsupported currency {target!r}"
+                )
+            target = "spirit_stones"
+        chance = entry.get("chance_bp", 10_000)
+        if isinstance(chance, bool) or not isinstance(chance, int) or not 0 <= chance <= 10_000:
+            raise RewardContentError(
+                f"battle reward {key} entry {index} chance_bp must be 0..10000"
+            )
+        if chance < 10_000 and roll_bp(f"{seed}:entry:{index}") >= chance:
+            continue
+        quantity = _battle_reward_quantity(
+            entry, key=key, index=index, seed=f"{seed}:quantity:{index}"
+        )
+        if quantity:
+            rewards[target] = rewards.get(target, 0) + quantity
+    pool = row.get("material_pool")
+    if pool is not None:
+        material, quantity = _battle_material_pool(pool, key, seed=f"{seed}:material_pool")
+        if quantity:
+            rewards[material] = rewards.get(material, 0) + quantity
+    return rewards
+
+
+def _battle_reward_quantity(
+    entry: dict[str, Any], *, key: str, index: int | str, seed: str
+) -> int:
+    if "quantity" in entry:
+        quantity = entry["quantity"]
+        if isinstance(quantity, bool) or not isinstance(quantity, int) or quantity < 0:
+            raise RewardContentError(
+                f"battle reward {key} entry {index} quantity must be a non-negative int"
+            )
+        return quantity
+    quantity_range = entry.get("quantity_range")
+    if (
+        not isinstance(quantity_range, list)
+        or len(quantity_range) != 2
+        or any(
+            isinstance(value, bool) or not isinstance(value, int) or value < 0
+            for value in quantity_range
+        )
+        or quantity_range[0] > quantity_range[1]
+    ):
+        raise RewardContentError(
+            f"battle reward {key} entry {index} requires quantity or quantity_range"
+        )
+    low, high = quantity_range
+    return low + roll_bp(seed) % (high - low + 1)
+
+
+def _battle_material_pool(pool: Any, key: str, *, seed: str) -> tuple[str, int]:
+    if not isinstance(pool, dict):
+        raise RewardContentError(f"battle reward {key} material_pool must be an object")
+    selection = pool.get("selection", "one_weighted")
+    if selection != "one_weighted":
+        raise RewardContentError(
+            f"battle reward {key} material_pool selection {selection!r} is unsupported"
+        )
+    entries = pool.get("entries")
+    if not isinstance(entries, list) or not entries:
+        raise RewardContentError(f"battle reward {key} material_pool requires entries")
+    outcomes: list[tuple[int, str]] = []
+    for index, entry in enumerate(entries):
+        if not isinstance(entry, dict):
+            raise RewardContentError(
+                f"battle reward {key} material_pool entry {index} must be an object"
+            )
+        item_key = entry.get("item_key")
+        weight = entry.get("weight")
+        if not isinstance(item_key, str) or not item_key:
+            raise RewardContentError(
+                f"battle reward {key} material_pool entry {index} requires item_key"
+            )
+        if isinstance(weight, bool) or not isinstance(weight, int) or weight <= 0:
+            raise RewardContentError(
+                f"battle reward {key} material_pool entry {index} requires a positive weight"
+            )
+        outcomes.append((weight, item_key))
+    quantity = _battle_reward_quantity(
+        {"quantity_range": pool.get("quantity_range")},
+        key=key,
+        index="material_pool",
+        seed=f"{seed}:quantity",
+    )
+    chosen = deterministic_weighted_choice(outcomes, f"{seed}:pick")
+    return chosen, quantity
 
 
 def _reward_pool_record(key: str, bundle: ContentBundle) -> dict[str, Any]:

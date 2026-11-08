@@ -4,7 +4,7 @@ from __future__ import annotations
 
 
 import hashlib
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from ..content import ContentBundle, ContentError, bundled_content
 
@@ -34,6 +34,7 @@ class EnemyDefinition:
     random_pool: str
     reward: dict[str, int]
     party_reward: dict[str, int] = field(default_factory=dict)
+    reward_refs: tuple[str, ...] = ()
 
 
 TRAINING_DUMMY = EnemyDefinition(
@@ -450,6 +451,12 @@ def _content_enemy(key: str, content: ContentBundle) -> EnemyDefinition:
         for reward_key, amount in party_reward.items()
     ):
         raise ContentError(f"enemy {key} has an invalid party reward")
+    reward_refs = record.get("reward_refs", [])
+    if (
+        not isinstance(reward_refs, list)
+        or any(not isinstance(reference, str) or not reference for reference in reward_refs)
+    ):
+        raise ContentError(f"enemy {key} reward_refs must be a string list")
     return EnemyDefinition(
         key=key,
         label=str(record["name"]),
@@ -464,6 +471,7 @@ def _content_enemy(key: str, content: ContentBundle) -> EnemyDefinition:
         random_pool=random_pool,
         reward=dict(reward),
         party_reward=dict(party_reward),
+        reward_refs=tuple(reward_refs),
     )
 
 
@@ -589,9 +597,16 @@ def enemy_definition(enemy_key: str, *, content: ContentBundle | None = None) ->
     if record is not None and isinstance(record.get("combat_profile"), dict):
         return _content_enemy(enemy_key, bundle)
     try:
-        return ENEMIES[enemy_key]
+        definition = ENEMIES[enemy_key]
     except KeyError as exc:
         raise ValueError(f"unsupported enemy: {enemy_key}") from exc
+    # A code-defined enemy may still declare its payout in content: the official
+    # `reward_refs` table governs the reward even when the stats stay in code.
+    if record is not None:
+        declared_refs = record.get("reward_refs") or []
+        if declared_refs:
+            definition = replace(definition, reward_refs=tuple(str(ref) for ref in declared_refs))
+    return definition
 
 
 def battle_roll_bp(seed: str) -> int:

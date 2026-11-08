@@ -42,6 +42,7 @@ from .skill_effects import (
     prepare_skill_action,
     reflected_enemy_damage,
 )
+from ..rewards.rules import battle_reward_tables
 from .rules import (
     ANCESTRAL_SPIRIT,
     DEMON_WAR_FRONT,
@@ -479,7 +480,13 @@ class CombatRepositoryMixin:
                 },
                 "random_pool": enemy.random_pool,
                 "random_seed": operation_id,
-                "reward": dict(enemy.reward),
+                "reward": (
+                    battle_reward_tables(
+                        enemy.reward_refs, self.content, seed=operation_id
+                    )
+                    if enemy.reward_refs
+                    else dict(enemy.reward)
+                ),
             }
             state = {
                 "round_no": 0,

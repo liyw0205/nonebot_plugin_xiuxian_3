@@ -120,8 +120,11 @@ def test_real_pve_settles_with_replay_durability_and_codex() -> None:
                 ).fetchone()[0]
             started, resolved, replay = await _run_real_pve(runtime, user, "combat-win-start")
             assert resolved.outcome == "won"
-            assert resolved.reward_status == "none"
-            assert resolved.reward == {}
+            # The wood rat declares `reward_refs: [reward.battle.wood_rat]`, so a win
+            # freezes that table instead of paying nothing.
+            assert resolved.reward_status == "pending"
+            assert resolved.reward["cultivation"] == 10
+            assert 0 <= resolved.reward.get("item.herb.blood_grass", 0) <= 1
             assert replay.enemy_key == "enemy.wood_rat"
             assert replay.actions
             assert all("operation_id" in action for action in replay.actions)
@@ -139,9 +142,9 @@ def test_real_pve_settles_with_replay_durability_and_codex() -> None:
             assert codex_after == codex_before + 1
 
             claimed = await runtime.dispatch(_context(user, "claim", operation_id="combat-win-claim"), "领取战斗奖励")
-            assert claimed.code == "BATTLE_REWARD_NOT_AVAILABLE"
+            assert claimed.code == "BATTLE_REWARD_CLAIMED"
             final = await runtime.dispatch(_context(user, "final"), "我的状态")
-            assert final.data["cultivation"] == before.data["cultivation"]
+            assert final.data["cultivation"] == before.data["cultivation"] + 10
             assert final.data["spirit_stones"] == before.data["spirit_stones"]
 
             assert started.battle_id

@@ -119,7 +119,7 @@
       ],
       "combat_profile": {
         "random_pool_key": "battle.enemy.bandit_apprentice",
-        "reward": {"spirit_stones": 6},
+        "reward": {},
         "drop_pool_key": "reward_pool.enemy.early"
       },
       "key": "enemy.bandit_apprentice",
