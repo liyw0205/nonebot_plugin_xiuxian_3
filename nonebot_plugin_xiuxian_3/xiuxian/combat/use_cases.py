@@ -31,6 +31,15 @@ def _phase_label(phase_key: str) -> str:
     return phase_key
 
 
+_STATUS_LABELS = {"bleeding": "流血"}
+
+
+def _status_label(status_key: str) -> str:
+    """Readable name for a declared enemy status; the key is the fallback."""
+
+    return _STATUS_LABELS.get(status_key, status_key)
+
+
 class CombatApplication:
     """Start and present server-driven combat without accepting client actions."""
 
@@ -250,15 +259,33 @@ class CombatApplication:
         outcome = result.get("outcome", "进行中")
         enemy_snapshot = record.snapshot.get("enemy", {})
         enemy_label = str(enemy_snapshot.get("label") or record.enemy_key)
+        declared_skill = enemy_snapshot.get("skill")
+        declared_skill = declared_skill if isinstance(declared_skill, dict) else {}
+        declared_key = str(declared_skill.get("key", ""))
+        declared_name = str(declared_skill.get("name", ""))
         lines = ["## 战斗回放", "", f"- **战斗**：`{record.battle_id}`", f"- **敌人**：{enemy_label}", f"- **结果**：{outcome}", ""]
         for action in record.actions:
             actor = "你" if action["actor_key"] == "player" else enemy_label
             target = enemy_label if action["target_key"] == "enemy" else "你"
             phase = action.get("state", {}).get("tribulation_phase")
             phase_text = f"（{_phase_label(phase)}阶段）" if phase else ""
-            lines.append(
-                f"- 回合 {action['round_no']}：{actor}{phase_text} 使用 `{action['skill_key']}` 攻击 {target}，伤害 {action['damage']}。"
-            )
+            is_enemy = action["actor_key"] != "player"
+            if is_enemy and declared_name and str(action["skill_key"]) == declared_key:
+                # The declared skill is prose the player can read, not a raw key.
+                line = f"- 回合 {action['round_no']}：{actor}{phase_text} 以{declared_name}攻击 {target}，伤害 {action['damage']}。"
+            else:
+                line = f"- 回合 {action['round_no']}：{actor}{phase_text} 使用 `{action['skill_key']}` 攻击 {target}，伤害 {action['damage']}。"
+            absorbed = int(action.get("state", {}).get("shield_absorbed", 0))
+            if absorbed:
+                ward = declared_name or "护盾"
+                line += f" {ward}吸收了 {absorbed} 点伤害。"
+            status_damage = int(action.get("state", {}).get("status_damage", 0))
+            status_key = action.get("state", {}).get("status")
+            if status_key:
+                line += f" {target}被{_status_label(str(status_key))}。"
+            if status_damage:
+                line += f" 持续伤害再结算 {status_damage} 点。"
+            lines.append(line)
         return CommandResult(
             True,
             "BATTLE_REPLAY",

@@ -182,15 +182,13 @@ def test_a_warded_battle_absorbs_and_replays_the_same_trail() -> None:
             equip_damage_weapon(runtime, "web", user, 120)
             resolved, replay = await _fight(runtime, user, "enemy.mist_guardian", "mist-shield-1")
             assert resolved.outcome == "won"
-            absorbed = [int(action.get("state", {}).get("enemy_hp", 0)) for action in replay.actions]
-            assert absorbed  # the ward is only visible through the frozen action trail
-            shielded = [
-                action for action in replay.actions if int(action.get("damage", 0)) >= 0
-            ]
-            assert shielded
-            # The pool is finite: a 320 HP guardian wards at most 256 damage.
-            trail = json.dumps(replay.actions, ensure_ascii=False)
-            assert "enemy_shield" in trail or "shield_absorbed" in trail
+            # The ward is only real if the frozen skill opened it and the trail
+            # records the absorbed damage: a null shield must fail this test.
+            assert replay.snapshot["enemy"]["skill"]["key"] == "enemy_skill.mist_shield"
+            absorbed_total = sum(
+                int(action.get("state", {}).get("shield_absorbed", 0)) for action in replay.actions
+            )
+            assert 0 < absorbed_total <= 256, absorbed_total
             again = await runtime.repository.replay_battle(
                 platform="web", platform_user_id=user, battle_id=resolved.battle_id
             )
@@ -200,5 +198,24 @@ def test_a_warded_battle_absorbs_and_replays_the_same_trail() -> None:
             assert [action["state"] for action in again.actions] == [
                 action["state"] for action in replay.actions
             ]
+
+    asyncio.run(run())
+
+
+def test_the_replay_reads_the_ward_as_prose_not_a_raw_key() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            user = "mist-shield-prose"
+            await _enter_cultivator(runtime, user)
+            _place(runtime, user, location="cave.mist_grotto", realm="qi_gathering", layer=4, max_hp=4000)
+            equip_damage_weapon(runtime, "web", user, 120)
+            resolved, _ = await _fight(runtime, user, "enemy.mist_guardian", "mist-shield-prose-1")
+            replay = await runtime.dispatch(
+                _context(user, "mist-prose-replay"), f"战斗回放 {resolved.battle_id}"
+            )
+            assert replay.code == "BATTLE_REPLAY"
+            assert "雾盾吸收了" in replay.message
+            assert "enemy_skill.mist_shield" not in replay.message
 
     asyncio.run(run())

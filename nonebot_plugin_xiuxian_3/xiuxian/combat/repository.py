@@ -462,11 +462,8 @@ class CombatRepositoryMixin:
             # Freeze the enemy's declared skill now: the turn engine may only
             # apply what the battle opened with, so a later content edit cannot
             # change an in-flight fight or its replay.
-            declared_skill = (
-                self.content.get("skill", enemy.skill_key)
-                if self.content is not None
-                else None
-            )
+            battle_content = getattr(self, "content", None) or bundled_content()
+            declared_skill = battle_content.get("skill", enemy.skill_key) if battle_content else None
             enemy_skill = resolve_enemy_skill(declared_skill) if declared_skill else None
             snapshot = {
                 "battle_type": battle_type,
@@ -783,6 +780,8 @@ class CombatRepositoryMixin:
             sequence = int(session["action_sequence"])
             actions: list[dict[str, object]] = []
             defending = False
+            shield_absorbed = 0
+            status_applied: str | None = None
             is_ancestral_spirit = str(enemy.get("key", "")) == ANCESTRAL_SPIRIT.key
             bloodline_shadow = bool(state.get("bloodline_shadow", False)) if is_ancestral_spirit else False
             shadow_at_round_start = bloodline_shadow
@@ -796,6 +795,8 @@ class CombatRepositoryMixin:
             reason = ""
             for actor in actor_order:
                 phase = phase_for_hp(enemy_hp, int(enemy["max_hp"])) if is_tribulation_trial else None
+                shield_absorbed = 0
+                status_applied = None
                 if actor == "player" and bloodline_shadow and not timeout:
                     action = {
                         "battle_id": battle_id,
@@ -902,8 +903,7 @@ class CombatRepositoryMixin:
                     absorbed, applied = absorb_with_shield(
                         state, int(action["damage"]), round_no=expected_round
                     )
-                    if absorbed:
-                        action["shield_absorbed"] = absorbed
+                    shield_absorbed = absorbed
                     enemy_hp = max(0, enemy_hp - applied)
                     dealt = applied
                     healing = min(
@@ -991,7 +991,7 @@ class CombatRepositoryMixin:
                         state, enemy_skill, int(action["damage"]), round_no=expected_round
                     )
                     if status_key:
-                        action["status"] = status_key
+                        status_applied = status_key
                 sequence += 1
                 action["state"] = {
                     "player_hp": player_hp,
@@ -1000,6 +1000,12 @@ class CombatRepositoryMixin:
                 }
                 if action.get("critical"):
                     action["state"]["critical"] = True
+                # The absorbed / applied amounts only survive replay inside the
+                # action state JSON, which is the one column the trail keeps.
+                if shield_absorbed:
+                    action["state"]["shield_absorbed"] = shield_absorbed
+                if status_applied:
+                    action["state"]["status"] = status_applied
                 if "recovery" in action:
                     action["state"]["recovery"] = action["recovery"]
                 if int(action.get("reflected_damage", 0)) > 0:
@@ -1065,8 +1071,7 @@ class CombatRepositoryMixin:
                         device_absorbed, device_applied = absorb_with_shield(
                             state, int(strike["damage"]), round_no=expected_round
                         )
-                        if device_absorbed:
-                            strike["shield_absorbed"] = device_absorbed
+                        shield_absorbed = device_absorbed
                         enemy_hp = max(0, enemy_hp - device_applied)
                         device_actions += 1
                         sequence += 1
@@ -1077,6 +1082,8 @@ class CombatRepositoryMixin:
                             "device_instance_id": str(device["instance_id"]),
                             "device_actions": device_actions,
                         }
+                        if shield_absorbed:
+                            strike["state"]["shield_absorbed"] = shield_absorbed
                         actions.append(strike)
                         if enemy_hp <= 0:
                             outcome, reason = "won", "enemy_defeated"
