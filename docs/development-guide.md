@@ -20,6 +20,7 @@
 | 工程依赖、有限里程碑、交付与回滚 | [implementation-plan.md](implementation-plan.md) |
 | 测试触发、结果与环境 | [testing.md](testing.md) |
 | 玩家文案、QQ/OneBot 投递与降级 | [messaging-copywriting.md](messaging-copywriting.md) |
+| QQ Markdown 支持语法、行内蓝字与投递验证 | [qq-markdown-reference.md](qq-markdown-reference.md) |
 
 产品冲突按总表公共边界/依赖 → 数据合同 → 领域契约裁决；JSON 是已定义可调参数的
 实际来源，不以代码默认值覆盖它。总设计解释背景，旧项目只提供通用分类与适配器经验，
