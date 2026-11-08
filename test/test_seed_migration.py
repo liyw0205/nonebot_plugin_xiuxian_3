@@ -911,14 +911,11 @@ def old_official_pills() -> bytes:
 
 def old_official_companions() -> bytes:
     # Reserialised by the companion-evolution slice; see old_official_daily_tasks.
-    # The evolution slice also appended two codex_entry_key properties (jade_rat,
-    # cloud_elk), so the reversed blob must strip those again.
-    text = (SEED_FIXTURES / "companions.json").read_text(encoding="utf-8")
-    for tail in ("jade_rat", "cloud_elk"):
-        pattern = f',\n      "codex_entry_key": "codex.creature.{tail}"'
-        assert pattern in text, tail
-        text = text.replace(pattern, "", 1)
-    return _registered_old_blob(COMPANION_FILE, text.encode("utf-8"))
+    # The archived blob predates the evolution codex entries this phase adds, so
+    # it is used verbatim.
+    return _registered_old_blob(
+        COMPANION_FILE, (SEED_FIXTURES / "companions.json").read_bytes()
+    )
 
 
 def old_official_companion_evolutions() -> bytes:
