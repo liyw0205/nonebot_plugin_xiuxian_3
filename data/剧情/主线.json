@@ -2905,7 +2905,95 @@
       "required_realm": "golden_core",
       "required_layer": 1,
       "first_clear_reward": {"spirit_stones": 60, "service_reputation": 5},
-      "repeat_reward": {"spirit_stones": 20}
+      "repeat_reward": {"spirit_stones": 20},
+      "next_stage_key": "chapter.9.stage.1"
+    },
+    {
+      "key": "chapter.9.stage.1",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 9,
+      "stage": 1,
+      "name": "云城受讬",
+      "desc": "带着镇务的荐书前往云城，把玄天卷的下一层交到云城账房。",
+      "body": "青石镇的账册合上之后，镇务又翻出一封压了许久的荐书：云城的商旅近年走货频繁，街巷里却总有人劫掠，账房早想请一位修行者随队押运一程。荐书上写着你的名字，落款是玄天初定那年。近郊的通路往北接云城，走上去便是另一处天地：那里没有山风，只有满城烟火与算盘声。",
+      "objectives": [
+        {"key": "arrive_cloud_city_9", "type": "travel_arrival", "label": "带着荐书抵达云城", "destination_key": "xuantian.cloud_city"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "云城", "description": "沿近郊往北的公开通路启程，行程结束后结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.9.stage.1"]},
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未抵达云城时关卡保持进行中，不扣主线奖励；重新启程并结算移动即可领受讬之赏。"
+      },
+      "status": "open",
+      "aliases": ["云城受讬"],
+      "prerequisites": ["chapter.8.stage.3"],
+      "required_realm": "golden_core",
+      "required_layer": 1,
+      "first_clear_reward": {"spirit_stones": 70, "service_reputation": 5},
+      "repeat_reward": {"spirit_stones": 20},
+      "next_stage_key": "chapter.9.stage.2"
+    },
+    {
+      "key": "chapter.9.stage.2",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 9,
+      "stage": 2,
+      "name": "街巷护送",
+      "desc": "随云城商旅穿行街巷，清剿沿路滋事的劫修。",
+      "body": "云城的街比青石镇窄，货担却多出十倍。账房把一队商旅交到你手上，说这一趟只走半城，货值却抵得上小镇半年的收成。走到第三道巷口，前面的人忽然停了：巷子尽头有人横刀站着，刀上有云城人的血。护送这一程，不是走完就算，要把刀留下。",
+      "objectives": [
+        {"key": "escort_cloud_city_street", "type": "exploration_battle_victory", "label": "在云城护送探索中赢得一场遭遇战", "mode_key": "explore.cloud_city_escort", "location_key": "xuantian.cloud_city"}
+      ],
+      "actions": [
+        {"command": "探索", "argument": "云城护送", "description": "在云城街巷开启护送探索，遭遇战由自动战斗结算。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.9.stage.2"]},
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "护送尚未取胜时关卡保持进行中，不扣主线奖励；补充体力后可再次进入街巷。"
+      },
+      "status": "open",
+      "aliases": ["街巷护送"],
+      "prerequisites": ["chapter.9.stage.1"],
+      "required_realm": "golden_core",
+      "required_layer": 2,
+      "first_clear_reward": {"spirit_stones": 80, "item.herb.spirit_leaf": 2, "service_reputation": 5},
+      "repeat_reward": {"spirit_stones": 25},
+      "next_stage_key": "chapter.9.stage.3"
+    },
+    {
+      "key": "chapter.9.stage.3",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 9,
+      "stage": 3,
+      "name": "雾中旧账",
+      "desc": "循着劫修供词回到雾隐洞天，把旧账结在守卫手里。",
+      "body": "劫修临死前吐出一个地名：雾隐洞天。他说那里的守卫收过云城的货，也收过比货更重的东西。洞天的雾还是老样子，进去三步便看不见来路；守卫仍在原处，仿佛这些年只等着有人拿着账来。把灵叶从雾里带出来，这卷账才算翻过去。",
+      "objectives": [
+        {"key": "bring_spirit_leaf_from_mist", "type": "exploration_reward", "label": "在雾隐洞天探索结算中取得灵叶", "mode_key": "explore.mist_grotto", "location_key": "cave.mist_grotto", "item_key": "item.herb.spirit_leaf", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "雾隐洞天", "description": "从云城返回玄天近郊，再进入雾隐洞天。"},
+        {"command": "探索", "argument": "雾隐洞天", "description": "在洞天内开启探索，结算时按奖池取得灵叶。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.9.stage.3"]},
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未取得灵叶时关卡保持进行中，不扣主线奖励；再次探索并结算即可领结账之赏。"
+      },
+      "status": "open",
+      "aliases": ["雾中旧账"],
+      "prerequisites": ["chapter.9.stage.2"],
+      "required_realm": "golden_core",
+      "required_layer": 3,
+      "first_clear_reward": {"spirit_stones": 90, "service_reputation": 6},
+      "repeat_reward": {"spirit_stones": 30}
     }
   ]
 }
