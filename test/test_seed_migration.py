@@ -390,12 +390,18 @@ def old_official_locations() -> bytes:
     text = (ROOT / "data" / LOCATION_FILE).read_text(encoding="utf-8")
     # The discoverability slice rewrote exploration actions on existing records.
     action_reverts = (
-        ('      "actions": ["read_entry_requirements", "explore.cloud_city_patrol"]', '      "actions": [\n        "read_entry_requirements"\n      ]'),
+        ('      "actions": ["read_entry_requirements", "explore.cloud_city_patrol", "explore.cloud_city_escort"]', '      "actions": [\n        "read_entry_requirements"\n      ]'),
         ('      "actions": ["event.boundary_rift", "explore.boundary_rift"]', '      "actions": ["event.boundary_rift"]'),
         ('      "actions": ["progression.trial.dao_origin", "explore.dao_origin"]', '      "actions": ["progression.trial.dao_origin"]'),
         ('      "actions": ["world.intro.demon", "explore.demon_threshold"]', '      "actions": [\n        "world.intro.demon"\n      ]'),
         ('      "actions": ["progression.tribulation_trial", "explore.tribulation_echo"]', '      "actions": ["progression.tribulation_trial"]'),
         ('      "actions": ["world.enter_void_route"]', '      "actions": ["world.enter_void_route", "explore.void_route"]'),
+        # The tending slice listed 灵田巡护 on the spirit field, so the reversed
+        # blob drops that one action line again.
+        (
+            '        "explore.spring_gather",\n        "explore.spirit_field_tending",',
+            '        "explore.spring_gather",',
+        ),
         # The trade-endpoint slice registered one secret realm on each trade
         # location, so the reversed blob must drop those two entries again.
         (

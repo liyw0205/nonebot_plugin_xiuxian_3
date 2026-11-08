@@ -105,6 +105,7 @@
       },
       "actions": [
         "explore.spring_gather",
+        "explore.spirit_field_tending",
         "progression.cultivate.spirit_spring",
         "production.teaching"
       ],
@@ -270,7 +271,7 @@
         "training_bp": 11000
       },
       "local_reputation_maximum": 1000,
-      "actions": ["read_entry_requirements", "explore.cloud_city_patrol"],
+      "actions": ["read_entry_requirements", "explore.cloud_city_patrol", "explore.cloud_city_escort"],
       "codex_entry_key": "codex.place.cloud_city",
       "key": "xuantian.cloud_city"
     },
