@@ -1702,6 +1702,39 @@ PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /root/myenv/bin/p
   新蓝字测试替换 segment 构造器，仅证明转换/发送分支；真机与全量事件覆盖不由此推断。
   M7 是用户新授权的有限数据补全；M5 的 2308 只证明旧双平台树，不声称当前代码重新全量。
 
+敌方技能效果、天劫阶段开关与炼虚许可内容化已在 `develop` 完成（本轮交付 D1–D7）：
+- 可发现性：`explore.cloud_city_escort` 与 `explore.spirit_field_tending` 此前为 `open` 却无任何地点
+  列出，玩家在云城/灵泉谷无法看到或开始；`data/地图/地点.json` 已在两处 `actions` 登记（沿用各自原有
+  排版风格），`scripts/seed_migrations.json` 已把上一个大产物 `b846681b…`（来自 `9861ee6`）登记为可迁移旧指纹，
+  目标指纹 `b62f965f…` 对应引入提交 `8ed8b7a`。新增 `test_open_modes_are_reachable.py` 断言两处可发现、
+  奖池/遭遇池可解析且仍为公开入口。
+- 敌方技能：自动战斗长期只记录 `enemy.skill_key` 并用裸 `stats.attack` 出手，`雾盾`（`shield_max_hp_bp` 8000、
+  2 回合、自身）与 `刀波`（13000 倍率 + 流血 2 回合）等声明完全无效。新增 `combat/enemy_skills.py`：
+  开战冻结解析后的技能（未知效果类型在加载期 `ContentError` 失败），按其声明的 `cooldown_rounds` 决定哪些回合
+  以技能出手（该字段此前同样未读），护盾按 `max_hp × shield_bp` 形成一次性吸收池并在持续回合后失效，
+  状态在回合末对玩家结算持续伤害；吸收/状态数值写入动作 `state`，回放与结算一致。战斗回放改以技能中文名
+  叙述并报告吸收量与流血，不再打印原始键。
+- 天劫：`enemy.tribulation_heaven.behavior.automatic_phase_selection` 此前未校验也未读取；`tribulation_content`
+  现解析该敌人记录并要求三项 behavior 为布尔，运行中内容的答案（而非导入期常量）冻结进渡劫快照；
+  声明为 false 时战斗停留在入场阶段，现有内容为 true，行为不变。
+- 炼虚许可：`quest.break_void.reward.breakthrough_permission` 此前无消费者，领取处硬编码发放无人消费的
+  `item.recipe.void_refinery`，`炼虚` 门槛硬编码任务键。`permit_rewards()` 现校验记录声明的发放
+  （`item.*`、`breakthrough_permission` 必须指向真实境界、数值键为正）并供领取使用；
+  `breakthrough_permissions()` 把境界映射到声明它的 `once_per_player` 任务，既有 `VOID_QUEST_MISSING`
+  门槛改为按内容解析许可任务，未领取时拒绝且不扣资产。
+- 测试修复（内容正确、断言未削弱）：`test_data_completion.py` 两处主线流程补上「开始主线后前往近郊并结算」
+  与「感气二层在灵泉谷真实结算灵泉采集」的公开链路，云城→云铁矿区按真实两跳路线行走，容量夹具新增
+  `stamina_max`（与既有 `max_hp` 同类，仅替换累计容量）；`test_mainline_vertical_slice.py` 从近郊先返回新手镇
+  再前往灵泉谷（近郊无直达路线）。
+聚焦证据：`test_enemy_skill_effects.py` 8 passed、`test_tribulation_phase_flag.py` 4 passed、
+`test_breakthrough_permission_gate.py` 8 passed、`test_open_modes_are_reachable.py` 2 passed、
+`test_exploration_discoverability.py` 3 passed、`test_data_completion.py` 24 passed、
+`test_mainline_vertical_slice.py` 3 passed、`test_seed_migration.py -k 'location or manifest or reverse'` 11 passed；
+回归 combat/combat_content/battle_reward_refs/exploration_combat 37 passed、tribulation_combat/tribulation_content
+17 passed、void_refining 17 passed。既有本地失败（HEAD 同样失败，不计入本轮）：`test_tribulation_combat` 回放
+「雷劫」文案断言、`test_spar_interactions` 回合数 15≠1、`test_high_realm_quests` 3 项、`test_void_refining`
+材料补充行程 1 项。未跑全量/压测/部署，未验 QQ 真机。
+
 ## 6. 维护与历史
 
 完成任务时只更新本页对应行、验收证据和受影响领域合同。历史材料只解释已做过什么，
