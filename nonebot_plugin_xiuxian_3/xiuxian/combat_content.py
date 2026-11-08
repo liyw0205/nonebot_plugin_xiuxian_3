@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import Any
 
 from .content import ContentBundle, ContentError
+from .combat.enemy_skills import resolve_enemy_skill
 from .rewards.rules import reward_pool_outcomes
 
 
@@ -57,6 +58,10 @@ def validate_combat_content(bundle: ContentBundle) -> dict[str, int]:
             skill = bundle.get("skill", skill_key, include_locked=False)
             if skill is None or skill.get("owner_type") != "enemy":
                 raise ContentError(f"enemy {key} references unavailable enemy skill {skill_key}")
+            # Resolving once here is the load-time contract: an effect type the
+            # turn engine cannot apply fails the whole bundle instead of
+            # silently striking for base damage at runtime.
+            resolve_enemy_skill(skill)
 
         reward_refs = row.get("reward_refs", [])
         if not isinstance(reward_refs, list) or any(not isinstance(ref, str) or not ref for ref in reward_refs):

@@ -42,6 +42,14 @@ from .skill_effects import (
     prepare_skill_action,
     reflected_enemy_damage,
 )
+from .enemy_skills import (
+    absorb_with_shield,
+    apply_enemy_status,
+    enemy_skill_attack,
+    open_enemy_shield,
+    resolve_enemy_skill,
+    tick_enemy_statuses,
+)
 from ..rewards.rules import battle_reward_tables
 from .rules import (
     ANCESTRAL_SPIRIT,
@@ -451,6 +459,15 @@ class CombatRepositoryMixin:
             # from the snapshot without re-reading a possibly changed build.
             device_snapshot = self._deployed_device_snapshot(connection, int(player["id"]))
             battle_id = uuid4().hex
+            # Freeze the enemy's declared skill now: the turn engine may only
+            # apply what the battle opened with, so a later content edit cannot
+            # change an in-flight fight or its replay.
+            declared_skill = (
+                self.content.get("skill", enemy.skill_key)
+                if self.content is not None
+                else None
+            )
+            enemy_skill = resolve_enemy_skill(declared_skill) if declared_skill else None
             snapshot = {
                 "battle_type": battle_type,
                 "exploration_id": exploration_id,
@@ -477,6 +494,7 @@ class CombatRepositoryMixin:
                     "initiative": enemy.initiative,
                     "agility": enemy.agility,
                     "skill_key": enemy.skill_key,
+                    "skill": enemy_skill,
                 },
                 "random_pool": enemy.random_pool,
                 "random_seed": operation_id,
@@ -495,6 +513,10 @@ class CombatRepositoryMixin:
                 "enemy_hp": enemy.max_hp,
                 "manual_reflect_damage_bp": stats["damage_reflection_bp"],
                 "timeout_count": 0,
+                # One ward per battle, opened at the first round: refreshing an
+                # 80% shield every round would stall the twenty-round contract.
+                "enemy_shield": open_enemy_shield(enemy_skill, enemy.max_hp, round_no=1),
+                "enemy_statuses": {},
             }
             turn_deadline = serialize_datetime(now + timedelta(seconds=TURN_TIMEOUT_SECONDS))
             connection.execute(
@@ -744,6 +766,7 @@ class CombatRepositoryMixin:
             snapshot = decode_json_strict(session["snapshot_json"])
             player_stats = frozen_combat_stats(snapshot["player"])
             enemy = dict(snapshot["enemy"])
+            enemy_skill = enemy.get("skill")
             device = snapshot["player"].get("device")
             device = dict(device) if isinstance(device, dict) else None
             device_actions = int(state.get("device_actions", 0)) if device is not None else 0
@@ -876,8 +899,13 @@ class CombatRepositoryMixin:
                                 // 10_000,
                             ) if base_damage > 0 else 0,
                         )
-                    enemy_hp = max(0, enemy_hp - int(action["damage"]))
-                    dealt = int(action["damage"])
+                    absorbed, applied = absorb_with_shield(
+                        state, int(action["damage"]), round_no=expected_round
+                    )
+                    if absorbed:
+                        action["shield_absorbed"] = absorbed
+                    enemy_hp = max(0, enemy_hp - applied)
+                    dealt = applied
                     healing = min(
                         max(0, int(player_stats["max_hp"]) - player_hp),
                         dealt * int(player_stats.get("lifesteal_bp", 0)) // 10_000,
@@ -914,7 +942,13 @@ class CombatRepositoryMixin:
                 else:
                     if actor == "enemy" and is_tribulation_trial:
                         phase = phase_for_hp(enemy_hp, int(enemy["max_hp"]))
-                    enemy_attack = phase.attack if phase is not None else int(enemy["attack"])
+                    enemy_attack = (
+                        phase.attack
+                        if phase is not None
+                        else enemy_skill_attack(
+                            enemy_skill, int(enemy["attack"]), round_no=expected_round
+                        )
+                    )
                     enemy_attack = mitigate_enemy_attack(enemy_attack, state, round_no=expected_round)
                     action = self._attack_action(
                         battle_id=battle_id,
@@ -953,6 +987,11 @@ class CombatRepositoryMixin:
                         action["reflected_damage"] = reflected
                         enemy_hp = max(0, enemy_hp - reflected)
                     player_hp = max(0, player_hp - int(action["damage"]))
+                    status_key = apply_enemy_status(
+                        state, enemy_skill, int(action["damage"]), round_no=expected_round
+                    )
+                    if status_key:
+                        action["status"] = status_key
                 sequence += 1
                 action["state"] = {
                     "player_hp": player_hp,
@@ -976,6 +1015,8 @@ class CombatRepositoryMixin:
                     "manual_reflect_damage_bp",
                     "enemy_attack_reduction_bp",
                     "enemy_debuff_until_round",
+                    "enemy_shield",
+                    "enemy_statuses",
                 ):
                     if key in state:
                         action["state"][key] = deepcopy(state[key])
@@ -1021,7 +1062,12 @@ class CombatRepositoryMixin:
                             crit_chance_bp=int(player_stats.get("crit_chance_bp", 0)),
                             crit_damage_bp=int(player_stats.get("crit_damage_bp", 0)),
                         )
-                        enemy_hp = max(0, enemy_hp - int(strike["damage"]))
+                        device_absorbed, device_applied = absorb_with_shield(
+                            state, int(strike["damage"]), round_no=expected_round
+                        )
+                        if device_absorbed:
+                            strike["shield_absorbed"] = device_absorbed
+                        enemy_hp = max(0, enemy_hp - device_applied)
                         device_actions += 1
                         sequence += 1
                         strike["state"] = {
@@ -1066,6 +1112,16 @@ class CombatRepositoryMixin:
                     "operation_id": operation_id,
                 }
                 actions.append(recovery_action)
+            status_tick, active_statuses = tick_enemy_statuses(state, round_no=expected_round)
+            if status_tick:
+                player_hp = max(0, player_hp - status_tick)
+                if actions:
+                    actions[-1]["state"]["player_hp"] = player_hp
+                    actions[-1]["state"]["status_damage"] = status_tick
+                    if active_statuses:
+                        actions[-1]["state"]["status_keys"] = list(active_statuses)
+                if outcome is None and player_hp <= 0:
+                    outcome, reason = "lost", "status_effect"
             if outcome is None and timeout_count >= 3:
                 outcome, reason = "lost", "three_turn_timeouts"
             if outcome is None and expected_round >= MAX_TURNS:
@@ -1117,6 +1173,8 @@ class CombatRepositoryMixin:
                 "manual_reflect_damage_bp",
                 "enemy_attack_reduction_bp",
                 "enemy_debuff_until_round",
+                "enemy_shield",
+                "enemy_statuses",
             ):
                 if key in skill_state:
                     state[key] = deepcopy(skill_state[key])
