@@ -223,13 +223,24 @@ def test_qq_and_onebot_run_dao_echoes_mainline_commands() -> None:
                 assert (await dispatch("seek", "寻仙问道")).code == "SEEKING_STARTED"
                 with sqlite3.connect(runtime.settings.database_path) as connection:
                     connection.execute(
-                        "UPDATE players SET stage='cultivator', realm_key='void_refining', realm_layer=10 "
-                        "WHERE platform=? AND platform_user_id=?",
+                        "UPDATE players SET stage='cultivator', realm_key='void_refining', realm_layer=10, "
+                        "location_key='xuantian.outskirts' WHERE platform=? AND platform_user_id=?",
                         (base.adapter, base.user_id),
                     )
 
                 started = await dispatch("start", "开始道源主线 建设者 1")
                 assert started.code == "DAO_ECHOES_STAGE_STARTED"
+                # The squad stage declares a travel_arrival objective: walk back to
+                # the old stele before claiming, exactly as a player must.
+                moved = await dispatch("travel", "前往 青石镇")
+                assert moved.code == "TRAVEL_STARTED", moved.message
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    set_travel_end_at(
+                        connection,
+                        moved.data["session_id"],
+                        (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat(),
+                    )
+                assert (await dispatch("travel-settle", "结算移动")).code == "TRAVEL_COMPLETED"
                 claimed = await dispatch("claim", "领取道源主线奖励 建设者 1")
                 assert claimed.code == "DAO_ECHOES_STAGE_CLAIMED"
                 assert claimed.data["stage_key"] == "lane.builder.chapter.01"
