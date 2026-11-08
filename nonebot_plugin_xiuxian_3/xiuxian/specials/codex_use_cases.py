@@ -87,6 +87,7 @@ class CodexApplication:
         else:
             lines.append("尚无相符的见闻。")
         lines.extend(["", "### 见闻收录", ""])
+        claimed_unlocks: list[str] = []
         milestones: list[dict[str, object]] = []
         for index, item in enumerate(record.milestones, start=1):
             if item.claimed:
@@ -98,6 +99,7 @@ class CodexApplication:
             lines.append(f"- **{index}. {item.label}**：{status}")
             if item.claimed and item.unlocks:
                 lines.append(f"  - 得：{'、'.join(unlock_label(key, self.repository.content) for key in item.unlocks)}")
+                claimed_unlocks.extend(item.unlocks)
             milestones.append(
                 {
                     "index": index,
@@ -112,6 +114,13 @@ class CodexApplication:
                     "unlocks": list(item.unlocks),
                 }
             )
+        if claimed_unlocks:
+            lines.extend(["", "### 已解锁见闻", ""])
+            for unlock_key in dict.fromkeys(claimed_unlocks):
+                lines.append(
+                    f"- **{unlock_label(unlock_key, self.repository.content)}**"
+                    f"（{unlock_key}）"
+                )
         return CommandResult(
             True,
             "CODEX_OVERVIEW",
@@ -128,6 +137,7 @@ class CodexApplication:
                     for item in entries
                 ],
                 "milestones": milestones,
+                "unlocked_benefits": list(dict.fromkeys(claimed_unlocks)),
             },
         )
 

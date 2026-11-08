@@ -2088,6 +2088,51 @@
       ],
       "key": "reward_pool.enemy.war_front",
       "status": "active"
+    },
+    {
+      "name": "妖兽观察所得",
+      "desc": "凭异兽徽记辨认山野妖兽踪迹，所得的观测记录与少量材料。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 1, "rewards": {"spirit_stones": 40, "codex.creature.iron_boar": 1}},
+        {"weight": 1, "rewards": {"spirit_stones": 46, "item.herb.spirit_leaf": 1, "codex.creature.iron_boar": 1}},
+        {"weight": 1, "rewards": {"spirit_stones": 52, "item.mat.array_sand": 1, "codex.creature.iron_boar": 1}},
+        {"weight": 1, "rewards": {"spirit_stones": 60, "item.mat.wood": 2, "codex.creature.iron_boar": 1}}
+      ],
+      "key": "reward_pool.idle.beast_observation",
+      "status": "active"
+    },
+    {
+      "name": "妖兽观察保底所得",
+      "desc": "逾时后仍可领取的少量灵石与一份观测记录。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 1, "rewards": {"spirit_stones": 20, "codex.creature.iron_boar": 1}}
+      ],
+      "key": "reward_pool.idle.beast_observation.fallback",
+      "status": "active"
+    },
+    {
+      "name": "塔外守望所得",
+      "desc": "依塔路提示在雾隐塔外守望，所得的灵石与塔路见闻。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 1, "rewards": {"spirit_stones": 44, "codex.instance.mist_grotto": 1}},
+        {"weight": 1, "rewards": {"spirit_stones": 50, "item.material.mist_core": 1, "codex.instance.mist_grotto": 1}},
+        {"weight": 1, "rewards": {"spirit_stones": 58, "item.mat.array_sand": 1, "codex.instance.mist_grotto": 1}}
+      ],
+      "key": "reward_pool.idle.tower_watch",
+      "status": "active"
+    },
+    {
+      "name": "塔外守望保底所得",
+      "desc": "逾时后仍可领取的少量灵石与塔路见闻。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 1, "rewards": {"spirit_stones": 22, "codex.instance.mist_grotto": 1}}
+      ],
+      "key": "reward_pool.idle.tower_watch.fallback",
+      "status": "active"
     }
   ],
   "schema": "xiuxian.content"

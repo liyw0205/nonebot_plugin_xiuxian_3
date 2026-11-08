@@ -123,6 +123,10 @@ class IdleRepositoryMixin:
             ).fetchone()
             if residence is None:
                 missing.append("需要有效居所或地块")
+        if definition.required_unlock and not self._has_codex_unlock(
+            connection, int(player["id"]), definition.required_unlock
+        ):
+            missing.append("需要已领取的图鉴见闻")
         selected_tool = self._idle_select_tool(connection, player, definition, None)
         facility = self._idle_select_facility(connection, player, definition, None)
         if definition.required_tool_keys and selected_tool is None and facility is None:
@@ -543,6 +547,22 @@ class IdleRepositoryMixin:
             raise IdleRequirementError("requested tool or facility is unavailable")
         if definition.required_tool_keys and selected_tool is None and selected_facility is None:
             raise IdleRequirementError("tool or facility is unavailable")
+
+    @staticmethod
+    def _has_codex_unlock(connection: sqlite3.Connection, player_id: int, unlock_key: str) -> bool:
+        """Return True when a claimed codex milestone granted this unlock."""
+
+        for row in connection.execute(
+            "SELECT unlocks_json FROM codex_milestone_claims WHERE player_id = ?",
+            (player_id,),
+        ).fetchall():
+            try:
+                unlocks = json.loads(str(row["unlocks_json"]))
+            except (TypeError, json.JSONDecodeError):
+                continue
+            if isinstance(unlocks, list) and unlock_key in unlocks:
+                return True
+        return False
 
     @staticmethod
     def _required_json_object(value: Any, label: str) -> dict[str, Any]:

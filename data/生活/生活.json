@@ -1437,6 +1437,54 @@
       "key": "dispatch.cultivator.herb_convoy",
       "record_type": "dispatch",
       "status": "active"
+    },
+    {
+      "name": "妖兽观察",
+      "desc": "凭异兽徽记辨认山野妖兽的踪迹，记下观测见闻。",
+      "aliases": [
+        "观兽",
+        "妖兽观察"
+      ],
+      "duration_seconds": 7200,
+      "cost": {
+        "stamina": 1,
+        "energy": 0
+      },
+      "daily_limit": 1,
+      "requirements": {
+        "stage": "seeker",
+        "codex_unlock": "display.codex_creature_badge"
+      },
+      "reward_pool_key": "reward_pool.idle.beast_observation",
+      "fallback_reward_pool_key": "reward_pool.idle.beast_observation.fallback",
+      "durability_cost_bp": 0,
+      "key": "idle.beast_observation",
+      "record_type": "idle_route",
+      "status": "active"
+    },
+    {
+      "name": "塔外守望",
+      "desc": "依塔路提示在雾隐塔外守候，留意试炼塔的出入见闻。",
+      "aliases": [
+        "守望雾隐塔",
+        "塔外守望"
+      ],
+      "duration_seconds": 10800,
+      "cost": {
+        "stamina": 2,
+        "energy": 0
+      },
+      "daily_limit": 1,
+      "requirements": {
+        "stage": "seeker",
+        "codex_unlock": "hint.tower_route"
+      },
+      "reward_pool_key": "reward_pool.idle.tower_watch",
+      "fallback_reward_pool_key": "reward_pool.idle.tower_watch.fallback",
+      "durability_cost_bp": 0,
+      "key": "idle.tower_watch",
+      "record_type": "idle_route",
+      "status": "active"
     }
   ],
   "schema": "xiuxian.content"

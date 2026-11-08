@@ -43,6 +43,7 @@ class IdleRouteDefinition:
     required_tool_keys: tuple[str, ...]
     facility_kind: str | None
     durability_cost_bp: int
+    required_unlock: str | None = None
 
 
 _STAGE_ORDER = {
@@ -232,6 +233,14 @@ def _parse_route(row: dict[str, Any], bundle: ContentBundle) -> IdleRouteDefinit
         raise ContentError(f"idle route {key} facility_kind must be a non-empty string")
     if tool_keys and not facility_kind:
         raise ContentError(f"idle route {key} tool routes require a facility kind")
+    required_unlock = requirements.get("codex_unlock")
+    if required_unlock is not None:
+        if (
+            not isinstance(required_unlock, str)
+            or not required_unlock
+            or not bundle.has("codex_unlock", required_unlock, include_locked=False)
+        ):
+            raise ContentError(f"idle route {key} references an unknown codex unlock")
 
     pool_key = _required_string(row.get("reward_pool_key"), key, "reward_pool_key")
     fallback_pool_key = _required_string(row.get("fallback_reward_pool_key"), key, "fallback_reward_pool_key")
@@ -260,6 +269,7 @@ def _parse_route(row: dict[str, Any], bundle: ContentBundle) -> IdleRouteDefinit
         required_tool_keys=tuple(tool_keys),
         facility_kind=facility_kind,
         durability_cost_bp=durability_cost,
+        required_unlock=required_unlock,
     )
 
 
