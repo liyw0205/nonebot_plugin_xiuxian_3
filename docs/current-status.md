@@ -150,6 +150,27 @@ M5 最终当前树本地阶段验收、审查与提交推送已完成；保留�
 迁移清单 `new_sha256`/`old_sha256`/`new_commit` 累计与地点/灵兽/材料/配方/图鉴反向助手同批提交。
 未跑全量/压测/部署，未验 QQ 真机。
 
+线索图鉴与"已声明未消费"字段接线已在 `develop` 完成（P1–P5）：六个 `item.clue.*` 此前没有匹配的
+`codex.material.<后缀>` 条目（`record_material_discoveries` 按后缀投影，故首次获得静默失败），
+`data/图鉴/条目.json` 补齐六条 `material` 条目；其中两条无产出的线索由既有奖池供给——
+`item.clue.mist_cave_route` 进入 `reward_pool.exploration.mist_grotto`（权重 9000）、
+`item.clue.demon_abyss_echo` 进入 `reward_pool.exploration.demon_abyss`（权重 8），
+`data/来源/来源.json` 新增 `source.item.clues` 只登记真实产出渠道。生活域三处"只解析不消费"的字段接上
+真实门槛：`route_rules.RouteDefinition` 新增 `unlock_key`（校验 `codex_unlock`），运输预览/开始按
+`codex_milestone_claims.unlocks_json` 强制，未领取返回 `ROUTE_UNLOCK_REQUIRED`；新增
+`route.town_herb_vale`（`hint.herb_route`）与 `route.cloud_to_abyss_gate`（`encyclopedia.domain_tactics`），
+路线 1 → 3。`_dispatch_preview` 改为按 `_STAGE_ORDER` 比较声明的 `required_stage`（缺省 `mortal`，
+既有 16 条行为不变），新增 `dispatch.seeker.clinic_run`（seeker）与 `dispatch.cultivator.herb_convoy`
+（cultivator），派遣 16 → 18。闲居新增可选 `requirements.codex_unlock` 门槛，新增
+`idle.beast_observation`（`display.codex_creature_badge`）与 `idle.tower_watch`（`hint.tower_route`）
+及四个完整/保底奖池，闲居 13 → 15；`图鉴` 概览新增「已解锁见闻」段与 `data.unlocked_benefits`，
+使 `encyclopedia.paths_6`、`display.domain_observatory` 有真实展示消费者（八条解锁全部有消费者）。
+聚焦证据：`test_clue_codex_lifecycle.py` 4 passed、`test_transport_route_unlocks.py` 3 passed
+（路线回归 `test_livelihood_route`/`test_world_transport_content` 64 passed）、
+`test_dispatch_stage_gate.py` 3 passed（派遣回归 19 passed）、`test_codex_unlock_consumers.py` 4 passed
+（闲居/图鉴里程碑回归 20 passed）；四份被改官方种子的迁移清单已同批登记。
+未跑全量/压测/部署，未验 QQ 真机。
+
 `chapter.2.stage.2` 云城初见内容化切片已在 `develop` 完成：正文、`travel_arrival`
 目标（结算后的公开抵达 `xuantian.cloud_city`）、行动、首通状态事件、`next_stage_key`
 指向 `chapter.2.stage.3` 与失败重试规则均已落地，沿用现有 objective 消费者与
