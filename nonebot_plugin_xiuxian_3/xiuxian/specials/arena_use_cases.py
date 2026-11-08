@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ...contracts import CommandContext, CommandResult
+from ...contracts import CommandAction, CommandContext, CommandResult
 from ..persistence.errors import (
     ArenaChallengeCapError,
     ArenaMatchNotFoundError,
@@ -13,6 +13,11 @@ from ..persistence.errors import (
     ArenaRewardNotAvailableError,
     ArenaSnapshotExpiredError,
     ArenaSnapshotNotFoundError,
+    ArenaSeasonAlreadyClaimedError,
+    ArenaSeasonClaimExpiredError,
+    ArenaSeasonNotClosedError,
+    ArenaSeasonNotFoundError,
+    ArenaSeasonRankOutOfBoardError,
     ArenaSnapshotRequirementError,
     ThreeRealmsArenaRequirementError,
     OperationConflictError,
@@ -24,6 +29,7 @@ from .arena_models import ArenaMatchRecord, ArenaSnapshotRecord
 from .arena_repository import ArenaRepositoryMixin
 from .arena_rules import ARENA_MODE_KEY, ARENA_PRACTICE_MODE_KEY, ARENA_RANK_MODE_KEY
 from .three_realms_arena_rules import THREE_REALMS_ARENA_MODE_KEY
+from ..utils.text import command_link
 
 
 class ArenaApplication:
@@ -326,5 +332,167 @@ class ArenaApplication:
             data={"match_id": record.match_id, "reward": record.reward, "idempotent_replay": record.already_completed},
         )
 
+
+
+    async def season(self, context: CommandContext) -> CommandResult:
+        """Show the weekly board, my placement and whether a claim is waiting."""
+
+        if len(context.command_args) > 1:
+            return CommandResult(
+                False, "INVALID_ARENA_COMMAND", "竞技场赛季最多接收一个周次。", context.request_id
+            )
+        week = context.command_args[0] if context.command_args else None
+        try:
+            board = await self.repository.arena_season_board(
+                platform=context.adapter, platform_user_id=context.user_id, week=week
+            )
+        except ArenaSeasonNotFoundError:
+            return CommandResult(
+                False, "ARENA_SEASON_NOT_FOUND", "找不到这一周的竞技场赛季。", context.request_id
+            )
+        except Exception as exc:  # noqa: BLE001 - mapped by the shared handler
+            return self._error(context, "", exc)
+
+        state = "已结束" if board["closed"] else "进行中"
+        lines = [
+            "## 竞技场周赛季",
+            "",
+            f"- **周期**：{board['starts_at'][:10]} → {board['ends_at'][:10]}（{state}）",
+        ]
+        mine = board.get("mine")
+        if mine is None:
+            lines.append("- **我的名次**：本周尚未计入排位对战")
+        else:
+            lines.append(
+                f"- **我的名次**：第 {mine['rank']} 名 · 积分 {mine['rating']} · "
+                f"{mine['wins']} 胜 {mine['losses']} 负 {mine['draws']} 平"
+            )
+            reward = mine.get("reward") or {}
+            parts = []
+            if reward.get("spirit_stones"):
+                parts.append(f"灵石 {reward['spirit_stones']}")
+            if reward.get("local_reputation"):
+                parts.append(f"本地名望 {reward['local_reputation']}")
+            items = [key for key in reward if key.startswith("item.")]
+            if items:
+                parts.append(f"物品 {len(items)} 件")
+            if parts:
+                lines.append(f"- **该名次奖励**：{' · '.join(parts)}")
+        previous = board.get("previous") or {}
+        previous_mine = previous.get("mine")
+        if previous_mine:
+            lines.append(
+                f"- **上周名次**：第 {previous_mine['rank']} 名 · 积分 {previous_mine['rating']}"
+            )
+        top = board.get("board") or []
+        if top:
+            lines.append("")
+            lines.append("**本周前五**")
+            lines.extend(
+                f"- 第 {entry['rank']} 名 · 积分 {entry['rating']} · {entry['wins']} 胜"
+                for entry in top[:5]
+            )
+        claimable_now = bool(board["claimable"])
+        claimable_previous = bool(previous.get("claimable"))
+        lines.append("")
+        if claimable_now or claimable_previous:
+            target = "本周" if claimable_now else "上周"
+            lines.append(f"{target}名次奖励已可领取，名次与奖励已冻结。")
+            lines.append(command_link(f"领取{target}竞技奖励", "领取竞技场赛季奖励"))
+        elif board["claimed"]:
+            lines.append("本周奖励已领取。")
+        elif previous.get("claimed") and previous_mine:
+            lines.append("上周奖励已领取。")
+        elif previous.get("claim_expired"):
+            lines.append("上周领奖期已过，名次已转为展示记录。")
+        elif previous_mine:
+            lines.append("上周名次不在奖励名额内。")
+        else:
+            lines.append("本周结算后可按名次领取奖励。")
+        actions = (
+            (CommandAction("领取周榜奖励", "领取竞技场赛季奖励", enter=True),)
+            if (claimable_now or claimable_previous)
+            else ()
+        )
+        return CommandResult(
+            True,
+            "ARENA_SEASON",
+            "\n".join(lines),
+            context.request_id,
+            data=board,
+            actions=actions,
+        )
+
+    async def claim_season(self, context: CommandContext) -> CommandResult:
+        """Claim the frozen payout of a closed week."""
+
+        if len(context.command_args) > 1:
+            return CommandResult(
+                False, "INVALID_ARENA_COMMAND", "领取赛季奖励最多接收一个周次。", context.request_id
+            )
+        week = context.command_args[0] if context.command_args else None
+        operation_id = self._operation_id(context, "arena.claim_season")
+        try:
+            payload = await self.repository.claim_arena_season_reward(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                week=week,
+                operation_id=operation_id,
+            )
+        except ArenaSeasonNotClosedError:
+            return CommandResult(
+                False, "ARENA_SEASON_OPEN", "这一周的赛季尚未结束，结算后才能领取。", context.request_id, operation_id
+            )
+        except ArenaSeasonRankOutOfBoardError:
+            return CommandResult(
+                False, "ARENA_SEASON_RANK_OUT_OF_BOARD", "本周名次不在奖励名额内。", context.request_id, operation_id
+            )
+        except ArenaSeasonAlreadyClaimedError:
+            return CommandResult(
+                False, "ARENA_SEASON_ALREADY_CLAIMED", "本周竞技奖励已经领取过了。", context.request_id, operation_id
+            )
+        except ArenaSeasonClaimExpiredError:
+            return CommandResult(
+                False,
+                "ARENA_SEASON_CLAIM_EXPIRED",
+                "该周领奖期已过，名次只保留为展示记录。",
+                context.request_id,
+                operation_id,
+            )
+        except ArenaSeasonNotFoundError:
+            return CommandResult(
+                False, "ARENA_SEASON_NOT_FOUND", "找不到这一周的竞技场赛季。", context.request_id, operation_id
+            )
+        except Exception as exc:  # noqa: BLE001
+            return self._error(context, operation_id, exc)
+        reward = payload.get("reward") or {}
+        parts = []
+        if reward.get("spirit_stones"):
+            parts.append(f"灵石 {reward['spirit_stones']}")
+        if reward.get("local_reputation"):
+            parts.append(f"本地名望 {reward['local_reputation']}")
+        items = [key for key in reward if key.startswith("item.")]
+        if items:
+            parts.append(f"物品 {len(items)} 件")
+        lines = [
+            "## 周榜奖励已领取",
+            "",
+            f"- **周次**：{payload['week_key']}",
+            f"- **名次**：第 {payload['rank']} 名",
+            f"- **所得**：{' · '.join(parts) if parts else '本周无额外所得'}",
+        ]
+        if payload.get("title_key"):
+            lines.append("- **称号**：周榜魁首")
+        lines.append("")
+        lines.append(command_link("再看竞技场赛季", "竞技场赛季"))
+        return CommandResult(
+            True,
+            "ARENA_SEASON_CLAIMED",
+            "\n".join(lines),
+            context.request_id,
+            operation_id,
+            data=payload,
+            actions=(CommandAction("再看竞技场赛季", "竞技场赛季", enter=True),),
+        )
 
 __all__ = ["ArenaApplication"]
