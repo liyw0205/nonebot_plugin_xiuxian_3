@@ -60,7 +60,7 @@ def _stages_by_key() -> dict[str, object]:
 
 def test_the_yuanying_arc_is_a_complete_gated_chain() -> None:
     stages = _stages_by_key()
-    assert len(MAINLINE_STAGES) == 36
+    assert len(MAINLINE_STAGES) == 39
     assert stages["chapter.9.stage.3"].next_stage_key == "chapter.10.stage.1"
 
     previous = "chapter.9.stage.3"
@@ -74,7 +74,9 @@ def test_the_yuanying_arc_is_a_complete_gated_chain() -> None:
         assert stage.actions, f"{key} needs a public action"
         assert stages[previous].next_stage_key == key
         previous = key
-    assert stages[ARC[-1]].next_stage_key is None
+    # chapter.13 (元婴 L10 万兽山) continues the same chain and closes the realm.
+    assert stages[ARC[-1]].next_stage_key == "chapter.13.stage.1"
+    assert stages["chapter.13.stage.3"].next_stage_key is None
 
 
 def test_every_yuanying_action_is_a_command_a_player_can_send(tmp_path: Path) -> None:

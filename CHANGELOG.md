@@ -4,6 +4,12 @@
 
 ### Added
 
+- 元婴混元收束：`chapter.13.stage.1`–`.3`（入山问脉、循血猎兽、守山定契）补上 `layer_max=10`
+  却一直没有主线的混元 L10，三关元婴 L10、`keep_running` 重试，末关 `next_stage_key` 为空；
+  `chapter.12.stage.3` 改为链接 13.1，三键登记进 `_VERTICAL_SLICE_STAGES`。
+  目标分别是抵达 `beast.ten_thousand_hills`、`explore.beast_hunt` 结算取得 `item.beast_blood`、
+  以及该模式的遭遇战胜利。万兽山入口需妖界声望 200 或 `access.beast_ten_thousand_hills`，
+  `desc`/`retry` 明写「近郊探索 → 阅读妖界史 → 完成妖界引导」与云舟渡口路线，不把入口说成可直达。
 - 元婴主线补全：`chapter.10.stage.1`–`chapter.12.stage.3` 九关（云城问舟、渡口候船、云舟北渡、
   入门问契、契阁残页、遗迹守卫、门备材料、归舟回城、回镇结卷）把 `chapter.9.stage.3` 接到
   魔渊入口、堕落遗迹与归途。目标为真实抵达（含云舟抵达 `demon.abyss_gate`）、
