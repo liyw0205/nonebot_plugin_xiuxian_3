@@ -71,9 +71,13 @@ def test_combat_content_closes_current_enemy_and_encounter_data() -> None:
     # (16 from the M9 batch plus the two foundation pools, the two trade-endpoint
     # realms' pools and the two inert-location modes added later).
     expected_consumed_encounters = 20 if (DATA / "探索/模式.json").exists() else 0
+    # 50 of the 62 enemy records declare `combat_profile` (47 previously; the three
+    # last code-owned ones — iron_boar, beast_guardian, tribulation_heaven — were
+    # contentized).  The remaining 12 are void-spire enemies resolved from
+    # 特殊/虚空塔.json by their own `enemy_definition` branch.
     assert summary == {
         "enemies": 68,
-        "enemy_profiles": 47,
+        "enemy_profiles": 50,
         "encounters": 22,
         "candidates": 39,
         "drop_pools": 8,
