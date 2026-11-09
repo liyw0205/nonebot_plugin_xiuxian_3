@@ -256,5 +256,10 @@ v0.6 `story.mainline.dao_echoes` 已开放玩家流程：炼虚 L10 后可查询
 元婴整段此前没有主线：`chapter.10.stage.1`–`chapter.12.stage.3`（云城问舟、渡口候船、云舟北渡、
 入门问契、契阁残页、遗迹守卫、门备材料、归舟回城、回镇结卷）把玄天卷经云舟渡口接到魔渊入口、
 堕落遗迹与归途，目标分别是抵达/云舟抵达、`explore.demon_abyss` 的结算产物与遭遇战胜利、
-`explore.demon_threshold` 的魔核，九关为元婴 L1–L9、`keep_running` 重试，最后一关
-`next_stage_key` 为空。完整说明见 [content-v0.12.md](content-v0.12.md)。
+`explore.demon_threshold` 的魔核，九关为元婴 L1–L9、`keep_running` 重试。
+完整说明见 [content-v0.12.md](content-v0.12.md)。
+
+元婴混元 L10 由 `chapter.13.stage.1`–`.3`（入山问脉、循血猎兽、守山定契）收束：入口 `beast.ten_thousand_hills`
+需妖界声望 200 或妖界引导的 `access.beast_ten_thousand_hills`，目标为抵达山口、`explore.beast_hunt`
+结算取得兽血、以及该模式的遭遇战胜利；末关 `next_stage_key` 为空，与化神 story 分开。
+完整说明见 [content-v0.13.md](content-v0.13.md)。

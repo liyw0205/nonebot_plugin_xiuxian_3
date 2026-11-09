@@ -77,6 +77,17 @@ M5 最终当前树本地阶段验收、审查与提交推送已完成；保留�
 主线剧情与离线成长首个真实纵向切片已推送 `42d1772`；不扩成 84 条主线批量填充，
 不重做 M9 数据，不把现存 PvP 入口描述成完整开放世界竞技生态。
 
+本轮在 `develop` 用 `chapter.13` 收束元婴链：`chapter.12.stage.3` 的 `next_stage_key` 原本为空，
+元婴 `layer_max=10` 的混元层没有主线。三关 `chapter.13.stage.1`–`.3`（入山问脉、循血猎兽、守山定契）
+均为元婴 L10，目标依次为抵达 `beast.ten_thousand_hills`、`explore.beast_hunt` 结算取得
+`item.beast_blood`、该模式遭遇战胜利，末关 `next_stage_key` 为空并登记进 `_VERTICAL_SLICE_STAGES`。
+万兽山入口是 `any_of` 地点门槛（妖界声望 200 或 `access.beast_ten_thousand_hills`），且只与云舟渡口相连，
+因此 `desc`/`retry` 明写「近郊探索 → 阅读妖界史 → 完成妖界引导 → 云舟渡口启程」，青石镇直连会返回
+`TRAVEL_ROUTE_INVALID`。剧情基线见[content-v0.13.md](gameplay/adventures/content-v0.13.md)。聚焦证据：
+`test_mainline_beast_chapter.py` 6 passed，主线受影响组（nascent arc / yuanying / mainline /
+vertical_slice / chapter6）19 passed，`test_seed_migration.py` 29 passed。未跑全量、未压测、未部署、
+未发真实 QQ 消息，未合并 `main`。
+
 本轮在 `develop` 补上元婴整段缺失的主线，并修正灵田谷物链与多居所播种：`chapter.10.stage.1`–
 `chapter.12.stage.3` 九关（云城问舟、渡口候船、云舟北渡、入门问契、契阁残页、遗迹守卫、门备材料、
 归舟回城、回镇结卷）把 `chapter.9.stage.3` 接到魔渊与归途，目标分别是抵达 `xuantian.cloud_city` /
