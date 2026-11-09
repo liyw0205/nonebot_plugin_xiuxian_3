@@ -3256,7 +3256,94 @@
       "required_realm": "nascent_soul",
       "required_layer": 9,
       "first_clear_reward": {"spirit_stones": 150, "item.material.ward_plate": 2, "service_reputation": 8},
-      "repeat_reward": {"spirit_stones": 45}
+      "repeat_reward": {"spirit_stones": 45},
+      "next_stage_key": "chapter.13.stage.1"
+    },
+    {
+      "key": "chapter.13.stage.1",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 13,
+      "stage": 1,
+      "name": "入山问脉",
+      "desc": "先向近郊取得妖界引路资格，再经云舟渡口北上，进入万兽山的山口。",
+      "body": "从云舟渡口往妖界的船不载货，只载人。云舟在万兽山的山口落下时，风里带着兽毛和湿土的味道，山道上压着新旧不一的蹄印，最深的那几道比人的手掌还宽。守山的老人坐在石阶上磨骨刀，抬头看了一眼你腰间的剑，说山里的东西近来不问来路，只问血。你把剑往里收了收，沿蹄印往山里走，走到第一处岔口时，听见林子深处也有东西在听你。",
+      "objectives": [
+        {"key": "arrive_beast_hills_13", "type": "travel_arrival", "label": "抵达万兽山入口", "destination_key": "beast.ten_thousand_hills"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "万兽山入口", "description": "从云舟渡口沿山道北上，行程结束后结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.13.stage.1"]},
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未抵达万兽山入口时关卡保持进行中，不扣主线奖励；先在近郊完成一次探索、阅读妖界史并完成妖界引导取得引路资格，再从云舟渡口启程并结算移动。"
+      },
+      "status": "open",
+      "aliases": ["入山问脉"],
+      "prerequisites": ["chapter.12.stage.3"],
+      "required_realm": "nascent_soul",
+      "required_layer": 10,
+      "first_clear_reward": {"spirit_stones": 120, "service_reputation": 6},
+      "repeat_reward": {"spirit_stones": 40},
+      "next_stage_key": "chapter.13.stage.2"
+    },
+    {
+      "key": "chapter.13.stage.2",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 13,
+      "stage": 2,
+      "name": "循血猎兽",
+      "desc": "循兽迹狩猎，取得一份兽血。",
+      "body": "山里的猎法与人间的不同：不必追得比它快，只要比它更懂得等。你在第二道山脊上守了半日，看见兽群换了两次方向，第三次才有一只落在队伍后头。血是热的，落在石头上很快就冷；猎人的规矩是只取一份，剩下的留给山。老人说妖界的山认这个规矩，认了才肯再开一次口子——所谓血脉，从来不是取来的，是换来的。",
+      "objectives": [
+        {"key": "bring_beast_blood_13", "type": "exploration_reward", "label": "在万兽山狩猎结算中取得兽血", "mode_key": "explore.beast_hunt", "location_key": "beast.ten_thousand_hills", "item_key": "item.beast_blood", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "万兽山狩猎", "description": "在万兽山外围循迹狩猎，结算时按奖池取得兽血。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.13.stage.2"]},
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未取得兽血时关卡保持进行中，不扣主线奖励；体力恢复后再在万兽山狩猎并结算即可。"
+      },
+      "status": "open",
+      "aliases": ["循血猎兽"],
+      "prerequisites": ["chapter.13.stage.1"],
+      "required_realm": "nascent_soul",
+      "required_layer": 10,
+      "first_clear_reward": {"spirit_stones": 90, "item.beast_blood": 1},
+      "repeat_reward": {"spirit_stones": 45},
+      "next_stage_key": "chapter.13.stage.3"
+    },
+    {
+      "key": "chapter.13.stage.3",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 13,
+      "stage": 3,
+      "name": "守山定契",
+      "desc": "在山道上与守山兽一战，让万兽山认下这一份血脉。",
+      "body": "取过血的人，山要亲自看一遍。第三日夜里，林子里那双听过你的东西终于站了出来：它比人高，肩背上覆着旧年留下的骨甲，站在山道上不动，也不叫，像在等你先开口。老人说过，守山的兽不拦空手的人，只拦带走东西的人。你把骨刀横过来，算是答了它的话——这一战过后，山才认你是能带走血脉的人，而元婴这一具身子，也就走到头了。",
+      "objectives": [
+        {"key": "defeat_beast_guardian_13", "type": "exploration_battle_victory", "label": "在万兽山狩猎中击败守山兽", "mode_key": "explore.beast_hunt", "location_key": "beast.ten_thousand_hills"}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "万兽山狩猎", "description": "再次入山狩猎，遭遇战由服务端自动战斗结算。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.13.stage.3"]},
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "守山兽未败时关卡保持进行中，不扣主线奖励；体力恢复后可再入万兽山狩猎，血脉不受损。"
+      },
+      "status": "open",
+      "aliases": ["守山定契"],
+      "prerequisites": ["chapter.13.stage.2"],
+      "required_realm": "nascent_soul",
+      "required_layer": 10,
+      "first_clear_reward": {"spirit_stones": 150, "item.clue.beast_bloodline": 1, "service_reputation": 8},
+      "repeat_reward": {"spirit_stones": 50}
     }
   ]
 }

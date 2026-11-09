@@ -88,7 +88,7 @@ def test_the_arc_links_the_chain_and_every_stage_is_real_story() -> None:
     for key in NEW_STAGES[:-1]:
         nxt = definitions[key].next_stage_key
         assert nxt in definitions, f"{key} points at a missing stage"
-    assert definitions["chapter.12.stage.3"].next_stage_key is None
+    assert definitions["chapter.12.stage.3"].next_stage_key == "chapter.13.stage.1"
 
     for key in NEW_STAGES:
         stage = definitions[key]
