@@ -384,6 +384,14 @@ operation 账本均不得变化。生活域短途运输虽已有独立路线快�
 
 只把配置登记进 manifest、增加盘点表或往记录里塞 `desc`，不代表玩法已数据驱动。
 
+上述第 2 条的"所有引用闭合"由 `test/test_content_completeness.py` 逐条守护，它检查五段链是否
+真的接通而不是各自看起来存在：open 探索模式必须被其地点 `actions` 列出、`reward_pool_key` 与
+`enemy_pool_key` 的每个候选都可解析、`required_layer` 落在该境界自己的 `layer_min..layer_max`
+内、`battle_chance_bp>0` 与敌人池互相印证；主线的 `exploration_reward` 目标物品必须在其模式奖池的
+`outcomes[].rewards` 里；没有 `combat_profile` 的敌人只允许是 `enemy.void_spire.*`（由塔内容解析）；
+非 `active`/`open` 的记录只允许两条 `admin_only` 凭证与两条带 `lock_reason` 的 `locked` 模式。
+新增模式或敌人若漏接任一环，该测试会在 CI 里点名文件与 key，而不是留给玩家发现。
+
 ## 6. 当前差距和迁移优先级
 
 道源任务 `task.dao_origin.guard`、`task.dao_origin.build` 与 `task.dao_origin.teach` 的 `target` 必须是正整数；`reward` 必须提供 `dao_fruit_progress`、`ascension_merit`、`world_merit` 与 `item.tribulation_token`，可另含已登记物品，数量为非负整数且不接受布尔值。首次核验时物品引用须指向当前开放物品，建设见闻须为有效服务图鉴。目标、任务名称、完整奖励、物品/见闻展示名和赛季在首笔有效进度时冻结到任务进度及每条来源事件；同赛季后续核验使用该快照，图鉴/物品改名或关闭不改写已有任务承诺，历史 L9→L10 资格按三项任务的事件快照核验共同完成赛季。新操作仍必须以当前任务状态为准，`closed` 任务不得新增进度；operation replay 先于当前内容校验，避免关闭或改名破坏历史结果。事件与进度快照不一致、坏 JSON 或字段缺失必须拒绝，不按旧格式或默认目标补齐。不得在 Python 保留同义目标/奖励表。

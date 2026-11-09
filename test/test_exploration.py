@@ -406,7 +406,10 @@ def test_exploration_conflicts_and_combat_encounters_are_settled_once() -> None:
             assert started.code == "EXPLORATION_STARTED"
             assert (await runtime.dispatch(_context(user, "cultivate"), "开始修炼")).code == "CULTIVATION_BUSY"
             _set_player(runtime, user, realm_layer=2)
-            assert (await runtime.dispatch(_context(user, "travel-conflict"), "前往 灵泉谷")).code == "TRAVEL_BUSY"
+            # 近郊 has no direct edge to 灵泉谷 (only 青石镇 / 雾隐洞天 do), so an
+            # unreachable destination proves nothing about the busy guard: route
+            # resolution rejects it first. Travel to a reachable neighbour instead.
+            assert (await runtime.dispatch(_context(user, "travel-conflict"), "前往 青石镇")).code == "TRAVEL_BUSY"
             assert (await runtime.dispatch(_context(user, "production"), "开始生产 炼丹")).code == "PRODUCTION_BUSY"
 
             _set_player(runtime, user, stamina=30, realm_key="qi_sensing", realm_layer=2, location_key="xuantian.outskirts")
