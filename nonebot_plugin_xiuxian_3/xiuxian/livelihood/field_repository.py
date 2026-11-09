@@ -97,7 +97,10 @@ class FieldPlotRepositoryMixin:
                 raise ResidenceRequiredError("planting requires an active residence")
             residence_snapshot = self._residence_snapshot(residence)
             plot_count = int(residence_snapshot["plot_count"])
-            if crop.residence_key and crop.residence_key != str(residence["residence_key"]):
+            allowed_residences = crop.residence_keys or (
+                (crop.residence_key,) if crop.residence_key else ()
+            )
+            if allowed_residences and str(residence["residence_key"]) not in allowed_residences:
                 raise ResidencePlotRequiredError("the residence does not support this crop")
             if plot_count < 1:
                 raise ResidencePlotRequiredError("the residence has no field plot")

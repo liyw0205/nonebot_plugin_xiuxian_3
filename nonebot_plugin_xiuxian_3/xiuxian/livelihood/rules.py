@@ -240,6 +240,7 @@ class CropDefinition:
     unmaintained_harvest: dict[str, int]
     daily_limit: int
     residence_key: str | None = None
+    residence_keys: tuple[str, ...] = ()
     random_pool: str | None = None
     maintained_harvest_ranges: dict[str, tuple[int, int]] | None = None
     reputation_key: str | None = None
@@ -300,14 +301,17 @@ def crop_definitions(content: ContentBundle | None = None) -> dict[str, CropDefi
         requirements = row.get("requirements", [])
         if not isinstance(requirements, list):
             raise ContentError(f"crop {key} requirements must be a list")
-        residence_key: str | None = None
+        residence_keys: list[str] = []
         for requirement in requirements:
             if not isinstance(requirement, dict):
                 raise ContentError(f"crop {key} has an invalid requirement")
             if requirement.get("type") == "residence_key":
-                residence_key = requirement.get("value")
-                if not isinstance(residence_key, str) or residence_key not in residences:
+                candidate = requirement.get("value")
+                if not isinstance(candidate, str) or candidate not in residences:
                     raise ContentError(f"crop {key} references an unknown residence")
+                if candidate in residence_keys:
+                    raise ContentError(f"crop {key} repeats residence {candidate}")
+                residence_keys.append(candidate)
             elif requirement.get("type") == "residence_plot":
                 if requirement.get("status") != "active":
                     raise ContentError(f"crop {key} has an invalid plot requirement")
@@ -332,13 +336,14 @@ def crop_definitions(content: ContentBundle | None = None) -> dict[str, CropDefi
             key=key,
             label=label,
             seed_key=seed_key,
+            residence_key=residence_keys[0] if residence_keys else None,
+            residence_keys=tuple(residence_keys),
             growth_seconds=growth_seconds,
             maintenance_energy=energy,
             required_maintenance=required,
             maintained_harvest=maintained,
             unmaintained_harvest=unmaintained,
             daily_limit=daily_limit,
-            residence_key=residence_key,
             random_pool=random_pool,
             maintained_harvest_ranges=ranges,
             reputation_key=reputation_key,

@@ -58,8 +58,9 @@ def test_multi_plot_content_chain_is_closed_and_keeps_the_material_matrix() -> N
     crop = crop_definition("云纹稻", bundle)
     assert crop.key == "crop.cloud_rice"
     assert crop.residence_key == "residence.herb_court"
-    assert crop.seed_key == "item.herb.spirit_leaf"
-    assert crop.seed_quantity == 2
+    assert crop.residence_keys == ("residence.herb_court",)
+    assert crop.seed_key == "item.grain.cloud_rice"
+    assert crop.seed_quantity == 1
     assert crop.maintained_harvest == {
         "item.grain.cloud_rice": 4,
         "item.herb.spirit_leaf": 1,
@@ -88,10 +89,10 @@ def test_multi_plot_content_chain_is_closed_and_keeps_the_material_matrix() -> N
 
     # The new crop chain must not widen the declared gathering matrix.
     assert validate_material_content(bundle) == {
-        "materials": 13,
-        "gathering_sources": 18,
-        "modes": 10,
-        "recipe_consumers": 32,
+        "materials": 14,
+        "gathering_sources": 19,
+        "modes": 11,
+        "recipe_consumers": 33,
     }
 
 
@@ -120,7 +121,7 @@ def test_two_plots_grow_maintain_harvest_cook_and_survive_restart(tmp_path: Path
                         "SELECT inventory_json FROM players WHERE id = ?", (player_id,)
                     ).fetchone()[0]
                 )
-                inventory["item.herb.spirit_leaf"] = inventory.get("item.herb.spirit_leaf", 0) + 8
+                inventory["item.grain.cloud_rice"] = inventory.get("item.grain.cloud_rice", 0) + 8
                 db.execute(
                     "UPDATE players SET inventory_json = ? WHERE id = ?",
                     (json.dumps(inventory), player_id),
@@ -185,7 +186,8 @@ def test_two_plots_grow_maintain_harvest_cook_and_survive_restart(tmp_path: Path
 
             _, produced = await flow.produce("云纹灵米饭", operation="multi-cook")
             assert produced.data["outputs"] == {"item.food.cloud_rice_meal": 2}
-            assert flow.inventory()["item.grain.cloud_rice"] == 3
+            # 8 seeded - 2 sown + 6 harvested - 3 cooked = 9
+            assert flow.inventory()["item.grain.cloud_rice"] == 9
             assert flow.inventory()["item.food.cloud_rice_meal"] == 2
             used = await flow.send("使用物品 云纹灵米饭 精力", "multi-use")
             assert used.data["effect"]["restored"] > 0
@@ -208,7 +210,7 @@ def test_two_plots_grow_maintain_harvest_cook_and_survive_restart(tmp_path: Path
             assert profile.data["plot_count"] == 2
             assert [entry["plot_index"] for entry in profile.data["plots"]] == [1, 2]
             assert {entry["status"] for entry in profile.data["plots"]} == {"harvested"}
-            assert flow.inventory()["item.grain.cloud_rice"] == 3
+            assert flow.inventory()["item.grain.cloud_rice"] == 9
             assert flow.inventory()["item.food.cloud_rice_meal"] == 1
         finally:
             await flow.runtime.close()
@@ -243,7 +245,7 @@ def test_corrupt_second_plot_snapshot_rolls_back_without_touching_the_first(
                         "SELECT inventory_json FROM players WHERE id = ?", (player_id,)
                     ).fetchone()[0]
                 )
-                inventory["item.herb.spirit_leaf"] = inventory.get("item.herb.spirit_leaf", 0) + 6
+                inventory["item.grain.cloud_rice"] = inventory.get("item.grain.cloud_rice", 0) + 6
                 db.execute(
                     "UPDATE players SET inventory_json = ? WHERE id = ?",
                     (json.dumps(inventory), player_id),
