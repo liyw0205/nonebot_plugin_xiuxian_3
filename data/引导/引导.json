@@ -268,6 +268,52 @@
         "key": "guide.idle_entry"
       },
       "key": "guide.idle_entry"
+    },
+    {
+      "name": "聚气纳息",
+      "label": "聚气纳息",
+      "desc": "聚气共十层，每层修为门槛：二层 180、三层 380、四层 620、五层 900、六层 1220、七层 1580、八层 1980、九层 2420、十层 2900。用 `开始修炼` 起势、`结算修炼` 收功积累修为，中断可 `恢复修炼`，不想继续可 `取消修炼`；修为够了用 `晋升境界` 进下一层。十层走满才算站在筑基门前，先看 `突破预览` 缺什么，别在这一境反复试突破。",
+      "content": "聚气是第二个大境界，十层各有修为门槛；修为靠修炼结算积累，够了再用晋升境界进层。\n\n十层走满才站在筑基门前，突破之前先看突破预览缺什么。",
+      "status": "active",
+      "operation": "guide.qi_gathering_breath",
+      "command": "聚气",
+      "aliases": ["聚气", "纳息", "聚气纳息"],
+      "requirements": [
+        {
+          "type": "stage",
+          "stage": "cultivator"
+        }
+      ],
+      "cost": {},
+      "repeatable": true,
+      "output": {
+        "type": "intro_flag",
+        "key": "guide.qi_gathering_breath"
+      },
+      "key": "guide.qi_gathering_breath"
+    },
+    {
+      "name": "聚气登阶",
+      "label": "聚气登阶",
+      "desc": "从聚气跨入筑基要跨过这一境的总修为 4260——它是十层累计的成果，不是单层门槛。准备齐了先 `突破预览` 看差什么，条件满足才 `开始突破`，再按提示 `结算突破`；失败不会把已有层数清零，但会消耗当次准备的资源。筑基之后的指路与主线从青石镇、灵泉谷展开，`我的状态` 会给出当前该走的那一步。",
+      "content": "聚气跨入筑基要跨过整境总修为 4260。准备齐了看突破预览，条件满足才开始突破，再结算突破；失败不清层数，但会消耗当次资源。",
+      "status": "active",
+      "operation": "guide.qi_gathering_ascent",
+      "command": "登阶",
+      "aliases": ["登阶", "聚气登阶", "筑基指路"],
+      "requirements": [
+        {
+          "type": "stage",
+          "stage": "cultivator"
+        }
+      ],
+      "cost": {},
+      "repeatable": true,
+      "output": {
+        "type": "intro_flag",
+        "key": "guide.qi_gathering_ascent"
+      },
+      "key": "guide.qi_gathering_ascent"
     }
   ],
   "schema": "xiuxian.content"

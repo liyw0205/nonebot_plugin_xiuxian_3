@@ -71,7 +71,10 @@ def test_public_onboarding_links_buttons_and_recipe_preview() -> None:
                     "完成引导 炼丹", "完成引导 炼器", "完成引导 布阵", "完成引导 烹饪"
                 }
                 service = await dispatch(_links(gather.message)["完成引导 炼丹"])
-                assert _links(service.message)["选择道途"] == "选择道途"
+                # After the service lesson the player is a seeker, so the hint points at
+                # the next pending seeker-tier guide rather than the path chooser. The
+                # chooser itself is still exercised on the next line.
+                assert _links(service.message)["完成引导 道途指引"] == "完成引导 道途指引"
                 assert (await dispatch("选择道途 辅修 炼丹")).ok
                 board = await dispatch("悬赏榜")
                 assert board.ok and not board.actions

@@ -42,6 +42,8 @@ TIER_OF = {
     "guide.dispatch_entry": STAGE_CULTIVATOR,
     "guide.secret_realm_entry": STAGE_CULTIVATOR,
     "guide.idle_entry": STAGE_CULTIVATOR,
+    "guide.qi_gathering_breath": STAGE_CULTIVATOR,
+    "guide.qi_gathering_ascent": STAGE_CULTIVATOR,
     "guide.seeker_path_hint": STAGE_SEEKER,
     "guide.seeker_sect_gate": STAGE_SEEKER,
 }
@@ -50,6 +52,8 @@ CULTIVATOR_GUIDES = (
     "guide.dispatch_entry",
     "guide.secret_realm_entry",
     "guide.idle_entry",
+    "guide.qi_gathering_breath",
+    "guide.qi_gathering_ascent",
 )
 SEEKER_GUIDES = ("guide.seeker_path_hint", "guide.seeker_sect_gate")
 
@@ -72,7 +76,7 @@ def test_guide_table_ships_two_tiers_with_closed_requirements() -> None:
     definitions = guide_definitions(_bundle())
     by_key = {definition["key"]: definition for definition in definitions}
 
-    assert len(definitions) == 9
+    assert len(definitions) == 11
     assert set(by_key) == set(TIER_OF)
     for key, tier in TIER_OF.items():
         assert by_key[key]["stage"] == tier, key
