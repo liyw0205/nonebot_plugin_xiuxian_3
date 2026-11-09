@@ -18,7 +18,14 @@ operation 回放原居所，不重复扣费。居所快照固定 `plot_count=2`�
 
 | `crop_key` | 前置/输入 | 生长/维护 | 收获 | 失败/上限 |
 |:--|:--|:--|:--|:--|
-| `crop.cloud_rice` | `residence.herb_court`；`item.herb.spirit_leaf` 2 作种 | 6h；精力 1；维护 2 次 | `item.grain.cloud_rice` 4、`item.herb.spirit_leaf` 1、青石镇名望 +2 | 未维护：云纹稻谷 2；每角色/业务日 2 轮（两垄合计） |
+| `crop.cloud_rice` | `residence.herb_court`；`item.grain.cloud_rice` 1 作种 | 6h；精力 1；维护 2 次 | `item.grain.cloud_rice` 4、`item.herb.spirit_leaf` 1、青石镇名望 +2 | 未维护：云纹稻谷 2；每角色/业务日 2 轮（两垄合计） |
+
+云纹稻是全档唯一以谷物作种的作物：种子即 `item.grain.cloud_rice` 本身，播种 1 份、收获 4 份，
+不再消耗灵叶。此前的「灵叶×2 作种」已作废，旧种子与旧快照的既有田垄不受影响。
+
+居所前置按 `requirements` 中声明的全部 `residence_key` 判定：作物声明多处居所时任一匹配即可播种。
+`crop.spirit_leaf` 同时声明 `residence.courtyard` 与 `residence.herb_court`，因此灵圃小院的
+两垄可以种灵叶；未声明该居所的作物仍按原规则拒绝，城镇客房（`residence.town_room`）不可种田。
 
 播种在 `livelihood.plant` 成功时锁种子/精力并固定收获与枯萎时间。未指定田垄时占用编号最小的
 空闲垄；指定 `1..plot_count` 之外的编号返回 `INVALID_FIELD_SLOT`，指定已占用垄返回
