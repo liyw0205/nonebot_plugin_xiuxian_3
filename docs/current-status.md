@@ -77,6 +77,16 @@ M5 最终当前树本地阶段验收、审查与提交推送已完成；保留�
 主线剧情与离线成长首个真实纵向切片已推送 `42d1772`；不扩成 84 条主线批量填充，
 不重做 M9 数据，不把现存 PvP 入口描述成完整开放世界竞技生态。
 
+本轮在 `develop` 把"内容看起来齐全、实际没接通"这类缺口固化成合同测试
+`test/test_content_completeness.py`（8 条，4 passed 起步→现 8 passed）。它守五段链：
+**模式 → 地点 action → 遭遇池 → 奖励池 → 境界门槛**，外加主线目标可支付性、敌人来源闭合、
+模式/地点元数据与状态面。实测基线（develop 上逐项跑过）：探索模式 29 条（27 open + 2 locked）、
+敌人 68 条（50 内容持有 + 18 `enemy.void_spire.*`）、主线 111 条、地点 34 个、奖励池 116、
+遭遇池 22，**确认数据缺口 0 条**。探查中两处我自己的判断被证伪并已更正：无 `combat_profile`
+的敌人是 18 条（不是 12 条）且全部为虚空塔敌人；`mortal` 是 `layer_min 0 / layer_max 0`，
+所以 `required_layer: 0` 的两条近郊模式是正确编码而非缺口。合同测试因此按境界自己的
+`layer_min..layer_max` 比较，而不是假定 1..n。未跑全量、未部署、未打 tag。
+
 本轮在 `develop` 把最后三条"代码持有"敌人内容化，消除"改内容被静默忽略"的坑：
 `enemy.beast_guardian` 在 `data/战斗/敌人.json` 里没有 `combat_profile`，`enemy_definition`
 因此回落到 `combat/rules.py` 的 `ENEMIES` 常量——chapter.13 期间我把这误判成"内容被忽略"的
