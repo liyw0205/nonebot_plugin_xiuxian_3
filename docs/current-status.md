@@ -77,6 +77,18 @@ M5 最终当前树本地阶段验收、审查与提交推送已完成；保留�
 主线剧情与离线成长首个真实纵向切片已推送 `42d1772`；不扩成 84 条主线批量填充，
 不重做 M9 数据，不把现存 PvP 入口描述成完整开放世界竞技生态。
 
+本轮在 `develop` 给仓库最大的未守护数据面——装备目录——加合同测试
+`test/test_equipment_catalog.py`（5 条）：1866 条带 `equipment_slot` 的 item 必须槽位与 key 前缀
+一致、`path_key` 属于六道途、成长引用解析到 `equipment_growth` 且不重复声明
+（内联 `growth` 与 `growth_profile_key` 只能二选一）、词条属性名必须来自
+`stats/rules.py` 的 `_FLAT_EFFECT_STATS`/`_AFFIX_STATS`、门槛落在真实境界层数内，且 12 个矩阵
+家族各 144 条、五个成长档位分布一致（15/31/33/32/33）。实测基线：词条 `flat_stat` 7 个属性名
+恰好等于 `_FLAT_EFFECT_STATS`，`combat_stat_bp` 11 个是 `_AFFIX_STATS` 的子集；
+7 条新手装备刻意无境界门槛。**确认数据缺口 0 条**，本轮不改任何装备数值。
+探查中三处判断被证伪并已按真实数据修正：`item.weapon.cloud_sword` 用的是内联 `growth`
+（"无成长"集合实际为空）、手抄词条白名单会误报 199 条（必须从引擎导入）、
+免门槛新手装备是设计而非缺字段。未跑全量、未部署、未打 tag。
+
 本轮在 `develop` 把"内容看起来齐全、实际没接通"这类缺口固化成合同测试
 `test/test_content_completeness.py`（8 条，4 passed 起步→现 8 passed）。它守五段链：
 **模式 → 地点 action → 遭遇池 → 奖励池 → 境界门槛**，外加主线目标可支付性、敌人来源闭合、

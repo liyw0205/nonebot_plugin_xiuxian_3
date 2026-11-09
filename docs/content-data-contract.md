@@ -392,6 +392,12 @@ operation 账本均不得变化。生活域短途运输虽已有独立路线快�
 非 `active`/`open` 的记录只允许两条 `admin_only` 凭证与两条带 `lock_reason` 的 `locked` 模式。
 新增模式或敌人若漏接任一环，该测试会在 CI 里点名文件与 key，而不是留给玩家发现。
 
+装备目录（1866 条带 `equipment_slot` 的 item）由 `test/test_equipment_catalog.py` 守护：
+槽位与 key 前缀一致、`path_key` 属于六道途或与 key 段一致、成长引用解析到 `equipment_growth`
+且不得同时声明两种成长形式、词条的 `flat_stat`/`combat_stat_bp` 属性名必须来自
+`stats/rules.py` 的 `_FLAT_EFFECT_STATS`/`_AFFIX_STATS`（**禁止在测试里另抄一份属性表**）、
+门槛落在真实境界层数内，以及 12 个矩阵家族各 144 条且成长档位分布一致。
+
 ## 6. 当前差距和迁移优先级
 
 道源任务 `task.dao_origin.guard`、`task.dao_origin.build` 与 `task.dao_origin.teach` 的 `target` 必须是正整数；`reward` 必须提供 `dao_fruit_progress`、`ascension_merit`、`world_merit` 与 `item.tribulation_token`，可另含已登记物品，数量为非负整数且不接受布尔值。首次核验时物品引用须指向当前开放物品，建设见闻须为有效服务图鉴。目标、任务名称、完整奖励、物品/见闻展示名和赛季在首笔有效进度时冻结到任务进度及每条来源事件；同赛季后续核验使用该快照，图鉴/物品改名或关闭不改写已有任务承诺，历史 L9→L10 资格按三项任务的事件快照核验共同完成赛季。新操作仍必须以当前任务状态为准，`closed` 任务不得新增进度；operation replay 先于当前内容校验，避免关闭或改名破坏历史结果。事件与进度快照不一致、坏 JSON 或字段缺失必须拒绝，不按旧格式或默认目标补齐。不得在 Python 保留同义目标/奖励表。
