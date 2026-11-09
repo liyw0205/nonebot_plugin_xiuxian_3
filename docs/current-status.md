@@ -77,6 +77,19 @@ M5 最终当前树本地阶段验收、审查与提交推送已完成；保留�
 主线剧情与离线成长首个真实纵向切片已推送 `42d1772`；不扩成 84 条主线批量填充，
 不重做 M9 数据，不把现存 PvP 入口描述成完整开放世界竞技生态。
 
+本轮在 `develop` 把最后三条"代码持有"敌人内容化，消除"改内容被静默忽略"的坑：
+`enemy.beast_guardian` 在 `data/战斗/敌人.json` 里没有 `combat_profile`，`enemy_definition`
+因此回落到 `combat/rules.py` 的 `ENEMIES` 常量——chapter.13 期间我把这误判成"内容被忽略"的
+运行时缺陷，复核后确认是设计内回落（`combat/rules.py:588` 明文记录），真正问题是内容里写的
+`stats` 不生效。现已给 `enemy.iron_boar`（同时补回内容缺失的 `agility: 8`）、
+`enemy.beast_guardian`、`enemy.tribulation_heaven` 补上 `combat_profile.random_pool_key`，
+**战斗数值一字未改**。来源划分：62 条敌人中 50 条内容持有，12 条 `enemy.void_spire.*` 由
+`data/特殊/虚空塔.json` 专属分支解析。聚焦证据：`test_enemy_content_parity.py` 4 passed
+（内容化前后 12 个字段逐项相同、虚空塔不受影响、把 `beast_guardian.hp` 改成 1 后战斗快照
+`max_hp` 确为 1），受影响回归 `test_battle_reward_refs`/`test_combat_content`/
+`test_tribulation_combat`/`test_tribulation_phase_flag`/`test_beast_hills` 共 34 passed，
+`test_combat_content` 的 `enemy_profiles` 计数由 47 更新为 50。未跑全量、未部署、未合并 main。
+
 本轮在 `develop` 用 `chapter.13` 收束元婴链：`chapter.12.stage.3` 的 `next_stage_key` 原本为空，
 元婴 `layer_max=10` 的混元层没有主线。三关 `chapter.13.stage.1`–`.3`（入山问脉、循血猎兽、守山定契）
 均为元婴 L10，目标依次为抵达 `beast.ten_thousand_hills`、`explore.beast_hunt` 结算取得
