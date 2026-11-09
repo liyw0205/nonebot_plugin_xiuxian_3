@@ -91,7 +91,10 @@ M5 最终当前树本地阶段验收、审查与提交推送已完成；保留�
 [content-v0.7.md](gameplay/livelihood/content-v0.7.md)。聚焦证据：
 `test_yuanying_mainline.py`、`test_mainline_nascent_arc.py` 9 passed，`test_livelihood_multi_plot.py`
 4 passed，`test_seed_migration.py`/主线与生活受影响回归 42+139+34 passed。
-未跑全量、未压测、未部署、未发真实 QQ 消息。
+已合入 `main` 并发布 v0.1.18：业务提交链 `37849ee`（元婴九关与灵田链）→ `2b3b057`（种子
+provenance）→ `e4efd9c`（文档与 0.1.18 收口），`develop` CI（`42664494354`）与 `main` push
+（`42665592637`）、tag `v0.1.18` push（`42665818047`）除 main push 的 `release` 按设计 skip 外均
+success，普通合并提交 `69f0263`。未跑全量、未压测、未部署、未发真实 QQ 消息。
 
 本轮在 `develop` 完成“探索模式可发现 + 敌人声明技能生效 + 天劫相位开关 + 突破许可内容化 +
 竞技场周赛季结算”一组闭环：
