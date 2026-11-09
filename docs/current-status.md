@@ -77,6 +77,22 @@ M5 最终当前树本地阶段验收、审查与提交推送已完成；保留�
 主线剧情与离线成长首个真实纵向切片已推送 `42d1772`；不扩成 84 条主线批量填充，
 不重做 M9 数据，不把现存 PvP 入口描述成完整开放世界竞技生态。
 
+本轮在 `develop` 补上元婴整段缺失的主线，并修正灵田谷物链与多居所播种：`chapter.10.stage.1`–
+`chapter.12.stage.3` 九关（云城问舟、渡口候船、云舟北渡、入门问契、契阁残页、遗迹守卫、门备材料、
+归舟回城、回镇结卷）把 `chapter.9.stage.3` 接到魔渊与归途，目标分别是抵达 `xuantian.cloud_city` /
+`xuantian.floating_boat` / `demon.abyss_gate` / `demon.fallen_ruins` / `xuantian.new_town`（含云舟抵达）、
+`explore.demon_abyss` 的 `item.clue.demon_contract` 结算产物与遭遇战胜利、`explore.demon_threshold`
+的 `item.demon_core`；九关为元婴 L1–L9、`keep_running` 重试、最后一关 `next_stage_key` 为空，
+并登记进 `_VERTICAL_SLICE_STAGES`，由既有 gate 校验正文长度、章节连续与 `state_changes`。
+`travel_arrival` 目标同时认已抵达的 `cloud_boat_sessions` 行，云舟航线由此可结算。灵田侧：
+`crop.cloud_rice` 改为以 `item.grain.cloud_rice` 1 作种（原为灵叶×2），作物定义收集全部
+`residence_key` 前置，`crop.spirit_leaf` 同时声明小院与灵圃小院，第二垄可种灵叶而城镇客房仍拒绝。
+剧情基线见[content-v0.12.md](gameplay/adventures/content-v0.12.md)，灵田口径见
+[content-v0.7.md](gameplay/livelihood/content-v0.7.md)。聚焦证据：
+`test_yuanying_mainline.py`、`test_mainline_nascent_arc.py` 9 passed，`test_livelihood_multi_plot.py`
+4 passed，`test_seed_migration.py`/主线与生活受影响回归 42+139+34 passed。
+未跑全量、未压测、未部署、未发真实 QQ 消息。
+
 本轮在 `develop` 完成“探索模式可发现 + 敌人声明技能生效 + 天劫相位开关 + 突破许可内容化 +
 竞技场周赛季结算”一组闭环：
 

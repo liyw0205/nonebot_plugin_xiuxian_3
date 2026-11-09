@@ -2036,6 +2036,14 @@ class AdventuresRepositoryMixin:
                     "AND destination=? AND starts_at>=? LIMIT 1",
                     (player_id, objective.get("destination_key"), started_at),
                 ).fetchone()
+                if found is None:
+                    # A 云舟 (cloud boat) arrival records its destination in its
+                    # own table and satisfies the same travel_arrival objective.
+                    found = connection.execute(
+                        "SELECT 1 FROM cloud_boat_sessions WHERE player_id=? AND status='arrived' "
+                        "AND destination=? AND starts_at>=? LIMIT 1",
+                        (player_id, objective.get("destination_key"), started_at),
+                    ).fetchone()
             elif kind == "exploration_reward":
                 rows = connection.execute(
                     "SELECT result_json FROM exploration_sessions WHERE player_id=? "

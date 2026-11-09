@@ -540,6 +540,10 @@
         {
           "type": "residence_key",
           "value": "residence.courtyard"
+        },
+        {
+          "type": "residence_key",
+          "value": "residence.herb_court"
         }
       ],
       "seed": {
@@ -587,8 +591,8 @@
         }
       ],
       "seed": {
-        "item_key": "item.herb.spirit_leaf",
-        "quantity": 2
+        "item_key": "item.grain.cloud_rice",
+        "quantity": 1
       },
       "growth_seconds": 21600,
       "maintenance": {

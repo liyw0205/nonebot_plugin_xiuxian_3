@@ -2993,7 +2993,270 @@
       "required_realm": "golden_core",
       "required_layer": 3,
       "first_clear_reward": {"spirit_stones": 90, "service_reputation": 6},
-      "repeat_reward": {"spirit_stones": 30}
+      "repeat_reward": {"spirit_stones": 30},
+      "next_stage_key": "chapter.10.stage.1"
+    },
+    {
+      "key": "chapter.10.stage.1",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 10,
+      "stage": 1,
+      "name": "云城问舟",
+      "desc": "金丹圆满之后，云城账房留了一封没有落款的信，只请你亲去一趟。",
+      "body": "金丹圆满的那一夜，青石镇落了整宿的雨。天亮时镇务送来云城账房的信，封皮上没有落款，只写了一句：北边的船近来不问货，只问人。信里夹着三枚灵石，说够你走到云城。镇口往北的官道是新修的石路，走上去一步一声脆响，比近郊的土路硬得多，也干净得多。",
+      "objectives": [
+        {"key": "arrive_cloud_city_10", "type": "travel_arrival", "label": "亲赴云城问明船事", "destination_key": "xuantian.cloud_city"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "云城", "description": "沿青石镇往北的公开官道北上，行程结束后结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.10.stage.1"]},
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未抵达云城时关卡保持进行中，不扣主线奖励；重新启程并结算移动即可领问舟之赏。"
+      },
+      "status": "open",
+      "aliases": ["云城问舟"],
+      "prerequisites": ["chapter.9.stage.3"],
+      "required_realm": "nascent_soul",
+      "required_layer": 1,
+      "first_clear_reward": {"spirit_stones": 100, "service_reputation": 5},
+      "repeat_reward": {"spirit_stones": 25},
+      "next_stage_key": "chapter.10.stage.2"
+    },
+    {
+      "key": "chapter.10.stage.2",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 10,
+      "stage": 2,
+      "name": "渡口候船",
+      "desc": "到云舟渡口问清北上的船期，替账房记下这一程的价钱。",
+      "body": "云城账房的人不肯多说，只把一张船期单推过来：北上的船只走魔界引导那一条线，一趟五百灵石，不问货，只问人。渡口在城东，走一刻钟就到，岸上堆着未拆的木箱，箱上全是同一种印记。守船的老人说，这一条线近年坐的人少了一半，问的人却多了三倍。",
+      "objectives": [
+        {"key": "arrive_floating_boat_10", "type": "travel_arrival", "label": "抵达云舟渡口", "destination_key": "xuantian.floating_boat"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "云舟渡口", "description": "从云城东行至渡口，行程结束后结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.10.stage.2"]},
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未抵达云舟渡口时关卡保持进行中，不扣主线奖励；从云城再次启程并结算移动即可。"
+      },
+      "status": "open",
+      "aliases": ["渡口候船"],
+      "prerequisites": ["chapter.10.stage.1"],
+      "required_realm": "nascent_soul",
+      "required_layer": 2,
+      "first_clear_reward": {"spirit_stones": 80, "service_reputation": 5},
+      "repeat_reward": {"spirit_stones": 30},
+      "next_stage_key": "chapter.10.stage.3"
+    },
+    {
+      "key": "chapter.10.stage.3",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 10,
+      "stage": 3,
+      "name": "云舟北渡",
+      "desc": "登上北上的云舟，落到深渊门前，看清信里写的“只问人”是什么。",
+      "body": "船比想象中窄，甲板上只摆得下六个座位，坐满了三个。船家收灵石时不抬头，只问一句你要去魔界做什么，问完便不再说话。云层压在船底，走了一个时辰才见到陆地：那不是山，是一道裂开的门，门里透出来的风是暖的。船靠岸时，守门的人点了一遍人头，像在核一份早就写好的名册。",
+      "objectives": [
+        {"key": "arrive_abyss_gate_10", "type": "travel_arrival", "label": "乘云舟抵达魔渊入口", "destination_key": "demon.abyss_gate"}
+      ],
+      "actions": [
+        {"command": "登上云舟", "argument": "魔界引导", "description": "在云舟渡口登上魔界引导航线，抵达魔渊入口后结算云舟。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.10.stage.3"]},
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未抵达魔渊入口时关卡保持进行中，不扣主线奖励；回到渡口再次登上魔界引导航线即可。"
+      },
+      "status": "open",
+      "aliases": ["云舟北渡"],
+      "prerequisites": ["chapter.10.stage.2"],
+      "required_realm": "nascent_soul",
+      "required_layer": 3,
+      "first_clear_reward": {"spirit_stones": 120, "service_reputation": 6},
+      "repeat_reward": {"spirit_stones": 35},
+      "next_stage_key": "chapter.11.stage.1"
+    },
+    {
+      "key": "chapter.11.stage.1",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 11,
+      "stage": 1,
+      "name": "入门问契",
+      "desc": "在深渊门前领下通行资格，再往堕落遗迹深处去看那道旧账。",
+      "body": "守门的人把一块木牌推到你面前：签字画押，记下污染与契约的风险，才许往里走。木牌背面刻着历年进出的数目，最后几行是空的，像专门留给后来的人。签完他把牌收走，只说了一句：里面的人也算过账，你若要翻，就翻到底。门后是一条下坡的碎石道，走上去脚下发滑。",
+      "objectives": [
+        {"key": "arrive_fallen_ruins_11", "type": "travel_arrival", "label": "取通行资格后深入堕落遗迹", "destination_key": "demon.fallen_ruins"}
+      ],
+      "actions": [
+        {"command": "接受魔界引导", "argument": "确认风险", "description": "在魔渊入口签下风险文书，取得魔界入口资格。"},
+        {"command": "前往", "argument": "堕落遗迹", "description": "沿门后的碎石道深入堕落遗迹，行程结束后结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.11.stage.1"]},
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未进入堕落遗迹时关卡保持进行中，不扣主线奖励；先在魔渊入口接受魔界引导取得资格，再启程结算移动。"
+      },
+      "status": "open",
+      "aliases": ["入门问契"],
+      "prerequisites": ["chapter.10.stage.3"],
+      "required_realm": "nascent_soul",
+      "required_layer": 4,
+      "first_clear_reward": {"spirit_stones": 100, "item.herb.spirit_leaf": 2},
+      "repeat_reward": {"spirit_stones": 30},
+      "next_stage_key": "chapter.11.stage.2"
+    },
+    {
+      "key": "chapter.11.stage.2",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 11,
+      "stage": 2,
+      "name": "契阁残页",
+      "desc": "在堕落遗迹的契阁里翻检旧账，找出买主的半个印。",
+      "body": "遗迹里的契阁塌了一半，纸页被风钉在石缝里，翻开来全是名字与数目，字迹一层压一层。第三处契阁的账上记着云城渡口的木箱，卖主栏空着，买主栏只有一个画了一半的印。纸角还留着指印，是热的，说明翻账的人刚走不久。把这一页带走，云城那边才认得出是谁。",
+      "objectives": [
+        {"key": "bring_demon_contract_11", "type": "exploration_reward", "label": "在堕落遗迹探索结算中取得契约残页", "mode_key": "explore.demon_abyss", "location_key": "demon.fallen_ruins", "item_key": "item.clue.demon_contract", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "魔界堕落遗迹探索", "description": "在堕落遗迹开启探索，结算时按奖池取得契约线索。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.11.stage.2"]},
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未取得契约残页时关卡保持进行中，不扣主线奖励；体力恢复后再次探索并结算即可。"
+      },
+      "status": "open",
+      "aliases": ["契阁残页"],
+      "prerequisites": ["chapter.11.stage.1"],
+      "required_realm": "nascent_soul",
+      "required_layer": 5,
+      "first_clear_reward": {"spirit_stones": 70, "item.clue.demon_contract": 1},
+      "repeat_reward": {"spirit_stones": 35},
+      "next_stage_key": "chapter.11.stage.3"
+    },
+    {
+      "key": "chapter.11.stage.3",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 11,
+      "stage": 3,
+      "name": "遗迹守卫",
+      "desc": "契阁深处有人守着最后一页账，把他从石前请开。",
+      "body": "残页只剩半张，另外半张压在契阁最深处的青石下。石前坐着个披甲的身影，甲片全是从别处拆下来的，缝口还带着原主的印记——那是历年没回去的人。它不问你为何而来，只把手按在青石上，像在替谁守着最后一页。既然账要翻完，就先把它从石前请开，再取那半张纸。",
+      "objectives": [
+        {"key": "defeat_abyss_keeper_11", "type": "exploration_battle_victory", "label": "在堕落遗迹探索中击败守账的守卫", "mode_key": "explore.demon_abyss", "location_key": "demon.fallen_ruins"}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "魔界堕落遗迹探索", "description": "再次进入堕落遗迹探索，遭遇战由服务端自动战斗结算。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.11.stage.3"]},
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "守卫未败时关卡保持进行中，不扣主线奖励；体力恢复后可再入遗迹探索。"
+      },
+      "status": "open",
+      "aliases": ["遗迹守卫"],
+      "prerequisites": ["chapter.11.stage.2"],
+      "required_realm": "nascent_soul",
+      "required_layer": 6,
+      "first_clear_reward": {"spirit_stones": 90, "item.demon_core": 1},
+      "repeat_reward": {"spirit_stones": 40},
+      "next_stage_key": "chapter.12.stage.1"
+    },
+    {
+      "key": "chapter.12.stage.1",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 12,
+      "stage": 1,
+      "name": "门备材料",
+      "desc": "回深渊门前收拾一程的补给，把魔息凝成的东西带回玄天。",
+      "body": "从契阁上来，门前的风还是暖的。守门人换了一个，仍旧点人头，仍旧不说话。门侧的碎石堆里散着凝成块的魔息，颜色发暗，掂起来比石头沉。老人说这东西带回玄天能换几味材料，只是别在怀里揣久了，揣久了人会做梦。把能带的都收进袋子，剩下的留给后来的人。",
+      "objectives": [
+        {"key": "gather_demon_core_12", "type": "exploration_reward", "label": "在深渊门备材探索结算中取得魔核", "mode_key": "explore.demon_threshold", "location_key": "demon.abyss_gate", "item_key": "item.demon_core", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "魔渊入口", "description": "从堕落遗迹回到深渊门前。"},
+        {"command": "开始探索", "argument": "深渊门备材", "description": "在深渊门附近采集补给，结算时取得魔核。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.12.stage.1"]},
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未取得魔核时关卡保持进行中，不扣主线奖励；在深渊门前再次采集并结算即可。"
+      },
+      "status": "open",
+      "aliases": ["门备材料"],
+      "prerequisites": ["chapter.11.stage.3"],
+      "required_realm": "nascent_soul",
+      "required_layer": 7,
+      "first_clear_reward": {"spirit_stones": 80, "item.demon_core": 1},
+      "repeat_reward": {"spirit_stones": 35},
+      "next_stage_key": "chapter.12.stage.2"
+    },
+    {
+      "key": "chapter.12.stage.2",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 12,
+      "stage": 2,
+      "name": "归舟回城",
+      "desc": "搭返程的云舟回云城，把那一页账交到该交的人手里。",
+      "body": "返程的船比来时更空，六个座位只坐了两个人。船家仍旧收灵石，仍旧不抬头，只在开船前说了一句：回去的人比来的人少。云层从船底翻上来，把深渊门的影子盖住，再抬头时已经能看见云城的檐角。账在怀里，纸边被体温捂得发软，字迹反倒更清楚了。",
+      "objectives": [
+        {"key": "return_cloud_city_12", "type": "travel_arrival", "label": "乘云舟返回云城", "destination_key": "xuantian.cloud_city"}
+      ],
+      "actions": [
+        {"command": "登上云舟", "argument": "返回云城", "description": "在魔渊入口登上返程航线，抵达云城后结算云舟。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.12.stage.2"]},
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未回到云城时关卡保持进行中，不扣主线奖励；在魔渊入口再次登上返程航线即可。"
+      },
+      "status": "open",
+      "aliases": ["归舟回城"],
+      "prerequisites": ["chapter.12.stage.1"],
+      "required_realm": "nascent_soul",
+      "required_layer": 8,
+      "first_clear_reward": {"spirit_stones": 130, "service_reputation": 6},
+      "repeat_reward": {"spirit_stones": 35},
+      "next_stage_key": "chapter.12.stage.3"
+    },
+    {
+      "key": "chapter.12.stage.3",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 12,
+      "stage": 3,
+      "name": "回镇结卷",
+      "desc": "带着残页与魔核回青石镇，把这一卷账当面结清。",
+      "body": "从云城回青石镇的路只有一刻钟，走完却像走了半年。镇务在门口等着，看见你怀里的残页先愣了一下，随后把镇志翻到最后一页：上面记着历年北上未归的名字，末行空着。你把残页压在镇志上，又把魔核放在旁边。镇务没有多问，只把末行填了你的名字，说这一卷账，从今日起算结清。",
+      "objectives": [
+        {"key": "return_new_town_12", "type": "travel_arrival", "label": "带着残页与魔核回到青石镇", "destination_key": "xuantian.new_town"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "青石镇", "description": "从云城沿官道南归，行程结束后结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.12.stage.3"]},
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未回到青石镇时关卡保持进行中，不扣主线奖励；从云城再次启程并结算移动即可。"
+      },
+      "status": "open",
+      "aliases": ["回镇结卷"],
+      "prerequisites": ["chapter.12.stage.2"],
+      "required_realm": "nascent_soul",
+      "required_layer": 9,
+      "first_clear_reward": {"spirit_stones": 150, "item.material.ward_plate": 2, "service_reputation": 8},
+      "repeat_reward": {"spirit_stones": 45}
     }
   ]
 }

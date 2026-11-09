@@ -252,3 +252,9 @@ v0.6 `story.mainline.dao_echoes` 已开放玩家流程：炼虚 L10 后可查询
 与雾隐洞天的旧账上，分别要求抵达云城、在 `explore.cloud_city_escort` 取胜、在 `explore.mist_grotto`
 结算中取得灵叶。三关均为金丹 L1–L3、`keep_running` 重试、各带首通与重复奖励，最后一关收束链路。
 完整说明见 [content-v0.11.md](content-v0.11.md)。
+
+元婴整段此前没有主线：`chapter.10.stage.1`–`chapter.12.stage.3`（云城问舟、渡口候船、云舟北渡、
+入门问契、契阁残页、遗迹守卫、门备材料、归舟回城、回镇结卷）把玄天卷经云舟渡口接到魔渊入口、
+堕落遗迹与归途，目标分别是抵达/云舟抵达、`explore.demon_abyss` 的结算产物与遭遇战胜利、
+`explore.demon_threshold` 的魔核，九关为元婴 L1–L9、`keep_running` 重试，最后一关
+`next_stage_key` 为空。完整说明见 [content-v0.12.md](content-v0.12.md)。

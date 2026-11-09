@@ -4,6 +4,18 @@
 
 ### Added
 
+- 元婴主线补全：`chapter.10.stage.1`–`chapter.12.stage.3` 九关（云城问舟、渡口候船、云舟北渡、
+  入门问契、契阁残页、遗迹守卫、门备材料、归舟回城、回镇结卷）把 `chapter.9.stage.3` 接到
+  魔渊入口、堕落遗迹与归途。目标为真实抵达（含云舟抵达 `demon.abyss_gate`）、
+  `explore.demon_abyss` 的契约线索结算产物与遭遇战胜利、`explore.demon_threshold` 的魔核；
+  九关元婴 L1–L9、`keep_running` 重试、末关结束链路，并登记进 `_VERTICAL_SLICE_STAGES`
+  由既有 gate 校验正文长度、章节连续与 `state_changes`。`travel_arrival` 同时接受已抵达的
+  `cloud_boat_sessions` 行。
+- 灵田谷物链：`crop.cloud_rice` 改以 `item.grain.cloud_rice` ×1 作种（原为灵叶×2），
+  播种 1 份收 4 份稻谷 + 1 份灵叶。
+- 灵田多居所作物：作物定义收集全部 `residence_key` 前置，任一声明的居所即可播种；
+  `crop.spirit_leaf` 同时声明 `residence.courtyard` 与 `residence.herb_court`，灵圃小院第二垄可种灵叶，
+  未声明居所与城镇客房仍按原规则拒绝。
 - Arena weekly ladder: `竞技场赛季` / `领取竞技场赛季奖励` (aliases `竞技场周榜` / `领取周榜奖励`)
   rebuild each closed week's board from immutable `arena_matches` history, freeze the top ranks
   into `arena_season_settlements` on first claim, and pay once per player per week from that frozen
