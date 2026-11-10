@@ -893,6 +893,9 @@
       "local_reputation_key": "local.xuantian.new_town",
       "reputation_location_key": "xuantian.new_town",
       "key": "project.town_well",
+      "service_sources": [
+        {"service_key": "service.transport", "operation_names": ["livelihood.settle_route"], "contribution_points": 20}
+      ],
       "record_type": "public_project",
       "status": "active"
     },
@@ -913,6 +916,9 @@
       },
       "codex_entry_key": "codex.dao.service_public_works",
       "key": "project.market_road",
+      "service_sources": [
+        {"service_key": "service.transport", "operation_names": ["livelihood.settle_route"], "contribution_points": 20}
+      ],
       "record_type": "public_project",
       "status": "active"
     },
@@ -931,6 +937,9 @@
       },
       "codex_entry_key": "codex.dao.service_public_works",
       "key": "project.herb_garden",
+      "service_sources": [
+        {"service_key": "service.transport", "operation_names": ["livelihood.settle_route"], "contribution_points": 20}
+      ],
       "record_type": "public_project",
       "status": "active"
     },
