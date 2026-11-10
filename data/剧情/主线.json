@@ -3439,7 +3439,7 @@
         {"key": "reach_habitat", "type": "travel_arrival", "label": "结算行程抵达万兽山", "destination_key": "beast.ten_thousand_hills"}
       ],
       "actions": [
-        {"command": "前往", "argument": "万兽山", "description": "从三界贸易口循已开放的山路前往万兽山，并结算抵达。"}
+        {"command": "前往", "argument": "万兽山入口", "description": "从三界贸易口循已开放的山路前往万兽山入口，并结算抵达。"}
       ],
       "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.habitat.1"]},
       "next_stage_key": "domain_frontier.habitat.2",
