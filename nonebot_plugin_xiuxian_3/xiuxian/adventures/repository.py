@@ -74,6 +74,7 @@ from ..world.void_rules import (
 )
 from ..progression.repository import ProgressionRepositoryMixin
 from ..progression.endgame_repository import EndgameRepositoryMixin
+from ..progression.endgame_rules import tribulation_definition
 from ..world.repository import WorldRepositoryMixin
 from ..world.rules import destination_definition, meets_realm
 from ..exploration.models import ExplorationSettlementRecord, ExplorationStartRecord
@@ -122,6 +123,7 @@ from ..adventures.rules import (
 )
 from ..utils.equipment import create_equipment_instances, equipment_instance_template
 from ..specials.codex_projection import record_codex_discovery
+from ..specials.idle_rules import resolve_route
 from ..routine.models import (
     AchievementClaimRecord,
     AchievementView,
@@ -226,8 +228,10 @@ def _bounty_snapshot(raw_value: Any) -> dict[str, Any]:
         raise ValueError("bounty snapshot contains an invalid string field")
     if snapshot["target_kind"] not in {
         "inventory_gain",
+        "inventory_delivery",
         "production_completed",
         "exploration_battle_wins",
+        "tribulation_trial_wins",
         "dispatch_successes",
         "public_service_completions",
         "idle_claims",
@@ -253,8 +257,10 @@ def _bounty_snapshot(raw_value: Any) -> dict[str, Any]:
             raise ValueError(f"bounty snapshot {key} must be non-negative")
     if not isinstance(snapshot["consume_target"], bool):
         raise ValueError("bounty snapshot consume_target must be a boolean")
-    if snapshot["consume_target"] and snapshot["target_kind"] != "inventory_gain":
+    if snapshot["consume_target"] and snapshot["target_kind"] not in {"inventory_gain", "inventory_delivery"}:
         raise ValueError("bounty snapshot cannot consume a non-inventory target")
+    if snapshot["target_kind"] == "inventory_delivery" and not snapshot["consume_target"]:
+        raise ValueError("bounty delivery snapshot must consume its target")
     if snapshot["target_kind"] == "production_completed" and snapshot["target_key"] is not None:
         raise ValueError("production bounty snapshot cannot have a target key")
     keyless_kinds = {"production_completed", "public_service_completions"}
@@ -431,6 +437,7 @@ class AdventuresRepositoryMixin:
         now: datetime,
         business_date: str,
         refresh_seed: str,
+        daily_counts: dict[str, int],
     ) -> list[Any]:
         """Return today's stable batch: eligible open definitions in the
         player's seeded order, truncated to the batch size. Ineligible
@@ -443,6 +450,7 @@ class AdventuresRepositoryMixin:
             for definition in bounty_definitions(self.content)
             if definition.runtime_status == "open"
             and self._bounty_player_eligible(connection, row, definition, now)
+            and daily_counts.get(definition.key, 0) < definition.daily_limit
         ]
         return list(refresh_bounty_candidates(open_definitions, seed=refresh_seed))[:batch_size]
 
@@ -475,7 +483,7 @@ class AdventuresRepositoryMixin:
             # (appended if outside the batch), and claimed/expired ones stay
             # visible through it.
             batched_definitions = self._bounty_daily_batch(
-                connection, row, now, business_date, refresh_seed
+                connection, row, now, business_date, refresh_seed, daily_counts
             )
             batch_keys = {definition.key for definition in batched_definitions}
             accepted_key = accepted["bounty_key"] if accepted is not None else None
@@ -607,6 +615,36 @@ class AdventuresRepositoryMixin:
         path_key = row["path_key"] if isinstance(row, sqlite3.Row) else row.get("path_key")
         if definition.path_keys and path_key not in definition.path_keys:
             return False
+        if definition.target_kind == "inventory_delivery" and inventory_amount(
+            player_inventory(row), str(definition.target_key)
+        ) < definition.target_amount:
+            return False
+        if definition.target_kind == "tribulation_trial_wins":
+            event = tribulation_definition(self.content)
+            won_trials = {
+                str(trial["trial_key"])
+                for trial in connection.execute(
+                    """
+                    SELECT t.trial_key FROM tribulation_trial_sessions t
+                    LEFT JOIN battle_sessions b ON b.player_id = t.player_id
+                      AND b.start_operation_id = t.operation_id
+                      AND b.battle_type = 'pve.tribulation_trial'
+                    WHERE t.player_id = ? AND (t.status = 'succeeded' OR (
+                      b.status = 'settled' AND json_extract(b.result_json, '$.outcome') = 'won'
+                    ))
+                    """,
+                    (row["id"],),
+                ).fetchall()
+            }
+            remaining = [trial for trial in event.trials if trial.key not in won_trials]
+            if realm_key != event.required_realm_key or sum(
+                layer >= max(event.required_layer, trial.required_layer) for trial in remaining
+            ) < definition.target_amount:
+                return False
+        if definition.target_kind == "idle_claims" and self._idle_requirements_missing(
+            connection, row, resolve_route(definition.target_key, self.content), now
+        ):
+            return False
         if definition.required_intro_flag:
             intro_raw = row["intro_json"] if isinstance(row, sqlite3.Row) else row.get("intro_json", {})
             intro = SQLitePlayerRepository._json_object(intro_raw, {})
@@ -671,10 +709,10 @@ class AdventuresRepositoryMixin:
         snapshot: dict[str, Any],
     ) -> int:
         target_amount = int(snapshot["target_amount"])
-        if snapshot["target_kind"] == "inventory_gain":
+        if snapshot["target_kind"] in {"inventory_gain", "inventory_delivery"}:
             inventory = player_inventory(row)
             current = inventory_amount(inventory, str(snapshot["target_key"]))
-            baseline = int(snapshot["baseline_quantity"])
+            baseline = int(snapshot["baseline_quantity"]) if snapshot["target_kind"] == "inventory_gain" else 0
             return max(0, min(target_amount, current - baseline))
         if snapshot["target_kind"] == "production_completed":
             current = connection.execute(
@@ -692,6 +730,18 @@ class AdventuresRepositoryMixin:
                   AND battle_type = 'pve.exploration'
                   AND enemy_key = ?
                   AND status = 'settled'
+                  AND json_extract(result_json, '$.outcome') = 'won'
+                """,
+                (row["id"], snapshot["target_key"]),
+            ).fetchone()
+            baseline = int(snapshot["baseline_exploration_battle_wins"])
+            return max(0, min(target_amount, int(current["count"]) - baseline))
+        if snapshot["target_kind"] == "tribulation_trial_wins":
+            current = connection.execute(
+                """
+                SELECT COUNT(*) AS count FROM battle_sessions
+                WHERE player_id = ? AND battle_type = 'pve.tribulation_trial'
+                  AND enemy_key = ? AND status = 'settled'
                   AND json_extract(result_json, '$.outcome') = 'won'
                 """,
                 (row["id"], snapshot["target_key"]),
@@ -804,16 +854,15 @@ class AdventuresRepositoryMixin:
             candidate_weights: list[dict[str, Any]] = []
             refresh_seed = bounty_refresh_seed(int(row["id"]), business_date)
             if bounty_key is None:
-                batch = self._bounty_daily_batch(
-                    connection, row, now, business_date, refresh_seed
+                candidates = self._bounty_daily_batch(
+                    connection, row, now, business_date, refresh_seed, daily_counts
                 )
-                candidates = [
-                    definition
-                    for definition in batch
-                    if daily_counts.get(definition.key, 0) < definition.daily_limit
-                ]
                 if not candidates:
-                    if batch:
+                    if any(
+                        item.runtime_status == "open"
+                        and self._bounty_player_eligible(connection, row, item, now)
+                        for item in bounty_definitions(self.content)
+                    ):
                         raise BountyDailyLimitError("daily bounty limit reached")
                     raise BountyRequirementError("no eligible bounty candidates")
                 bounty_choice_seed = uuid4().hex
@@ -842,8 +891,11 @@ class AdventuresRepositoryMixin:
                 "SELECT COUNT(*) AS count FROM production_orders WHERE player_id = ? AND status = 'completed'",
                 (row["id"],),
             ).fetchone()
-            if definition.target_kind == "exploration_battle_wins":
-                battle_type = "pve.exploration"
+            if definition.target_kind in {"exploration_battle_wins", "tribulation_trial_wins"}:
+                battle_type = (
+                    "pve.exploration" if definition.target_kind == "exploration_battle_wins"
+                    else "pve.tribulation_trial"
+                )
                 battle_wins = connection.execute(
                     """
                     SELECT COUNT(*) AS count
@@ -971,7 +1023,7 @@ class AdventuresRepositoryMixin:
                 "bounty_key": definition.key,
                 "label": definition.label,
                 "status": "accepted",
-                "progress": 0,
+                "progress": definition.target_amount if definition.target_kind == "inventory_delivery" else 0,
                 "target": definition.target_amount,
                 "starts_at": starts_at,
                 "expires_at": expires_at,

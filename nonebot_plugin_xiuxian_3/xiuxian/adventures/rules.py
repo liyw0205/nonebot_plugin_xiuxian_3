@@ -5,19 +5,22 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Mapping
 
+from ..combat.tribulation_content import tribulation_trial
 from ..content import ContentBundle, ContentError, bundled_content
 from ..player.path_rules import subprofession_records
 from ..rewards.rules import local_reputation_maximum, reward_pool_outcomes
 from ..specials.dispatch_rules import resolve_dispatch
-from ..utils.randomness import deterministic_integer, deterministic_weighted_choice
+from ..utils.randomness import deterministic_weighted_choice
 
 
 _DEFAULT_CONTENT = bundled_content()
 _TARGET_KINDS = frozenset(
     {
         "inventory_gain",
+        "inventory_delivery",
         "production_completed",
         "exploration_battle_wins",
+        "tribulation_trial_wins",
         "dispatch_successes",
         "public_service_completions",
         "idle_claims",
@@ -128,20 +131,22 @@ def bounty_definitions(content: ContentBundle | None = None) -> tuple[BountyDefi
         else:
             if not isinstance(target_key, str) or not target_key:
                 raise ContentError(f"bounty {key} requires a target_key")
-            if target_kind == "inventory_gain":
+            if target_kind in {"inventory_gain", "inventory_delivery"}:
                 try:
                     bundle.require("item", target_key, include_locked=False)
                 except KeyError as exc:
                     raise ContentError(
                         f"bounty {key} references inactive item {target_key}"
                     ) from exc
-            elif target_kind == "exploration_battle_wins":
+            elif target_kind in {"exploration_battle_wins", "tribulation_trial_wins"}:
                 try:
                     bundle.require("enemy", target_key, include_locked=False)
                 except KeyError as exc:
                     raise ContentError(
                         f"bounty {key} references inactive enemy {target_key}"
                     ) from exc
+                if target_kind == "tribulation_trial_wins" and target_key != tribulation_trial(bundle)["enemy_key"]:
+                    raise ContentError(f"bounty {key} must reference the tribulation trial enemy")
             elif target_kind == "dispatch_successes":
                 try:
                     resolved_dispatch = resolve_dispatch(target_key, bundle)
@@ -167,8 +172,10 @@ def bounty_definitions(content: ContentBundle | None = None) -> tuple[BountyDefi
                     )
         if "consume_target" not in row or not isinstance(row["consume_target"], bool):
             raise ContentError(f"bounty {key} consume_target must be a boolean")
-        if row["consume_target"] and target_kind != "inventory_gain":
+        if row["consume_target"] and target_kind not in {"inventory_gain", "inventory_delivery"}:
             raise ContentError(f"bounty {key} can only consume an inventory target")
+        if target_kind == "inventory_delivery" and not row["consume_target"]:
+            raise ContentError(f"bounty {key} inventory_delivery must consume its target")
         status = row.get("status")
         if not isinstance(status, str) or status not in {"open", "locked"}:
             raise ContentError(f"bounty {key} status must be open or locked")
@@ -482,19 +489,17 @@ def refresh_bounty_candidates(
     *,
     seed: str,
 ) -> tuple[BountyDefinition, ...]:
-    """Return all eligible candidates in a stable, daily-randomized order."""
+    """Return a stable weighted order without replacement for one UTC day."""
 
     if not isinstance(seed, str) or not seed:
         raise ValueError("bounty refresh seed must be a non-empty string")
-    return tuple(
-        sorted(
-            candidates,
-            key=lambda definition: (
-                deterministic_integer(f"{seed}:{definition.key}", 2**63),
-                definition.key,
-            ),
-        )
-    )
+    remaining = sorted(candidates, key=lambda definition: definition.key)
+    ordered: list[BountyDefinition] = []
+    while remaining:
+        selected = choose_bounty(remaining, seed=f"{seed}:{len(ordered)}")
+        ordered.append(selected)
+        remaining.remove(selected)
+    return tuple(ordered)
 
 
 __all__ = [

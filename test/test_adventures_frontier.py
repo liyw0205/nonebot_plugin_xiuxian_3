@@ -60,10 +60,10 @@ def test_cloud_mine_bounty_qq_and_onebot_full_claim_flow() -> None:
         with TemporaryDirectory() as data_dir:
             runtime = create_runtime(data_dir=data_dir)
             cases = (
-                # L4 is a direct gate and does not require a permit.
+                # L4 can obtain cloud iron through the public idle route.
                 ("qq.official", "cloud-bounty-qq", "foundation", 4, {}),
-                # L1 is allowed through a persisted mining permit.
-                ("onebot.v11", "cloud-bounty-ob", "foundation", 1, {"item.permit.cloud_mine": 1}),
+                # A permit does not bypass the source's minimum realm layer.
+                ("onebot.v11", "cloud-bounty-ob", "foundation", 4, {"item.permit.cloud_mine": 1}),
             )
             for adapter, user, realm_key, realm_layer, starting_inventory in cases:
                 created = await runtime.adapters.dispatch(
@@ -88,9 +88,8 @@ def test_cloud_mine_bounty_qq_and_onebot_full_claim_flow() -> None:
                     _context(adapter, user, "board"),
                     "悬赏榜",
                 )
-                cloud_offer = next(item for item in board.data["offers"] if item["bounty_key"] == "bounty.cloud_mine")
-                assert cloud_offer["status"] == "available"
-                assert cloud_offer["target"] == 3
+                assert len(board.data["offers"]) == 3
+                assert all(item["status"] == "available" for item in board.data["offers"])
 
                 accepted = await runtime.adapters.dispatch(
                     adapter,
@@ -99,6 +98,12 @@ def test_cloud_mine_bounty_qq_and_onebot_full_claim_flow() -> None:
                 )
                 assert accepted.code == "BOUNTY_ACCEPTED"
                 assert accepted.data["bounty_key"] == "bounty.cloud_mine"
+                active_board = await runtime.adapters.dispatch(
+                    adapter, _context(adapter, user, "active-board"), "悬赏榜"
+                )
+                cloud_offer = next(item for item in active_board.data["offers"] if item["bounty_key"] == "bounty.cloud_mine")
+                assert cloud_offer["status"] == "accepted"
+                assert cloud_offer["target"] == 3
 
                 _inventory(runtime, adapter, user, **{"item.material.cloud_iron": 3})
                 claimed = await runtime.adapters.dispatch(
@@ -180,6 +185,11 @@ def test_cloud_mine_bounty_requires_access_and_expiry_does_not_reward() -> None:
                 user,
                 inventory_json=json.dumps({"item.permit.cloud_mine": 1}, sort_keys=True),
             )
+            permit_denied = await runtime.adapters.dispatch(
+                adapter, _context(adapter, user, "permit-denied"), "接取悬赏 云铁悬赏"
+            )
+            assert permit_denied.code == "BOUNTY_REQUIREMENT_MISSING"
+            _set_player(runtime, adapter, user, realm_layer=4)
             accepted = await runtime.adapters.dispatch(
                 adapter,
                 _context(adapter, user, "accept", operation_id="cloud-expiry-accept"),

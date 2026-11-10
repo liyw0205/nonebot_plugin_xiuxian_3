@@ -834,6 +834,11 @@ def test_custom_wayfaring_seed_is_preserved(host: Path) -> None:
 
 
 SEED_FIXTURES = Path(__file__).resolve().parent / "fixtures" / "official_seeds"
+BOUNTY_SOURCE_SEEDS = {
+    Path("任务/悬赏.json"): "bounties_pre_reachability.json",
+    Path("生产/配方.json"): "recipes_pre_reachability.json",
+    Path("生活/生活.json"): "livelihood_pre_reachability.json",
+}
 PLACE_CODEX_FILE = Path("图鉴/条目.json")
 DAILY_TASK_FILE = Path("任务/任务.json")
 PILL_FILE = Path("道具/丹药.json")
@@ -895,8 +900,45 @@ def _registered_old_blob(relative: Path, blob: bytes) -> bytes:
     return blob
 
 
-def _without_records(relative: Path, keys: frozenset[str]) -> bytes:
-    document = json.loads((ROOT / "data" / relative).read_text(encoding="utf-8"))
+def test_bounty_source_seeds_upgrade_together_with_backup_and_idempotency(host: Path) -> None:
+    old = {
+        relative: _registered_old_blob(relative, (SEED_FIXTURES / fixture).read_bytes())
+        for relative, fixture in BOUNTY_SOURCE_SEEDS.items()
+    }
+    for relative, blob in old.items():
+        (host / "data" / relative).write_bytes(blob)
+    result = deploy(host)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "matchers=1 handlers=1" in result.stdout
+    backups = list((host / ".xiuxian3/backups").glob("deploy-*"))
+    assert len(backups) == 1
+    for relative, blob in old.items():
+        assert (host / "data" / relative).read_bytes() == (ROOT / "data" / relative).read_bytes()
+        assert (backups[0] / "data" / relative).read_bytes() == blob
+    preserved(host)
+    repeated = deploy(host)
+    assert repeated.returncode == 0, repeated.stdout + repeated.stderr
+    assert "种子更新 0 个" in repeated.stdout
+    preserved(host)
+
+
+def test_unknown_bounty_source_seeds_are_preserved(host: Path) -> None:
+    custom = {
+        relative: (SEED_FIXTURES / fixture).read_bytes() + b"\n"
+        for relative, fixture in BOUNTY_SOURCE_SEEDS.items()
+    }
+    for relative, blob in custom.items():
+        (host / "data" / relative).write_bytes(blob)
+    result = deploy(host)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "种子更新 0 个" in result.stdout
+    for relative, blob in custom.items():
+        assert (host / "data" / relative).read_bytes() == blob
+    preserved(host)
+
+
+def _without_records(relative: Path, keys: frozenset[str], *, source: Path | None = None) -> bytes:
+    document = json.loads((source or ROOT / "data" / relative).read_text(encoding="utf-8"))
     document["records"] = [
         record for record in document["records"] if record["key"] not in keys
     ]
@@ -955,6 +997,7 @@ def old_official_recipes() -> bytes:
                 "recipe.array.war_front_ward",
             }
         ),
+        source=SEED_FIXTURES / "recipes_pre_reachability.json",
     )
 
 

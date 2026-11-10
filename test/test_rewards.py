@@ -480,6 +480,7 @@ def test_weighted_reward_pool_rejects_invalid_content(tmp_path: Path) -> None:
                 _reward_axis("item.herb.spirit_leaf", {1: 60, 2: 40}),
                 _reward_axis("item.mat.array_sand", {0: 60, 1: 40}),
                 _reward_axis("item.spirit_water", {1: 100}),
+                _reward_axis("item.food.coarse_spirit_rice", {1: 100}),
             ),
         ),
         (
@@ -525,6 +526,10 @@ def test_exploration_reward_pool_preserves_every_joint_probability(
     outcomes = reward_pool_outcomes(pool_key, bundle)
     total_weight = sum(weight for weight, _ in outcomes)
     expected = _joint_reward_probabilities(*axes)
+    if pool_key == "reward_pool.exploration.mist_grotto":
+        # The public legacy-clue source adds weight 9000 to the original 1,000,000.
+        expected = {key: probability * Fraction(1000, 1009) for key, probability in expected.items()}
+        expected[(("cultivation", 500), ("item.clue.mist_cave_route", 1))] = Fraction(9, 1009)
     actual: dict[tuple[tuple[str, int], ...], Fraction] = {}
     for weight, rewards in outcomes:
         assert all(quantity > 0 for quantity in rewards.values())
