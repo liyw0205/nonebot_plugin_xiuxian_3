@@ -25,6 +25,7 @@ from ..persistence.errors import (
     OperationConflictError,
     ProjectAlreadyCompleteError,
     ProjectContributionLimitError,
+    ProjectDailyLimitError,
     ProjectContributionRequirementError,
     ProjectContentClosedError,
     ProjectNotFoundError,
@@ -287,6 +288,24 @@ class ProjectRepositoryMixin:
         now: datetime,
         now_text: str,
     ) -> ProjectContributionRecord:
+        if source_operation_id == "最近运输":
+            route = connection.execute(
+                "SELECT r.settle_operation_id FROM livelihood_trade_routes r "
+                "WHERE r.player_id=? AND r.status='settled' "
+                "AND NOT EXISTS (SELECT 1 FROM livelihood_project_contributions c "
+                "WHERE c.player_id=r.player_id AND c.source_operation_id=r.settle_operation_id) "
+                "ORDER BY r.settled_at DESC, r.id DESC LIMIT 1",
+                (player["id"],),
+            ).fetchone()
+            if route is None:
+                used = connection.execute(
+                    "SELECT 1 FROM livelihood_trade_routes WHERE player_id=? AND status='settled' LIMIT 1",
+                    (player["id"],),
+                ).fetchone()
+                if used is not None:
+                    raise ProjectSourceAlreadyUsedError("all settled transport sources have already contributed")
+                raise ProjectContributionRequirementError("no settled transport source is available")
+            source_operation_id = str(route["settle_operation_id"])
         evidence = player_operation(connection, source_operation_id, player_id=int(player["id"]))
         if evidence is None:
             raise ProjectContributionRequirementError("service source is unavailable")
@@ -686,7 +705,7 @@ class ProjectRepositoryMixin:
             (project["project_id"], player["id"], day),
         ).fetchone()
         if int(row["points"] if row else 0) + int(requested_points) > 30:
-            raise ProjectContributionLimitError("本项目今日贡献已达上限")
+            raise ProjectDailyLimitError("本项目今日贡献已达上限")
 
     @staticmethod
     def _refresh_status(project: Any, connection: Any, now: datetime, now_text: str) -> None:

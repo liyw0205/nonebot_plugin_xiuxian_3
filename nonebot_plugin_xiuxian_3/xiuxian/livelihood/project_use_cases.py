@@ -12,6 +12,7 @@ from ..persistence.errors import (
     PlayerSuspendedError,
     ProjectAlreadyCompleteError,
     ProjectContributionLimitError,
+    ProjectDailyLimitError,
     ProjectContributionRequirementError,
     ProjectContentClosedError,
     ProjectNotFoundError,
@@ -109,6 +110,7 @@ class ProjectApplication:
                     "effect_ends_at": project.effect_ends_at,
                 }
             )
+        lines.append("> 接收运输劳作的项目可用 `贡献公共项目 项目名 运输` 贡献本人已完成的运输；每份劳作只记一次。")
         return CommandResult(True, "PROJECT_LIST", "\n".join(lines).rstrip(), context.request_id, data={"projects": data})
 
     async def contribute(self, context: CommandContext) -> CommandResult:
@@ -122,7 +124,10 @@ class ProjectApplication:
         if self._project_key(args[0]) is not None:
             project_key = self._project_key(args[0])
             if len(args) == 2:
-                amount_text = args[1]
+                if args[1] == "运输":
+                    source_operation_id = "最近运输"
+                else:
+                    amount_text = args[1]
             elif len(args) == 3:
                 if self._service_marker(args[1]):
                     source_operation_id = args[2]
@@ -159,10 +164,15 @@ class ProjectApplication:
             )
         except ProjectContentClosedError:
             return CommandResult(False, "LIVELIHOOD_CONTENT_CLOSED", "该公共项目暂未开放。", context.request_id, operation_id)
+        except ProjectDailyLimitError:
+            return CommandResult(False, "PROJECT_CONTRIBUTION_LIMIT", "本项目今日剩余贡献额度不足，请明日再来；本次没有扣除资源或使用运输劳作。", context.request_id, operation_id)
         except ProjectContributionLimitError:
             return CommandResult(False, "PROJECT_CONTRIBUTION_LIMIT", "单次公共项目贡献最多 30 点。", context.request_id, operation_id)
         except ProjectContributionRequirementError:
-            return CommandResult(False, "PROJECT_SOURCE_INVALID" if source_operation_id else "PROJECT_RESOURCE_INVALID", "这份结算凭证不符合当前公共项目要求。" if source_operation_id else "该资源不能用于当前公共项目。", context.request_id, operation_id)
+            message = "这份结算凭证不符合当前公共项目要求。" if source_operation_id else "该资源不能用于当前公共项目。"
+            if source_operation_id == "最近运输":
+                message = "没有符合项目要求的已完成运输。请先备货、开始运输并结算运输，再来贡献。"
+            return CommandResult(False, "PROJECT_SOURCE_INVALID" if source_operation_id else "PROJECT_RESOURCE_INVALID", message, context.request_id, operation_id)
         except ProjectSourceAlreadyUsedError:
             return CommandResult(False, "PROJECT_SOURCE_ALREADY_USED", "这份结算凭证已经贡献过公共项目。", context.request_id, operation_id)
         except ProjectAlreadyCompleteError:

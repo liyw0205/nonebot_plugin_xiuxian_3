@@ -1020,6 +1020,10 @@ class ProjectContributionLimitError(RuntimeError):
     """A single public-project contribution exceeds the point cap."""
 
 
+class ProjectDailyLimitError(ProjectContributionLimitError):
+    """The player's project contribution would exceed today's remaining quota."""
+
+
 class ProjectContributionRequirementError(RuntimeError):
     """The selected resource cannot contribute to this public project."""
 

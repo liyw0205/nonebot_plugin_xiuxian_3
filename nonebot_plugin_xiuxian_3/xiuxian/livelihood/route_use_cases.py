@@ -306,6 +306,7 @@ class RouteApplication:
                 f"- **地方名望**：+{record.local_reputation_delta}\n"
                 f"- **已交付货物**：{record.cargo_name} ×{record.cargo_quantity}"
                 + (f"\n- **灵骑**：{record.mount_name}获得运输经验 {record.mount_experience}。" if record.mount_name else "")
+                + "\n\n> 可查看 `公共项目`，用 `贡献公共项目 项目名 运输` 记下这份劳作；同一份运输只能贡献一次。"
             ),
             context.request_id,
             operation_id,

@@ -123,7 +123,6 @@ def old_official_mainline() -> bytes:
                 # Only story-tail stages legitimately omit the ahead reference.
                 tail = key in (
                     "chapter.8.stage.3",
-                    "domain_frontier.protect.6",
                     "void_archive.return.8",
                     "lane.builder.chapter.10",
                     "lane.witness.chapter.10",
@@ -834,6 +833,30 @@ def test_custom_wayfaring_seed_is_preserved(host: Path) -> None:
 
 
 SEED_FIXTURES = Path(__file__).resolve().parent / "fixtures" / "official_seeds"
+
+
+def test_pre_refuge_mainline_migrates_with_real_official_fixture(host: Path) -> None:
+    old = (SEED_FIXTURES / "mainline_pre_refuge.json").read_bytes()
+    manifest = json.loads((ROOT / "scripts/seed_migrations.json").read_text(encoding="utf-8"))
+    rule = manifest[MAINLINE.as_posix()]
+    assert hashlib.sha256(old).hexdigest() in rule["old_sha256"]
+    (host / "data" / MAINLINE).write_bytes(old)
+    migrated = deploy(host)
+    assert migrated.returncode == 0, migrated.stdout + migrated.stderr
+    assert (host / "data" / MAINLINE).read_bytes() == (ROOT / "data" / MAINLINE).read_bytes()
+    assert any(path.read_bytes() == old for path in host.glob(".xiuxian3/backups/deploy-*/data/剧情/主线.json"))
+    preserved(host)
+
+
+def test_custom_pre_refuge_mainline_is_preserved(host: Path) -> None:
+    custom = (SEED_FIXTURES / "mainline_pre_refuge.json").read_bytes() + b"\n"
+    (host / "data" / MAINLINE).write_bytes(custom)
+    result = deploy(host)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert (host / "data" / MAINLINE).read_bytes() == custom
+    preserved(host)
+
+
 BOUNTY_SOURCE_SEEDS = {
     Path("任务/悬赏.json"): "bounties_pre_reachability.json",
     Path("生产/配方.json"): "recipes_pre_reachability.json",

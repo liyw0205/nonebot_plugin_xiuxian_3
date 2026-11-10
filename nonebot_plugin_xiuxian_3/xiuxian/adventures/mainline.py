@@ -158,6 +158,9 @@ _VERTICAL_SLICE_STAGES = frozenset(
         "domain_frontier.protect.4",
         "domain_frontier.protect.5",
         "domain_frontier.protect.6",
+        "domain_frontier.refuge.1",
+        "domain_frontier.refuge.2",
+        "domain_frontier.refuge.3",
         "void_archive.recorder.1",
         "void_archive.recorder.2",
         "void_archive.recorder.3",
@@ -366,6 +369,36 @@ def _story_objectives(
             normalized = {
                 "key": str(objective_key), "type": kind, "label": label.strip(),
                 "commission_key": commission_key,
+            }
+        elif kind == "public_project_contribution":
+            if set(objective) != {"key", "type", "label", "project_key", "min_points"}:
+                raise ContentError(f"mainline {key} objective {objective_key} has an invalid project shape")
+            project_key = objective.get("project_key")
+            points = objective.get("min_points")
+            if not isinstance(project_key, str) or not project_key.strip():
+                raise ContentError(f"mainline {key} objective {objective_key} requires project_key")
+            if isinstance(points, bool) or not isinstance(points, int) or points <= 0:
+                raise ContentError(f"mainline {key} objective {objective_key} min_points must be positive")
+            if bundle is not None:
+                project = bundle.get("livelihood", project_key, include_locked=False)
+                if project is None or project.get("record_type") != "public_project":
+                    raise ContentError(f"mainline {key} objective {objective_key} references unknown project")
+            normalized = {
+                "key": str(objective_key), "type": kind, "label": label.strip(),
+                "project_key": project_key, "min_points": points,
+            }
+        elif kind == "idle_claim":
+            if set(objective) != {"key", "type", "label", "route_key"}:
+                raise ContentError(f"mainline {key} objective {objective_key} has an invalid idle shape")
+            route_key = objective.get("route_key")
+            if not isinstance(route_key, str) or not route_key.strip():
+                raise ContentError(f"mainline {key} objective {objective_key} requires route_key")
+            if bundle is not None:
+                route = bundle.get("livelihood", route_key, include_locked=False)
+                if route is None or route.get("record_type") != "idle_route":
+                    raise ContentError(f"mainline {key} objective {objective_key} references unknown idle route")
+            normalized = {
+                "key": str(objective_key), "type": kind, "label": label.strip(), "route_key": route_key,
             }
         else:
             raise ContentError(f"mainline {key} objective {objective_key} has unsupported type {kind}")
@@ -635,6 +668,9 @@ def _stage_key(
     candidate = str(value).strip()
     if candidate in aliases:
         return aliases[candidate]
+    named = [definition.key for definition in definitions if definition.label == candidate]
+    if len(named) == 1:
+        return named[0]
     if candidate.isdigit():
         return f"chapter.{int(chapter)}.stage.{int(candidate)}"
     if story_key and candidate.startswith(f"{story_key}:"):
