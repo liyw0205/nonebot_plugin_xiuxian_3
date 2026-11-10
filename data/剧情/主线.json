@@ -592,7 +592,8 @@
         {"key": "seal_domain_front", "type": "travel_arrival", "label": "结算行程回到领域前线", "destination_key": "xuantian.domain_front"}
       ],
       "actions": [
-        {"command": "前往", "argument": "领域前线", "description": "从界隙秘境经魔界战场与青石镇返回领域前线，逐段结算移动。"}
+        {"command": "前往", "argument": "领域前线", "description": "从界隙秘境经魔界战场与青石镇返回领域前线，逐段结算移动。"},
+        {"command": "开始领域前线主线", "argument": "归镇筹粮", "description": "领到避难所建设权限后，可先走建设后记；净渊与护祖原线仍可照常推进。"}
       ],
       "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.guard.6"]},
       "next_stage_key": "domain_frontier.purify.1",
@@ -945,6 +946,7 @@
         {"command": "前往", "argument": "三界贸易口", "description": "从妖界万兽山出发抵达三界贸易口，等待行程结束并结算移动。"}
       ],
       "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.protect.6"]},
+      "next_stage_key": "domain_frontier.refuge.1",
       "retry": {
         "on_incomplete": "keep_running",
         "cooldown_seconds": 0,
@@ -3344,6 +3346,86 @@
       "required_layer": 10,
       "first_clear_reward": {"spirit_stones": 150, "item.clue.beast_bloodline": 1, "service_reputation": 8},
       "repeat_reward": {"spirit_stones": 50}
+    },
+    {
+      "key": "domain_frontier.refuge.1",
+      "story_key": "story.mainline.domain_frontier",
+      "chapter": 4,
+      "stage": 1,
+      "name": "归镇筹粮",
+      "desc": "带着守界名册回镇，为避难所筹一份能送到前线的补给。",
+      "body": "封界之后，守望人将一页空白名册交给你：上面没有战功，只有尚未安顿的行旅。青石镇的粮商愿意代送补给，却要有人亲自回镇接洽。你收好建设凭信，从领域前线沿旧路回到青石镇；此行不要求宗门担保，守界所得的权限已经足够。先把这一程结算，再去近郊采止血草，便能为下一程短运备货。",
+      "objectives": [
+        {"key": "return_for_supplies", "type": "travel_arrival", "label": "开始本关后结算行程抵达青石镇", "destination_key": "xuantian.new_town"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "青石镇", "description": "从领域前线返镇后结算移动；若在别处，先按地图逐段返镇。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.refuge.1"]},
+      "next_stage_key": "domain_frontier.refuge.2",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "旧行程不计入本关；体力不足先恢复，再出发返镇并结算移动，关卡进度保留。"},
+      "status": "open",
+      "aliases": ["避难所后记一关"],
+      "required_realm": "soul_transformation",
+      "required_layer": 1,
+      "prerequisites": ["domain_frontier.guard.6"],
+      "reputation_key": "local.xuantian.domain_front",
+      "first_clear_reward": {"spirit_stones": 20},
+      "repeat_reward": {"spirit_stones": 4}
+    },
+    {
+      "key": "domain_frontier.refuge.2",
+      "story_key": "story.mainline.domain_frontier",
+      "chapter": 4,
+      "stage": 2,
+      "name": "共筑安所",
+      "desc": "将真正送达的物资记入避难所，而不是把备料当作已经建成。",
+      "body": "镇口的车辙还新，前线的名册却不能凭一车空话添人。去近郊采得止血草，回青石镇装上一份短途运输，抵达后结算，再把这份劳作贡献给领域避难所。守望人只认本关开始后新增的个人贡献，满十点便记下你的名字；一份成功运输可贡献二十点，也可以按项目需求交付亲手取得的木材、粗糙灵米或低阶疗伤丹。无需独自建完全部避难所。",
+      "objectives": [
+        {"key": "build_refuge", "type": "public_project_contribution", "label": "开始本关后向领域避难所累计贡献至少 10 点", "project_key": "project.domain_refuge", "min_points": 10}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "近郊", "description": "结算移动后开始探索近郊采集，再结算探索取得止血草；回青石镇备运。"},
+        {"command": "开始运输", "argument": "止血草 1", "description": "在青石镇装货，抵达后结算运输；使用成功结算的劳作贡献项目。"},
+        {"command": "贡献公共项目", "argument": "领域避难所 运输", "description": "贡献本人最近一份尚未使用的成功运输，得 20 点；也可查看公共项目后按需求交材料。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.refuge.2"]},
+      "next_stage_key": "domain_frontier.refuge.3",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "未满十点时进度保留，旧贡献与他人贡献不计；没有运输就先采集并完成短运。同项目每天最多贡献三十点，本周项目已满则等下个业务周再贡献。"},
+      "status": "open",
+      "aliases": ["避难所后记二关"],
+      "required_realm": "soul_transformation",
+      "required_layer": 1,
+      "prerequisites": ["domain_frontier.refuge.1"],
+      "reputation_key": "local.xuantian.domain_front",
+      "first_clear_reward": {"local_reputation": 2, "service_reputation": 1},
+      "repeat_reward": {"spirit_stones": 4}
+    },
+    {
+      "key": "domain_frontier.refuge.3",
+      "story_key": "story.mainline.domain_frontier",
+      "chapter": 4,
+      "stage": 3,
+      "name": "灯火长守",
+      "desc": "留下一个完整长夜，让建设名册上的名字成为行旅可依靠的灯火。",
+      "body": "避难所还在一砖一瓦地修，你已能接下一夜看守。守望人把门灯交来，说这一夜不求你再立战功，只求到时回来收下交班簿。安排避难所看守需要个人历史贡献至少十点，耗三点体力，离线十小时后才能完整领取；并不要求本周项目全部建成。只有本关开始后的新安排与完整交班才作数。灯火一夜未断，行旅才会把前线认作可停脚的地方。",
+      "objectives": [
+        {"key": "watch_refuge", "type": "idle_claim", "label": "开始本关后新安排并完整领取一次避难所看守", "route_key": "idle.domain_refuge_watch"}
+      ],
+      "actions": [
+        {"command": "挂机预览", "argument": "避难所看守", "description": "确认个人贡献、体力与当天次数；其他长行动结束后再安排。"},
+        {"command": "开始挂机", "argument": "避难所看守", "description": "本关开始后安排，十小时后领取挂机；最迟在开始后 34 小时内完整领取。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.refuge.3"]},
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "提前领取不扣奖励；旧安排、撤回和逾时保底不完成本关。逾时先领取保底，再等次日重新安排并完整交班；关卡保留，已完成的建设不需重做。"},
+      "status": "open",
+      "aliases": ["避难所后记终关"],
+      "required_realm": "soul_transformation",
+      "required_layer": 1,
+      "prerequisites": ["domain_frontier.refuge.2"],
+      "reputation_key": "local.xuantian.domain_front",
+      "first_clear_reward": {"spirit_stones": 40, "local_reputation": 3, "service_reputation": 1},
+      "repeat_reward": {"spirit_stones": 4}
     }
   ]
 }
