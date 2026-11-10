@@ -1,0 +1,3349 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "mainline",
+  "records": [
+    {
+      "key": "chapter.1.stage.1",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 1,
+      "stage": 1,
+      "name": "初入玄天",
+      "desc": "完成寻仙问道，踏入玄天近郊。",
+      "body": "寻仙问道之后，青石镇外的山风第一次有了灵气的回响。镇口老修士把一枚旧木牌交到你手中：牌面没有门派印记，只刻着玄天二字。近郊不远，却是凡俗与修行真正相接的地方。沿石阶走出镇门，看看这片天地是否也在等你的回答。",
+      "objectives": [
+        {"key": "arrive_outskirts", "type": "travel_arrival", "label": "抵达玄天近郊", "destination_key": "xuantian.outskirts"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "近郊", "description": "启程后等待行程结束，再结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.1.stage.1"]},
+      "next_stage_key": "chapter.1.stage.2",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "关卡会保留进行中，不扣奖励也不增加尝试次数；完成目标后可立即重领。"
+      },
+      "status": "open",
+      "aliases": ["初入玄天"],
+      "reputation_key": "local.xuantian.new_town",
+      "prerequisites": ["player.start_seeking"],
+      "first_clear_reward": {
+        "access.xuantian.outskirts": 1,
+        "codex.place.outskirts": 1,
+        "local_reputation": 3
+      },
+      "repeat_reward": {"spirit_stones": 5}
+    },
+    {
+      "key": "chapter.1.stage.2",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 1,
+      "stage": 2,
+      "name": "灵泉取叶",
+      "desc": "沿近郊线索前往灵泉谷，取得第一片灵叶。",
+      "body": "近郊石壁上留着一道新鲜的水痕，沿它向山谷深入，便听见灵泉在雾气后缓缓涌动。旧木牌在泉边微微发热，像是在提醒你：灵气并非只供吐纳，也藏在一草一木的生长里。完成止血草引路后，去谷中采下一片灵叶，把这次发现带回自己的修行。",
+      "objectives": [
+        {
+          "key": "gather_spirit_leaf",
+          "type": "exploration_reward",
+          "label": "在灵泉采集结算中取得灵叶",
+          "mode_key": "explore.spring_gather",
+          "location_key": "xuantian.spirit_field",
+          "item_key": "item.herb.spirit_leaf",
+          "quantity": 1
+        }
+      ],
+      "actions": [
+        {"command": "前往", "argument": "灵泉谷", "description": "完成止血草引路并达到感气二层后启程。"},
+        {"command": "开始探索", "argument": "灵泉采集", "description": "行程结束后结算采集收获。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.1.stage.2"]},
+      "next_stage_key": "chapter.1.stage.3",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "关卡会保留进行中，不扣奖励也不增加尝试次数；完成目标后可立即重领。"
+      },
+      "status": "open",
+      "aliases": ["灵泉取叶"],
+      "prerequisites": ["chapter.1.stage.1", "guide.gather_blood_grass"],
+      "required_realm": "qi_sensing",
+      "required_layer": 2,
+      "first_clear_reward": {
+        "access.xuantian.spirit_field": 1,
+        "item.herb.spirit_leaf": 2
+      },
+      "repeat_reward": {"item.herb.spirit_leaf": 1}
+    },
+    {
+      "key": "chapter.1.stage.3",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 1,
+      "stage": 3,
+      "name": "雾中守门",
+      "desc": "在雾隐入口完成守门试炼，取得秘境线索。",
+      "body": "灵泉谷的水声在身后渐远，雾气却沿着山脊压了下来。洞天守门人没有拦你，只把一盏将熄的引路灯放在石阶中央：灯火若被雾灵吹灭，便说明你的脚步还不足以守住这道门。你必须在雾隐洞天一层走完一次公开探索，迎住守卫或雾灵的试探，并从自动战斗的结果里证明自己没有把危险留给后来者。战胜后，守门人会把秘境线索刻进你的行囊；若战败，灯火仍在原处，等你恢复后再次试门。",
+      "objectives": [
+        {
+          "key": "mist_gate_battle",
+          "type": "exploration_battle_victory",
+          "label": "在雾隐洞天探索中赢得一场自动遭遇战",
+          "mode_key": "explore.mist_grotto",
+          "location_key": "cave.mist_grotto"
+        }
+      ],
+      "actions": [
+        {"command": "前往", "argument": "雾隐洞天一层", "description": "达到气府境四层并持有雾隐洞天一层凭证后启程。"},
+        {"command": "开始探索", "argument": "雾隐洞天探索", "description": "完成自动遭遇战并结算探索，战胜守卫或雾灵才算守门成功。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.1.stage.3"]},
+      "next_stage_key": "chapter.2.stage.1",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "探索战败或尚未结算时关卡保持进行中，不扣主线奖励；恢复后可再次探索，只有胜利遭遇才推进。"
+      },
+      "status": "open",
+      "aliases": ["雾中守门"],
+      "prerequisites": ["chapter.1.stage.2"],
+      "required_realm": "qi_sensing",
+      "required_layer": 3,
+      "first_clear_reward": {
+        "access.instance.secret_realm": 1,
+        "title_key": "title.mist_watcher"
+      },
+      "repeat_reward": {"codex.observation": 1}
+    },
+    {
+      "key": "chapter.2.stage.1",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 2,
+      "stage": 1,
+      "name": "城镇委托",
+      "desc": "完成一项常驻经营委托，开启玄天商路。",
+      "body": "雾隐线索带你回到青石镇，药铺掌柜正守着一批迟迟未到的止血草。镇里的商路不靠一句承诺运转：先把委托接进自己的委托簿，再从公开采集或已有库存备齐三株止血草，最后在订单仍有效时交付。掌柜会把这次交货记入镇务账册，商路因此向你开放；材料不足或订单过期不会吞掉物品，补齐后仍可接当天的其他委托重试。",
+      "objectives": [
+        {
+          "key": "town_herb_supply",
+          "type": "commission_delivery",
+          "label": "在主线开始后交付止血草供应委托",
+          "commission_key": "town_commission.herb_supply"
+        }
+      ],
+      "actions": [
+        {"command": "查看委托", "argument": "城镇委托", "description": "先查看当日公开订单，再接取止血草供应。"},
+        {"command": "交付委托", "argument": "止血草供应", "description": "接取订单后交付三株止血草，结算事务会同时写入名望与信誉。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.2.stage.1"]},
+      "next_stage_key": "chapter.2.stage.2",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "委托材料不足或订单过期时保留主线进行中，不发放商路奖励；接取并交付新的公开订单后可再次结算。"
+      },
+      "status": "open",
+      "aliases": ["城镇委托"],
+      "reputation_key": "local.xuantian.new_town",
+      "prerequisites": ["chapter.1.stage.3", "livelihood.town_commission.delivered"],
+      "first_clear_reward": {
+        "access.xuantian.trade_route": 1,
+        "service_reputation": 5
+      },
+      "repeat_reward": {"spirit_stones": 10}
+    },
+    {
+      "key": "chapter.2.stage.2",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 2,
+      "stage": 2,
+      "name": "云城初见",
+      "desc": "循着商路抵达云城，辨认玄天中层的灵脉与市集。",
+      "body": "商路自青石镇一路抬升，云雾在脚下汇成一片白色的海。云城的守门修士不验名帖，只看你是否亲自走过这段路：结丹之前的脚步还追不上城口的云风，寻常行囊也压不住三千里灵脉的潮汐。从青石镇、近郊或宗门山门启程，等行程真正结算、双脚踏上云城门阶，再把城中的灵脉与市集看在眼里。城籍只认抵达的记录——行程尚未结算时不会提前记下你的名字，补齐结算后即可领取这份初见之礼。",
+      "objectives": [
+        {"key": "arrive_cloud_city", "type": "travel_arrival", "label": "在主线开始后抵达玄天界·云城", "destination_key": "xuantian.cloud_city"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "云城", "description": "达到结丹一层后从青石镇、近郊或宗门山门启程，等待行程结束并结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.2.stage.2"]},
+      "next_stage_key": "chapter.2.stage.3",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "行程尚未抵达结算时关卡保持进行中，不扣主线奖励；恢复体力后重新启程并结算移动，即可再次领取。"
+      },
+      "status": "open",
+      "aliases": ["云城初见"],
+      "reputation_key": "local.xuantian.cloud_city",
+      "prerequisites": ["chapter.2.stage.1"],
+      "required_realm": "golden_core",
+      "required_layer": 1,
+      "first_clear_reward": {
+        "access.xuantian.cloud_city": 1,
+        "codex.place.cloud_city": 1,
+        "local_reputation": 5
+      },
+      "repeat_reward": {"spirit_stones": 15}
+    },
+    {
+      "key": "chapter.2.stage.3",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 2,
+      "stage": 3,
+      "name": "商会听潮",
+      "desc": "在云城商会核对货单，听见云舟将启的消息。",
+      "body": "云城商会的掌柜翻着新开的商路账册，在末页压了一张航讯：云舟渡口重启，循潮水航路可往洞天深处。听潮不是听一句传闻——商会只把航讯交给亲到过渡口的人。备好五百灵石与脚力，从云城动身，等行程结算、站在渡口的石阶上听见云舟解缆的潮声，商路才算真正把你记进常客名册。灵石不足或行程未结算时航讯不销，凑齐后再走一趟即可。",
+      "objectives": [
+        {"key": "arrive_floating_boat", "type": "travel_arrival", "label": "在主线开始后抵达云舟渡口", "destination_key": "xuantian.floating_boat"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "云舟渡口", "description": "从云城启程，行程需五百灵石渡资，等待结束后结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.2.stage.3"]},
+      "next_stage_key": "chapter.3.stage.1",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "渡资不足或行程尚未结算时关卡保持进行中，不扣主线奖励；备齐灵石重新启程并结算移动后可再次领取。"
+      },
+      "status": "open",
+      "aliases": ["商会听潮"],
+      "prerequisites": ["chapter.2.stage.2"],
+      "required_realm": "foundation",
+      "required_layer": 3,
+      "first_clear_reward": {
+        "access.xuantian.floating_boat": 1,
+        "service_reputation": 8
+      },
+      "repeat_reward": {"spirit_stones": 18}
+    },
+    {
+      "key": "chapter.3.stage.1",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 3,
+      "stage": 1,
+      "name": "云铁入山",
+      "desc": "沿云城北侧山道进入矿区，寻得云铁灵脉的入口。",
+      "body": "商会掌柜指给你的是云城北侧那条山道：越往上走，风里的铁腥味越重，碎石缝间偶尔闪过一线银蓝——那就是云铁灵脉露出的须角。矿区不拦客，只认筑基四层以上、亲自查验过矿道地形的行修。可以从云城直接上山，也可以先乘云舟返回云城再走北道；行程结算、站在矿口的碎石滩上，矿区才把你记进在册行修。行程没有结算就不算入山，山道一直在，随时可以再走。",
+      "objectives": [
+        {"key": "arrive_cloud_mine", "type": "travel_arrival", "label": "在主线开始后抵达云铁矿区", "destination_key": "xuantian.cloud_mine"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "云铁矿区", "description": "达到筑基四层后从云城或青石镇启程，等待行程结束并结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.3.stage.1"]},
+      "next_stage_key": "chapter.3.stage.2",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "行程尚未抵达结算时关卡保持进行中，不扣主线奖励；恢复体力后重新启程并结算移动，即可再次领取。"
+      },
+      "status": "open",
+      "aliases": ["云铁入山"],
+      "reputation_key": "local.xuantian.cloud_city",
+      "prerequisites": ["chapter.2.stage.3"],
+      "required_realm": "foundation",
+      "required_layer": 4,
+      "first_clear_reward": {
+        "access.xuantian.cloud_mine": 1,
+        "local_reputation": 5
+      },
+      "repeat_reward": {"item.material.cloud_iron": 1}
+    },
+    {
+      "key": "chapter.3.stage.2",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 3,
+      "stage": 2,
+      "name": "矿兽试锋",
+      "desc": "守住云铁矿脉，取得一块完整云铁作为凭证。",
+      "body": "矿口监工不要豪言，只要凭证：在册行修得亲自在矿道里走完一轮采掘，把云铁灵脉的脾气摸清楚。许可、矿镐或采矿辅修任备其一，就能开工；矿脉深处偶有矿兽出没，服务端按开始快照自动应对，你只需等这轮探索结算。结算袋里取出一块完整云铁，监工便在名册上记下你的名号——采掘未满、灵石体力不足或当日次数用尽都不记名，明日再上山即可。",
+      "objectives": [
+        {
+          "key": "mine_cloud_iron_proof",
+          "type": "exploration_reward",
+          "label": "在主线开始后的云铁矿区采掘结算中取得云铁",
+          "mode_key": "explore.cloud_mine",
+          "location_key": "xuantian.cloud_mine",
+          "item_key": "item.material.cloud_iron",
+          "quantity": 1
+        }
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "云铁矿区采集", "description": "备好许可、矿镐或采矿辅修后开工，行程结束结算采掘，取得至少一块云铁。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.3.stage.2"]},
+      "next_stage_key": "chapter.3.stage.3",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "本轮采掘尚未结算或尚无云铁时关卡保持进行中，不扣主线奖励；补齐准入后再次采掘并结算，即可领取。"
+      },
+      "status": "open",
+      "aliases": ["矿兽试锋"],
+      "prerequisites": ["chapter.3.stage.1"],
+      "required_realm": "foundation",
+      "required_layer": 6,
+      "first_clear_reward": {
+        "item.material.cloud_iron": 3,
+        "codex.material.cloud_iron": 1
+      },
+      "repeat_reward": {"item.material.cloud_iron": 1}
+    },
+    {
+      "key": "chapter.3.stage.3",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 3,
+      "stage": 3,
+      "name": "云舟试航",
+      "desc": "以云铁为引登上云舟，确认通往洞天深处的航路。",
+      "body": "渡口管事捏着你名册上的云铁记号，把一张试航签推过案面：云舟不渡没有走过航线的人。从矿区下山，经青石镇、云城一路回到渡口，备好渡资登上首班云舟，沿浮舟航线完整走完一轮试炼并在结算时留下试航签——这一段航路才算被你亲自确认过。试炼没有结算就不签发，灵石不足或当日次数用尽都不扣名册，明日首班舟前再来即可。",
+      "objectives": [
+        {
+          "key": "cloud_boat_trial_proof",
+          "type": "exploration_reward",
+          "label": "在主线开始后的云舟试炼结算中取得试航签",
+          "mode_key": "explore.cloud_boat_trial",
+          "location_key": "xuantian.floating_boat",
+          "item_key": "item.ticket.cloud_boat_fragment",
+          "quantity": 1
+        }
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "云舟试炼", "description": "结丹一层后在云舟渡口登舟，走完一轮航线并结算探索，取得至少一枚试航签。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.3.stage.3"]},
+      "next_stage_key": "chapter.4.stage.1",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "本轮试炼尚未结算或尚无试航签时关卡保持进行中，不扣主线奖励；补齐渡资与体力后再次登舟结算，即可领取。"
+      },
+      "status": "open",
+      "aliases": ["云舟试航"],
+      "prerequisites": ["chapter.3.stage.2"],
+      "required_realm": "golden_core",
+      "required_layer": 1,
+      "first_clear_reward": {
+        "access.xuantian.floating_boat": 1,
+        "service_reputation": 8
+      },
+      "repeat_reward": {"spirit_stones": 25}
+    },
+    {
+      "key": "chapter.4.stage.1",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 4,
+      "stage": 1,
+      "name": "阵堂初会",
+      "desc": "在阵堂前递上云铁凭证，获准旁观护城阵纹。",
+      "body": "阵堂执事验过你名册上的云铁与试航记号，只给一句指引：护城阵纹在殿前石台上流转，看得懂多少全凭自己。阵堂不考境界高低，只认亲至——航路不直渡，先从渡口乘云舟绕行深渊门，再转回程航线回到云城，或取道宗门山门，最后从云城沿阶上到阵堂；行程结算、站在石台前看过一轮阵纹起落，初会才算成礼。堂中阵法研习另有宗门或讲学之请的门禁，今日只算旁观；行程没有结算就不记名，随时可再来。",
+      "objectives": [
+        {"key": "arrive_array_hall", "type": "travel_arrival", "label": "在主线开始后抵达玄天阵堂", "destination_key": "xuantian.array_hall"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "玄天阵堂", "description": "沿公开航路回到云城（渡口可乘云舟绕行深渊门转回），从云城或宗门山门启程，等待行程结束并结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.4.stage.1"]},
+      "next_stage_key": "chapter.4.stage.2",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "行程尚未抵达结算时关卡保持进行中，不扣主线奖励；恢复体力后重新启程并结算移动，即可再次领取。"
+      },
+      "status": "open",
+      "aliases": ["阵堂初会"],
+      "prerequisites": ["chapter.3.stage.3"],
+      "required_realm": "golden_core",
+      "required_layer": 1,
+      "first_clear_reward": {
+        "access.xuantian.array_hall": 1,
+        "service_reputation": 5
+      },
+      "repeat_reward": {"spirit_stones": 25}
+    },
+    {
+      "key": "chapter.4.stage.2",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 4,
+      "stage": 2,
+      "name": "阵纹试炼",
+      "desc": "补全一段护城阵纹，留下属于自己的阵砂印记。",
+      "body": "阵堂执事把一段残破的护城阵纹拓片推到你面前：补纹不用灵石，用的是阵砂——玄武岩径裸露山层里挖出来的细砂。堂里没有存砂，也不会替你垫一份：从阵堂下阶到宗门山门，经青石镇出外，过玄天近郊上玄武岩径，在裸露山层采掘到带着灵纹碎屑的阵砂，带回堂前把那段阵纹描完，试炼才算留名。一趟采不尽就再采一趟，当日次数用尽明日再来；残纹不扣人，堂前的石阶永远留着你的位置。",
+      "objectives": [
+        {
+          "key": "basalt_array_sand_proof",
+          "type": "exploration_reward",
+          "label": "在主线开始后的玄武岩径采掘结算中取得阵砂",
+          "mode_key": "explore.gather_basalt_pass",
+          "location_key": "xuantian.basalt_pass",
+          "item_key": "item.mat.array_sand",
+          "quantity": 1
+        }
+      ],
+      "actions": [
+        {"command": "前往", "argument": "玄武岩径", "description": "从阵堂经宗门山门、青石镇、玄天近郊一路进山（均为公开通路），行程结束后结算移动。"},
+        {"command": "开始探索", "argument": "玄武岩径采集", "description": "在山层采掘铁石与阵砂，结算时取得至少一份阵砂。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.4.stage.2"]},
+      "next_stage_key": "chapter.4.stage.3",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "本轮采掘尚未结算或尚无阵砂时关卡保持进行中，不扣主线奖励；再采一轮并结算后即可领取。"
+      },
+      "status": "open",
+      "aliases": ["阵纹试炼"],
+      "prerequisites": ["chapter.4.stage.1"],
+      "required_realm": "golden_core",
+      "required_layer": 3,
+      "first_clear_reward": {
+        "item.mat.array_sand": 2,
+        "service_reputation": 5
+      },
+      "repeat_reward": {"item.mat.array_sand": 1}
+    },
+    {
+      "key": "chapter.4.stage.3",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 4,
+      "stage": 3,
+      "name": "玄天新章",
+      "desc": "把云城、矿区与阵堂的线索合入商路，开启玄天中层的新篇。",
+      "body": "镇口老修士把这条线的每一站都替你数过：近郊的木牌、灵泉的叶、雾里的灯、药铺的账、云城的门、矿口的砂、阵堂的纹——商路要翻开新的一页，得由走完这条路的人亲自把线索交回起点。从玄武岩径下山，经玄天近郊回到青石镇，行程结算后把这些年在玄天中层走过的路讲给镇务账册听。玄天的中层对你彻底敞开，而更远的航路、界壁与洞天仍在雾后等你——本卷至此合上，新章各路由镇外的关口自行开验。",
+      "objectives": [
+        {"key": "return_new_town", "type": "travel_arrival", "label": "在主线开始后回到青石镇合上商路线索", "destination_key": "xuantian.new_town"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "青石镇", "description": "从玄武岩径经玄天近郊下山回镇（均为公开通路），等待行程结束并结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.4.stage.3"]},
+      "next_stage_key": "chapter.5.stage.1",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "行程尚未回到青石镇结算时关卡保持进行中，不扣主线奖励；重新启程并结算移动，即可领取合卷之礼。"
+      },
+      "status": "open",
+      "aliases": ["玄天新章"],
+      "prerequisites": ["chapter.4.stage.2"],
+      "required_realm": "golden_core",
+      "required_layer": 6,
+      "first_clear_reward": {
+        "access.xuantian.trade_route": 1,
+        "service_reputation": 10
+      },
+      "repeat_reward": {"spirit_stones": 30}
+    },
+    {
+      "key": "domain_frontier.guard.1",
+      "story_key": "story.mainline.domain_frontier",
+      "chapter": 1,
+      "stage": 1,
+      "name": "烽火初燃",
+      "desc": "响应领域前线召令，在边界烽火中立下守望之誓。",
+      "body": "召令送达青石镇那晚，界隙方向的天光整夜没有暗下去。守望之誓不在纸上——烽火台的规矩只有一条：誓要在界前立。备好体力，带上已选的领域，从青石镇沿军道直奔领域前线；行程结算、站到烽火之下，值夜的哨人才会把你的名字报进守望名册，界前巡防与后方补给线此后都算认了你这条路。誓不由代立，也没人替你赶路：行程没有结算，名册上就永远只留着一行空白。",
+      "objectives": [
+        {"key": "arrive_domain_front", "type": "travel_arrival", "label": "在主线开始后抵达领域前线", "destination_key": "xuantian.domain_front"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "领域前线", "description": "达到化神一层并已选择领域后从青石镇等来源地点启程，等待行程结束并结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.guard.1"]},
+      "next_stage_key": "domain_frontier.guard.2",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "行程尚未抵达前线结算时关卡保持进行中，不扣主线奖励；恢复体力后重新启程并结算移动，即可立誓领取。"
+      },
+      "status": "open",
+      "aliases": ["守界一关"],
+      "required_realm": "soul_transformation",
+      "required_layer": 1,
+      "prerequisites": ["event.domain_front.joined"],
+      "first_clear_reward": {"codex.domain.frontline": 1},
+      "repeat_reward": {"spirit_stones": 8}
+    },
+    {
+      "key": "domain_frontier.guard.2",
+      "story_key": "story.mainline.domain_frontier",
+      "chapter": 1,
+      "stage": 2,
+      "name": "巡守裂隙",
+      "desc": "沿着破碎的界纹巡行，寻回失散的守界灵印。",
+      "body": "界战一起，界隙那边的裂口就顺着界纹往这边蔓延。守界的规矩是趁烽火未熄走一遍界纹：从领域前线随军道出关，踏过魔界战线，进界隙秘境，沿裂隙边缘把每一道碎纹都巡到。灵印是哨位留下的记号，巡到哪一段，哪一段的守军就知道这条线还有人认；巡不到的地方界纹会自己长回去，名册上那一节也就空着。界隙只认界战窗口，窗口不开，军道不放行，这段巡守便只能等下一次烽火。",
+      "objectives": [
+        {"key": "patrol_boundary_rift", "type": "travel_arrival", "label": "在界战窗口内抵达界隙秘境", "destination_key": "cave.boundary_realm"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "界隙秘境", "description": "界战窗口开启后，从领域前线经青石镇与魔界战线出关，等待行程结束并结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.guard.2"]},
+      "next_stage_key": "domain_frontier.guard.3",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "界纹尚未巡到尽头时关卡保持进行中，不扣主线奖励；等界战窗口再启程并结算移动，即可继续巡守。"
+      },
+      "status": "open",
+      "aliases": ["守界二关"],
+      "required_realm": "soul_transformation",
+      "required_layer": 1,
+      "prerequisites": ["domain_frontier.guard.1"],
+      "first_clear_reward": {"codex.domain.frontline": 1},
+      "repeat_reward": {"spirit_stones": 8}
+    },
+    {
+      "key": "domain_frontier.guard.3",
+      "story_key": "story.mainline.domain_frontier",
+      "chapter": 1,
+      "stage": 3,
+      "name": "鏖战边关",
+      "desc": "与领域守军并肩迎敌，守住一线将倾的天门。",
+      "body": "界隙的守望者不认名册，只认站在裂口前的人。守界三关要在界隙巡查里正面接战：从秘境边缘起巡查，等界隙守望者现身，把它压回裂口另一侧，战线才算守住。战斗结算写进战线记录，守军按这一笔认你的战功；退让一次，缺口就得由别人补上。巡查有次数，战线不等人，接不住这一战，名册上仍只留一行空白。",
+      "objectives": [
+        {"key": "repel_rift_watcher", "type": "exploration_battle_victory", "label": "在界隙巡查中击退界隙守望者", "mode_key": "explore.boundary_rift", "location_key": "cave.boundary_realm"}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "界隙巡查", "description": "在界隙秘境开始界隙巡查，等待结算并在遭遇中取胜。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.guard.3"]},
+      "next_stage_key": "domain_frontier.guard.4",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "界隙守望者尚未被击退时关卡保持进行中，不扣主线奖励；恢复体力后重新巡查并在遭遇中取胜，即可领取。"
+      },
+      "status": "open",
+      "aliases": ["守界三关"],
+      "required_realm": "soul_transformation",
+      "required_layer": 1,
+      "prerequisites": ["domain_frontier.guard.2", "event.domain_front.battle"],
+      "first_clear_reward": {"codex.domain.frontline": 1},
+      "repeat_reward": {"spirit_stones": 8}
+    },
+    {
+      "key": "domain_frontier.guard.4",
+      "story_key": "story.mainline.domain_frontier",
+      "chapter": 1,
+      "stage": 4,
+      "name": "镇纹回响",
+      "desc": "将战场所得化作镇纹，令动荡的领域重新回应众生。",
+      "body": "巡守所得要镇回纹上，否则界纹只是被走过一遍。守界四关要在界隙巡查里拾回领域核心碎片：碎片是界纹断裂时崩落的核屑，只有它能在前线把裂口重新钉住。拾到碎片、带回前线镇纹，动荡的领域才会重新回应众生；空手而归，这一节界纹仍算未镇，名册上的战功也立不住。",
+      "objectives": [
+        {"key": "recover_domain_core", "type": "exploration_reward", "label": "在界隙巡查中拾回领域核心碎片", "mode_key": "explore.boundary_rift", "location_key": "cave.boundary_realm", "item_key": "item.domain_core_fragment", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "界隙巡查", "description": "在界隙秘境开始界隙巡查，等待结算并在所得中取得领域核心碎片。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.guard.4"]},
+      "next_stage_key": "domain_frontier.guard.5",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未拾回领域核心碎片时关卡保持进行中，不扣主线奖励；恢复体力后重新巡查并取回碎片，即可镇纹领取。"
+      },
+      "status": "open",
+      "aliases": ["守界四关"],
+      "required_realm": "soul_transformation",
+      "required_layer": 1,
+      "prerequisites": ["domain_frontier.guard.3"],
+      "first_clear_reward": {"codex.domain.frontline": 1},
+      "repeat_reward": {"spirit_stones": 8}
+    },
+    {
+      "key": "domain_frontier.guard.5",
+      "story_key": "story.mainline.domain_frontier",
+      "chapter": 1,
+      "stage": 5,
+      "name": "共铸守门",
+      "desc": "汇聚诸宗之力修补守门阵基，为最后的封界作准备。",
+      "body": "守门阵基不是一块石头，是百宗各自认下的那一角。守界五关要在界隙巡查里把阵材凑齐：雾隐核心是界纹的骨料，巡一趟界隙，把能带回来的都带回前线，阵基才立得住。诸宗看的是名册上的实绩，不是口头上的同盟；阵材没到位，封界就只能再等一轮烽火。",
+      "objectives": [
+        {"key": "gather_gate_core", "type": "exploration_reward", "label": "在界隙巡查中带回雾隐核心", "mode_key": "explore.boundary_rift", "location_key": "cave.boundary_realm", "item_key": "item.material.mist_core", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "界隙巡查", "description": "在界隙秘境开始界隙巡查，等待结算并在所得中取得雾隐核心。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.guard.5"]},
+      "next_stage_key": "domain_frontier.guard.6",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "阵材尚未凑齐时关卡保持进行中，不扣主线奖励；恢复体力后重新巡查并带回雾隐核心，即可共铸守门。"
+      },
+      "status": "open",
+      "aliases": ["守界五关"],
+      "required_realm": "soul_transformation",
+      "required_layer": 1,
+      "prerequisites": ["domain_frontier.guard.4", "event.domain_front.contribution"],
+      "first_clear_reward": {"codex.domain.frontline": 1},
+      "repeat_reward": {"spirit_stones": 8}
+    },
+    {
+      "key": "domain_frontier.guard.6",
+      "story_key": "story.mainline.domain_frontier",
+      "chapter": 1,
+      "stage": 6,
+      "name": "守界封天",
+      "desc": "以守望之心镇定边界，换得一方安宁与继续建设的道途。",
+      "body": "守界最后一关不在界隙，而在前线：把巡守与鏖战的所得带回领域前线，当着守望名册把界纹镇住。回程只有一条路——从界隙退回魔界战场，再经青石镇入关；界战窗口一关，战场就不放行，这一趟只能等下一次烽火。镇纹一落，界前巡防、后方补给与百宗阵基才算连成一条线；回不到前线，前面的战功就只是别处的一段行程。",
+      "objectives": [
+        {"key": "seal_domain_front", "type": "travel_arrival", "label": "结算行程回到领域前线", "destination_key": "xuantian.domain_front"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "领域前线", "description": "从界隙秘境经魔界战场与青石镇返回领域前线，逐段结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.guard.6"]},
+      "next_stage_key": "domain_frontier.purify.1",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未回到前线镇纹时关卡保持进行中，不扣主线奖励；恢复体力后重新启程并结算移动，即可封界领取。"
+      },
+      "status": "open",
+      "aliases": ["守界终关"],
+      "reputation_key": "local.xuantian.domain_front",
+      "required_realm": "soul_transformation",
+      "required_layer": 1,
+      "prerequisites": ["domain_frontier.guard.5", "event.domain_front.claimed"],
+      "first_clear_reward": {"access.project.domain_refuge": 1, "local_reputation": 8, "service_reputation": 3},
+      "repeat_reward": {"spirit_stones": 12}
+    },
+    {
+      "key": "domain_frontier.purify.1",
+      "story_key": "story.mainline.domain_frontier",
+      "chapter": 2,
+      "stage": 1,
+      "name": "浊潮初见",
+      "desc": "踏入污染边缘，辨认浊潮侵蚀领域的第一道痕迹。",
+      "body": "守界封住的是这一侧，另一侧的浊潮还在。净渊线从云舟渡口开始：在渡口等魔界引导的云舟，隔着界壁就能看见被浊气浸过的天光，那是污染侵蚀领域的第一道痕迹。渡口只认灵石与体力，备不齐就上不了船，也就看不到这道痕迹。",
+      "objectives": [
+        {"key": "reach_cloud_dock", "type": "travel_arrival", "label": "结算行程抵达云舟渡口", "destination_key": "xuantian.floating_boat"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "云舟渡口", "description": "从妖界万兽山返回云舟渡口，等待行程结束并结算移动；随后登上魔界引导航线。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.purify.1"]},
+      "next_stage_key": "domain_frontier.purify.2",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未抵达云舟渡口时关卡保持进行中，不扣主线奖励；备好灵石与体力后重新启程并结算移动，即可继续净渊。"
+      },
+      "status": "open",
+      "aliases": ["净渊一关"],
+      "required_realm": "soul_transformation",
+      "required_layer": 1,
+      "prerequisites": ["event.domain_front.joined"],
+      "first_clear_reward": {"codex.domain.frontline": 1},
+      "repeat_reward": {"spirit_stones": 8}
+    },
+    {
+      "key": "domain_frontier.purify.2",
+      "story_key": "story.mainline.domain_frontier",
+      "chapter": 2,
+      "stage": 2,
+      "name": "引流归墟",
+      "desc": "引浊潮入阵，借天地回旋之势为净渊开出一线生机。",
+      "body": "浊潮不是死水，它顺着灵脉回流。净渊二关要在深渊门备材：在魔渊入口附近收集补给与浊气凝成的灵魂晶石，把回流的势头引向阵眼，为净渊开出一线生机。晶石要自己采回来，阵眼才认这一笔。",
+      "objectives": [
+        {"key": "draw_turbid_tide", "type": "exploration_reward", "label": "在深渊门备材中取得灵魂晶石", "mode_key": "explore.demon_threshold", "location_key": "demon.abyss_gate", "item_key": "item.soul_crystal", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "深渊门备材", "description": "在魔渊入口开始深渊门备材，等待结算并取得灵魂晶石。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.purify.2"]},
+      "next_stage_key": "domain_frontier.purify.3",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未取得灵魂晶石时关卡保持进行中，不扣主线奖励；恢复体力与虚力后重新备材，即可引流归墟。"
+      },
+      "status": "open",
+      "aliases": ["净渊二关"],
+      "required_realm": "soul_transformation",
+      "required_layer": 1,
+      "prerequisites": ["domain_frontier.purify.1"],
+      "first_clear_reward": {"codex.domain.frontline": 1},
+      "repeat_reward": {"spirit_stones": 8}
+    },
+    {
+      "key": "domain_frontier.purify.3",
+      "story_key": "story.mainline.domain_frontier",
+      "chapter": 2,
+      "stage": 3,
+      "name": "净火照渊",
+      "desc": "以净火照彻深渊，斩断污染与领域灵脉之间的暗线。",
+      "body": "污染与灵脉之间有一条暗线，肉眼看不见，只认魔核的回响。净渊三关要在深渊门备材中取回魔核：以净火照彻深渊，用魔核的余温把暗线烧断，污染才不会再顺着灵脉爬回领域。暗线一日不烧断，污染就一日顺着灵脉往回爬。",
+      "objectives": [
+        {"key": "burn_turbid_line", "type": "exploration_reward", "label": "在深渊门备材中取得魔核", "mode_key": "explore.demon_threshold", "location_key": "demon.abyss_gate", "item_key": "item.demon_core", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "深渊门备材", "description": "在魔渊入口开始深渊门备材，等待结算并取得魔核。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.purify.3"]},
+      "next_stage_key": "domain_frontier.purify.4",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未取得魔核时关卡保持进行中，不扣主线奖励；恢复体力与虚力后重新备材，即可照渊。"
+      },
+      "status": "open",
+      "aliases": ["净渊三关"],
+      "required_realm": "soul_transformation",
+      "required_layer": 1,
+      "prerequisites": ["domain_frontier.purify.2", "event.domain_front.battle"],
+      "first_clear_reward": {"codex.domain.frontline": 1},
+      "repeat_reward": {"spirit_stones": 8}
+    },
+    {
+      "key": "domain_frontier.purify.4",
+      "story_key": "story.mainline.domain_frontier",
+      "chapter": 2,
+      "stage": 4,
+      "name": "洗剑沉渊",
+      "desc": "把战意沉入渊底，以一剑洗去附着在界壁上的旧秽。",
+      "body": "暗线断了，旧秽还附着在界壁上。净渊四关要下到魔界堕落遗迹：把战意沉入渊底，在遗迹里走一趟，以一剑洗去附着的旧秽。遗迹只认魔界入口资格，没确认过风险的人进不去，也就洗不动这层旧秽。",
+      "objectives": [
+        {"key": "descend_fallen_ruins", "type": "travel_arrival", "label": "结算行程抵达魔界堕落遗迹", "destination_key": "demon.fallen_ruins"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "堕落遗迹", "description": "从魔渊入口出发抵达魔界堕落遗迹，等待行程结束并结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.purify.4"]},
+      "next_stage_key": "domain_frontier.purify.5",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未抵达堕落遗迹时关卡保持进行中，不扣主线奖励；恢复体力后重新启程并结算移动，即可沉渊洗剑。"
+      },
+      "status": "open",
+      "aliases": ["净渊四关"],
+      "required_realm": "soul_transformation",
+      "required_layer": 1,
+      "prerequisites": ["domain_frontier.purify.3"],
+      "first_clear_reward": {"codex.domain.frontline": 1},
+      "repeat_reward": {"spirit_stones": 8}
+    },
+    {
+      "key": "domain_frontier.purify.5",
+      "story_key": "story.mainline.domain_frontier",
+      "chapter": 2,
+      "stage": 5,
+      "name": "百宗同契",
+      "desc": "邀百宗共立净渊契约，让清明之气沿着前线重归人间。",
+      "body": "净渊不是一个人能立下的契。百宗同契要在堕落遗迹的探索中拾回契约线索：浊潮的源头与谁签过旧约，线索上写得明白。把线索带回前线，百宗才肯共立净渊契约，清明之气才有名分沿着前线重归人间。",
+      "objectives": [
+        {"key": "recover_abyss_contract", "type": "exploration_reward", "label": "在魔界堕落遗迹探索中取得契约线索", "mode_key": "explore.demon_abyss", "location_key": "demon.fallen_ruins", "item_key": "item.clue.demon_contract", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "魔界堕落遗迹探索", "description": "在魔界堕落遗迹开始探索，等待结算并取得契约线索。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.purify.5"]},
+      "next_stage_key": "domain_frontier.purify.6",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未取得契约线索时关卡保持进行中，不扣主线奖励；恢复体力后重新探索，即可同契。"
+      },
+      "status": "open",
+      "aliases": ["净渊五关"],
+      "required_realm": "soul_transformation",
+      "required_layer": 1,
+      "prerequisites": ["domain_frontier.purify.4", "event.domain_front.contribution"],
+      "first_clear_reward": {"codex.domain.frontline": 1},
+      "repeat_reward": {"spirit_stones": 8}
+    },
+    {
+      "key": "domain_frontier.purify.6",
+      "story_key": "story.mainline.domain_frontier",
+      "chapter": 2,
+      "stage": 6,
+      "name": "净渊开明",
+      "desc": "封住浊潮源头，留下可供众修继续修复的净渊法脉。",
+      "body": "契约立了，源头还得封。净渊开明要在堕落遗迹的探索里正面接战：浊潮源头的守卫不认契约，只认谁站在渊底。把它击退，源头才算封住，净渊法脉才能留给众修继续修复。退让一次，浊潮会顺着旧线再涨回来。",
+      "objectives": [
+        {"key": "seal_abyss_source", "type": "exploration_battle_victory", "label": "在魔界堕落遗迹探索中击退源头守卫", "mode_key": "explore.demon_abyss", "location_key": "demon.fallen_ruins"}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "魔界堕落遗迹探索", "description": "在魔界堕落遗迹开始探索，等待结算并在遭遇中取胜。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.purify.6"]},
+      "next_stage_key": "domain_frontier.protect.1",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "源头守卫尚未被击退时关卡保持进行中，不扣主线奖励；恢复体力后重新探索并在遭遇中取胜，即可开明。"
+      },
+      "status": "open",
+      "aliases": ["净渊终关"],
+      "reputation_key": "local.demon.abyss_market",
+      "required_realm": "soul_transformation",
+      "required_layer": 1,
+      "prerequisites": ["domain_frontier.purify.5", "event.domain_front.claimed"],
+      "first_clear_reward": {"access.project.abyss_purification": 1, "local_reputation": 8, "service_reputation": 3},
+      "repeat_reward": {"spirit_stones": 12}
+    },
+    {
+      "key": "domain_frontier.protect.1",
+      "story_key": "story.mainline.domain_frontier",
+      "chapter": 3,
+      "stage": 1,
+      "name": "祖脉来书",
+      "desc": "从前线收到祖灵湖急信，循着血脉回响踏上护祖之路。",
+      "body": "祖灵湖的急信比前线军报还急。护祖一关要先到湖边：循着血脉回响从万兽山走进祖灵湖，站上祖脉震荡的那片水面。妖界只认声望够的人，声望不到，湖边的路就断在万兽山口。急信上只写了一句：祖脉在震，速来。",
+      "objectives": [
+        {"key": "reach_ancestral_lake", "type": "travel_arrival", "label": "结算行程抵达祖灵湖", "destination_key": "beast.ancestral_lake"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "祖灵湖", "description": "从妖界万兽山出发抵达祖灵湖，等待行程结束并结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.protect.1"]},
+      "next_stage_key": "domain_frontier.protect.2",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未抵达祖灵湖时关卡保持进行中，不扣主线奖励；备好体力后重新启程并结算移动，即可护祖。"
+      },
+      "status": "open",
+      "aliases": ["护祖一关"],
+      "required_realm": "soul_transformation",
+      "required_layer": 1,
+      "prerequisites": ["event.domain_front.joined"],
+      "first_clear_reward": {"codex.domain.frontline": 1},
+      "repeat_reward": {"spirit_stones": 8}
+    },
+    {
+      "key": "domain_frontier.protect.2",
+      "story_key": "story.mainline.domain_frontier",
+      "chapter": 3,
+      "stage": 2,
+      "name": "护脉踏歌",
+      "desc": "踏过震荡的灵脉，将散落的护祖符骨一一归位。",
+      "body": "祖脉一震荡，护祖符骨就散了一地。护祖二关要在祖灵湖探索里把符骨一一定回原位：踏过震荡的灵脉，把散落的骨片归位，祖脉才重新连成一条。符骨要靠自己走回来，别人代不了这一趟。",
+      "objectives": [
+        {"key": "restore_ancestral_bones", "type": "exploration_reward", "label": "在祖灵湖探索中取得祖灵血", "mode_key": "explore.ancestral_lake", "location_key": "beast.ancestral_lake", "item_key": "item.ancestral_blood", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "祖灵湖探索", "description": "在祖灵湖开始探索，等待结算并取得祖灵血。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.protect.2"]},
+      "next_stage_key": "domain_frontier.protect.3",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未取得祖灵血时关卡保持进行中，不扣主线奖励；恢复体力后重新探索，即可护脉踏歌。"
+      },
+      "status": "open",
+      "aliases": ["护祖二关"],
+      "required_realm": "soul_transformation",
+      "required_layer": 1,
+      "prerequisites": ["domain_frontier.protect.1"],
+      "first_clear_reward": {"codex.domain.frontline": 1},
+      "repeat_reward": {"spirit_stones": 8}
+    },
+    {
+      "key": "domain_frontier.protect.3",
+      "story_key": "story.mainline.domain_frontier",
+      "chapter": 3,
+      "stage": 3,
+      "name": "祖影临阵",
+      "desc": "迎着祖影降临的异象守住阵脚，不让前线再失一寸。",
+      "body": "符骨归位，祖影也就来了。护祖三关要在祖灵湖探索里正面接战：祖影临阵不是吉兆也不是凶兆，是祖脉在试谁站得住。把祖影守回去，阵脚才算稳住；守不住，刚归位的符骨会再散一次。",
+      "objectives": [
+        {"key": "hold_ancestral_shadow", "type": "exploration_battle_victory", "label": "在祖灵湖探索中守住祖影临阵", "mode_key": "explore.ancestral_lake", "location_key": "beast.ancestral_lake"}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "祖灵湖探索", "description": "在祖灵湖开始探索，等待结算并在遭遇中取胜。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.protect.3"]},
+      "next_stage_key": "domain_frontier.protect.4",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "祖影尚未退去时关卡保持进行中，不扣主线奖励；恢复体力后重新探索并在遭遇中取胜，即可临阵。"
+      },
+      "status": "open",
+      "aliases": ["护祖三关"],
+      "required_realm": "soul_transformation",
+      "required_layer": 1,
+      "prerequisites": ["domain_frontier.protect.2", "event.domain_front.battle"],
+      "first_clear_reward": {"codex.domain.frontline": 1},
+      "repeat_reward": {"spirit_stones": 8}
+    },
+    {
+      "key": "domain_frontier.protect.4",
+      "story_key": "story.mainline.domain_frontier",
+      "chapter": 3,
+      "stage": 4,
+      "name": "血誓回潮",
+      "desc": "以血誓安抚回潮的祖灵之力，使其不再冲击界门。",
+      "body": "祖影退了，回潮的祖灵之力还要安抚。护祖四关要在万兽山狩猎中取回兽血：以血誓为引，把回潮之力重新压回祖脉，不让它再冲界门。兽血要在万兽山自己猎回来，买来的血立不住誓。",
+      "objectives": [
+        {"key": "swear_blood_oath", "type": "exploration_reward", "label": "在万兽山狩猎中取得兽血", "mode_key": "explore.beast_hunt", "location_key": "beast.ten_thousand_hills", "item_key": "item.beast_blood", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "万兽山狩猎", "description": "从祖灵湖返回万兽山开始狩猎，等待结算并取得兽血。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.protect.4"]},
+      "next_stage_key": "domain_frontier.protect.5",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未取得兽血时关卡保持进行中，不扣主线奖励；恢复体力后重新狩猎，即可立誓。"
+      },
+      "status": "open",
+      "aliases": ["护祖四关"],
+      "required_realm": "soul_transformation",
+      "required_layer": 1,
+      "prerequisites": ["domain_frontier.protect.3"],
+      "first_clear_reward": {"codex.domain.frontline": 1},
+      "repeat_reward": {"spirit_stones": 8}
+    },
+    {
+      "key": "domain_frontier.protect.5",
+      "story_key": "story.mainline.domain_frontier",
+      "chapter": 3,
+      "stage": 5,
+      "name": "万灵同守",
+      "desc": "召集万灵共守祖脉，为祖灵栖地留下长久的护生阵。",
+      "body": "血誓立了，还得让万灵认这一脉。万灵同守要在万兽山狩猎中找回血脉线索：线索记着祖脉与各族的旧约，把旧约一一对上，万灵才肯共守祖脉。线索不是战利品，是各家认亲的凭据。",
+      "objectives": [
+        {"key": "gather_bloodline_clue", "type": "exploration_reward", "label": "在万兽山狩猎中取得血脉线索", "mode_key": "explore.beast_hunt", "location_key": "beast.ten_thousand_hills", "item_key": "item.clue.beast_bloodline", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "万兽山狩猎", "description": "在万兽山开始狩猎，等待结算并取得血脉线索。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.protect.5"]},
+      "next_stage_key": "domain_frontier.protect.6",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未取得血脉线索时关卡保持进行中，不扣主线奖励；恢复体力后重新狩猎，即可同守。"
+      },
+      "status": "open",
+      "aliases": ["护祖五关"],
+      "required_realm": "soul_transformation",
+      "required_layer": 1,
+      "prerequisites": ["domain_frontier.protect.4", "event.domain_front.contribution"],
+      "first_clear_reward": {"codex.domain.frontline": 1},
+      "repeat_reward": {"spirit_stones": 8}
+    },
+    {
+      "key": "domain_frontier.protect.6",
+      "story_key": "story.mainline.domain_frontier",
+      "chapter": 3,
+      "stage": 6,
+      "name": "护祖长明",
+      "desc": "护住祖脉长明不灭，换得祖灵栖地的修复之权与一方名望。",
+      "body": "护祖最后一关落在三界贸易口：把护住的祖脉与万灵的旧约带到渡口备案，祖灵栖地的修复之权才算落到名册上。长明不是一句祝词，是备案之后才有的名望与权限。走不到渡口，前面的护持就只是湖上的一段往事。",
+      "objectives": [
+        {"key": "register_ancestral_habitat", "type": "travel_arrival", "label": "结算行程抵达三界贸易口", "destination_key": "beast.three_realms_trade_port"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "三界贸易口", "description": "从妖界万兽山出发抵达三界贸易口，等待行程结束并结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.protect.6"]},
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未抵达三界贸易口时关卡保持进行中，不扣主线奖励；恢复体力后重新启程并结算移动，即可长明领取。"
+      },
+      "status": "open",
+      "aliases": ["护祖终关"],
+      "reputation_key": "local.beast.three_realms_trade_port",
+      "required_realm": "soul_transformation",
+      "required_layer": 1,
+      "prerequisites": ["domain_frontier.protect.5", "event.domain_front.claimed"],
+      "first_clear_reward": {"access.project.ancestral_habitat": 1, "local_reputation": 8, "service_reputation": 3},
+      "repeat_reward": {"spirit_stones": 12}
+    },
+    {
+      "key": "void_archive.recorder.1",
+      "story_key": "story.mainline.void_archive",
+      "chapter": 1,
+      "stage": 1,
+      "name": "残卷初鸣",
+      "desc": "档案解锁后，你在破碎的星痕中听见远古残卷的第一声回响。",
+      "body": "档案解锁之后，虚空里第一次有了回响。记录者一关要先走一趟第一航道：从虚空门户启程，沿既有航路抵达虚空第一航道，在星痕破碎处听见残卷初鸣。航道只认炼虚一层的修为，修为不到，回响就只是风声。",
+      "objectives": [
+        {"key": "hear_first_echo", "type": "travel_arrival", "label": "结算行程抵达虚空第一航道", "destination_key": "void.first_route"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "虚空第一航道", "description": "从虚空门户启程抵达虚空第一航道，等待行程结束并结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.void_archive:void_archive.recorder.1"]},
+      "next_stage_key": "void_archive.recorder.2",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未抵达第一航道时关卡保持进行中，不扣主线奖励；恢复体力后重新启程并结算移动，即可听见残卷初鸣。"
+      },
+      "status": "open",
+      "aliases": ["记录者一关"],
+      "required_realm": "void_refining",
+      "required_layer": 1,
+      "prerequisites": ["event.archive_unlock"],
+      "first_clear_reward": {"codex.void.route_ruins": 1},
+      "repeat_reward": {"spirit_stones": 8}
+    },
+    {
+      "key": "void_archive.recorder.2",
+      "story_key": "story.mainline.void_archive",
+      "chapter": 1,
+      "stage": 2,
+      "name": "辨字寻源",
+      "desc": "你辨认残卷上的古字，沿着断裂的灵光追索档案最初的源头。",
+      "body": "残卷上的古字不是给人读的，是给走的人认的。记录者二关要在第一航道探索中取回档案残片·甲：沿断裂的灵光辨认字迹，把散落在星砂里的那一角拼回来。残片要靠自己巡回来，别人代读的字不算数。",
+      "objectives": [
+        {"key": "read_ancient_script", "type": "exploration_reward", "label": "在第一航道探索中取得档案残片·甲", "mode_key": "explore.void_route", "location_key": "void.first_route", "item_key": "item.archive_fragment.alpha", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "虚空航道历练", "description": "在虚空第一航道开始探索，等待结算并取得档案残片·甲。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.void_archive:void_archive.recorder.2"]},
+      "next_stage_key": "void_archive.recorder.3",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未取得残片·甲时关卡保持进行中，不扣主线奖励；恢复体力与虚力后重新探索，即可辨字寻源。"
+      },
+      "status": "open",
+      "aliases": ["记录者二关"],
+      "required_realm": "void_refining",
+      "required_layer": 1,
+      "prerequisites": ["void_archive.recorder.1"],
+      "first_clear_reward": {"codex.void.route_ruins": 1},
+      "repeat_reward": {"spirit_stones": 8}
+    },
+    {
+      "key": "void_archive.recorder.3",
+      "story_key": "story.mainline.void_archive",
+      "chapter": 1,
+      "stage": 3,
+      "name": "守痕问道",
+      "desc": "你以神识守住档案灵痕，让守卫战留下的胜迹不被虚空抹去。",
+      "body": "字认出来了，档案的守卫也就跟来了。记录者三关要在第一航道探索中正面接战：守卫战留下的胜迹必须守住，否则虚空会把灵痕一并抹去。接不住这一战，刚拼回来的字会重新散成星砂。",
+      "objectives": [
+        {"key": "guard_archive_trace", "type": "exploration_battle_victory", "label": "在第一航道探索中击退档案守卫", "mode_key": "explore.void_route", "location_key": "void.first_route"}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "虚空航道历练", "description": "在虚空第一航道开始探索，等待结算并在遭遇中取胜。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.void_archive:void_archive.recorder.3"]},
+      "next_stage_key": "void_archive.recorder.4",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "灵痕尚未守住时关卡保持进行中，不扣主线奖励；恢复体力与虚力后重新探索并在遭遇中取胜，即可守痕问道。"
+      },
+      "status": "open",
+      "aliases": ["记录者三关"],
+      "required_realm": "void_refining",
+      "required_layer": 1,
+      "prerequisites": ["void_archive.recorder.2", "event.archive_guard.won"],
+      "first_clear_reward": {"codex.void.route_ruins": 1},
+      "repeat_reward": {"spirit_stones": 8}
+    },
+    {
+      "key": "void_archive.recorder.4",
+      "story_key": "story.mainline.void_archive",
+      "chapter": 1,
+      "stage": 4,
+      "name": "星简归位",
+      "desc": "散落星简重新归位，沉寂多年的档案页在你掌中缓缓合拢。",
+      "body": "守住灵痕只是第一步，散落的星简还得归位。记录者四关要从第一航道深入虚空档案遗迹：把掌中的星简放回它原本的位置，让沉寂多年的档案页重新合拢。遗迹只认走过第一航道的人，没到过航道，星简就没有落点。",
+      "objectives": [
+        {"key": "return_star_tablets", "type": "travel_arrival", "label": "结算行程抵达虚空档案遗迹", "destination_key": "void.archive_ruins"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "虚空档案遗迹", "description": "从虚空第一航道深入虚空档案遗迹，等待行程结束并结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.void_archive:void_archive.recorder.4"]},
+      "next_stage_key": "void_archive.recorder.5",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未抵达档案遗迹时关卡保持进行中，不扣主线奖励；恢复体力后重新启程并结算移动，即可归位星简。"
+      },
+      "status": "open",
+      "aliases": ["记录者四关"],
+      "required_realm": "void_refining",
+      "required_layer": 1,
+      "prerequisites": ["void_archive.recorder.3"],
+      "first_clear_reward": {"codex.void.route_ruins": 1},
+      "repeat_reward": {"spirit_stones": 8}
+    },
+    {
+      "key": "void_archive.recorder.5",
+      "story_key": "story.mainline.void_archive",
+      "chapter": 1,
+      "stage": 5,
+      "name": "听见旧誓",
+      "desc": "旧日守誓人的声音穿过裂隙，你将那一句未完的誓言记入新卷。",
+      "body": "档案页合拢时，旧日守誓人的声音穿过裂隙。记录者五关要在档案遗迹探索中取回档案残片·乙：把那一句未完的誓言听清、记下，写进新卷。誓言不在纸上，只在遗迹深处回响，走不到就抄不下来。",
+      "objectives": [
+        {"key": "record_old_oath", "type": "exploration_reward", "label": "在档案遗迹探索中取得档案残片·乙", "mode_key": "explore.archive_ruins", "location_key": "void.archive_ruins", "item_key": "item.archive_fragment.beta", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "档案遗迹搜寻", "description": "在虚空档案遗迹开始探索，等待结算并取得档案残片·乙。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.void_archive:void_archive.recorder.5"]},
+      "next_stage_key": "void_archive.recorder.6",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未取得残片·乙时关卡保持进行中，不扣主线奖励；恢复体力与虚力后重新探索，即可听见旧誓。"
+      },
+      "status": "open",
+      "aliases": ["记录者五关"],
+      "required_realm": "void_refining",
+      "required_layer": 1,
+      "prerequisites": ["void_archive.recorder.4", "event.archive_unlock"],
+      "first_clear_reward": {"codex.void.route_ruins": 1},
+      "repeat_reward": {"spirit_stones": 8}
+    },
+    {
+      "key": "void_archive.recorder.6",
+      "story_key": "story.mainline.void_archive",
+      "chapter": 1,
+      "stage": 6,
+      "name": "补写天缺",
+      "desc": "你以自身道意补上残卷天缺，使断掉的纪年重新连成一线。",
+      "body": "誓言记下了，纪年却还断着。记录者六关要在档案遗迹探索中取回档案残片·丙：以自身道意补上残卷天缺，让断掉的纪年重新连成一线。天缺认的是道意，不是字数，凑不出道意就接不上这一线。",
+      "objectives": [
+        {"key": "mend_broken_chronicle", "type": "exploration_reward", "label": "在档案遗迹探索中取得档案残片·丙", "mode_key": "explore.archive_ruins", "location_key": "void.archive_ruins", "item_key": "item.archive_fragment.gamma", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "档案遗迹搜寻", "description": "在虚空档案遗迹开始探索，等待结算并取得档案残片·丙。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.void_archive:void_archive.recorder.6"]},
+      "next_stage_key": "void_archive.recorder.7",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未取得残片·丙时关卡保持进行中，不扣主线奖励；恢复体力与虚力后重新探索，即可补写天缺。"
+      },
+      "status": "open",
+      "aliases": ["记录者六关"],
+      "required_realm": "void_refining",
+      "required_layer": 1,
+      "prerequisites": ["void_archive.recorder.5"],
+      "first_clear_reward": {"codex.void.route_ruins": 1},
+      "repeat_reward": {"spirit_stones": 8}
+    },
+    {
+      "key": "void_archive.recorder.7",
+      "story_key": "story.mainline.void_archive",
+      "chapter": 1,
+      "stage": 7,
+      "name": "万象留名",
+      "desc": "你将三界诸象刻入档案，让后来者知晓这条航道曾有人走过。",
+      "body": "纪年连上了，还得让后来者知道这条航道曾有人走过。记录者七关要在档案遗迹探索中取回虚空档案本体：把三界诸象刻入档案，留下这一代修士的落款。档案不认旁听，只认亲手刻下的人。",
+      "objectives": [
+        {"key": "inscribe_all_realms", "type": "exploration_reward", "label": "在档案遗迹探索中取得虚空档案", "mode_key": "explore.archive_ruins", "location_key": "void.archive_ruins", "item_key": "item.void_archive", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "档案遗迹搜寻", "description": "在虚空档案遗迹开始探索，等待结算并取得虚空档案。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.void_archive:void_archive.recorder.7"]},
+      "next_stage_key": "void_archive.recorder.8",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未取得虚空档案时关卡保持进行中，不扣主线奖励；恢复体力与虚力后重新探索，即可万象留名。"
+      },
+      "status": "open",
+      "aliases": ["记录者七关"],
+      "required_realm": "void_refining",
+      "required_layer": 1,
+      "prerequisites": ["void_archive.recorder.6"],
+      "first_clear_reward": {"codex.void.route_ruins": 1},
+      "repeat_reward": {"spirit_stones": 8}
+    },
+    {
+      "key": "void_archive.recorder.8",
+      "story_key": "story.mainline.void_archive",
+      "chapter": 1,
+      "stage": 8,
+      "name": "档案成章",
+      "desc": "最后一页落笔，虚空档案终于有了属于这一代修士的完整篇章。",
+      "body": "最后一页落笔之前，遗迹深处还有一场收束之战。记录者八关要在档案遗迹探索中击退最后的守卫：把这一代的篇章护到合卷，虚空档案才算真正有了完整的一章。守不住这一战，前面七关的字迹会一起褪色。",
+      "objectives": [
+        {"key": "close_first_chapter", "type": "exploration_battle_victory", "label": "在档案遗迹探索中守住合卷之战", "mode_key": "explore.archive_ruins", "location_key": "void.archive_ruins"}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "档案遗迹搜寻", "description": "在虚空档案遗迹开始探索，等待结算并在遭遇中取胜。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.void_archive:void_archive.recorder.8"]},
+      "next_stage_key": "void_archive.escort.1",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "合卷之战尚未守住时关卡保持进行中，不扣主线奖励；恢复体力与虚力后重新探索并在遭遇中取胜，即可成章。"
+      },
+      "status": "open",
+      "aliases": ["记录者终关"],
+      "required_realm": "void_refining",
+      "required_layer": 1,
+      "prerequisites": ["void_archive.recorder.7"],
+      "first_clear_reward": {"codex.void.route_ruins": 1, "spirit_stones": 20},
+      "repeat_reward": {"spirit_stones": 12}
+    },
+    {
+      "key": "void_archive.escort.1",
+      "story_key": "story.mainline.void_archive",
+      "chapter": 2,
+      "stage": 1,
+      "name": "护卷入阵",
+      "desc": "档案守卫败退，你护着新卷踏入未稳的虚空阵门。",
+      "body": "档案成章，守卫也败退了，可新卷还没进阵门。护航一关要护着新卷回到虚空第一航道：从档案遗迹启程，把卷轴送进未稳的虚空阵门。阵门只认走过航道的人，没走过就带不进这一卷。",
+      "objectives": [
+        {"key": "escort_into_formation", "type": "travel_arrival", "label": "结算行程抵达虚空第一航道", "destination_key": "void.first_route"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "虚空第一航道", "description": "从虚空档案遗迹返回虚空第一航道，等待行程结束并结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.void_archive:void_archive.escort.1"]},
+      "next_stage_key": "void_archive.escort.2",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未回到第一航道时关卡保持进行中，不扣主线奖励；恢复体力后重新启程并结算移动，即可护卷入阵。"
+      },
+      "status": "open",
+      "aliases": ["护航者一关"],
+      "required_realm": "void_refining",
+      "required_layer": 1,
+      "prerequisites": ["event.archive_guard.won"],
+      "first_clear_reward": {"codex.void.route_ruins": 1},
+      "repeat_reward": {"spirit_stones": 8}
+    },
+    {
+      "key": "void_archive.escort.2",
+      "story_key": "story.mainline.void_archive",
+      "chapter": 2,
+      "stage": 2,
+      "name": "渡过乱流",
+      "desc": "乱流卷起万丈星砂，你稳住护卷灵舟，不让一页旧史坠入黑暗。",
+      "body": "阵门一开，乱流就卷起万丈星砂。护航二关要在第一航道探索中取回虚空锚：用锚把护卷灵舟稳住，不让一页旧史坠入黑暗。锚要在乱流里自己捞回来，买来的锚钉不住这条航道。每日只够巡两趟，探不动就先回门户歇息，明日再捞。",
+      "objectives": [
+        {"key": "steady_through_turbulence", "type": "exploration_reward", "label": "在第一航道探索中取得虚空锚", "mode_key": "explore.void_route", "location_key": "void.first_route", "item_key": "item.void_anchor", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "虚空航道历练", "description": "在虚空第一航道开始探索，等待结算并取得虚空锚。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.void_archive:void_archive.escort.2"]},
+      "next_stage_key": "void_archive.escort.3",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未取得虚空锚时关卡保持进行中，不扣主线奖励；恢复体力与虚力后重新探索，即可渡过乱流。"
+      },
+      "status": "open",
+      "aliases": ["护航者二关"],
+      "required_realm": "void_refining",
+      "required_layer": 1,
+      "prerequisites": ["void_archive.escort.1"],
+      "first_clear_reward": {"codex.void.route_ruins": 1},
+      "repeat_reward": {"spirit_stones": 8}
+    },
+    {
+      "key": "void_archive.escort.3",
+      "story_key": "story.mainline.void_archive",
+      "chapter": 2,
+      "stage": 3,
+      "name": "断桥引路",
+      "desc": "前路只剩断桥，你以剑意接续星桥，为后来护航者留下落脚处。",
+      "body": "舟稳住了，前路却只剩断桥。护航三关要在第一航道探索中取回虚空晶：以剑意接续星桥，把断口一处处连起来，为后来护航者留下落脚处。晶石是桥基，缺一处，桥就断一处。航道每日只容两度历练，虚力与体力见底时先歇，别硬撑断桥。",
+      "objectives": [
+        {"key": "bridge_the_broken_path", "type": "exploration_reward", "label": "在第一航道探索中取得虚空晶", "mode_key": "explore.void_route", "location_key": "void.first_route", "item_key": "item.void_crystal", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "虚空航道历练", "description": "在虚空第一航道开始探索，等待结算并取得虚空晶。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.void_archive:void_archive.escort.3"]},
+      "next_stage_key": "void_archive.escort.4",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未取得虚空晶时关卡保持进行中，不扣主线奖励；恢复体力与虚力后重新探索，即可断桥引路。"
+      },
+      "status": "open",
+      "aliases": ["护航者三关"],
+      "required_realm": "void_refining",
+      "required_layer": 1,
+      "prerequisites": ["void_archive.escort.2"],
+      "first_clear_reward": {"codex.void.route_ruins": 1},
+      "repeat_reward": {"spirit_stones": 8}
+    },
+    {
+      "key": "void_archive.escort.4",
+      "story_key": "story.mainline.void_archive",
+      "chapter": 2,
+      "stage": 4,
+      "name": "迎回孤灯",
+      "desc": "档案深处的孤灯将熄，你以道火相迎，护住最后一缕归航灵光。",
+      "body": "桥接上了，档案深处的孤灯却将熄。护航四关要在第一航道探索中正面接战：以道火相迎，护住最后一缕归航灵光。迎不回来，这条航道就再没有灯可循。这一战接不住就退回第一航道重来，每日仍有两趟机会。",
+      "objectives": [
+        {"key": "welcome_the_lone_light", "type": "exploration_battle_victory", "label": "在第一航道探索中护住归航灵光", "mode_key": "explore.void_route", "location_key": "void.first_route"}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "虚空航道历练", "description": "在虚空第一航道开始探索，等待结算并在遭遇中取胜。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.void_archive:void_archive.escort.4"]},
+      "next_stage_key": "void_archive.escort.5",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "孤灯尚未迎回时关卡保持进行中，不扣主线奖励；恢复体力与虚力后重新探索并在遭遇中取胜，即可迎回孤灯。"
+      },
+      "status": "open",
+      "aliases": ["护航者四关"],
+      "required_realm": "void_refining",
+      "required_layer": 1,
+      "prerequisites": ["void_archive.escort.3", "event.archive_unlock"],
+      "first_clear_reward": {"codex.void.route_ruins": 1},
+      "repeat_reward": {"spirit_stones": 8}
+    },
+    {
+      "key": "void_archive.escort.5",
+      "story_key": "story.mainline.void_archive",
+      "chapter": 2,
+      "stage": 5,
+      "name": "护阵镇潮",
+      "desc": "虚空潮汐撞击阵眼，你守在阵心，替档案挡下接连三重劫波。",
+      "body": "灵光接上了，虚空潮汐又撞向阵眼。护航五关要护着新卷深入虚空档案遗迹：守在阵心，替档案挡下接连三重劫波。阵眼只认到过遗迹的人，站不到阵心，就挡不住这一轮潮汐。遗迹每日只开两度搜寻，潮汐未镇住时先退回航道，等明日再进。",
+      "objectives": [
+        {"key": "hold_the_formation_eye", "type": "travel_arrival", "label": "结算行程抵达虚空档案遗迹", "destination_key": "void.archive_ruins"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "虚空档案遗迹", "description": "从虚空第一航道深入虚空档案遗迹，等待行程结束并结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.void_archive:void_archive.escort.5"]},
+      "next_stage_key": "void_archive.escort.6",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未抵达档案遗迹时关卡保持进行中，不扣主线奖励；恢复体力后重新启程并结算移动，即可护阵镇潮。"
+      },
+      "status": "open",
+      "aliases": ["护航者五关"],
+      "required_realm": "void_refining",
+      "required_layer": 1,
+      "prerequisites": ["void_archive.escort.4"],
+      "first_clear_reward": {"codex.void.route_ruins": 1},
+      "repeat_reward": {"spirit_stones": 8}
+    },
+    {
+      "key": "void_archive.escort.6",
+      "story_key": "story.mainline.void_archive",
+      "chapter": 2,
+      "stage": 6,
+      "name": "借风回舵",
+      "desc": "你借虚空风势回转灵舟，让失散的护航印记重新照见彼此。",
+      "body": "潮汐退了，失散的护航印记还得重新照见彼此。护航六关要在档案遗迹探索中取回档案残片·丙：借虚空风势回转灵舟，把印记一处处接回航路。印记不认喊话，只认走到位的舟。每日两度搜寻用尽后先歇，风势不会跑，印记也不会散。",
+      "objectives": [
+        {"key": "turn_with_the_void_wind", "type": "exploration_reward", "label": "在档案遗迹探索中取得档案残片·丙", "mode_key": "explore.archive_ruins", "location_key": "void.archive_ruins", "item_key": "item.archive_fragment.gamma", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "档案遗迹搜寻", "description": "在虚空档案遗迹开始探索，等待结算并取得档案残片·丙。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.void_archive:void_archive.escort.6"]},
+      "next_stage_key": "void_archive.escort.7",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未取得残片·丙时关卡保持进行中，不扣主线奖励；恢复体力与虚力后重新探索，即可借风回舵。"
+      },
+      "status": "open",
+      "aliases": ["护航者六关"],
+      "required_realm": "void_refining",
+      "required_layer": 1,
+      "prerequisites": ["void_archive.escort.5"],
+      "first_clear_reward": {"codex.void.route_ruins": 1},
+      "repeat_reward": {"spirit_stones": 8}
+    },
+    {
+      "key": "void_archive.escort.7",
+      "story_key": "story.mainline.void_archive",
+      "chapter": 2,
+      "stage": 7,
+      "name": "共守归途",
+      "desc": "同行诸修以心印相连，你们共同守住档案归途最后的风暴关。",
+      "body": "印记归位，归途最后的风暴关就在眼前。护航七关要在档案遗迹探索中正面接战：同行诸修以心印相连，共同守住这一关。守不住，前面六关的护航就只剩一段孤舟的旧事。接不住就退回遗迹入口，等状态恢复再战，每日两度。",
+      "objectives": [
+        {"key": "guard_the_return_storm", "type": "exploration_battle_victory", "label": "在档案遗迹探索中守住归途风暴关", "mode_key": "explore.archive_ruins", "location_key": "void.archive_ruins"}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "档案遗迹搜寻", "description": "在虚空档案遗迹开始探索，等待结算并在遭遇中取胜。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.void_archive:void_archive.escort.7"]},
+      "next_stage_key": "void_archive.escort.8",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "风暴关尚未守住时关卡保持进行中，不扣主线奖励；恢复体力与虚力后重新探索并在遭遇中取胜，即可共守归途。"
+      },
+      "status": "open",
+      "aliases": ["护航者七关"],
+      "required_realm": "void_refining",
+      "required_layer": 1,
+      "prerequisites": ["void_archive.escort.6"],
+      "first_clear_reward": {"codex.void.route_ruins": 1},
+      "repeat_reward": {"spirit_stones": 8}
+    },
+    {
+      "key": "void_archive.escort.8",
+      "story_key": "story.mainline.void_archive",
+      "chapter": 2,
+      "stage": 8,
+      "name": "护航抵岸",
+      "desc": "灵舟终于抵达星门彼岸，档案在你手中安然渡过这一段虚空。",
+      "body": "风暴过去了，灵舟终于抵达星门彼岸。护航八关要把档案送回虚空门户：从档案遗迹沿航道回到门户，让这一卷在你手中安然渡过整段虚空。回不到门户，这一趟护航就还没靠岸。体力不足时先在遗迹歇脚，补满再启程，门户不会挪位置。",
+      "objectives": [
+        {"key": "escort_to_the_portal", "type": "travel_arrival", "label": "结算行程抵达虚空门户", "destination_key": "void.portal"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "虚空门户", "description": "从虚空档案遗迹返回虚空门户，等待行程结束并结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.void_archive:void_archive.escort.8"]},
+      "next_stage_key": "void_archive.return.1",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未抵达虚空门户时关卡保持进行中，不扣主线奖励；恢复体力后重新启程并结算移动，即可护航抵岸。"
+      },
+      "status": "open",
+      "aliases": ["护航者终关"],
+      "required_realm": "void_refining",
+      "required_layer": 1,
+      "prerequisites": ["void_archive.escort.7"],
+      "first_clear_reward": {"codex.void.route_ruins": 1, "spirit_stones": 20},
+      "repeat_reward": {"spirit_stones": 12}
+    },
+    {
+      "key": "void_archive.return.1",
+      "story_key": "story.mainline.void_archive",
+      "chapter": 3,
+      "stage": 1,
+      "name": "故土回望",
+      "desc": "时序堡垒的钟声为你指路，你在虚空尽头回望曾经的故土。",
+      "body": "时序堡垒的钟声穿过虚空，为你指了归路。归乡一关要先回到虚空第一航道：在虚空尽头回望曾经的故土，把来路重新认一遍。钟声只对走完护航的人响，没护过卷，回望就只是空望。",
+      "objectives": [
+        {"key": "look_back_home", "type": "travel_arrival", "label": "结算行程抵达虚空第一航道", "destination_key": "void.first_route"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "虚空第一航道", "description": "从虚空门户返回虚空第一航道，等待行程结束并结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.void_archive:void_archive.return.1"]},
+      "next_stage_key": "void_archive.return.2",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未回到第一航道时关卡保持进行中，不扣主线奖励；恢复体力后重新启程并结算移动，即可故土回望。"
+      },
+      "status": "open",
+      "aliases": ["归乡者一关"],
+      "required_realm": "void_refining",
+      "required_layer": 1,
+      "prerequisites": ["story.mainline.void_archive.time_fort"],
+      "first_clear_reward": {"codex.void.route_ruins": 1},
+      "repeat_reward": {"spirit_stones": 8}
+    },
+    {
+      "key": "void_archive.return.2",
+      "story_key": "story.mainline.void_archive",
+      "chapter": 3,
+      "stage": 2,
+      "name": "拾回旧梦",
+      "desc": "旧梦化作星屑落在掌心，你循着记忆深处的方向继续前行。",
+      "body": "旧梦化作星屑落在掌心。归乡二关要在档案遗迹探索中取回档案残片·乙：循着记忆深处的方向继续前行，把旧梦里那一段重新抄进新卷。梦不认旁人转述，只认亲手拾起的人。每日两度搜寻用尽后先歇，旧梦仍在原处等你。",
+      "objectives": [
+        {"key": "gather_old_dreams", "type": "exploration_reward", "label": "在档案遗迹探索中取得档案残片·乙", "mode_key": "explore.archive_ruins", "location_key": "void.archive_ruins", "item_key": "item.archive_fragment.beta", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "档案遗迹搜寻", "description": "在虚空档案遗迹开始探索，等待结算并取得档案残片·乙。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.void_archive:void_archive.return.2"]},
+      "next_stage_key": "void_archive.return.3",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未取得残片·乙时关卡保持进行中，不扣主线奖励；恢复体力与虚力后重新探索，即可拾回旧梦。"
+      },
+      "status": "open",
+      "aliases": ["归乡者二关"],
+      "required_realm": "void_refining",
+      "required_layer": 1,
+      "prerequisites": ["void_archive.return.1"],
+      "first_clear_reward": {"codex.void.route_ruins": 1},
+      "repeat_reward": {"spirit_stones": 8}
+    },
+    {
+      "key": "void_archive.return.3",
+      "story_key": "story.mainline.void_archive",
+      "chapter": 3,
+      "stage": 3,
+      "name": "问归何处",
+      "desc": "你向无名星门问归处，得到的回答藏在档案最深的一页。",
+      "body": "旧梦抄完了，归处却还藏在档案最深的一页。归乡三关要在第一航道探索中取回虚空晶：向无名星门问归处，用晶石照见那一页的方位。问路要自己走到星门前，隔着航道问不出答案。",
+      "objectives": [
+        {"key": "ask_the_way_home", "type": "exploration_reward", "label": "在第一航道探索中取得虚空晶", "mode_key": "explore.void_route", "location_key": "void.first_route", "item_key": "item.void_crystal", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "虚空航道历练", "description": "在虚空第一航道开始探索，等待结算并取得虚空晶。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.void_archive:void_archive.return.3"]},
+      "next_stage_key": "void_archive.return.4",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未取得虚空晶时关卡保持进行中，不扣主线奖励；恢复体力与虚力后重新探索，即可问归何处。"
+      },
+      "status": "open",
+      "aliases": ["归乡者三关"],
+      "required_realm": "void_refining",
+      "required_layer": 1,
+      "prerequisites": ["void_archive.return.2"],
+      "first_clear_reward": {"codex.void.route_ruins": 1},
+      "repeat_reward": {"spirit_stones": 8}
+    },
+    {
+      "key": "void_archive.return.4",
+      "story_key": "story.mainline.void_archive",
+      "chapter": 3,
+      "stage": 4,
+      "name": "故关再渡",
+      "desc": "旧日关隘重现眼前，你以今日修为再渡一回，替故人续上未竟之路。",
+      "body": "方位照见了，旧日关隘也重现眼前。归乡四关要在第一航道探索中正面接战：以今日修为再渡一回，替故人续上未竟之路。渡不过去，旧关就仍是旧关，故人的路也接不上。接不住就退回第一航道，恢复后再渡，每日两度。",
+      "objectives": [
+        {"key": "cross_the_old_pass", "type": "exploration_battle_victory", "label": "在第一航道探索中再渡旧关", "mode_key": "explore.void_route", "location_key": "void.first_route"}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "虚空航道历练", "description": "在虚空第一航道开始探索，等待结算并在遭遇中取胜。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.void_archive:void_archive.return.4"]},
+      "next_stage_key": "void_archive.return.5",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "旧关尚未再渡时关卡保持进行中，不扣主线奖励；恢复体力与虚力后重新探索并在遭遇中取胜，即可故关再渡。"
+      },
+      "status": "open",
+      "aliases": ["归乡者四关"],
+      "required_realm": "void_refining",
+      "required_layer": 1,
+      "prerequisites": ["void_archive.return.3", "event.archive_unlock"],
+      "first_clear_reward": {"codex.void.route_ruins": 1},
+      "repeat_reward": {"spirit_stones": 8}
+    },
+    {
+      "key": "void_archive.return.5",
+      "story_key": "story.mainline.void_archive",
+      "chapter": 3,
+      "stage": 5,
+      "name": "照见来路",
+      "desc": "档案映出你的来路，曾经求道的初心在虚空中重新明亮。",
+      "body": "旧关渡过了，档案还要映出你的来路。归乡五关要回到虚空档案遗迹：让档案把曾经求道的初心重新照亮，照见自己是从哪一步走到这里的。遗迹只映走过全程的人，半途折返，映出的就只是影子。",
+      "objectives": [
+        {"key": "reflect_the_journey", "type": "travel_arrival", "label": "结算行程抵达虚空档案遗迹", "destination_key": "void.archive_ruins"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "虚空档案遗迹", "description": "从虚空第一航道返回虚空档案遗迹，等待行程结束并结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.void_archive:void_archive.return.5"]},
+      "next_stage_key": "void_archive.return.6",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未抵达档案遗迹时关卡保持进行中，不扣主线奖励；恢复体力后重新启程并结算移动，即可照见来路。"
+      },
+      "status": "open",
+      "aliases": ["归乡者五关"],
+      "required_realm": "void_refining",
+      "required_layer": 1,
+      "prerequisites": ["void_archive.return.4"],
+      "first_clear_reward": {"codex.void.route_ruins": 1},
+      "repeat_reward": {"spirit_stones": 8}
+    },
+    {
+      "key": "void_archive.return.6",
+      "story_key": "story.mainline.void_archive",
+      "chapter": 3,
+      "stage": 6,
+      "name": "归心化桥",
+      "desc": "归心所向化作长桥，你踏着桥上微光，把故土的名字重新写入天穹。",
+      "body": "来路照见了，归心就要化成桥。归乡六关要在档案遗迹探索中取回虚空档案本体：踏着桥上的微光，把故土的名字重新写入天穹。桥是归心化出来的，心不到，桥就架不起来。每日两度搜寻用尽后先歇，归心不会因为等一日就变淡。",
+      "objectives": [
+        {"key": "bridge_with_true_heart", "type": "exploration_reward", "label": "在档案遗迹探索中取得虚空档案", "mode_key": "explore.archive_ruins", "location_key": "void.archive_ruins", "item_key": "item.void_archive", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "档案遗迹搜寻", "description": "在虚空档案遗迹开始探索，等待结算并取得虚空档案。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.void_archive:void_archive.return.6"]},
+      "next_stage_key": "void_archive.return.7",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未取得虚空档案时关卡保持进行中，不扣主线奖励；恢复体力与虚力后重新探索，即可归心化桥。"
+      },
+      "status": "open",
+      "aliases": ["归乡者六关"],
+      "required_realm": "void_refining",
+      "required_layer": 1,
+      "prerequisites": ["void_archive.return.5"],
+      "first_clear_reward": {"codex.void.route_ruins": 1},
+      "repeat_reward": {"spirit_stones": 8}
+    },
+    {
+      "key": "void_archive.return.7",
+      "story_key": "story.mainline.void_archive",
+      "chapter": 3,
+      "stage": 7,
+      "name": "万里同门",
+      "desc": "无论身在何方，见过档案的人都以同门相认，归途因此不再孤寂。",
+      "body": "名字写回天穹，见过档案的人便以同门相认。归乡七关要在档案遗迹探索中正面接战：守住这份相认，不让归途再落回孤身一人。守不住，前面的桥就只是一个人的桥。接不住就退回遗迹入口，恢复状态后再守，每日两度。",
+      "objectives": [
+        {"key": "keep_the_fellowship", "type": "exploration_battle_victory", "label": "在档案遗迹探索中守住同门归途", "mode_key": "explore.archive_ruins", "location_key": "void.archive_ruins"}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "档案遗迹搜寻", "description": "在虚空档案遗迹开始探索，等待结算并在遭遇中取胜。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.void_archive:void_archive.return.7"]},
+      "next_stage_key": "void_archive.return.8",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "同门归途尚未守住时关卡保持进行中，不扣主线奖励；恢复体力与虚力后重新探索并在遭遇中取胜，即可万里同门。"
+      },
+      "status": "open",
+      "aliases": ["归乡者七关"],
+      "required_realm": "void_refining",
+      "required_layer": 1,
+      "prerequisites": ["void_archive.return.6"],
+      "first_clear_reward": {"codex.void.route_ruins": 1},
+      "repeat_reward": {"spirit_stones": 8}
+    },
+    {
+      "key": "void_archive.return.8",
+      "story_key": "story.mainline.void_archive",
+      "chapter": 3,
+      "stage": 8,
+      "name": "归乡见天",
+      "desc": "你携档案归来，星门在身后合拢，眼前只剩一片可继续修行的清明天色。",
+      "body": "最后一程是把档案带回门户。归乡八关要从档案遗迹回到虚空门户：携卷归来，让星门在身后合拢，眼前只剩一片可以继续修行的清明天色。走不到门户，这一卷就还留在虚空里，归乡也还差最后一步。",
+      "objectives": [
+        {"key": "return_through_the_gate", "type": "travel_arrival", "label": "结算行程抵达虚空门户", "destination_key": "void.portal"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "虚空门户", "description": "从虚空档案遗迹返回虚空门户，等待行程结束并结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.void_archive:void_archive.return.8"]},
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未抵达虚空门户时关卡保持进行中，不扣主线奖励；恢复体力后重新启程并结算移动，即可归乡见天。"
+      },
+      "status": "open",
+      "aliases": ["归乡者终关"],
+      "required_realm": "void_refining",
+      "required_layer": 1,
+      "prerequisites": ["void_archive.return.7"],
+      "first_clear_reward": {"codex.void.route_ruins": 1, "spirit_stones": 20},
+      "repeat_reward": {"spirit_stones": 12}
+    },
+    {
+      "key": "lane.builder.chapter.01",
+      "story_key": "story.mainline.dao_echoes",
+      "chapter": 1,
+      "stage": 1,
+      "lane": "builder",
+      "lane_name": "建设者",
+      "name": "检校旧碑",
+      "desc": "你从玄天旧碑校正三界道路的刻痕。",
+      "body": "三界共用的道路要从一块旧碑重新量起。建设者一关先回到青石镇，在玄天旧碑前校正三界道路的刻痕：把被风沙磨平的里程与岔口一一记下，再与今日的实际路况对照。碑文只认亲自走到碑前的人，隔着传闻校不出刻痕。",
+      "objectives": [
+        {"key": "survey_old_stele", "type": "travel_arrival", "label": "结算行程抵达青石镇", "destination_key": "xuantian.new_town"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "青石镇", "description": "回到青石镇旧碑前，等待行程结束并结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.dao_echoes:lane.builder.chapter.01"]},
+      "next_stage_key": "lane.builder.chapter.02",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未抵达青石镇时关卡保持进行中，不扣主线奖励；恢复体力后重新启程并结算移动，即可检校旧碑。"
+      },
+      "status": "open",
+      "required_realm": "void_refining",
+      "required_layer": 10,
+      "prerequisites": [],
+      "first_clear_reward": {"codex.story.dao_echoes.builder.chapter.01": 1},
+      "repeat_reward": {}
+    },
+    {
+      "key": "lane.builder.chapter.02",
+      "story_key": "story.mainline.dao_echoes",
+      "chapter": 1,
+      "stage": 2,
+      "lane": "builder",
+      "lane_name": "建设者",
+      "name": "补绘河图",
+      "desc": "你把魔界商路与玄天水脉补入共用地图。",
+      "body": "旧碑校完，河图还缺魔界那一段。建设者二关要沿许可路线进入魔界堕落遗迹，在探索中取回契约线索：把魔界商路的走向与补给点补进共用地图，不让后来者凭传言过境。线索只在遗迹深处，走不到就补不上这一段。",
+      "objectives": [
+        {"key": "map_demon_road", "type": "exploration_reward", "label": "在魔界堕落遗迹探索中取得契约线索", "mode_key": "explore.demon_abyss", "location_key": "demon.fallen_ruins", "item_key": "item.clue.demon_contract", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "魔界堕落遗迹探索", "description": "在魔界堕落遗迹开始探索，等待结算并取得契约线索。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.dao_echoes:lane.builder.chapter.02"]},
+      "next_stage_key": "lane.builder.chapter.03",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未取得契约线索时关卡保持进行中，不扣主线奖励；恢复体力与虚力后重新探索，即可补绘河图。"
+      },
+      "status": "open",
+      "required_realm": "void_refining",
+      "required_layer": 10,
+      "prerequisites": ["lane.builder.chapter.01"],
+      "first_clear_reward": {"codex.story.dao_echoes.builder.chapter.02": 1},
+      "repeat_reward": {}
+    },
+    {
+      "key": "lane.builder.chapter.03",
+      "story_key": "story.mainline.dao_echoes",
+      "chapter": 1,
+      "stage": 3,
+      "lane": "builder",
+      "lane_name": "建设者",
+      "name": "修复灵脉",
+      "desc": "你记录妖界愿意开放的灵脉节点，不取走源头。",
+      "body": "魔界一段补齐，妖界的灵脉节点还空着。建设者三关要在万兽山狩猎中取回血脉线索：记下妖界愿意开放的灵脉节点，只登记入口，不取走源头。灵脉归妖界所有，线索要自己猎回来，旁人代记的节点不作数。",
+      "objectives": [
+        {"key": "record_beast_nodes", "type": "exploration_reward", "label": "在万兽山狩猎中取得血脉线索", "mode_key": "explore.beast_hunt", "location_key": "beast.ten_thousand_hills", "item_key": "item.clue.beast_bloodline", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "万兽山狩猎", "description": "在万兽山入口开始探索，等待结算并取得血脉线索。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.dao_echoes:lane.builder.chapter.03"]},
+      "next_stage_key": "lane.builder.chapter.04",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未取得血脉线索时关卡保持进行中，不扣主线奖励；恢复体力与虚力后重新探索，即可修复灵脉。"
+      },
+      "status": "open",
+      "required_realm": "void_refining",
+      "required_layer": 10,
+      "prerequisites": ["lane.builder.chapter.02"],
+      "first_clear_reward": {"codex.story.dao_echoes.builder.chapter.03": 1},
+      "repeat_reward": {}
+    },
+    {
+      "key": "lane.builder.chapter.04",
+      "story_key": "story.mainline.dao_echoes",
+      "chapter": 1,
+      "stage": 4,
+      "lane": "builder",
+      "lane_name": "建设者",
+      "name": "搭建互市",
+      "desc": "三界代表确认互市只交换自愿交付的物资。",
+      "body": "两界的路都通了，还需要一个三界都认的互市。建设者四关要从万兽山入口前往三界贸易口，与三界代表当面确认互市只交换自愿交付的物资。互市认的是到场的人，没到过贸易口，就谈不成这一场。",
+      "objectives": [
+        {"key": "open_shared_market", "type": "travel_arrival", "label": "结算行程抵达三界贸易口", "destination_key": "beast.three_realms_trade_port"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "三界贸易口", "description": "从万兽山入口前往三界贸易口，等待行程结束并结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.dao_echoes:lane.builder.chapter.04"]},
+      "next_stage_key": "lane.builder.chapter.05",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未抵达三界贸易口时关卡保持进行中，不扣主线奖励；恢复体力后重新启程并结算移动，即可搭建互市。"
+      },
+      "status": "open",
+      "required_realm": "void_refining",
+      "required_layer": 10,
+      "prerequisites": ["lane.builder.chapter.03"],
+      "first_clear_reward": {"codex.story.dao_echoes.builder.chapter.04": 1},
+      "repeat_reward": {}
+    },
+    {
+      "key": "lane.builder.chapter.05",
+      "story_key": "story.mainline.dao_echoes",
+      "chapter": 1,
+      "stage": 5,
+      "lane": "builder",
+      "lane_name": "建设者",
+      "name": "重立界标",
+      "desc": "你为不同语言和习俗并存的边界立下新界标。",
+      "body": "互市立起来了，边界却还是旧界标。建设者五关要先进入界隙秘境：在语言与习俗并存的交界处立下新界标，让不同来路的人都能认出自己走到哪里。秘境只认走完前面几程的人，没到过就立不稳这根界标。",
+      "objectives": [
+        {"key": "raise_new_boundary", "type": "travel_arrival", "label": "结算行程抵达界隙秘境", "destination_key": "cave.boundary_realm"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "界隙秘境", "description": "从魔界战线进入界隙秘境，等待行程结束并结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.dao_echoes:lane.builder.chapter.05"]},
+      "next_stage_key": "lane.builder.chapter.06",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未抵达界隙秘境时关卡保持进行中，不扣主线奖励；恢复体力后重新启程并结算移动，即可重立界标。"
+      },
+      "status": "open",
+      "required_realm": "void_refining",
+      "required_layer": 10,
+      "prerequisites": ["lane.builder.chapter.04"],
+      "first_clear_reward": {"codex.story.dao_echoes.builder.chapter.05": 1},
+      "repeat_reward": {}
+    },
+    {
+      "key": "lane.builder.chapter.06",
+      "story_key": "story.mainline.dao_echoes",
+      "chapter": 1,
+      "stage": 6,
+      "lane": "builder",
+      "lane_name": "建设者",
+      "name": "补缀界壁",
+      "desc": "你与各界工匠修补裂隙，不抹去旧有疆界。",
+      "body": "界标立好，界壁上的裂隙还在渗风。建设者六关要在界隙巡查中正面接战：与各界工匠一同修补裂隙，把袭来的异物挡在壁外，不抹去旧有疆界。接不住这一战，刚立好的界标会被风从裂缝里吹走。",
+      "objectives": [
+        {"key": "mend_the_wall", "type": "exploration_battle_victory", "label": "在界隙巡查中守住修补之战", "mode_key": "explore.boundary_rift", "location_key": "cave.boundary_realm"}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "界隙巡查", "description": "在界隙秘境开始探索，等待结算并在遭遇中取胜。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.dao_echoes:lane.builder.chapter.06"]},
+      "next_stage_key": "lane.builder.chapter.07",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "修补之战尚未守住时关卡保持进行中，不扣主线奖励；恢复体力与虚力后重新探索并在遭遇中取胜，即可补缀界壁。"
+      },
+      "status": "open",
+      "required_realm": "void_refining",
+      "required_layer": 10,
+      "prerequisites": ["lane.builder.chapter.05"],
+      "first_clear_reward": {"codex.story.dao_echoes.builder.chapter.06": 1},
+      "repeat_reward": {}
+    },
+    {
+      "key": "lane.builder.chapter.07",
+      "story_key": "story.mainline.dao_echoes",
+      "chapter": 1,
+      "stage": 7,
+      "lane": "builder",
+      "lane_name": "建设者",
+      "name": "汇合三源",
+      "desc": "三界各自交出一枚可撤回的道源校验印。",
+      "body": "界壁补上了，三界的道源校验印还要汇到一处。建设者七关要沿虚空第一航道探索，取回虚空晶：以晶石为凭，把三界各自交出的可撤回校验印合成一源。晶石要在航道里自己巡回来，借来的晶不认这一源。",
+      "objectives": [
+        {"key": "merge_three_sources", "type": "exploration_reward", "label": "在虚空第一航道探索中取得虚空晶", "mode_key": "explore.void_route", "location_key": "void.first_route", "item_key": "item.void_crystal", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "虚空航道历练", "description": "在虚空第一航道开始探索，等待结算并取得虚空晶。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.dao_echoes:lane.builder.chapter.07"]},
+      "next_stage_key": "lane.builder.chapter.08",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未取得虚空晶时关卡保持进行中，不扣主线奖励；恢复体力与虚力后重新探索，即可汇合三源。"
+      },
+      "status": "open",
+      "required_realm": "void_refining",
+      "required_layer": 10,
+      "prerequisites": ["lane.builder.chapter.06"],
+      "first_clear_reward": {"codex.story.dao_echoes.builder.chapter.07": 1},
+      "repeat_reward": {}
+    },
+    {
+      "key": "lane.builder.chapter.08",
+      "story_key": "story.mainline.dao_echoes",
+      "chapter": 1,
+      "stage": 8,
+      "lane": "builder",
+      "lane_name": "建设者",
+      "name": "立约共修",
+      "desc": "你把维护责任分给三界，而非交给单一宗门。",
+      "body": "三源汇合，共修之约要有个可查的落处。建设者八关要从第一航道深入虚空档案遗迹：把立约共修的条文存进档案，让维护责任分给三界而非单一宗门。遗迹只认走过航道的人，没走到就存不进这一约。",
+      "objectives": [
+        {"key": "seal_shared_covenant", "type": "travel_arrival", "label": "结算行程抵达虚空档案遗迹", "destination_key": "void.archive_ruins"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "虚空档案遗迹", "description": "从虚空第一航道深入虚空档案遗迹，等待行程结束并结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.dao_echoes:lane.builder.chapter.08"]},
+      "next_stage_key": "lane.builder.chapter.09",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未抵达虚空档案遗迹时关卡保持进行中，不扣主线奖励；恢复体力后重新启程并结算移动，即可立约共修。"
+      },
+      "status": "open",
+      "required_realm": "void_refining",
+      "required_layer": 10,
+      "prerequisites": ["lane.builder.chapter.07"],
+      "first_clear_reward": {"codex.story.dao_echoes.builder.chapter.08": 1},
+      "repeat_reward": {}
+    },
+    {
+      "key": "lane.builder.chapter.09",
+      "story_key": "story.mainline.dao_echoes",
+      "chapter": 1,
+      "stage": 9,
+      "lane": "builder",
+      "lane_name": "建设者",
+      "name": "回望代价",
+      "desc": "你登记工程代价与未解决的异议，供后来者查阅。",
+      "body": "约立下了，工程付出的代价也得如实登记。建设者九关要在档案遗迹探索中取回档案残片·乙：把耗去的材料、耽误的行程与未解决的异议一并写入，供后来者查阅。残片要自己找回来，别人的转述登不进档案。",
+      "objectives": [
+        {"key": "record_the_cost", "type": "exploration_reward", "label": "在档案遗迹探索中取得档案残片·乙", "mode_key": "explore.archive_ruins", "location_key": "void.archive_ruins", "item_key": "item.archive_fragment.beta", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "档案遗迹搜寻", "description": "在虚空档案遗迹开始探索，等待结算并取得档案残片·乙。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.dao_echoes:lane.builder.chapter.09"]},
+      "next_stage_key": "lane.builder.chapter.10",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未取得残片·乙时关卡保持进行中，不扣主线奖励；恢复体力与虚力后重新探索，即可回望代价。"
+      },
+      "status": "open",
+      "required_realm": "void_refining",
+      "required_layer": 10,
+      "prerequisites": ["lane.builder.chapter.08"],
+      "first_clear_reward": {"codex.story.dao_echoes.builder.chapter.09": 1},
+      "repeat_reward": {}
+    },
+    {
+      "key": "lane.builder.chapter.10",
+      "story_key": "story.mainline.dao_echoes",
+      "chapter": 1,
+      "stage": 10,
+      "lane": "builder",
+      "lane_name": "建设者",
+      "name": "道统新章",
+      "desc": "三界共同确认工程可以延续，也可以由后人修改。",
+      "body": "代价登记完毕，最后一步是把这一章交给道源门。建设者终关要以合道修为携道果碎片从档案遗迹启程，前往道源门：三界共同确认工程可以延续，也可以由后人修改。道源门只认合道六层与到手的道果，修为不到，门不会开。",
+      "objectives": [
+        {"key": "open_the_new_chapter", "type": "travel_arrival", "label": "结算行程抵达道源门", "destination_key": "dao.origin_gate"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "道源门", "description": "从虚空档案遗迹启程前往道源门，等待行程结束并结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.dao_echoes:lane.builder.chapter.10"]},
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未抵达道源门时关卡保持进行中，不扣主线奖励；备齐道果碎片并恢复体力后重新启程，即可开启道统新章。"
+      },
+      "status": "open",
+      "required_realm": "dao_union",
+      "required_layer": 6,
+      "prerequisites": ["lane.builder.chapter.09"],
+      "first_clear_reward": {"codex.story.dao_echoes.builder.chapter.10": 1},
+      "repeat_reward": {}
+    },
+    {
+      "key": "lane.witness.chapter.01",
+      "story_key": "story.mainline.dao_echoes",
+      "chapter": 1,
+      "stage": 1,
+      "lane": "witness",
+      "lane_name": "见证者",
+      "name": "收录旧誓",
+      "desc": "你收录三界旧约原文，不把互相矛盾的誓言删去。",
+      "body": "见证从原文开始。见证者一关要先到云城，把三界旧约的原文逐条收录：互相矛盾的誓言照录不删，只标注出处与年代。云城藏录只对亲自到场的人开放，隔着一界抄来的誓词不作数。",
+      "objectives": [
+        {"key": "collect_old_oaths", "type": "travel_arrival", "label": "结算行程抵达云城", "destination_key": "xuantian.cloud_city"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "玄天界·云城", "description": "前往云城藏录，等待行程结束并结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.dao_echoes:lane.witness.chapter.01"]},
+      "next_stage_key": "lane.witness.chapter.02",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未抵达云城时关卡保持进行中，不扣主线奖励；恢复体力后重新启程并结算移动，即可收录旧誓。"
+      },
+      "status": "open",
+      "required_realm": "void_refining",
+      "required_layer": 10,
+      "prerequisites": [],
+      "first_clear_reward": {"codex.story.dao_echoes.witness.chapter.01": 1},
+      "repeat_reward": {}
+    },
+    {
+      "key": "lane.witness.chapter.02",
+      "story_key": "story.mainline.dao_echoes",
+      "chapter": 1,
+      "stage": 2,
+      "lane": "witness",
+      "lane_name": "见证者",
+      "name": "听取三界",
+      "desc": "你分别记录玄天、魔界和妖界的陈述与诉求。",
+      "body": "原文录完，还要听当事人怎么说。见证者二关要从魔渊入口前往魔渊集市，分别记录魔界一方的陈述与诉求：他们愿意开放什么、坚持什么，都要按原话记下。集市认的是到场的人，没到过就听不到这一面之词。",
+      "objectives": [
+        {"key": "hear_three_realms", "type": "travel_arrival", "label": "结算行程抵达魔渊集市", "destination_key": "demon.abyss_market"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "魔渊集市", "description": "从魔渊入口前往魔渊集市，等待行程结束并结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.dao_echoes:lane.witness.chapter.02"]},
+      "next_stage_key": "lane.witness.chapter.03",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未抵达魔渊集市时关卡保持进行中，不扣主线奖励；恢复体力后重新启程并结算移动，即可听取三界。"
+      },
+      "status": "open",
+      "required_realm": "void_refining",
+      "required_layer": 10,
+      "prerequisites": ["lane.witness.chapter.01"],
+      "first_clear_reward": {"codex.story.dao_echoes.witness.chapter.02": 1},
+      "repeat_reward": {}
+    },
+    {
+      "key": "lane.witness.chapter.03",
+      "story_key": "story.mainline.dao_echoes",
+      "chapter": 1,
+      "stage": 3,
+      "lane": "witness",
+      "lane_name": "见证者",
+      "name": "辨清旧争",
+      "desc": "你将争端中的事实、推测和传闻分开存档。",
+      "body": "陈述听过了，旧争里的虚实还得分开。见证者三关要在堕落遗迹探索中取回魔核：把争端中的事实、推测与传闻分开存档，让后来者知道哪一条有实物可查。魔核是实物凭据，要自己找回来，传闻不算证据。",
+      "objectives": [
+        {"key": "separate_old_disputes", "type": "exploration_reward", "label": "在魔界堕落遗迹探索中取得魔核", "mode_key": "explore.demon_abyss", "location_key": "demon.fallen_ruins", "item_key": "item.demon_core", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "魔界堕落遗迹探索", "description": "在魔界堕落遗迹开始探索，等待结算并取得魔核。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.dao_echoes:lane.witness.chapter.03"]},
+      "next_stage_key": "lane.witness.chapter.04",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未取得魔核时关卡保持进行中，不扣主线奖励；恢复体力与虚力后重新探索，即可辨清旧争。"
+      },
+      "status": "open",
+      "required_realm": "void_refining",
+      "required_layer": 10,
+      "prerequisites": ["lane.witness.chapter.02"],
+      "first_clear_reward": {"codex.story.dao_echoes.witness.chapter.03": 1},
+      "repeat_reward": {}
+    },
+    {
+      "key": "lane.witness.chapter.04",
+      "story_key": "story.mainline.dao_echoes",
+      "chapter": 1,
+      "stage": 4,
+      "lane": "witness",
+      "lane_name": "见证者",
+      "name": "见证守卫",
+      "desc": "你记录一次边境防御的参与者与各方损失。",
+      "body": "分清旧争之后，边境上的守卫战正打到一半。见证者四关要在堕落遗迹探索中正面接战：记录一次边境防御的参与者与各方损失，不替任何一方美化战果。接不住这一战，记录就只剩下赢家的说法。",
+      "objectives": [
+        {"key": "witness_the_defense", "type": "exploration_battle_victory", "label": "在魔界堕落遗迹探索中守住见证之战", "mode_key": "explore.demon_abyss", "location_key": "demon.fallen_ruins"}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "魔界堕落遗迹探索", "description": "在魔界堕落遗迹开始探索，等待结算并在遭遇中取胜。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.dao_echoes:lane.witness.chapter.04"]},
+      "next_stage_key": "lane.witness.chapter.05",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "见证之战尚未守住时关卡保持进行中，不扣主线奖励；恢复体力与虚力后重新探索并在遭遇中取胜，即可见证守卫。"
+      },
+      "status": "open",
+      "required_realm": "void_refining",
+      "required_layer": 10,
+      "prerequisites": ["lane.witness.chapter.03"],
+      "first_clear_reward": {"codex.story.dao_echoes.witness.chapter.04": 1},
+      "repeat_reward": {}
+    },
+    {
+      "key": "lane.witness.chapter.05",
+      "story_key": "story.mainline.dao_echoes",
+      "chapter": 1,
+      "stage": 5,
+      "lane": "witness",
+      "lane_name": "见证者",
+      "name": "见证互助",
+      "desc": "你把一次跨界救援记为共同完成，而非单方恩赐。",
+      "body": "守卫战记下了，跨界救援也该有人作证。见证者五关要在祖灵湖探索中正面接战：把一次跨界救援记为共同完成，而非单方恩赐。祖灵湖只对妖界声望足够的人开放，接不住这一战，救援就只剩一句空话。",
+      "objectives": [
+        {"key": "witness_mutual_aid", "type": "exploration_battle_victory", "label": "在祖灵湖探索中守住救援之战", "mode_key": "explore.ancestral_lake", "location_key": "beast.ancestral_lake"}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "祖灵湖探索", "description": "在祖灵湖开始探索，等待结算并在遭遇中取胜。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.dao_echoes:lane.witness.chapter.05"]},
+      "next_stage_key": "lane.witness.chapter.06",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "救援之战尚未守住时关卡保持进行中，不扣主线奖励；恢复体力与虚力后重新探索并在遭遇中取胜，即可见证互助。"
+      },
+      "status": "open",
+      "required_realm": "void_refining",
+      "required_layer": 10,
+      "prerequisites": ["lane.witness.chapter.04"],
+      "first_clear_reward": {"codex.story.dao_echoes.witness.chapter.05": 1},
+      "repeat_reward": {}
+    },
+    {
+      "key": "lane.witness.chapter.06",
+      "story_key": "story.mainline.dao_echoes",
+      "chapter": 1,
+      "stage": 6,
+      "lane": "witness",
+      "lane_name": "见证者",
+      "name": "核验盟约",
+      "desc": "你逐条核对盟约文本与实际履行记录。",
+      "body": "救援记下了，盟约还要逐条核对。见证者六关要在万兽山狩猎中取回兽血：以兽血为凭，核对盟约文本与实际履行记录，把写了却没做的条目单独标出。兽血要自己猎回来，空口核对不出履行。",
+      "objectives": [
+        {"key": "verify_the_pact", "type": "exploration_reward", "label": "在万兽山狩猎中取得兽血", "mode_key": "explore.beast_hunt", "location_key": "beast.ten_thousand_hills", "item_key": "item.beast_blood", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "万兽山狩猎", "description": "在万兽山入口开始探索，等待结算并取得兽血。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.dao_echoes:lane.witness.chapter.06"]},
+      "next_stage_key": "lane.witness.chapter.07",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未取得兽血时关卡保持进行中，不扣主线奖励；恢复体力与虚力后重新探索，即可核验盟约。"
+      },
+      "status": "open",
+      "required_realm": "void_refining",
+      "required_layer": 10,
+      "prerequisites": ["lane.witness.chapter.05"],
+      "first_clear_reward": {"codex.story.dao_echoes.witness.chapter.06": 1},
+      "repeat_reward": {}
+    },
+    {
+      "key": "lane.witness.chapter.07",
+      "story_key": "story.mainline.dao_echoes",
+      "chapter": 1,
+      "stage": 7,
+      "lane": "witness",
+      "lane_name": "见证者",
+      "name": "保留异议",
+      "desc": "你为未签署盟约的意见保留同等可查的档案。",
+      "body": "盟约核完了，未签署的意见也不能丢。见证者七关要从万兽山入口前往三界贸易口，为未签署盟约的一界保留同等可查的档案：异议与正文并列存档，谁都能调阅。贸易口认的是到场的人，没到过就存不进这一份。",
+      "objectives": [
+        {"key": "keep_the_dissent", "type": "travel_arrival", "label": "结算行程抵达三界贸易口", "destination_key": "beast.three_realms_trade_port"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "三界贸易口", "description": "从万兽山入口前往三界贸易口，等待行程结束并结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.dao_echoes:lane.witness.chapter.07"]},
+      "next_stage_key": "lane.witness.chapter.08",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未抵达三界贸易口时关卡保持进行中，不扣主线奖励；恢复体力后重新启程并结算移动，即可保留异议。"
+      },
+      "status": "open",
+      "required_realm": "void_refining",
+      "required_layer": 10,
+      "prerequisites": ["lane.witness.chapter.06"],
+      "first_clear_reward": {"codex.story.dao_echoes.witness.chapter.07": 1},
+      "repeat_reward": {}
+    },
+    {
+      "key": "lane.witness.chapter.08",
+      "story_key": "story.mainline.dao_echoes",
+      "chapter": 1,
+      "stage": 8,
+      "lane": "witness",
+      "lane_name": "见证者",
+      "name": "确认代价",
+      "desc": "你将停战与合作的代价写入公开记录。",
+      "body": "异议存好了，停战与合作的代价也要写进公开记录。见证者八关要在虚空档案遗迹探索中取回档案残片·丙：把各方付出的代价如实登记，不因结局好看就略去损失。残片要自己找回来，别人代写的不算公开记录。",
+      "objectives": [
+        {"key": "confirm_the_cost", "type": "exploration_reward", "label": "在档案遗迹探索中取得档案残片·丙", "mode_key": "explore.archive_ruins", "location_key": "void.archive_ruins", "item_key": "item.archive_fragment.gamma", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "档案遗迹搜寻", "description": "在虚空档案遗迹开始探索，等待结算并取得档案残片·丙。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.dao_echoes:lane.witness.chapter.08"]},
+      "next_stage_key": "lane.witness.chapter.09",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未取得残片·丙时关卡保持进行中，不扣主线奖励；恢复体力与虚力后重新探索，即可确认代价。"
+      },
+      "status": "open",
+      "required_realm": "void_refining",
+      "required_layer": 10,
+      "prerequisites": ["lane.witness.chapter.07"],
+      "first_clear_reward": {"codex.story.dao_echoes.witness.chapter.08": 1},
+      "repeat_reward": {}
+    },
+    {
+      "key": "lane.witness.chapter.09",
+      "story_key": "story.mainline.dao_echoes",
+      "chapter": 1,
+      "stage": 9,
+      "lane": "witness",
+      "lane_name": "见证者",
+      "name": "保存全录",
+      "desc": "你完成三界档案副本，任何一界都可核验其内容。",
+      "body": "代价确认之后，整份记录要有一个可核验的副本。见证者九关要在档案遗迹探索中取回虚空档案：完成三界档案副本，任何一界都能核验其内容。档案要自己刻回来，单方留存的抄本不作数。",
+      "objectives": [
+        {"key": "keep_the_full_record", "type": "exploration_reward", "label": "在档案遗迹探索中取得虚空档案", "mode_key": "explore.archive_ruins", "location_key": "void.archive_ruins", "item_key": "item.void_archive", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "档案遗迹搜寻", "description": "在虚空档案遗迹开始探索，等待结算并取得虚空档案。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.dao_echoes:lane.witness.chapter.09"]},
+      "next_stage_key": "lane.witness.chapter.10",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未取得虚空档案时关卡保持进行中，不扣主线奖励；恢复体力与虚力后重新探索，即可保存全录。"
+      },
+      "status": "open",
+      "required_realm": "void_refining",
+      "required_layer": 10,
+      "prerequisites": ["lane.witness.chapter.08"],
+      "first_clear_reward": {"codex.story.dao_echoes.witness.chapter.09": 1},
+      "repeat_reward": {}
+    },
+    {
+      "key": "lane.witness.chapter.10",
+      "story_key": "story.mainline.dao_echoes",
+      "chapter": 1,
+      "stage": 10,
+      "lane": "witness",
+      "lane_name": "见证者",
+      "name": "不替众人选择",
+      "desc": "你把记录交还三界，不替任何人决定共同结局。",
+      "body": "副本做成了，最后一步是把记录交还三界。见证者终关要从第一航道深入虚空档案遗迹，把全录交给三界，不替任何人决定共同结局。遗迹只认走过航道的人，没走到就交不回这一份记录。",
+      "objectives": [
+        {"key": "return_the_record", "type": "travel_arrival", "label": "结算行程抵达虚空档案遗迹", "destination_key": "void.archive_ruins"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "虚空档案遗迹", "description": "从虚空第一航道深入虚空档案遗迹，等待行程结束并结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.dao_echoes:lane.witness.chapter.10"]},
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未抵达虚空档案遗迹时关卡保持进行中，不扣主线奖励；恢复体力后重新启程并结算移动，即可把记录交还三界。"
+      },
+      "status": "open",
+      "required_realm": "void_refining",
+      "required_layer": 10,
+      "prerequisites": ["lane.witness.chapter.09"],
+      "first_clear_reward": {"codex.story.dao_echoes.witness.chapter.10": 1},
+      "repeat_reward": {}
+    },
+    {
+      "key": "lane.traveler.chapter.01",
+      "story_key": "story.mainline.dao_echoes",
+      "chapter": 1,
+      "stage": 1,
+      "lane": "traveler",
+      "lane_name": "远行者",
+      "name": "走访玄天",
+      "desc": "你从玄天出发，确认旧有道路仍可安全通行。",
+      "body": "远行从最熟悉的一段路开始。远行者一关要从宗门山门出发，确认玄天旧有道路仍可安全通行：把沿途的路况与落脚处记下，为后面的三界行程做准备。山门只认亲自启程的人，没走过就谈不上确认。",
+      "objectives": [
+        {"key": "walk_the_home_roads", "type": "travel_arrival", "label": "结算行程抵达宗门山门", "destination_key": "xuantian.sect_gate"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "宗门山门", "description": "前往宗门山门启程，等待行程结束并结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.dao_echoes:lane.traveler.chapter.01"]},
+      "next_stage_key": "lane.traveler.chapter.02",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未抵达宗门山门时关卡保持进行中，不扣主线奖励；恢复体力后重新启程并结算移动，即可走访玄天。"
+      },
+      "status": "open",
+      "required_realm": "void_refining",
+      "required_layer": 10,
+      "prerequisites": [],
+      "first_clear_reward": {"codex.story.dao_echoes.traveler.chapter.01": 1},
+      "repeat_reward": {}
+    },
+    {
+      "key": "lane.traveler.chapter.02",
+      "story_key": "story.mainline.dao_echoes",
+      "chapter": 1,
+      "stage": 2,
+      "lane": "traveler",
+      "lane_name": "远行者",
+      "name": "渡过魔土",
+      "desc": "你沿许可路线穿过魔界，记录沿途补给点。",
+      "body": "玄天一段确认了，接下来是魔土。远行者二关要先乘云舟抵达魔渊入口，再沿许可路线深入堕落遗迹：记录沿途的补给点与避让处，不带走任何未经许可之物。魔界只认持许可的人，路线走错一步就过不去。",
+      "objectives": [
+        {"key": "cross_the_demon_land", "type": "travel_arrival", "label": "结算行程抵达堕落遗迹", "destination_key": "demon.fallen_ruins"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "堕落遗迹", "description": "从魔渊入口沿许可路线前往堕落遗迹，等待行程结束并结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.dao_echoes:lane.traveler.chapter.02"]},
+      "next_stage_key": "lane.traveler.chapter.03",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未抵达堕落遗迹时关卡保持进行中，不扣主线奖励；恢复体力后重新启程并结算移动，即可渡过魔土。"
+      },
+      "status": "open",
+      "required_realm": "void_refining",
+      "required_layer": 10,
+      "prerequisites": ["lane.traveler.chapter.01"],
+      "first_clear_reward": {"codex.story.dao_echoes.traveler.chapter.02": 1},
+      "repeat_reward": {}
+    },
+    {
+      "key": "lane.traveler.chapter.03",
+      "story_key": "story.mainline.dao_echoes",
+      "chapter": 1,
+      "stage": 3,
+      "lane": "traveler",
+      "lane_name": "远行者",
+      "name": "寻访妖庭",
+      "desc": "你到访妖界聚落，依当地规矩递交来意。",
+      "body": "魔土渡过了，妖界的聚落还得亲自到访。远行者三关要从云舟渡口前往万兽山入口，依当地规矩递交来意：把妖界的通行约定与禁忌记下，不擅自踏入未开放之地。妖界只认守规矩的来客，硬闯就再无下一次。",
+      "objectives": [
+        {"key": "visit_the_beast_halls", "type": "travel_arrival", "label": "结算行程抵达万兽山入口", "destination_key": "beast.ten_thousand_hills"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "万兽山入口", "description": "从云舟渡口前往万兽山入口，等待行程结束并结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.dao_echoes:lane.traveler.chapter.03"]},
+      "next_stage_key": "lane.traveler.chapter.04",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未抵达万兽山入口时关卡保持进行中，不扣主线奖励；恢复体力后重新启程并结算移动，即可寻访妖庭。"
+      },
+      "status": "open",
+      "required_realm": "void_refining",
+      "required_layer": 10,
+      "prerequisites": ["lane.traveler.chapter.02"],
+      "first_clear_reward": {"codex.story.dao_echoes.traveler.chapter.03": 1},
+      "repeat_reward": {}
+    },
+    {
+      "key": "lane.traveler.chapter.04",
+      "story_key": "story.mainline.dao_echoes",
+      "chapter": 1,
+      "stage": 4,
+      "lane": "traveler",
+      "lane_name": "远行者",
+      "name": "巡查界隙",
+      "desc": "你巡查三界交界处，标记可通行与需避让的区域。",
+      "body": "三界都走到了，交界处还要巡一遍。远行者四关要在界隙巡查中正面接战：标记可通行与需避让的区域，把袭来的异物挡在巡查线之外。接不住这一战，标好的通行区会被裂隙重新吞掉。",
+      "objectives": [
+        {"key": "patrol_the_rift", "type": "exploration_battle_victory", "label": "在界隙巡查中守住巡查线", "mode_key": "explore.boundary_rift", "location_key": "cave.boundary_realm"}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "界隙巡查", "description": "在界隙秘境开始探索，等待结算并在遭遇中取胜。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.dao_echoes:lane.traveler.chapter.04"]},
+      "next_stage_key": "lane.traveler.chapter.05",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "巡查线尚未守住时关卡保持进行中，不扣主线奖励；恢复体力与虚力后重新探索并在遭遇中取胜，即可巡查界隙。"
+      },
+      "status": "open",
+      "required_realm": "void_refining",
+      "required_layer": 10,
+      "prerequisites": ["lane.traveler.chapter.03"],
+      "first_clear_reward": {"codex.story.dao_echoes.traveler.chapter.04": 1},
+      "repeat_reward": {}
+    },
+    {
+      "key": "lane.traveler.chapter.05",
+      "story_key": "story.mainline.dao_echoes",
+      "chapter": 1,
+      "stage": 5,
+      "lane": "traveler",
+      "lane_name": "远行者",
+      "name": "抵达档案",
+      "desc": "你把一路见闻交给虚空档案遗迹保存。",
+      "body": "巡查完界隙，一路见闻要有个归处。远行者五关要从虚空门户启程，经第一航道深入虚空档案遗迹：把三界的见闻交给档案保存，让后来者能查到这段路。遗迹只认走过航道的人，没走到就存不下来。",
+      "objectives": [
+        {"key": "deliver_to_the_archive", "type": "travel_arrival", "label": "结算行程抵达虚空档案遗迹", "destination_key": "void.archive_ruins"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "虚空档案遗迹", "description": "从虚空第一航道深入虚空档案遗迹，等待行程结束并结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.dao_echoes:lane.traveler.chapter.05"]},
+      "next_stage_key": "lane.traveler.chapter.06",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未抵达虚空档案遗迹时关卡保持进行中，不扣主线奖励；恢复体力后重新启程并结算移动，即可抵达档案。"
+      },
+      "status": "open",
+      "required_realm": "void_refining",
+      "required_layer": 10,
+      "prerequisites": ["lane.traveler.chapter.04"],
+      "first_clear_reward": {"codex.story.dao_echoes.traveler.chapter.05": 1},
+      "repeat_reward": {}
+    },
+    {
+      "key": "lane.traveler.chapter.06",
+      "story_key": "story.mainline.dao_echoes",
+      "chapter": 1,
+      "stage": 6,
+      "lane": "traveler",
+      "lane_name": "远行者",
+      "name": "重返三界",
+      "desc": "你带回三地各自认可的路线副本。",
+      "body": "见闻存进档案，还要把路线副本带回三界。远行者六关要从档案遗迹返回万兽山入口，再前往三界贸易口：带回三地各自认可的路线副本，让每一界都留一份。贸易口认的是到场的人，没到过就交不出副本。",
+      "objectives": [
+        {"key": "bring_back_the_routes", "type": "travel_arrival", "label": "结算行程抵达三界贸易口", "destination_key": "beast.three_realms_trade_port"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "三界贸易口", "description": "从万兽山入口前往三界贸易口，等待行程结束并结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.dao_echoes:lane.traveler.chapter.06"]},
+      "next_stage_key": "lane.traveler.chapter.07",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未抵达三界贸易口时关卡保持进行中，不扣主线奖励；恢复体力后重新启程并结算移动，即可重返三界。"
+      },
+      "status": "open",
+      "required_realm": "void_refining",
+      "required_layer": 10,
+      "prerequisites": ["lane.traveler.chapter.05"],
+      "first_clear_reward": {"codex.story.dao_echoes.traveler.chapter.06": 1},
+      "repeat_reward": {}
+    },
+    {
+      "key": "lane.traveler.chapter.07",
+      "story_key": "story.mainline.dao_echoes",
+      "chapter": 1,
+      "stage": 7,
+      "lane": "traveler",
+      "lane_name": "远行者",
+      "name": "交接道路",
+      "desc": "你向接任者说明沿途风险与通行约定。",
+      "body": "副本交回三界，这条路也该有人接手。远行者七关要从万兽山入口返回云舟渡口：向接任者说明沿途风险与通行约定，把路线连同代价一并交代清楚。渡口是航路的起点，没到过渡口，交接就不算完成。",
+      "objectives": [
+        {"key": "hand_over_the_road", "type": "travel_arrival", "label": "结算行程抵达云舟渡口", "destination_key": "xuantian.floating_boat"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "云舟渡口", "description": "从万兽山入口返回云舟渡口，等待行程结束并结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.dao_echoes:lane.traveler.chapter.07"]},
+      "next_stage_key": "lane.traveler.chapter.08",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未抵达云舟渡口时关卡保持进行中，不扣主线奖励；恢复体力后重新启程并结算移动，即可交接道路。"
+      },
+      "status": "open",
+      "required_realm": "void_refining",
+      "required_layer": 10,
+      "prerequisites": ["lane.traveler.chapter.06"],
+      "first_clear_reward": {"codex.story.dao_echoes.traveler.chapter.07": 1},
+      "repeat_reward": {}
+    },
+    {
+      "key": "lane.traveler.chapter.08",
+      "story_key": "story.mainline.dao_echoes",
+      "chapter": 1,
+      "stage": 8,
+      "lane": "traveler",
+      "lane_name": "远行者",
+      "name": "携行消息",
+      "desc": "你传递各界允许公开的消息，不带走私密档案。",
+      "body": "交接完毕，路上还有该带的消息。远行者八关要在魔渊入口备材中取回灵魂晶石：传递各界允许公开的消息，不带走私密档案，晶石只作通行与凭信的记录。晶石要自己在门口备齐，别人的晶不认这一段行程。",
+      "objectives": [
+        {"key": "carry_the_open_news", "type": "exploration_reward", "label": "在魔渊入口备材中取得灵魂晶石", "mode_key": "explore.demon_threshold", "location_key": "demon.abyss_gate", "item_key": "item.soul_crystal", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "深渊门备材", "description": "在魔渊入口开始探索，等待结算并取得灵魂晶石。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.dao_echoes:lane.traveler.chapter.08"]},
+      "next_stage_key": "lane.traveler.chapter.09",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未取得灵魂晶石时关卡保持进行中，不扣主线奖励；恢复体力与虚力后重新探索，即可携行消息。"
+      },
+      "status": "open",
+      "required_realm": "void_refining",
+      "required_layer": 10,
+      "prerequisites": ["lane.traveler.chapter.07"],
+      "first_clear_reward": {"codex.story.dao_echoes.traveler.chapter.08": 1},
+      "repeat_reward": {}
+    },
+    {
+      "key": "lane.traveler.chapter.09",
+      "story_key": "story.mainline.dao_echoes",
+      "chapter": 1,
+      "stage": 9,
+      "lane": "traveler",
+      "lane_name": "远行者",
+      "name": "拒绝捷径",
+      "desc": "你放弃未经许可的捷径，保留可复核的行程。",
+      "body": "消息带到了，最后一段路却摆着一条未经许可的捷径。远行者九关要在虚空第一航道探索中取回虚空锚：放弃捷径、保留可复核的行程，用锚把航线钉在公开航路上。锚要在航道里自己巡回来，抄近路的行程不作数。",
+      "objectives": [
+        {"key": "refuse_the_shortcut", "type": "exploration_reward", "label": "在虚空第一航道探索中取得虚空锚", "mode_key": "explore.void_route", "location_key": "void.first_route", "item_key": "item.void_anchor", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "虚空航道历练", "description": "在虚空第一航道开始探索，等待结算并取得虚空锚。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.dao_echoes:lane.traveler.chapter.09"]},
+      "next_stage_key": "lane.traveler.chapter.10",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未取得虚空锚时关卡保持进行中，不扣主线奖励；恢复体力与虚力后重新探索，即可拒绝捷径。"
+      },
+      "status": "open",
+      "required_realm": "void_refining",
+      "required_layer": 10,
+      "prerequisites": ["lane.traveler.chapter.08"],
+      "first_clear_reward": {"codex.story.dao_echoes.traveler.chapter.09": 1},
+      "repeat_reward": {}
+    },
+    {
+      "key": "lane.traveler.chapter.10",
+      "story_key": "story.mainline.dao_echoes",
+      "chapter": 1,
+      "stage": 10,
+      "lane": "traveler",
+      "lane_name": "远行者",
+      "name": "归来开篇",
+      "desc": "你回到出发地，确认这条路由后来者继续书写。",
+      "body": "最后一程是回到出发地。远行者终关要从云舟渡口返回青石镇：确认这条路由后来者继续书写，把一路的见闻与代价留在碑前。走不到青石镇，这一趟远行就还差最后一步，开篇也还没落笔。",
+      "objectives": [
+        {"key": "return_and_begin", "type": "travel_arrival", "label": "结算行程抵达青石镇", "destination_key": "xuantian.new_town"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "青石镇", "description": "从云舟渡口返回青石镇，等待行程结束并结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.dao_echoes:lane.traveler.chapter.10"]},
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未抵达青石镇时关卡保持进行中，不扣主线奖励；恢复体力后重新启程并结算移动，即可归来开篇。"
+      },
+      "status": "open",
+      "required_realm": "void_refining",
+      "required_layer": 10,
+      "prerequisites": ["lane.traveler.chapter.09"],
+      "first_clear_reward": {"codex.story.dao_echoes.traveler.chapter.10": 1},
+      "repeat_reward": {}
+    },
+    {
+      "key": "chapter.5.stage.1",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 5,
+      "stage": 1,
+      "name": "航路启程",
+      "desc": "拿着合卷的凭证去云舟渡口，把航路的第一段走成自己的脚印。",
+      "body": "合卷的凭证还带着镇务账册的墨香，云舟渡口却已换了风向。云城商会把话说明白：玄天中层的路你已经走完，再往外的航路不由镇口老修士担保，只由肯上船的人自己作数。从青石镇起程，经云城换上云舟渡口的关文，把这一趟行程结算成抵达——航路的第一段不考眼力，只考你愿不愿意真的走到云舟渡口的水边。",
+      "objectives": [
+        {"key": "arrive_floating_boat", "type": "travel_arrival", "label": "在主线开始后抵达云舟渡口", "destination_key": "xuantian.floating_boat"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "云城", "description": "从青石镇走公开通路前往云城，行程结束后结算移动。"},
+        {"command": "前往", "argument": "云舟渡口", "description": "在云城登舟前往云舟渡口（需五百灵石渡资），结算移动后抵达。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.5.stage.1"]},
+      "next_stage_key": "chapter.5.stage.2",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "行程尚未在云舟渡口结算时关卡保持进行中，不扣主线奖励；备好渡资再走一次，结算抵达后即可领取。"
+      },
+      "status": "open",
+      "aliases": ["航路启程"],
+      "prerequisites": ["chapter.4.stage.3"],
+      "required_realm": "golden_core",
+      "required_layer": 1,
+      "first_clear_reward": {"spirit_stones": 40, "item.ticket.cloud_boat_fragment": 1},
+      "repeat_reward": {"spirit_stones": 20}
+    },
+    {
+      "key": "chapter.5.stage.2",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 5,
+      "stage": 2,
+      "name": "云舟验票",
+      "desc": "在云舟渡口完成一轮云舟试炼，带着残票回来复命。",
+      "body": "云舟渡口的老舟工不看境界，只看手上的票据：云舟试炼一轮下来，航路上会散出几张残票，攒够一张才算真的上过船。试炼不长，三百息的工夫，却要求你亲自在甲板上走完全程、把航路遭遇记进册子。开船前备足体力，行程结束结算试炼，把至少一张残票攥在手里，再回来答话。",
+      "objectives": [
+        {"key": "cloud_boat_fragment_proof", "type": "exploration_reward", "label": "在主线开始后的云舟试炼结算中取得云舟残票", "mode_key": "explore.cloud_boat_trial", "location_key": "xuantian.floating_boat", "item_key": "item.ticket.cloud_boat_fragment", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "云舟试炼", "description": "在云舟渡口开始试炼（每日三次、消耗体力），行程结束结算试炼。"},
+        {"command": "结算探索", "argument": "云舟试炼", "description": "结算本轮试炼，取得至少一张云舟残票。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.5.stage.2"]},
+      "next_stage_key": "chapter.5.stage.3",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "本轮试炼尚未结算或尚无残票时关卡保持进行中，不扣主线奖励；补足体力再试一轮并结算，即可领取。"
+      },
+      "status": "open",
+      "aliases": ["云舟验票"],
+      "prerequisites": ["chapter.5.stage.1"],
+      "required_realm": "golden_core",
+      "required_layer": 1,
+      "first_clear_reward": {"item.ticket.cloud_boat_fragment": 2, "service_reputation": 5},
+      "repeat_reward": {"item.ticket.cloud_boat_fragment": 1}
+    },
+    {
+      "key": "chapter.5.stage.3",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 5,
+      "stage": 3,
+      "name": "归镇复命",
+      "desc": "带着残票回到青石镇，把航路开篇交还给镇务账册。",
+      "body": "残票在袖中磨出了毛边，故事却已经完整：从镇口老修士数过的每一站，到云舟渡口老舟工只看票据的那一眼，玄天中层的路你已经走到头，航路的第一段也算走过。从云舟渡口经云城回青石镇，把这一趟的行程结算成抵达，再把残票交回镇务账册——航路既已开篇，界壁与洞天便各自等它们自己的卷。",
+      "objectives": [
+        {"key": "return_new_town_after_trial", "type": "travel_arrival", "label": "在主线开始后回到青石镇交付航路残票", "destination_key": "xuantian.new_town"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "云城", "description": "从云舟渡口乘舟返回云城，行程结束后结算移动。"},
+        {"command": "前往", "argument": "青石镇", "description": "从云城走公开通路回到青石镇，结算移动后交付残票。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.5.stage.3"]},
+      "next_stage_key": "chapter.6.stage.1",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "行程尚未回到青石镇结算时关卡保持进行中，不扣主线奖励；重新启程并结算移动，即可领取开篇之礼。"
+      },
+      "status": "open",
+      "aliases": ["归镇复命"],
+      "prerequisites": ["chapter.5.stage.2"],
+      "required_realm": "golden_core",
+      "required_layer": 1,
+      "first_clear_reward": {"spirit_stones": 50, "service_reputation": 5},
+      "repeat_reward": {"spirit_stones": 20}
+    },
+    {
+      "key": "chapter.6.stage.1",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 6,
+      "stage": 1,
+      "name": "灵泉旧载",
+      "desc": "回青石镇整备，听镇务提起灵泉谷的旧载。",
+      "body": "合卷的凭证交回账册时，镇务翻出一页更早的旧载：灵泉谷的泉眼在玄天中层初定时就已登记，只是当年无人能给谷中灵叶定出价码，这页便一直压在册底。如今航路既已开篇，账册要有人亲自去谷中走一遭，把泉边的草木与清泉重新记回来。先回青石镇把旧载接在手上，再去谷口答话。",
+      "objectives": [
+        {"key": "accept_spirit_field_ledger", "type": "travel_arrival", "label": "在主线开始后回到青石镇接旧载", "destination_key": "xuantian.new_town"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "青石镇", "description": "沿公开通路回到青石镇，等待行程结束并结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.6.stage.1"]},
+      "next_stage_key": "chapter.6.stage.2",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "行程尚未在青石镇结算时关卡保持进行中，不扣主线奖励；重新启程并结算移动，即可接上旧载。"
+      },
+      "status": "open",
+      "aliases": ["灵泉旧载"],
+      "prerequisites": ["chapter.5.stage.3"],
+      "required_realm": "qi_sensing",
+      "required_layer": 2,
+      "first_clear_reward": {"spirit_stones": 40, "item.herb.spirit_leaf": 1},
+      "repeat_reward": {"spirit_stones": 20}
+    },
+    {
+      "key": "chapter.6.stage.2",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 6,
+      "stage": 2,
+      "name": "灵泉验叶",
+      "desc": "在灵泉谷结算一轮采集，取回谷中灵叶。",
+      "body": "谷口的守泉人只认谷里长出来的东西：灵泉谷的采集不比矿区考较气力，六息一株的活计里藏着泉眼的脾气。沿谷走完一轮，把至少一片灵叶攥在手里，才能证明这页旧载不是纸上的空话。采集有限量，走空了便改日再来，别拿旁处的叶子充数。",
+      "objectives": [
+        {"key": "spirit_leaf_ledger_proof", "type": "exploration_reward", "label": "在主线开始后的灵泉谷采集中取得灵叶", "mode_key": "explore.spring_gather", "location_key": "xuantian.spirit_field", "item_key": "item.herb.spirit_leaf", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "灵泉采集", "description": "在灵泉谷开始采集（消耗体力、每日有限次），行程结束结算。"},
+        {"command": "结算探索", "argument": "灵泉采集", "description": "结算本轮采集，取得至少一片灵叶。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.6.stage.2"]},
+      "next_stage_key": "chapter.6.stage.3",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "本轮采集尚未结算或尚无灵叶时关卡保持进行中，不扣主线奖励；补足体力再采一轮并结算，即可领取。"
+      },
+      "status": "open",
+      "aliases": ["灵泉验叶"],
+      "prerequisites": ["chapter.6.stage.1"],
+      "required_realm": "qi_sensing",
+      "required_layer": 2,
+      "first_clear_reward": {"item.herb.spirit_leaf": 2, "service_reputation": 5},
+      "repeat_reward": {"item.herb.spirit_leaf": 1}
+    },
+    {
+      "key": "chapter.6.stage.3",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 6,
+      "stage": 3,
+      "name": "旧载归册",
+      "desc": "带着灵叶回到青石镇，把灵泉谷旧载交还账册。",
+      "body": "灵叶在袖中散着清苦的气味，旧载终于有了能落笔的数字：谷口几处泉眼、岸边几样草木、清泉几日一涨，都在这一趟里记全。从灵泉谷回青石镇，把行程结算成抵达，再把灵叶交回镇务账册——洞天卷自此开篇，界壁那边的雾还等着它自己的名字。",
+      "objectives": [
+        {"key": "return_ledger_to_town", "type": "travel_arrival", "label": "在主线开始后回到青石镇交还旧载", "destination_key": "xuantian.new_town"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "青石镇", "description": "从灵泉谷走公开通路回青石镇，等待行程结束并结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.6.stage.3"]},
+      "next_stage_key": "chapter.7.stage.1",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "行程尚未回到青石镇结算时关卡保持进行中，不扣主线奖励；重新启程并结算移动，即可领回册之赏。"
+      },
+      "status": "open",
+      "aliases": ["旧载归册"],
+      "prerequisites": ["chapter.6.stage.2"],
+      "required_realm": "qi_sensing",
+      "required_layer": 2,
+      "first_clear_reward": {"spirit_stones": 50, "service_reputation": 5},
+      "repeat_reward": {"spirit_stones": 20}
+    },
+    {
+      "key": "chapter.7.stage.1",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 7,
+      "stage": 1,
+      "name": "洞天二层启程",
+      "desc": "从云舟渡口登舟，把行程一路推到雾隐洞天二层的入口。",
+      "body": "旧载归册之后，镇务翻出另一页：雾隐洞天不止一层，二层在洞天下沉的那道裂隙之后，谷中采不到，矿道也走不进去，只有云舟肯在那处停靠。渡口的舟工把话说得干脆：洞天二层的凭证一张只能开一道门，登舟要一张，进洞还要一张，凑不齐就别指望在半途折返。先沿公开通路走到云舟渡口，把启程这一趟结算成抵达，再看手里的凭证够不够。",
+      "objectives": [
+        {"key": "reach_cloud_boat_dock", "type": "travel_arrival", "label": "在主线开始后抵达云舟渡口", "destination_key": "xuantian.floating_boat"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "云城", "description": "从青石镇走公开通路前往云城，行程结束后结算移动。"},
+        {"command": "前往", "argument": "云舟渡口", "description": "在云城登舟前往云舟渡口（需五百灵石渡资），结算移动后抵达。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.7.stage.1"]},
+      "next_stage_key": "chapter.7.stage.2",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "行程尚未在云舟渡口结算时关卡保持进行中，不扣主线奖励；备好渡资再走一次，结算抵达后即可领取。"
+      },
+      "status": "open",
+      "aliases": ["洞天二层启程"],
+      "prerequisites": ["chapter.6.stage.3"],
+      "required_realm": "golden_core",
+      "required_layer": 1,
+      "first_clear_reward": {"spirit_stones": 40, "item.cave_pass_advanced": 1},
+      "repeat_reward": {"spirit_stones": 20}
+    },
+    {
+      "key": "chapter.7.stage.2",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 7,
+      "stage": 2,
+      "name": "二层寻铁",
+      "desc": "乘云舟下到雾隐洞天二层，把洞天深处的云铁带回一块。",
+      "body": "洞天二层的气味与一层不同：石壁更冷，回响更长，脚下每一块落石都像有人在更深处敲过。舟工只送到裂口，余下的路要自己走完——六百息的探索，四成的机会撞上守洞的东西，撞上了就得打，打不赢就只剩一身伤和一张作废的行程。这里出的是云铁，比矿道里采到的更沉，也更难带出来；结算时手里至少要有一块，才算真的下过二层。",
+      "objectives": [
+        {"key": "mist_two_cloud_iron", "type": "exploration_reward", "label": "在主线开始后的洞天二层探索中取得云铁", "mode_key": "explore.mist_grotto_2", "location_key": "cave.mist_grotto_2", "item_key": "item.material.cloud_iron", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "登上云舟", "argument": "洞天二层", "description": "在云城或云舟渡口登舟前往雾隐洞天二层（需洞天二层凭证与五百灵石），随后发送 `结算云舟` 抵达。"},
+        {"command": "开始探索", "argument": "洞天二层探索", "description": "在洞天二层开始探索（需凭证、消耗体力、每日两次），随后发送 `结算探索` 取得云铁。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.7.stage.2"]},
+      "next_stage_key": "chapter.7.stage.3",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未结算云舟或探索未取得云铁时关卡保持进行中，不扣主线奖励；备齐凭证与体力再来一次，结算后即可领取。"
+      },
+      "status": "open",
+      "aliases": ["二层寻铁"],
+      "prerequisites": ["chapter.7.stage.1"],
+      "required_realm": "golden_core",
+      "required_layer": 1,
+      "first_clear_reward": {"item.material.cloud_iron": 2, "service_reputation": 5},
+      "repeat_reward": {"spirit_stones": 20}
+    },
+    {
+      "key": "chapter.7.stage.3",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 7,
+      "stage": 3,
+      "name": "归镇记功",
+      "desc": "带着二层云铁乘舟回云城，再走回青石镇把这趟记进账册。",
+      "body": "云铁压在行囊里，比来时沉得多。洞天二层的裂口在身后合拢，舟工照旧只送到云城，剩下的路要自己走回青石镇：渡口、云城、镇门，三处关文一处不落，账册才认这一趟。镇务把云铁过了秤，说洞天卷到这一层算是走通了，再往下的裂隙不在玄天的旧载里，得等它自己有名有姓的那一天。",
+      "objectives": [
+        {"key": "return_town_with_mist_iron", "type": "travel_arrival", "label": "在主线开始后带着二层云铁回到青石镇", "destination_key": "xuantian.new_town"}
+      ],
+      "actions": [
+        {"command": "登上云舟", "argument": "返回云城", "description": "从雾隐洞天二层登舟返回云城，随后发送 `结算云舟` 抵达。"},
+        {"command": "前往", "argument": "青石镇", "description": "从云城走公开通路回到青石镇，结算移动后交铁记功。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.7.stage.3"]},
+      "next_stage_key": "chapter.8.stage.1",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "行程尚未回到青石镇结算时关卡保持进行中，不扣主线奖励；重新启程并结算移动，即可领记功之赏。"
+      },
+      "status": "open",
+      "aliases": ["归镇记功"],
+      "prerequisites": ["chapter.7.stage.2"],
+      "required_realm": "golden_core",
+      "required_layer": 1,
+      "first_clear_reward": {"spirit_stones": 60, "service_reputation": 5},
+      "repeat_reward": {"spirit_stones": 20}
+    },
+    {
+      "key": "chapter.8.stage.1",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 8,
+      "stage": 1,
+      "name": "岩径启程",
+      "desc": "从近郊拐进玄武岩径，把这一趟试炼的路先走明白。",
+      "body": "近郊往东有一条被碎石压出来的窄径，尽头是玄武岩垒成的旧试炼场。镇务把话说明白：岩径不算险地，却也不是散步的地方，径上每隔一段就有伏着的岩兽与阵纹残迹，走完全程要留够体力和时辰。这卷不考你打得多漂亮，只考你肯不肯真的走进去、把往返的路记在册上。先沿公开通路走到岩径入口，把启程这趟结算成抵达。",
+      "objectives": [
+        {"key": "reach_basalt_pass", "type": "travel_arrival", "label": "在主线开始后抵达玄武岩径", "destination_key": "xuantian.basalt_pass"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "近郊", "description": "从青石镇走公开通路前往玄天近郊，行程结束后结算移动。"},
+        {"command": "前往", "argument": "玄武岩径", "description": "从近郊拐入玄武岩径，结算移动后抵达试炼场入口。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.8.stage.1"]},
+      "next_stage_key": "chapter.8.stage.2",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "行程尚未在玄武岩径结算时关卡保持进行中，不扣主线奖励；补足体力再走一次，结算抵达后即可领取。"
+      },
+      "status": "open",
+      "aliases": ["岩径启程"],
+      "prerequisites": ["chapter.7.stage.3"],
+      "required_realm": "golden_core",
+      "required_layer": 1,
+      "first_clear_reward": {"spirit_stones": 40},
+      "repeat_reward": {"spirit_stones": 20}
+    },
+    {
+      "key": "chapter.8.stage.2",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 8,
+      "stage": 2,
+      "name": "岩径历练",
+      "desc": "在玄武岩径走完一轮历练，带回一块阵砂。",
+      "body": "试炼场里的岩兽不吃话术，只认脚步。一轮历练二百四十息，六成的机会会撞上守径的岩兽或阵纹所化的傀儡，撞上了就得打完再往前走；打不动也不要紧，退回来养好伤再进。这一趟要带回的是阵砂——阵堂炼纹用的底料，岩径里才有，别处采不到。结算时手里至少攥住一块，才算真的走过这一轮。",
+      "objectives": [
+        {"key": "basalt_array_sand", "type": "exploration_reward", "label": "在主线开始后的岩径历练中取得阵砂", "mode_key": "explore.trial_basalt_pass", "location_key": "xuantian.basalt_pass", "item_key": "item.mat.array_sand", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "玄武岩径历练", "description": "在玄武岩径开始历练（消耗体力、每日四次），随后发送 `结算探索` 结算。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.8.stage.2"]},
+      "next_stage_key": "chapter.8.stage.3",
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未结算历练或未取得阵砂时关卡保持进行中，不扣主线奖励；补足体力再走一轮并结算，即可领取。"
+      },
+      "status": "open",
+      "aliases": ["岩径历练"],
+      "prerequisites": ["chapter.8.stage.1"],
+      "required_realm": "golden_core",
+      "required_layer": 1,
+      "first_clear_reward": {"item.mat.array_sand": 2, "service_reputation": 5},
+      "repeat_reward": {"spirit_stones": 20}
+    },
+    {
+      "key": "chapter.8.stage.3",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 8,
+      "stage": 3,
+      "name": "归镇交割",
+      "desc": "带着阵砂沿原路回镇，把岩径这一卷交还账册。",
+      "body": "阵砂在袋里硌得慌，路却比来时短。从岩径退回近郊，再从近郊走回青石镇，两段行程都要结算，账册才认这一趟。镇务把阵砂过了秤，说岩径这处试炼场从玄天初定就立着，只是这些年没人愿意为它单独立卷；如今补上了，阵堂那边也能按册领料。玄天卷到这一层，近郊的边角算是走遍了。",
+      "objectives": [
+        {"key": "return_town_with_array_sand", "type": "travel_arrival", "label": "在主线开始后带着阵砂回到青石镇", "destination_key": "xuantian.new_town"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "近郊", "description": "从玄武岩径退回玄天近郊，行程结束后结算移动。"},
+        {"command": "前往", "argument": "青石镇", "description": "从近郊走公开通路回到青石镇，结算移动后交割阵砂。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.8.stage.3"]},
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "行程尚未回到青石镇结算时关卡保持进行中，不扣主线奖励；重新启程并结算移动，即可领交割之赏。"
+      },
+      "status": "open",
+      "aliases": ["归镇交割"],
+      "prerequisites": ["chapter.8.stage.2"],
+      "required_realm": "golden_core",
+      "required_layer": 1,
+      "first_clear_reward": {"spirit_stones": 60, "service_reputation": 5},
+      "repeat_reward": {"spirit_stones": 20},
+      "next_stage_key": "chapter.9.stage.1"
+    },
+    {
+      "key": "chapter.9.stage.1",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 9,
+      "stage": 1,
+      "name": "云城受讬",
+      "desc": "带着镇务的荐书前往云城，把玄天卷的下一层交到云城账房。",
+      "body": "青石镇的账册合上之后，镇务又翻出一封压了许久的荐书：云城的商旅近年走货频繁，街巷里却总有人劫掠，账房早想请一位修行者随队押运一程。荐书上写着你的名字，落款是玄天初定那年。近郊的通路往北接云城，走上去便是另一处天地：那里没有山风，只有满城烟火与算盘声。",
+      "objectives": [
+        {"key": "arrive_cloud_city_9", "type": "travel_arrival", "label": "带着荐书抵达云城", "destination_key": "xuantian.cloud_city"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "云城", "description": "沿近郊往北的公开通路启程，行程结束后结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.9.stage.1"]},
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未抵达云城时关卡保持进行中，不扣主线奖励；重新启程并结算移动即可领受讬之赏。"
+      },
+      "status": "open",
+      "aliases": ["云城受讬"],
+      "prerequisites": ["chapter.8.stage.3"],
+      "required_realm": "golden_core",
+      "required_layer": 1,
+      "first_clear_reward": {"spirit_stones": 70, "service_reputation": 5},
+      "repeat_reward": {"spirit_stones": 20},
+      "next_stage_key": "chapter.9.stage.2"
+    },
+    {
+      "key": "chapter.9.stage.2",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 9,
+      "stage": 2,
+      "name": "街巷护送",
+      "desc": "随云城商旅穿行街巷，清剿沿路滋事的劫修。",
+      "body": "云城的街比青石镇窄，货担却多出十倍。账房把一队商旅交到你手上，说这一趟只走半城，货值却抵得上小镇半年的收成。走到第三道巷口，前面的人忽然停了：巷子尽头有人横刀站着，刀上有云城人的血。护送这一程，不是走完就算，要把刀留下。",
+      "objectives": [
+        {"key": "escort_cloud_city_street", "type": "exploration_battle_victory", "label": "在云城护送探索中赢得一场遭遇战", "mode_key": "explore.cloud_city_escort", "location_key": "xuantian.cloud_city"}
+      ],
+      "actions": [
+        {"command": "探索", "argument": "云城护送", "description": "在云城街巷开启护送探索，遭遇战由自动战斗结算。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.9.stage.2"]},
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "护送尚未取胜时关卡保持进行中，不扣主线奖励；补充体力后可再次进入街巷。"
+      },
+      "status": "open",
+      "aliases": ["街巷护送"],
+      "prerequisites": ["chapter.9.stage.1"],
+      "required_realm": "golden_core",
+      "required_layer": 2,
+      "first_clear_reward": {"spirit_stones": 80, "item.herb.spirit_leaf": 2, "service_reputation": 5},
+      "repeat_reward": {"spirit_stones": 25},
+      "next_stage_key": "chapter.9.stage.3"
+    },
+    {
+      "key": "chapter.9.stage.3",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 9,
+      "stage": 3,
+      "name": "雾中旧账",
+      "desc": "循着劫修供词回到雾隐洞天，把旧账结在守卫手里。",
+      "body": "劫修临死前吐出一个地名：雾隐洞天。他说那里的守卫收过云城的货，也收过比货更重的东西。洞天的雾还是老样子，进去三步便看不见来路；守卫仍在原处，仿佛这些年只等着有人拿着账来。把灵叶从雾里带出来，这卷账才算翻过去。",
+      "objectives": [
+        {"key": "bring_spirit_leaf_from_mist", "type": "exploration_reward", "label": "在雾隐洞天探索结算中取得灵叶", "mode_key": "explore.mist_grotto", "location_key": "cave.mist_grotto", "item_key": "item.herb.spirit_leaf", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "雾隐洞天", "description": "从云城返回玄天近郊，再进入雾隐洞天。"},
+        {"command": "探索", "argument": "雾隐洞天", "description": "在洞天内开启探索，结算时按奖池取得灵叶。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.9.stage.3"]},
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未取得灵叶时关卡保持进行中，不扣主线奖励；再次探索并结算即可领结账之赏。"
+      },
+      "status": "open",
+      "aliases": ["雾中旧账"],
+      "prerequisites": ["chapter.9.stage.2"],
+      "required_realm": "golden_core",
+      "required_layer": 3,
+      "first_clear_reward": {"spirit_stones": 90, "service_reputation": 6},
+      "repeat_reward": {"spirit_stones": 30},
+      "next_stage_key": "chapter.10.stage.1"
+    },
+    {
+      "key": "chapter.10.stage.1",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 10,
+      "stage": 1,
+      "name": "云城问舟",
+      "desc": "金丹圆满之后，云城账房留了一封没有落款的信，只请你亲去一趟。",
+      "body": "金丹圆满的那一夜，青石镇落了整宿的雨。天亮时镇务送来云城账房的信，封皮上没有落款，只写了一句：北边的船近来不问货，只问人。信里夹着三枚灵石，说够你走到云城。镇口往北的官道是新修的石路，走上去一步一声脆响，比近郊的土路硬得多，也干净得多。",
+      "objectives": [
+        {"key": "arrive_cloud_city_10", "type": "travel_arrival", "label": "亲赴云城问明船事", "destination_key": "xuantian.cloud_city"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "云城", "description": "沿青石镇往北的公开官道北上，行程结束后结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.10.stage.1"]},
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未抵达云城时关卡保持进行中，不扣主线奖励；重新启程并结算移动即可领问舟之赏。"
+      },
+      "status": "open",
+      "aliases": ["云城问舟"],
+      "prerequisites": ["chapter.9.stage.3"],
+      "required_realm": "nascent_soul",
+      "required_layer": 1,
+      "first_clear_reward": {"spirit_stones": 100, "service_reputation": 5},
+      "repeat_reward": {"spirit_stones": 25},
+      "next_stage_key": "chapter.10.stage.2"
+    },
+    {
+      "key": "chapter.10.stage.2",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 10,
+      "stage": 2,
+      "name": "渡口候船",
+      "desc": "到云舟渡口问清北上的船期，替账房记下这一程的价钱。",
+      "body": "云城账房的人不肯多说，只把一张船期单推过来：北上的船只走魔界引导那一条线，一趟五百灵石，不问货，只问人。渡口在城东，走一刻钟就到，岸上堆着未拆的木箱，箱上全是同一种印记。守船的老人说，这一条线近年坐的人少了一半，问的人却多了三倍。",
+      "objectives": [
+        {"key": "arrive_floating_boat_10", "type": "travel_arrival", "label": "抵达云舟渡口", "destination_key": "xuantian.floating_boat"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "云舟渡口", "description": "从云城东行至渡口，行程结束后结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.10.stage.2"]},
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未抵达云舟渡口时关卡保持进行中，不扣主线奖励；从云城再次启程并结算移动即可。"
+      },
+      "status": "open",
+      "aliases": ["渡口候船"],
+      "prerequisites": ["chapter.10.stage.1"],
+      "required_realm": "nascent_soul",
+      "required_layer": 2,
+      "first_clear_reward": {"spirit_stones": 80, "service_reputation": 5},
+      "repeat_reward": {"spirit_stones": 30},
+      "next_stage_key": "chapter.10.stage.3"
+    },
+    {
+      "key": "chapter.10.stage.3",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 10,
+      "stage": 3,
+      "name": "云舟北渡",
+      "desc": "登上北上的云舟，落到深渊门前，看清信里写的“只问人”是什么。",
+      "body": "船比想象中窄，甲板上只摆得下六个座位，坐满了三个。船家收灵石时不抬头，只问一句你要去魔界做什么，问完便不再说话。云层压在船底，走了一个时辰才见到陆地：那不是山，是一道裂开的门，门里透出来的风是暖的。船靠岸时，守门的人点了一遍人头，像在核一份早就写好的名册。",
+      "objectives": [
+        {"key": "arrive_abyss_gate_10", "type": "travel_arrival", "label": "乘云舟抵达魔渊入口", "destination_key": "demon.abyss_gate"}
+      ],
+      "actions": [
+        {"command": "登上云舟", "argument": "魔界引导", "description": "在云舟渡口登上魔界引导航线，抵达魔渊入口后结算云舟。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.10.stage.3"]},
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未抵达魔渊入口时关卡保持进行中，不扣主线奖励；回到渡口再次登上魔界引导航线即可。"
+      },
+      "status": "open",
+      "aliases": ["云舟北渡"],
+      "prerequisites": ["chapter.10.stage.2"],
+      "required_realm": "nascent_soul",
+      "required_layer": 3,
+      "first_clear_reward": {"spirit_stones": 120, "service_reputation": 6},
+      "repeat_reward": {"spirit_stones": 35},
+      "next_stage_key": "chapter.11.stage.1"
+    },
+    {
+      "key": "chapter.11.stage.1",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 11,
+      "stage": 1,
+      "name": "入门问契",
+      "desc": "在深渊门前领下通行资格，再往堕落遗迹深处去看那道旧账。",
+      "body": "守门的人把一块木牌推到你面前：签字画押，记下污染与契约的风险，才许往里走。木牌背面刻着历年进出的数目，最后几行是空的，像专门留给后来的人。签完他把牌收走，只说了一句：里面的人也算过账，你若要翻，就翻到底。门后是一条下坡的碎石道，走上去脚下发滑。",
+      "objectives": [
+        {"key": "arrive_fallen_ruins_11", "type": "travel_arrival", "label": "取通行资格后深入堕落遗迹", "destination_key": "demon.fallen_ruins"}
+      ],
+      "actions": [
+        {"command": "接受魔界引导", "argument": "确认风险", "description": "在魔渊入口签下风险文书，取得魔界入口资格。"},
+        {"command": "前往", "argument": "堕落遗迹", "description": "沿门后的碎石道深入堕落遗迹，行程结束后结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.11.stage.1"]},
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未进入堕落遗迹时关卡保持进行中，不扣主线奖励；先在魔渊入口接受魔界引导取得资格，再启程结算移动。"
+      },
+      "status": "open",
+      "aliases": ["入门问契"],
+      "prerequisites": ["chapter.10.stage.3"],
+      "required_realm": "nascent_soul",
+      "required_layer": 4,
+      "first_clear_reward": {"spirit_stones": 100, "item.herb.spirit_leaf": 2},
+      "repeat_reward": {"spirit_stones": 30},
+      "next_stage_key": "chapter.11.stage.2"
+    },
+    {
+      "key": "chapter.11.stage.2",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 11,
+      "stage": 2,
+      "name": "契阁残页",
+      "desc": "在堕落遗迹的契阁里翻检旧账，找出买主的半个印。",
+      "body": "遗迹里的契阁塌了一半，纸页被风钉在石缝里，翻开来全是名字与数目，字迹一层压一层。第三处契阁的账上记着云城渡口的木箱，卖主栏空着，买主栏只有一个画了一半的印。纸角还留着指印，是热的，说明翻账的人刚走不久。把这一页带走，云城那边才认得出是谁。",
+      "objectives": [
+        {"key": "bring_demon_contract_11", "type": "exploration_reward", "label": "在堕落遗迹探索结算中取得契约残页", "mode_key": "explore.demon_abyss", "location_key": "demon.fallen_ruins", "item_key": "item.clue.demon_contract", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "魔界堕落遗迹探索", "description": "在堕落遗迹开启探索，结算时按奖池取得契约线索。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.11.stage.2"]},
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未取得契约残页时关卡保持进行中，不扣主线奖励；体力恢复后再次探索并结算即可。"
+      },
+      "status": "open",
+      "aliases": ["契阁残页"],
+      "prerequisites": ["chapter.11.stage.1"],
+      "required_realm": "nascent_soul",
+      "required_layer": 5,
+      "first_clear_reward": {"spirit_stones": 70, "item.clue.demon_contract": 1},
+      "repeat_reward": {"spirit_stones": 35},
+      "next_stage_key": "chapter.11.stage.3"
+    },
+    {
+      "key": "chapter.11.stage.3",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 11,
+      "stage": 3,
+      "name": "遗迹守卫",
+      "desc": "契阁深处有人守着最后一页账，把他从石前请开。",
+      "body": "残页只剩半张，另外半张压在契阁最深处的青石下。石前坐着个披甲的身影，甲片全是从别处拆下来的，缝口还带着原主的印记——那是历年没回去的人。它不问你为何而来，只把手按在青石上，像在替谁守着最后一页。既然账要翻完，就先把它从石前请开，再取那半张纸。",
+      "objectives": [
+        {"key": "defeat_abyss_keeper_11", "type": "exploration_battle_victory", "label": "在堕落遗迹探索中击败守账的守卫", "mode_key": "explore.demon_abyss", "location_key": "demon.fallen_ruins"}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "魔界堕落遗迹探索", "description": "再次进入堕落遗迹探索，遭遇战由服务端自动战斗结算。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.11.stage.3"]},
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "守卫未败时关卡保持进行中，不扣主线奖励；体力恢复后可再入遗迹探索。"
+      },
+      "status": "open",
+      "aliases": ["遗迹守卫"],
+      "prerequisites": ["chapter.11.stage.2"],
+      "required_realm": "nascent_soul",
+      "required_layer": 6,
+      "first_clear_reward": {"spirit_stones": 90, "item.demon_core": 1},
+      "repeat_reward": {"spirit_stones": 40},
+      "next_stage_key": "chapter.12.stage.1"
+    },
+    {
+      "key": "chapter.12.stage.1",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 12,
+      "stage": 1,
+      "name": "门备材料",
+      "desc": "回深渊门前收拾一程的补给，把魔息凝成的东西带回玄天。",
+      "body": "从契阁上来，门前的风还是暖的。守门人换了一个，仍旧点人头，仍旧不说话。门侧的碎石堆里散着凝成块的魔息，颜色发暗，掂起来比石头沉。老人说这东西带回玄天能换几味材料，只是别在怀里揣久了，揣久了人会做梦。把能带的都收进袋子，剩下的留给后来的人。",
+      "objectives": [
+        {"key": "gather_demon_core_12", "type": "exploration_reward", "label": "在深渊门备材探索结算中取得魔核", "mode_key": "explore.demon_threshold", "location_key": "demon.abyss_gate", "item_key": "item.demon_core", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "魔渊入口", "description": "从堕落遗迹回到深渊门前。"},
+        {"command": "开始探索", "argument": "深渊门备材", "description": "在深渊门附近采集补给，结算时取得魔核。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.12.stage.1"]},
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未取得魔核时关卡保持进行中，不扣主线奖励；在深渊门前再次采集并结算即可。"
+      },
+      "status": "open",
+      "aliases": ["门备材料"],
+      "prerequisites": ["chapter.11.stage.3"],
+      "required_realm": "nascent_soul",
+      "required_layer": 7,
+      "first_clear_reward": {"spirit_stones": 80, "item.demon_core": 1},
+      "repeat_reward": {"spirit_stones": 35},
+      "next_stage_key": "chapter.12.stage.2"
+    },
+    {
+      "key": "chapter.12.stage.2",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 12,
+      "stage": 2,
+      "name": "归舟回城",
+      "desc": "搭返程的云舟回云城，把那一页账交到该交的人手里。",
+      "body": "返程的船比来时更空，六个座位只坐了两个人。船家仍旧收灵石，仍旧不抬头，只在开船前说了一句：回去的人比来的人少。云层从船底翻上来，把深渊门的影子盖住，再抬头时已经能看见云城的檐角。账在怀里，纸边被体温捂得发软，字迹反倒更清楚了。",
+      "objectives": [
+        {"key": "return_cloud_city_12", "type": "travel_arrival", "label": "乘云舟返回云城", "destination_key": "xuantian.cloud_city"}
+      ],
+      "actions": [
+        {"command": "登上云舟", "argument": "返回云城", "description": "在魔渊入口登上返程航线，抵达云城后结算云舟。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.12.stage.2"]},
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未回到云城时关卡保持进行中，不扣主线奖励；在魔渊入口再次登上返程航线即可。"
+      },
+      "status": "open",
+      "aliases": ["归舟回城"],
+      "prerequisites": ["chapter.12.stage.1"],
+      "required_realm": "nascent_soul",
+      "required_layer": 8,
+      "first_clear_reward": {"spirit_stones": 130, "service_reputation": 6},
+      "repeat_reward": {"spirit_stones": 35},
+      "next_stage_key": "chapter.12.stage.3"
+    },
+    {
+      "key": "chapter.12.stage.3",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 12,
+      "stage": 3,
+      "name": "回镇结卷",
+      "desc": "带着残页与魔核回青石镇，把这一卷账当面结清。",
+      "body": "从云城回青石镇的路只有一刻钟，走完却像走了半年。镇务在门口等着，看见你怀里的残页先愣了一下，随后把镇志翻到最后一页：上面记着历年北上未归的名字，末行空着。你把残页压在镇志上，又把魔核放在旁边。镇务没有多问，只把末行填了你的名字，说这一卷账，从今日起算结清。",
+      "objectives": [
+        {"key": "return_new_town_12", "type": "travel_arrival", "label": "带着残页与魔核回到青石镇", "destination_key": "xuantian.new_town"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "青石镇", "description": "从云城沿官道南归，行程结束后结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.12.stage.3"]},
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未回到青石镇时关卡保持进行中，不扣主线奖励；从云城再次启程并结算移动即可。"
+      },
+      "status": "open",
+      "aliases": ["回镇结卷"],
+      "prerequisites": ["chapter.12.stage.2"],
+      "required_realm": "nascent_soul",
+      "required_layer": 9,
+      "first_clear_reward": {"spirit_stones": 150, "item.material.ward_plate": 2, "service_reputation": 8},
+      "repeat_reward": {"spirit_stones": 45},
+      "next_stage_key": "chapter.13.stage.1"
+    },
+    {
+      "key": "chapter.13.stage.1",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 13,
+      "stage": 1,
+      "name": "入山问脉",
+      "desc": "先向近郊取得妖界引路资格，再经云舟渡口北上，进入万兽山的山口。",
+      "body": "从云舟渡口往妖界的船不载货，只载人。云舟在万兽山的山口落下时，风里带着兽毛和湿土的味道，山道上压着新旧不一的蹄印，最深的那几道比人的手掌还宽。守山的老人坐在石阶上磨骨刀，抬头看了一眼你腰间的剑，说山里的东西近来不问来路，只问血。你把剑往里收了收，沿蹄印往山里走，走到第一处岔口时，听见林子深处也有东西在听你。",
+      "objectives": [
+        {"key": "arrive_beast_hills_13", "type": "travel_arrival", "label": "抵达万兽山入口", "destination_key": "beast.ten_thousand_hills"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "万兽山入口", "description": "从云舟渡口沿山道北上，行程结束后结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.13.stage.1"]},
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未抵达万兽山入口时关卡保持进行中，不扣主线奖励；先在近郊完成一次探索、阅读妖界史并完成妖界引导取得引路资格，再从云舟渡口启程并结算移动。"
+      },
+      "status": "open",
+      "aliases": ["入山问脉"],
+      "prerequisites": ["chapter.12.stage.3"],
+      "required_realm": "nascent_soul",
+      "required_layer": 10,
+      "first_clear_reward": {"spirit_stones": 120, "service_reputation": 6},
+      "repeat_reward": {"spirit_stones": 40},
+      "next_stage_key": "chapter.13.stage.2"
+    },
+    {
+      "key": "chapter.13.stage.2",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 13,
+      "stage": 2,
+      "name": "循血猎兽",
+      "desc": "循兽迹狩猎，取得一份兽血。",
+      "body": "山里的猎法与人间的不同：不必追得比它快，只要比它更懂得等。你在第二道山脊上守了半日，看见兽群换了两次方向，第三次才有一只落在队伍后头。血是热的，落在石头上很快就冷；猎人的规矩是只取一份，剩下的留给山。老人说妖界的山认这个规矩，认了才肯再开一次口子——所谓血脉，从来不是取来的，是换来的。",
+      "objectives": [
+        {"key": "bring_beast_blood_13", "type": "exploration_reward", "label": "在万兽山狩猎结算中取得兽血", "mode_key": "explore.beast_hunt", "location_key": "beast.ten_thousand_hills", "item_key": "item.beast_blood", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "万兽山狩猎", "description": "在万兽山外围循迹狩猎，结算时按奖池取得兽血。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.13.stage.2"]},
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "尚未取得兽血时关卡保持进行中，不扣主线奖励；体力恢复后再在万兽山狩猎并结算即可。"
+      },
+      "status": "open",
+      "aliases": ["循血猎兽"],
+      "prerequisites": ["chapter.13.stage.1"],
+      "required_realm": "nascent_soul",
+      "required_layer": 10,
+      "first_clear_reward": {"spirit_stones": 90, "item.beast_blood": 1},
+      "repeat_reward": {"spirit_stones": 45},
+      "next_stage_key": "chapter.13.stage.3"
+    },
+    {
+      "key": "chapter.13.stage.3",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 13,
+      "stage": 3,
+      "name": "守山定契",
+      "desc": "在山道上与守山兽一战，让万兽山认下这一份血脉。",
+      "body": "取过血的人，山要亲自看一遍。第三日夜里，林子里那双听过你的东西终于站了出来：它比人高，肩背上覆着旧年留下的骨甲，站在山道上不动，也不叫，像在等你先开口。老人说过，守山的兽不拦空手的人，只拦带走东西的人。你把骨刀横过来，算是答了它的话——这一战过后，山才认你是能带走血脉的人，而元婴这一具身子，也就走到头了。",
+      "objectives": [
+        {"key": "defeat_beast_guardian_13", "type": "exploration_battle_victory", "label": "在万兽山狩猎中击败守山兽", "mode_key": "explore.beast_hunt", "location_key": "beast.ten_thousand_hills"}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "万兽山狩猎", "description": "再次入山狩猎，遭遇战由服务端自动战斗结算。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.13.stage.3"]},
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "守山兽未败时关卡保持进行中，不扣主线奖励；体力恢复后可再入万兽山狩猎，血脉不受损。"
+      },
+      "status": "open",
+      "aliases": ["守山定契"],
+      "prerequisites": ["chapter.13.stage.2"],
+      "required_realm": "nascent_soul",
+      "required_layer": 10,
+      "first_clear_reward": {"spirit_stones": 150, "item.clue.beast_bloodline": 1, "service_reputation": 8},
+      "repeat_reward": {"spirit_stones": 50}
+    }
+  ]
+}

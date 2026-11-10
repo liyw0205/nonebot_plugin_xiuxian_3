@@ -2138,6 +2138,20 @@ class AdventuresRepositoryMixin:
                     "AND commissions.commission_key=? AND claims.delivered_at>=? LIMIT 1",
                     (player_id, objective.get("commission_key"), started_at),
                 ).fetchone()
+            elif kind == "public_project_contribution":
+                progress = connection.execute(
+                    "SELECT COALESCE(SUM(c.contribution_points), 0) FROM livelihood_project_contributions c "
+                    "JOIN livelihood_projects p ON p.project_id=c.project_id "
+                    "WHERE c.player_id=? AND p.project_key=? AND c.created_at>=?",
+                    (player_id, objective["project_key"], started_at),
+                ).fetchone()
+                found = progress if progress[0] >= objective["min_points"] else None
+            elif kind == "idle_claim":
+                found = connection.execute(
+                    "SELECT 1 FROM idle_assignments WHERE player_id=? AND route_key=? "
+                    "AND status='claimed' AND starts_at>=? LIMIT 1",
+                    (player_id, objective["route_key"], started_at),
+                ).fetchone()
             else:
                 raise ValueError("mainline snapshot objective type is invalid")
             if found is None:
@@ -2221,6 +2235,20 @@ class AdventuresRepositoryMixin:
                         set(objective) == {"key", "type", "label", "commission_key"}
                         and isinstance(objective["commission_key"], str)
                         and bool(objective["commission_key"].strip())
+                    )
+                if objective["type"] == "public_project_contribution":
+                    points = objective.get("min_points")
+                    return (
+                        set(objective) == {"key", "type", "label", "project_key", "min_points"}
+                        and isinstance(objective["project_key"], str)
+                        and bool(objective["project_key"].strip())
+                        and isinstance(points, int) and not isinstance(points, bool) and points > 0
+                    )
+                if objective["type"] == "idle_claim":
+                    return (
+                        set(objective) == {"key", "type", "label", "route_key"}
+                        and isinstance(objective["route_key"], str)
+                        and bool(objective["route_key"].strip())
                     )
                 return False
 

@@ -88,7 +88,7 @@
 
 玄天主线首两关 `chapter.1.stage.1` 与 `chapter.1.stage.2` 必须提供非空 `body`、非空 `objectives`、
 可执行提示 `actions`、`state_changes.activity_events`、同故事内的 `next_stage_key` 和 `retry`。
-关卡目标只支持服务端可证明的 `travel_arrival`（开放地点键）和 `exploration_reward`（开放模式、地点、物品
+首两关目标使用服务端可证明的 `travel_arrival`（开放地点键）和 `exploration_reward`（开放模式、地点、物品
 及正数量）；探索地点必须与模式的地点一致。`actions` 给出当前公开命令及参数，不能替代运行时目标校验。
 
 开始时将上述叙事/规则与奖励一起冻结到 `mainline_runs.snapshot_json`。旅行目标只认开始后已抵达的
@@ -99,6 +99,12 @@
 
 本合同只要求首两关通过完整叙事字段与引用验证，不代表其余主线记录已补完；不得以短 `desc` 伪装正文，
 也不得批量生成无消费者的目标。后续剧情关卡须逐段闭合真实地点/任务/战斗/奖励生产者后再开放。
+
+领域避难所后记增量支持 `public_project_contribution`（`project_key`、正整数 `min_points`）与
+`idle_claim`（`route_key`）。引用必须分别是开放公共项目、开放闲居路线，禁止额外字段与布尔数量。
+贡献只累加本关开始后本人指定项目的持久化贡献点数，可跨业务周；不要求全项目建成，不读背包。
+闲居只认本关开始后新安排且已完整领取的指定路线，`expired/cancelled/running` 不计入。
+目标、奖励与重试提示仍在开始时冻结，旧快照不追补新目标；目标不足保持原关卡且不写领奖 operation。
 
 ### 2.0.3 生产物资的采集来源
 

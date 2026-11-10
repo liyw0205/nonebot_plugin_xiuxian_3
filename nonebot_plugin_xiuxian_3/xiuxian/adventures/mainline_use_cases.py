@@ -148,6 +148,8 @@ class AdventuresMainlineApplication:
         stages: list[dict[str, object]] = []
         for item in record.stages:
             lines.append(f"- **第 {item.chapter} 章·{item.stage}关 {item.label}**：{STATUS_LABELS.get(item.status, item.status)}")
+            if item.status == "available":
+                lines.append(f"  `{self.start_command} {item.label}`")
             stages.append(
                 {
                     "chapter": item.chapter,

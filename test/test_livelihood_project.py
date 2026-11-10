@@ -285,6 +285,14 @@ def test_public_project_codex_discovery_freezes_content_and_replays_on_both_adap
                 entry["name"] = "改名后的道统公共建设"
                 entry["status"] = "closed"
                 entries_path.write_text(json.dumps(entries, ensure_ascii=False, indent=2), encoding="utf-8")
+                # Close dependent milestones too, so the hot update remains a
+                # valid content graph while historical discoveries stay readable.
+                milestones_path = data_dir / "图鉴" / "里程碑.json"
+                milestones = json.loads(milestones_path.read_text(encoding="utf-8"))
+                for milestone in milestones["records"]:
+                    if "codex.dao.service_public_works" in milestone.get("entry_keys", []):
+                        milestone["status"] = "closed"
+                milestones_path.write_text(json.dumps(milestones, ensure_ascii=False), encoding="utf-8")
 
                 recovered = create_runtime(data_dir=data_dir)
                 replay = await recovered.dispatch(
