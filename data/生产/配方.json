@@ -632,7 +632,7 @@
       },
       "min_realm_layer": 1,
       "required_realm": "qi_gathering",
-      "additional_realms": [],
+      "additional_realms": ["foundation", "golden_core", "nascent_soul", "soul_transformation", "void_refining", "dao_union", "tribulation"],
       "proficiency_bp": 3000,
       "required_location": [
         "xuantian.spirit_field"

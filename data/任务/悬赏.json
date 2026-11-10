@@ -4,7 +4,7 @@
     {
       "key": "bounty.herb_supply",
       "name": "草药补给",
-      "desc": "收集止血草，为镇中药铺补充常用药材。",
+      "desc": "收集止血草，为镇中药铺补充常用药材。前往近郊后进行近郊采集；只计接取后新增的止血草。",
       "quality": "common",
       "status": "open",
       "aliases": [
@@ -27,14 +27,14 @@
     {
       "key": "bounty.craft_order",
       "name": "生产订单",
-      "desc": "完成一份生产订单，协助坊市处理积压委托。",
+      "desc": "完成一份生产订单，协助坊市处理积压委托。感气后可用基础配方完成生产；配方预览可查看材料与工具要求。",
       "quality": "common",
       "status": "open",
       "aliases": [
         "生产"
       ],
-      "required_realm": null,
-      "required_layer": 0,
+      "required_realm": "qi_sensing",
+      "required_layer": 1,
       "path_keys": [],
       "weight": 60,
       "duration_seconds": 7200,
@@ -50,7 +50,7 @@
     {
       "key": "bounty.cloud_mine",
       "name": "云铁矿区悬赏",
-      "desc": "向云城矿务司交付云铁，补足器坊储备。",
+      "desc": "向云城矿务司交付云铁，补足器坊储备。筑基四层可先安排六小时矿区看守，接取后领取闲居；单次随机得一至三枚，须得三枚才能完成，接取时须留足领取时间。金丹后可经云城抵达云铁矿区采集。",
       "quality": "uncommon",
       "status": "open",
       "aliases": [
@@ -59,39 +59,6 @@
       "required_realm": "foundation",
       "required_layer": 4,
       "path_keys": [],
-      "access_any": [
-        {
-          "type": "subprofession",
-          "value": "mining"
-        },
-        {
-          "type": "intro_flag",
-          "value": "permit.cloud_mine"
-        },
-        {
-          "type": "intro_flag",
-          "value": "cloud_mine.permit"
-        },
-        {
-          "type": "intro_flag",
-          "value": "commission.cloud_mine"
-        },
-        {
-          "type": "inventory_item",
-          "item_key": "item.permit.cloud_mine",
-          "quantity": 1
-        },
-        {
-          "type": "inventory_item",
-          "item_key": "item.tool.mining_pickaxe",
-          "quantity": 1
-        },
-        {
-          "type": "inventory_item",
-          "item_key": "item.tool.mining_pickaxe_t2",
-          "quantity": 1
-        }
-      ],
       "weight": 80,
       "duration_seconds": 7200,
       "daily_limit": 1,
@@ -106,7 +73,7 @@
     {
       "key": "bounty.elite_hunt",
       "name": "洞天精英悬赏",
-      "desc": "进入雾隐洞天二层，击败雾隐精英。",
+      "desc": "进入雾隐洞天二层，击败雾隐精英。从云舟渡口乘舟进入洞天二层，备好高级通行证，再进行洞天二层探索。",
       "quality": "rare",
       "status": "open",
       "aliases": [
@@ -129,14 +96,14 @@
     {
       "key": "bounty.demon_relief",
       "name": "魔界救援",
-      "desc": "向深渊救援营交付粗糙灵米，支援前线补给。",
+      "desc": "向深渊救援营交付粗糙灵米，支援前线补给。完成魔界引导后可接；灵米可在灵泉采集取得，须接取后新增并交付。",
       "quality": "rare",
       "status": "open",
       "aliases": [
         "魔界救援悬赏"
       ],
-      "required_realm": null,
-      "required_layer": 0,
+      "required_realm": "qi_sensing",
+      "required_layer": 2,
       "path_keys": [],
       "weight": 10,
       "duration_seconds": 14400,
@@ -155,7 +122,7 @@
     {
       "key": "bounty.beast_habitat",
       "name": "妖界栖地保护",
-      "desc": "协助万兽山完成灵兽迁徙，维护栖地秩序。",
+      "desc": "协助万兽山完成灵兽迁徙，维护栖地秩序。持有效妖界贸易许可，接取后开始派遣 妖界迁徙，须成功结算两次。",
       "quality": "rare",
       "status": "open",
       "aliases": [
@@ -181,7 +148,7 @@
     {
       "key": "bounty.spell_trial",
       "name": "灵术校验",
-      "desc": "法修击败近郊妖兽，验证术法控制与灵力运转。",
+      "desc": "法修击败近郊妖兽，验证术法控制与灵力运转。在近郊采集或近郊短历练中遭遇木鼠并获胜，只计接取后的正式探索战。",
       "quality": "uncommon",
       "status": "open",
       "aliases": [],
@@ -204,7 +171,7 @@
     {
       "key": "bounty.body_trial",
       "name": "淬体试炼",
-      "desc": "入近郊伏妖，淬炼肉身、磨砺护体之法。",
+      "desc": "入近郊伏妖，淬炼肉身、磨砺护体之法。在近郊采集或近郊短历练中遭遇木鼠并获胜，只计接取后的正式探索战。",
       "quality": "uncommon",
       "status": "open",
       "aliases": [
@@ -229,7 +196,7 @@
     {
       "key": "bounty.void_anchoring",
       "name": "虚空锚定悬赏",
-      "desc": "向界壁巡守交付虚空晶，协助稳定炼虚境附近的航道。",
+      "desc": "向界壁巡守交付虚空晶，协助稳定炼虚境附近的航道。经界隙进入虚空航道，进行虚空航道历练取得虚空晶。",
       "quality": "mythic",
       "status": "open",
       "aliases": [
@@ -252,15 +219,15 @@
     {
       "key": "bounty.mortal.rice_delivery",
       "name": "灵米送暖",
-      "desc": "为青石镇旅舍收集粗糙灵米，完成一份凡人阶段的稳定委托。",
+      "desc": "为青石镇旅舍收集粗糙灵米。感气二层后前往灵泉谷进行灵泉采集，只计接取后新增的灵米。",
       "quality": "common",
       "status": "open",
       "aliases": [
         "灵米送暖",
         "灵米委托"
       ],
-      "required_realm": "mortal",
-      "required_layer": 0,
+      "required_realm": "qi_sensing",
+      "required_layer": 2,
       "path_keys": [],
       "weight": 90,
       "duration_seconds": 3600,
@@ -276,7 +243,7 @@
     {
       "key": "bounty.mortal.wood_order",
       "name": "木材修缮",
-      "desc": "为青石镇修缮棚屋收集木材，完成凡人阶段的公开采办。",
+      "desc": "为青石镇修缮棚屋收集木材，完成凡人阶段的公开采办。凡人可从青石镇前往近郊，进行近郊采集取得木材。",
       "quality": "common",
       "status": "open",
       "aliases": [
@@ -299,7 +266,7 @@
     {
       "key": "bounty.qi_sensing.leaf_gather",
       "name": "灵叶采集",
-      "desc": "为初阶药房补足灵叶，按实际取得的材料计数。",
+      "desc": "为初阶药房补足灵叶，按实际取得的材料计数。从近郊前往百草坡进行百草坡采集，或在灵泉谷进行灵泉采集。",
       "quality": "common",
       "status": "open",
       "aliases": [
@@ -322,7 +289,7 @@
     {
       "key": "bounty.qi_sensing.ironstone",
       "name": "铁石补给",
-      "desc": "为山径修缮筹集铁石，适合感气阶段反复完成。",
+      "desc": "为山径修缮筹集铁石，适合感气阶段反复完成。在近郊采集或铁木林采集中取得铁石。",
       "quality": "common",
       "status": "open",
       "aliases": [
@@ -345,7 +312,7 @@
     {
       "key": "bounty.qi_gathering.array_sand",
       "name": "阵砂补库",
-      "desc": "交付阵砂，补充聚气修士的基础阵材库存。",
+      "desc": "交付阵砂，补充聚气修士的基础阵材库存。从近郊前往玄武岩径，进行玄武岩径采集取得阵砂。",
       "quality": "uncommon",
       "status": "open",
       "aliases": [
@@ -368,7 +335,7 @@
     {
       "key": "bounty.qi_gathering.wood",
       "name": "灵木采办",
-      "desc": "为聚灵阵作坊采办木材，目标来自公开采集与生活奖励。",
+      "desc": "为聚灵阵作坊采办木材，目标来自公开采集与生活奖励。从近郊前往铁木林，进行铁木林采集取得木材。",
       "quality": "common",
       "status": "open",
       "aliases": [
@@ -391,7 +358,7 @@
     {
       "key": "bounty.qi_gathering.cloud_tea",
       "name": "云灵茶试饮",
-      "desc": "完成一份公开烹饪配方并交付云灵茶，换取作坊信誉。",
+      "desc": "完成一份公开烹饪配方并交付云灵茶，换取作坊信誉。在灵泉谷采集灵叶与粗糙灵米，就地开始生产云灵茶，领取生产后交付。",
       "quality": "uncommon",
       "status": "open",
       "aliases": [
@@ -413,14 +380,15 @@
     },
     {
       "key": "bounty.foundation.bandit_hunt",
-      "name": "筑基清剿",
-      "desc": "在公开历练中击退劫修学徒，稳定近郊往来。",
+      "name": "商道清剿",
+      "desc": "在公开历练中击退劫修学徒，稳定近郊往来。金丹后从青石镇前往云城，进行云城护送，在探索遭遇中击败劫修学徒。",
       "quality": "uncommon",
       "status": "open",
       "aliases": [
-        "劫修清剿"
+        "劫修清剿",
+        "筑基清剿"
       ],
-      "required_realm": "foundation",
+      "required_realm": "golden_core",
       "required_layer": 1,
       "path_keys": [],
       "weight": 90,
@@ -437,7 +405,7 @@
     {
       "key": "bounty.foundation.mist_core",
       "name": "雾核搜集",
-      "desc": "从雾隐洞天或其守卫掉落中取得雾隐核心。",
+      "desc": "从雾隐洞天或其守卫掉落中取得雾隐核心。在灵泉谷备好基础通行证进入雾隐洞天探索，或击败其中守卫取得雾隐核心。",
       "quality": "uncommon",
       "status": "open",
       "aliases": [
@@ -460,7 +428,7 @@
     {
       "key": "bounty.golden_core.cloud_iron",
       "name": "云铁验收",
-      "desc": "交付云铁，协助云城工坊完成金丹阶段的器材验收。",
+      "desc": "交付云铁，协助云城工坊完成金丹阶段的器材验收。从云城前往云铁矿区，备好矿镐、许可或采矿辅修后进行云铁矿区采集。",
       "quality": "rare",
       "status": "open",
       "aliases": [
@@ -483,7 +451,7 @@
     {
       "key": "bounty.golden_core.cloud_boat",
       "name": "云舟票补",
-      "desc": "补齐云舟航线票据碎片，支持金丹修士的公开航路。",
+      "desc": "补齐云舟航线票据碎片，支持金丹修士的公开航路。从云城前往云舟渡口，进行云舟试炼取得票据碎片。",
       "quality": "rare",
       "status": "open",
       "aliases": [
@@ -506,7 +474,7 @@
     {
       "key": "bounty.nascent.demon_core",
       "name": "魔核回收",
-      "desc": "在魔界公开历练中取得魔核并交回边境集市。",
+      "desc": "在魔界公开历练中取得魔核并交回边境集市。完成魔界引导后在深渊门进行深渊门备材，或前往堕落遗迹进行魔界堕落遗迹探索。",
       "quality": "rare",
       "status": "open",
       "aliases": [
@@ -529,7 +497,7 @@
     {
       "key": "bounty.nascent.boundary_watch",
       "name": "界隙守望",
-      "desc": "击退界隙守望者，维持跨界边境的公开巡查线。",
+      "desc": "击退界隙守望者，维持跨界边境的公开巡查线。从青石镇经魔界战线前往界隙裂隙，进行界隙巡查并击败界隙守望者。",
       "quality": "rare",
       "status": "open",
       "aliases": [
@@ -552,7 +520,7 @@
     {
       "key": "bounty.nascent.beast_blood",
       "name": "兽血采样",
-      "desc": "在万兽山公开狩猎中取得兽血，交由跨界研究处验收。",
+      "desc": "在万兽山公开狩猎中取得兽血，交由跨界研究处验收。近郊探索后阅读妖界史、完成妖界引导，再从云舟渡口前往万兽山进行狩猎。",
       "quality": "rare",
       "status": "open",
       "aliases": [
@@ -575,7 +543,7 @@
     {
       "key": "bounty.soul.ancestral_blood",
       "name": "祖灵血样",
-      "desc": "在祖灵湖公开探索中取得祖灵血，供领域研究使用。",
+      "desc": "在祖灵湖公开探索中取得祖灵血，供领域研究使用。在万兽山狩猎积累妖界声望至三千后前往祖灵湖，进行祖灵湖探索。",
       "quality": "rare",
       "status": "open",
       "aliases": [
@@ -598,7 +566,7 @@
     {
       "key": "bounty.soul.domain_fragment",
       "name": "领域碎片",
-      "desc": "收集领域核心碎片，完成化神阶段的公共建设委托。",
+      "desc": "收集领域核心碎片，完成化神阶段的公共建设委托。可在界隙巡查取得领域核心碎片，化神后也可进行远古洞天探索。",
       "quality": "rare",
       "status": "open",
       "aliases": [
@@ -621,7 +589,7 @@
     {
       "key": "bounty.soul.ancestral_watch",
       "name": "祖灵湖守望",
-      "desc": "击退祖灵湖影，完成化神阶段的湖岸巡查。",
+      "desc": "击退祖灵湖影，完成化神阶段的湖岸巡查。妖界声望三千后从万兽山前往祖灵湖，进行祖灵湖探索并获胜。",
       "quality": "rare",
       "status": "open",
       "aliases": [
@@ -644,7 +612,7 @@
     {
       "key": "bounty.void.anchor",
       "name": "虚空锚补给",
-      "desc": "向虚空航道补充虚空锚，维持炼虚阶段的公开航行。",
+      "desc": "向虚空航道补充虚空锚，维持炼虚阶段的公开航行。经界隙抵达虚空航道，进行虚空航道历练取得虚空锚。",
       "quality": "mythic",
       "status": "open",
       "aliases": [
@@ -667,7 +635,7 @@
     {
       "key": "bounty.void.archive_fragment",
       "name": "档案碎片归档",
-      "desc": "将档案遗迹取得的碎片交回云城档案处。",
+      "desc": "将档案遗迹取得的碎片交回云城档案处。甲型档案碎片来自虚空航道历练，也可在档案遗迹搜寻中击败守卫取得。",
       "quality": "mythic",
       "status": "open",
       "aliases": [
@@ -690,7 +658,7 @@
     {
       "key": "bounty.dao.fruit_fragment",
       "name": "道果碎片验收",
-      "desc": "向道源服务处交付道果碎片，换取终局服务名望。",
+      "desc": "向道源服务处交付道果碎片，换取终局服务名望。可交付领取合道许可所得、突破合道消耗后余下的两枚道果碎片；按现有库存计数并扣除，不要求重新取得。",
       "quality": "mythic",
       "status": "open",
       "aliases": [
@@ -702,7 +670,7 @@
       "weight": 80,
       "duration_seconds": 57600,
       "daily_limit": 1,
-      "target_kind": "inventory_gain",
+      "target_kind": "inventory_delivery",
       "target_key": "item.dao_fruit_fragment",
       "target_amount": 2,
       "reward_pool_key": "reward_pool.bounty.void_anchoring",
@@ -713,7 +681,7 @@
     {
       "key": "bounty.dao.archive",
       "name": "道源档案整理",
-      "desc": "交付虚空档案，协助道源门完成资料整理。",
+      "desc": "交付虚空档案，协助道源门完成资料整理。在档案遗迹进行档案遗迹搜寻，取得虚空档案。",
       "quality": "mythic",
       "status": "open",
       "aliases": [
@@ -736,7 +704,7 @@
     {
       "key": "bounty.dao.service",
       "name": "道统服务轮值",
-      "desc": "完成一次道源服务派遣，记录公开轮值贡献。",
+      "desc": "完成一次道源服务派遣，记录公开轮值贡献。接取后开始道统服务派遣，八小时后结算成功即可；失败可在期限内重试。",
       "quality": "mythic",
       "status": "open",
       "aliases": [
@@ -759,7 +727,7 @@
     {
       "key": "bounty.tribulation.guard",
       "name": "天劫护持",
-      "desc": "交付天劫护符，为渡劫台的公开护持库补充材料。",
+      "desc": "交付天劫护符，为渡劫台的公开护持库补充材料。备好天劫凭证与领域核心，开始终局配方 天劫保护阵并结算终局配方取得护符；只计接取后新增的护符。",
       "quality": "mythic",
       "status": "open",
       "aliases": [
@@ -782,7 +750,7 @@
     {
       "key": "bounty.tribulation.token",
       "name": "天劫凭证核验",
-      "desc": "向渡劫台交付天劫凭证，完成终局资格核验。",
+      "desc": "向渡劫台交付天劫凭证，完成终局资格核验。通过道源任务完成留界建设或道统传承并领取当季奖励，取得新的天劫凭证；既有凭证不计新增。",
       "quality": "mythic",
       "status": "open",
       "aliases": [
@@ -805,7 +773,7 @@
     {
       "key": "bounty.tribulation.echo",
       "name": "天劫回响",
-      "desc": "在公开天劫遭遇中击败天劫回响，记录渡劫台战果。",
+      "desc": "在公开天劫遭遇中击败天劫回响，记录渡劫台战果。在渡劫台开始天劫试炼并击败三劫天尊；只计接取后的专用试炼战，普通探索与旧战果不计。",
       "quality": "mythic",
       "status": "open",
       "aliases": [
@@ -817,7 +785,7 @@
       "weight": 45,
       "duration_seconds": 86400,
       "daily_limit": 1,
-      "target_kind": "exploration_battle_wins",
+      "target_kind": "tribulation_trial_wins",
       "target_key": "enemy.tribulation_heaven",
       "target_amount": 1,
       "reward_pool_key": "reward_pool.bounty.void_anchoring",
@@ -828,7 +796,7 @@
     {
       "key": "bounty.abyss_core",
       "name": "深渊魔核",
-      "desc": "深入魔渊深层收集凝实魔核，交由魔界商队验货。",
+      "desc": "深入魔渊深层收集凝实魔核，交由魔界商队验货。完成魔界准入后从堕落遗迹前往魔渊深层，进行魔渊深层探索。",
       "quality": "rare",
       "status": "open",
       "aliases": [
@@ -851,7 +819,7 @@
     {
       "key": "bounty.abyss_clue",
       "name": "深渊契约",
-      "desc": "在魔渊深层寻回一纸契约线索，供后续勘验。",
+      "desc": "在魔渊深层寻回一纸契约线索，供后续勘验。从堕落遗迹前往魔渊深层，进行魔渊深层探索取得契约线索。",
       "quality": "epic",
       "status": "open",
       "aliases": [
@@ -874,7 +842,7 @@
     {
       "key": "bounty.domain_soul",
       "name": "洞天神魂",
-      "desc": "于远古洞天采得神魂晶，补足领域工坊的消耗。",
+      "desc": "于远古洞天采得神魂晶，补足领域工坊的消耗。从雾隐洞天二层前往远古洞天，进行远古洞天探索取得神魂晶。",
       "quality": "rare",
       "status": "open",
       "aliases": [
@@ -897,7 +865,7 @@
     {
       "key": "bounty.domain_fragment_raid",
       "name": "洞天残片",
-      "desc": "从远古洞天取回四枚领域核心碎片，用于加固禁制。",
+      "desc": "从远古洞天取回四枚领域核心碎片，用于加固禁制。从雾隐洞天二层前往远古洞天，进行远古洞天探索取得核心碎片。",
       "quality": "epic",
       "status": "open",
       "aliases": [
@@ -920,7 +888,7 @@
     {
       "key": "bounty.ironwood_timber",
       "name": "铁木备料",
-      "desc": "为宗门制器备下铁木林出的旧木，交付镇务入库。",
+      "desc": "为宗门制器备下铁木林出的旧木，交付镇务入库。前往铁木林进行铁木林采集，须接取后新增六份木材并交付。",
       "quality": "common",
       "status": "open",
       "aliases": [
@@ -943,7 +911,7 @@
     {
       "key": "bounty.ironstone_delivery",
       "name": "铁石入库",
-      "desc": "把铁木林采得的铁石送进镇务库房，供灵具修缮登记。",
+      "desc": "把铁木林采得的铁石送进镇务库房，供灵具修缮登记。前往铁木林进行铁木林采集，须接取后新增四份铁石并交付。",
       "quality": "common",
       "status": "open",
       "aliases": [
@@ -966,7 +934,7 @@
     {
       "key": "bounty.grotto_iron_order",
       "name": "洞天云铁呈交",
-      "desc": "洞天二层带回的云铁质地沉厚，镇务按件收下并登记。",
+      "desc": "洞天二层带回的云铁质地沉厚，镇务按件收下并登记。乘云舟进入雾隐洞天二层，进行洞天二层探索取得云铁并交付。",
       "quality": "rare",
       "status": "open",
       "aliases": [
@@ -989,7 +957,7 @@
     {
       "key": "bounty.dao_origin_service",
       "name": "道统起源服务",
-      "desc": "为公共项目出力三次，记为道统起源服务，得当地道统名望与图鉴见闻。",
+      "desc": "为公共项目出力三次，记为道统起源服务，得当地道统名望与图鉴见闻。接取后向三个不同公共项目各完成一次服务贡献；同一项目重复服务只算一次。",
       "quality": "mythic",
       "status": "open",
       "aliases": [
@@ -1013,7 +981,7 @@
     {
       "key": "bounty.idle.mine_watch",
       "name": "矿区看守差事",
-      "desc": "替云铁矿区看守矿脉，完成一次矿区看守的闲居安排。",
+      "desc": "替云铁矿区看守矿脉，完成一次矿区看守的闲居安排。接取后安排矿区看守，再领取一次该闲居结算；既有已结算差事不计。",
       "quality": "uncommon",
       "status": "open",
       "aliases": [
@@ -1036,7 +1004,7 @@
     {
       "key": "bounty.idle.demon_post",
       "name": "魔界驿所差事",
-      "desc": "替魔界驿所看守货栈，完成一次驿所值守的闲居安排。",
+      "desc": "替魔界驿所看守货栈，完成一次驿所值守的闲居安排。须有有效魔界贸易许可；接取后安排魔界驿所值守并领取闲居结算。",
       "quality": "rare",
       "status": "open",
       "aliases": [
@@ -1059,7 +1027,7 @@
     {
       "key": "bounty.idle.dao_post",
       "name": "道统据点差事",
-      "desc": "替已定道统的宗门看守据点，完成一次据点值守的闲居安排。",
+      "desc": "替已定道统的宗门看守据点，完成一次据点值守的闲居安排。须加入已定道统的宗门；接取后开始挂机 道统据点看守，十二小时后领取挂机。",
       "quality": "mythic",
       "status": "open",
       "aliases": [
@@ -1069,7 +1037,7 @@
       "required_layer": 1,
       "path_keys": [],
       "weight": 50,
-      "duration_seconds": 43200,
+      "duration_seconds": 86400,
       "daily_limit": 1,
       "target_kind": "idle_claims",
       "target_key": "idle.dao_settlement_watch",
@@ -1082,7 +1050,7 @@
     {
       "key": "bounty.foundation.workshop_order",
       "name": "筑基坊市订单",
-      "desc": "为青石镇坊市完成两份生产订单，夯实筑基期的炼制根基。",
+      "desc": "为青石镇坊市完成两份生产订单，夯实筑基期的炼制根基。用可用的公开配方生产并结算两份订单，只计接取后新完成的订单。",
       "quality": "uncommon",
       "status": "open",
       "aliases": [
@@ -1106,7 +1074,7 @@
     {
       "key": "bounty.foundation.service_round",
       "name": "筑基共建差事",
-      "desc": "参与镇中公共事务三次，为筑基修士留下共建声名。",
+      "desc": "参与镇中公共事务三次，为筑基修士留下共建声名。接取后为三个不同公共项目各完成一次服务贡献，同一项目不重复计数。",
       "quality": "uncommon",
       "status": "open",
       "aliases": [
@@ -1130,7 +1098,7 @@
     {
       "key": "bounty.golden_core.patrol_dispatch",
       "name": "金丹巡守派遣",
-      "desc": "完成两次金丹矿脉巡探派遣，护住云城外的商路。",
+      "desc": "完成两次金丹矿脉巡探派遣，护住云城外的商路。接取后开始派遣 云铁矿区勘测，单次三十分钟，须成功结算两次。",
       "quality": "rare",
       "status": "open",
       "aliases": [
@@ -1154,7 +1122,7 @@
     {
       "key": "bounty.nascent.ruins_hunt",
       "name": "元婴遗迹清剿",
-      "desc": "在魔界遗迹击败遗迹巡守两次，压住外溢的魔气。",
+      "desc": "在魔界遗迹击败遗迹巡守两次，压住外溢的魔气。完成魔界引导后从云舟渡口抵达深渊门，前往堕落遗迹进行魔界堕落遗迹探索。",
       "quality": "rare",
       "status": "open",
       "aliases": [
@@ -1178,7 +1146,7 @@
     {
       "key": "bounty.soul.domain_courier",
       "name": "化神界域信使",
-      "desc": "完成两次化神界域传信派遣，维系领域前线的联络。",
+      "desc": "完成两次化神界域传信派遣，维系领域前线的联络。接取后开始派遣 领域前线文书接力，单次一小时，须成功结算两次。",
       "quality": "rare",
       "status": "open",
       "aliases": [
@@ -1202,7 +1170,7 @@
     {
       "key": "bounty.void.archive_watch",
       "name": "虚空档案守望",
-      "desc": "击败档案守卫两次，守稳虚空遗迹的归档秩序。",
+      "desc": "击败档案守卫两次，守稳虚空遗迹的归档秩序。在虚空航道历练或档案遗迹搜寻的探索战中击败档案守卫两次。",
       "quality": "mythic",
       "status": "open",
       "aliases": [
@@ -1226,7 +1194,7 @@
     {
       "key": "bounty.market.demon_core_run",
       "name": "魔渊契约回收",
-      "desc": "将魔渊契约集市秘境中取得的魔核交回集市，换取集市名望与佣金。",
+      "desc": "将魔渊契约集市秘境中取得的魔核交回集市，换取集市名望与佣金。完成魔界准入后经深渊门前往魔渊集市，进入魔渊集市秘境取得魔核后交付。",
       "quality": "rare",
       "status": "open",
       "aliases": [
@@ -1249,7 +1217,7 @@
     {
       "key": "bounty.market.beast_blood_run",
       "name": "货栈私货验货",
-      "desc": "将三界货栈秘境中取得的兽血交给贸易口验货，换取贸易口名望与佣金。",
+      "desc": "将三界货栈秘境中取得的兽血交给贸易口验货，换取贸易口名望与佣金。经万兽山前往三界贸易口，进入贸易口秘境取得兽血后交付。",
       "quality": "rare",
       "status": "open",
       "aliases": [
@@ -1267,6 +1235,29 @@
       "reward_pool_key": "reward_pool.bounty.beast_habitat",
       "reputation_key": "local.beast.three_realms_trade_port",
       "consume_target": true,
+      "reward_labels": {}
+    },
+    {
+      "key": "bounty.mortal.ironstone_order",
+      "name": "镇道备石",
+      "desc": "为青石镇修补道路备下两份铁石。凡人可前往近郊进行近郊采集，只计接取后新增的铁石。",
+      "quality": "common",
+      "status": "open",
+      "aliases": [
+        "凡人备石"
+      ],
+      "required_realm": "mortal",
+      "required_layer": 0,
+      "path_keys": [],
+      "weight": 60,
+      "duration_seconds": 3600,
+      "daily_limit": 1,
+      "target_kind": "inventory_gain",
+      "target_key": "item.ore.ironstone",
+      "target_amount": 2,
+      "reward_pool_key": "reward_pool.bounty.craft_order",
+      "reputation_key": "local.xuantian.new_town",
+      "consume_target": false,
       "reward_labels": {}
     }
   ],

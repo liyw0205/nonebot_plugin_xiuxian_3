@@ -68,13 +68,13 @@ class IdleRepositoryMixin:
             player = self._require_player(connection, platform, platform_user_id, writable=False)
             return tuple(self._idle_preview(connection, player, definition, now) for definition in requested)
 
-    def _idle_preview(
+    def _idle_requirements_missing(
         self,
         connection: sqlite3.Connection,
         player: sqlite3.Row,
         definition: IdleRouteDefinition,
         now: datetime,
-    ) -> IdleRoutePreviewRecord:
+    ) -> list[str]:
         missing: list[str] = []
         stage_order = {"new_user": 0, "mortal": 1, "seeker": 2, "cultivator": 3, "suspended": -1}
         if stage_order.get(str(player["stage"]), -1) < stage_order.get(definition.required_stage, 1):
@@ -131,6 +131,16 @@ class IdleRepositoryMixin:
         facility = self._idle_select_facility(connection, player, definition, None)
         if definition.required_tool_keys and selected_tool is None and facility is None:
             missing.append("需要基础工具或作坊槽")
+        return missing
+
+    def _idle_preview(
+        self,
+        connection: sqlite3.Connection,
+        player: sqlite3.Row,
+        definition: IdleRouteDefinition,
+        now: datetime,
+    ) -> IdleRoutePreviewRecord:
+        missing = self._idle_requirements_missing(connection, player, definition, now)
         active = connection.execute(
             "SELECT 1 FROM idle_assignments WHERE player_id = ? AND status IN ('assigned', 'running') LIMIT 1",
             (player["id"],),

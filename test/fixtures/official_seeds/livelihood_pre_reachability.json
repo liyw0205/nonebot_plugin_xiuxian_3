@@ -1,0 +1,1495 @@
+{
+  "kind": "livelihood",
+  "records": [
+    {
+      "name": "镇中行旅",
+      "desc": "替镇中商铺照看往来，积攒些许灵石与青石镇名望。",
+      "aliases": ["城镇跑腿", "看店"],
+      "duration_seconds": 7200,
+      "cost": {"stamina": 0, "energy": 0},
+      "daily_limit": 2,
+      "requirements": {"stage": "mortal", "location_key": "xuantian.new_town"},
+      "reward_pool_key": "reward_pool.idle.town_errand",
+      "fallback_reward_pool_key": "reward_pool.idle.town_errand.fallback",
+      "durability_cost_bp": 0,
+      "key": "idle.town_errand",
+      "record_type": "idle_route",
+      "status": "active"
+    },
+    {
+      "name": "灵圃看护",
+      "desc": "照料院中灵草，收获可供日常炼制的药材。",
+      "aliases": ["药圃看护", "看护药圃"],
+      "duration_seconds": 14400,
+      "cost": {"stamina": 0, "energy": 1},
+      "daily_limit": 1,
+      "requirements": {"stage": "mortal", "active_residence": true},
+      "reward_pool_key": "reward_pool.idle.herb_watch",
+      "fallback_reward_pool_key": "reward_pool.idle.herb_watch.fallback",
+      "durability_cost_bp": 0,
+      "key": "idle.herb_watch",
+      "record_type": "idle_route",
+      "status": "active"
+    },
+    {
+      "name": "作坊值守",
+      "desc": "替作坊看守炉锤与阵材，所得皆为日常所用。",
+      "aliases": ["作坊看守", "工具看守"],
+      "duration_seconds": 10800,
+      "cost": {"stamina": 0, "energy": 0},
+      "daily_limit": 1,
+      "requirements": {
+        "stage": "mortal",
+        "tool_item_keys": ["item.tool.basic_furnace", "item.tool.basic_hammer"],
+        "facility_kind": "artifice"
+      },
+      "reward_pool_key": "reward_pool.idle.workshop_care",
+      "fallback_reward_pool_key": "reward_pool.idle.workshop_care.fallback",
+      "durability_cost_bp": 50,
+      "key": "idle.workshop_care",
+      "record_type": "idle_route",
+      "status": "active"
+    },
+    {
+      "name": "商道探路",
+      "desc": "沿青石镇外商道察看路况，积攒灵石并记下沿途见闻。",
+      "aliases": ["商路观察"],
+      "duration_seconds": 21600,
+      "cost": {"stamina": 2, "energy": 0},
+      "daily_limit": 1,
+      "requirements": {
+        "stage": "mortal",
+        "local_reputation": {"local.xuantian.new_town": 20}
+      },
+      "reward_pool_key": "reward_pool.idle.route_scout",
+      "fallback_reward_pool_key": "reward_pool.idle.route_scout.fallback",
+      "durability_cost_bp": 0,
+      "key": "idle.route_scout",
+      "record_type": "idle_route",
+      "status": "active"
+    },
+    {
+      "name": "城镇送货",
+      "desc": "替镇中商铺护送货物，沿途积攒灵石与青石镇名望。",
+      "aliases": ["送货", "镇中送货"],
+      "duration_seconds": 1800,
+      "daily_limit": 3,
+      "cost": {"stamina": 3},
+      "risk_pool": "dispatch.town",
+      "requirements": {"stage": "mortal"},
+      "risk": {
+        "weights": {"success": 7500, "delayed": 1500, "partial": 1000}
+      },
+      "rewards": {
+        "success": {"spirit_stones": 30, "local.xuantian.new_town": 3},
+        "partial": {"spirit_stones": 15, "local.xuantian.new_town": 1}
+      },
+      "key": "dispatch.town_delivery",
+      "record_type": "dispatch",
+      "status": "active"
+    },
+    {
+      "name": "药材搜寻",
+      "desc": "替药铺寻回近郊灵草，积累草木见闻。",
+      "aliases": ["搜寻药材", "寻药"],
+      "duration_seconds": 3600,
+      "daily_limit": 2,
+      "cost": {"stamina": 4},
+      "risk_pool": "dispatch.herb",
+      "requirements": {"stage": "mortal", "intro_flag": "guide.gather_blood_grass"},
+      "risk": {
+        "weights": {"success": 7000, "partial": 2000, "failed": 1000}
+      },
+      "failure_refunds": {"stamina": 2},
+      "rewards": {
+        "success": {
+          "item.herb.blood_grass": {"quantity_range": [3, 5]},
+          "item.herb.spirit_leaf": {"quantity_range": [0, 1]},
+          "codex.dispatch.herb_search": 1
+        },
+        "partial": {"item.herb.blood_grass": {"quantity_range": [1, 2]}}
+      },
+      "key": "dispatch.herb_search",
+      "record_type": "dispatch",
+      "status": "active"
+    },
+    {
+      "name": "作坊帮工",
+      "desc": "在作坊照看炉火与阵材，换取灵石和工匠信任。",
+      "aliases": ["作坊帮忙", "帮工"],
+      "duration_seconds": 7200,
+      "daily_limit": 2,
+      "cost": {"energy": 4, "item.mat.wood": 2},
+      "risk_pool": "dispatch.workshop",
+      "requirements": {"stage": "mortal", "intro_flag": "guide.choose_service"},
+      "risk": {
+        "weights": {"success": 6500, "delayed": 2000, "failed": 1500}
+      },
+      "failure_refunds": {"item.mat.wood": 1},
+      "rewards": {
+        "success": {
+          "spirit_stones": 45,
+          "service_reputation": 2,
+          "item.mat.array_sand": {"quantity_range": [1, 2]}
+        }
+      },
+      "key": "dispatch.workshop_help",
+      "record_type": "dispatch",
+      "status": "active"
+    },
+    {
+      "name": "魔界救援",
+      "desc": "将药材与灵米送往魔界商路，替受困行旅解围。",
+      "aliases": ["魔界援助"],
+      "duration_seconds": 14400,
+      "daily_limit": 3,
+      "cost": {"item.herb.blood_grass": 2, "item.food.coarse_spirit_rice": 2},
+      "risk_pool": "dispatch.demon_relief",
+      "requirements": {"stage": "mortal", "required_permit": "permit.demon_trade"},
+      "required_permit": "permit.demon_trade",
+      "risk": {
+        "weights": {"success": 7000, "partial": 2000, "failed": 1000}
+      },
+      "failure_refunds": {"item.herb.blood_grass": 1, "item.food.coarse_spirit_rice": 1},
+      "rewards": {
+        "success": {"local.demon.abyss_market": 6, "codex.story.dispatch_demon_relief": 1},
+        "partial": {"local.demon.abyss_market": 3}
+      },
+      "key": "dispatch.demon_relief",
+      "record_type": "dispatch",
+      "status": "active"
+    },
+    {
+      "name": "妖界迁徙",
+      "desc": "护送灵叶与灵米越过商路，替迁徙的灵兽寻得安稳去处。",
+      "aliases": ["妖界护送"],
+      "duration_seconds": 14400,
+      "daily_limit": 3,
+      "cost": {"item.herb.spirit_leaf": 2, "item.food.coarse_spirit_rice": 2},
+      "risk_pool": "dispatch.beast_relocation",
+      "requirements": {"stage": "mortal", "required_permit": "permit.beast_trade"},
+      "required_permit": "permit.beast_trade",
+      "risk": {
+        "weights": {"success": 7000, "partial": 2000, "failed": 1000}
+      },
+      "failure_refunds": {"item.herb.spirit_leaf": 1, "item.food.coarse_spirit_rice": 1},
+      "rewards": {
+        "success": {"local.beast.three_realms_trade_port": 6, "codex.story.dispatch_beast_relocation": 1},
+        "partial": {"local.beast.three_realms_trade_port": 3}
+      },
+      "key": "dispatch.beast_relocation",
+      "record_type": "dispatch",
+      "status": "active"
+    },
+    {
+      "name": "道统服务",
+      "desc": "替道统修缮灵脉与居所，积攒道统名望与服务信誉。",
+      "aliases": ["道统帮办"],
+      "duration_seconds": 28800,
+      "daily_limit": 2,
+      "cost": {"stamina": 6, "energy": 4},
+      "risk_pool": "dispatch.dao_service",
+      "requirements": {
+        "stage": "mortal",
+        "realm": {"key": "dao_union", "min_layer": 1},
+        "service_reputation": 80
+      },
+      "risk": {
+        "weights": {"success": 8500, "partial": 1000, "failed": 500}
+      },
+      "rewards": {
+        "success": {
+          "local.dao_service": 8,
+          "service_reputation": 4,
+          "codex.dao.service_origin": 1,
+          "codex.story.dao_service_origin": 1
+        },
+        "partial": {"local.dao_service": 4}
+      },
+      "key": "dispatch.dao_service",
+      "record_type": "dispatch",
+      "status": "active"
+    },
+    {
+      "name": "雾隐洞天巡护",
+      "desc": "为雾隐洞天一层巡逻护径，收获阵砂与镇中声望。",
+      "aliases": ["洞天巡护", "巡护"],
+      "duration_seconds": 1200,
+      "daily_limit": 3,
+      "cost": {"stamina": 4},
+      "risk_pool": "dispatch.foundation.patrol",
+      "requirements": {"stage": "mortal", "realm": {"key": "foundation", "min_layer": 1}},
+      "risk": {"weights": {"success": 7200, "partial": 1900, "failed": 900}},
+      "failure_refunds": {"stamina": 2},
+      "rewards": {
+        "success": {"item.mat.array_sand": {"quantity_range": [1, 2]}, "spirit_stones": 60, "local.xuantian.new_town": 4},
+        "partial": {"spirit_stones": 30, "local.xuantian.new_town": 1}
+      },
+      "key": "dispatch.foundation.patrol",
+      "record_type": "dispatch",
+      "status": "active"
+    },
+    {
+      "name": "云城商队护送",
+      "desc": "护送商队自青石镇前往云城，沿途积攒灵叶与云城人情。",
+      "aliases": ["护送商队", "商队护送"],
+      "duration_seconds": 1800,
+      "daily_limit": 3,
+      "cost": {"stamina": 5},
+      "risk_pool": "dispatch.foundation.escort",
+      "requirements": {"stage": "mortal", "realm": {"key": "foundation", "min_layer": 1}},
+      "risk": {"weights": {"success": 7000, "delayed": 1200, "partial": 1300, "failed": 500}},
+      "failure_refunds": {"stamina": 2},
+      "rewards": {
+        "success": {"item.herb.spirit_leaf": {"quantity_range": [2, 3]}, "spirit_stones": 70, "local.xuantian.cloud_city": 4},
+        "partial": {"item.herb.spirit_leaf": {"quantity_range": [1, 1]}, "spirit_stones": 35}
+      },
+      "key": "dispatch.foundation.escort",
+      "record_type": "dispatch",
+      "status": "active"
+    },
+    {
+      "name": "云铁矿区勘测",
+      "desc": "替云城商会勘测云铁矿区新脉，带回矿石与信任。",
+      "aliases": ["矿区勘测", "勘测"],
+      "duration_seconds": 1800,
+      "daily_limit": 2,
+      "cost": {"stamina": 6, "energy": 2},
+      "risk_pool": "dispatch.golden_core.vein_survey",
+      "requirements": {"stage": "mortal", "realm": {"key": "golden_core", "min_layer": 1}},
+      "risk": {"weights": {"success": 7000, "partial": 2000, "failed": 1000}},
+      "failure_refunds": {"stamina": 3, "energy": 1},
+      "rewards": {
+        "success": {"item.material.cloud_iron": {"quantity_range": [1, 2]}, "spirit_stones": 90, "local.xuantian.cloud_city": 5},
+        "partial": {"spirit_stones": 45, "local.xuantian.cloud_city": 2}
+      },
+      "key": "dispatch.golden_core.vein_survey",
+      "record_type": "dispatch",
+      "status": "active"
+    },
+    {
+      "name": "丹材押运",
+      "desc": "为云城丹坊押运灵魂晶等贵重丹材，赏金丰厚。",
+      "aliases": ["押运丹材", "丹材护送"],
+      "duration_seconds": 2400,
+      "daily_limit": 2,
+      "cost": {"stamina": 6, "energy": 2},
+      "risk_pool": "dispatch.golden_core.pill_run",
+      "requirements": {"stage": "mortal", "realm": {"key": "golden_core", "min_layer": 1}},
+      "risk": {"weights": {"success": 6800, "delayed": 1400, "partial": 1300, "failed": 500}},
+      "failure_refunds": {"stamina": 3, "energy": 1},
+      "rewards": {
+        "success": {"item.soul_crystal": {"quantity_range": [1, 2]}, "spirit_stones": 100},
+        "partial": {"item.soul_crystal": {"quantity_range": [1, 1]}, "spirit_stones": 50}
+      },
+      "key": "dispatch.golden_core.pill_run",
+      "record_type": "dispatch",
+      "status": "active"
+    },
+    {
+      "name": "堕落遗迹哨探",
+      "desc": "在堕落遗迹外围哨探魔物动向，换取魔核与集市信用。",
+      "aliases": ["遗迹哨探", "哨探"],
+      "duration_seconds": 2400,
+      "daily_limit": 2,
+      "cost": {"stamina": 7, "energy": 3},
+      "risk_pool": "dispatch.nascent.ruins_watch",
+      "requirements": {"stage": "mortal", "realm": {"key": "nascent_soul", "min_layer": 1}},
+      "risk": {"weights": {"success": 6800, "partial": 2100, "failed": 1100}},
+      "failure_refunds": {"stamina": 3, "energy": 1},
+      "rewards": {
+        "success": {"item.demon_core": {"quantity_range": [1, 2]}, "spirit_stones": 130, "local.demon.abyss_market": 5},
+        "partial": {"spirit_stones": 65, "local.demon.abyss_market": 2}
+      },
+      "key": "dispatch.nascent.ruins_watch",
+      "record_type": "dispatch",
+      "status": "active"
+    },
+    {
+      "name": "万兽山兽群清点",
+      "desc": "替万兽山管事清点外围兽群，带回兽血样本与贸易口人情。",
+      "aliases": ["兽群清点", "清点兽群"],
+      "duration_seconds": 2400,
+      "daily_limit": 2,
+      "cost": {"stamina": 7, "energy": 3},
+      "risk_pool": "dispatch.nascent.beast_census",
+      "requirements": {"stage": "mortal", "realm": {"key": "nascent_soul", "min_layer": 1}},
+      "risk": {"weights": {"success": 6800, "delayed": 1200, "partial": 1400, "failed": 600}},
+      "failure_refunds": {"stamina": 3, "energy": 1},
+      "rewards": {
+        "success": {"item.beast_blood": {"quantity_range": [1, 2]}, "spirit_stones": 140, "local.beast.three_realms_trade_port": 5},
+        "partial": {"item.beast_blood": {"quantity_range": [1, 1]}, "spirit_stones": 70}
+      },
+      "key": "dispatch.nascent.beast_census",
+      "record_type": "dispatch",
+      "status": "active"
+    },
+    {
+      "name": "领域前线文书接力",
+      "desc": "在领域前线各哨位间接力运送军报，磨砺阵砂与前线声望。",
+      "aliases": ["文书接力", "接力军报"],
+      "duration_seconds": 3600,
+      "daily_limit": 2,
+      "cost": {"stamina": 8, "energy": 4},
+      "risk_pool": "dispatch.soul.domain_relay",
+      "requirements": {"stage": "mortal", "realm": {"key": "soul_transformation", "min_layer": 1}},
+      "risk": {"weights": {"success": 6600, "partial": 2200, "failed": 1200}},
+      "failure_refunds": {"stamina": 4, "energy": 2},
+      "rewards": {
+        "success": {"item.mat.array_sand": {"quantity_range": [2, 3]}, "spirit_stones": 180, "local.xuantian.domain_front": 6},
+        "partial": {"item.mat.array_sand": {"quantity_range": [1, 1]}, "spirit_stones": 90}
+      },
+      "key": "dispatch.soul.domain_relay",
+      "record_type": "dispatch",
+      "status": "active"
+    },
+    {
+      "name": "魔渊集市货单核对",
+      "desc": "替魔渊集市行商核对货单账目，换取魔核与集市声望。",
+      "aliases": ["货单核对", "核对货单"],
+      "duration_seconds": 3600,
+      "daily_limit": 2,
+      "cost": {"stamina": 8, "energy": 4},
+      "risk_pool": "dispatch.soul.abyss_manifest",
+      "requirements": {"stage": "mortal", "realm": {"key": "soul_transformation", "min_layer": 1}},
+      "risk": {"weights": {"success": 6600, "delayed": 1200, "partial": 1500, "failed": 700}},
+      "failure_refunds": {"stamina": 4, "energy": 2},
+      "rewards": {
+        "success": {"item.demon_core": {"quantity_range": [2, 3]}, "spirit_stones": 200, "local.demon.abyss_market": 6},
+        "partial": {"item.demon_core": {"quantity_range": [1, 1]}, "spirit_stones": 100}
+      },
+      "key": "dispatch.soul.abyss_manifest",
+      "record_type": "dispatch",
+      "status": "active"
+    },
+    {
+      "name": "时序福地花畦打理",
+      "desc": "受守园人之托打理时序福地花畦，采得时痕草与谢资。",
+      "aliases": ["打理花畦", "花畦打理"],
+      "duration_seconds": 3600,
+      "daily_limit": 2,
+      "cost": {"stamina": 9, "energy": 4},
+      "risk_pool": "dispatch.void.garden_tending",
+      "requirements": {"stage": "mortal", "realm": {"key": "void_refining", "min_layer": 1}},
+      "risk": {"weights": {"success": 6500, "partial": 2300, "failed": 1200}},
+      "failure_refunds": {"stamina": 4, "energy": 2},
+      "rewards": {
+        "success": {"item.herb.time_trace": {"quantity_range": [1, 2]}, "spirit_stones": 240},
+        "partial": {"spirit_stones": 120}
+      },
+      "key": "dispatch.void.garden_tending",
+      "record_type": "dispatch",
+      "status": "active"
+    },
+    {
+      "name": "虚空航道信使",
+      "desc": "为虚空航道两侧营地说信，酬以灵魂晶与贸易口信誉。",
+      "aliases": ["航道信使", "虚空信使"],
+      "duration_seconds": 3600,
+      "daily_limit": 2,
+      "cost": {"stamina": 9, "energy": 5},
+      "risk_pool": "dispatch.void.route_courier",
+      "requirements": {"stage": "mortal", "realm": {"key": "void_refining", "min_layer": 1}},
+      "risk": {"weights": {"success": 6500, "delayed": 1300, "partial": 1500, "failed": 700}},
+      "failure_refunds": {"stamina": 4, "energy": 2},
+      "rewards": {
+        "success": {"item.soul_crystal": {"quantity_range": [2, 3]}, "spirit_stones": 260, "local.beast.three_realms_trade_port": 6},
+        "partial": {"item.soul_crystal": {"quantity_range": [1, 1]}, "spirit_stones": 130}
+      },
+      "key": "dispatch.void.route_courier",
+      "record_type": "dispatch",
+      "status": "active"
+    },
+    {
+      "name": "青石镇客房",
+      "desc": "镇中简洁安稳的落脚处，可供歇息、存放少量行李并打理一方小田。",
+      "aliases": ["客房", "小屋"],
+      "requirements": [
+        {
+          "type": "stage_min",
+          "stage": "mortal"
+        }
+      ],
+      "rent": {
+        "currency_key": "currency.spirit_stone",
+        "amount": 20,
+        "period_business_days": 3
+      },
+      "capacity": {
+        "rest_slots": 1,
+        "plots": 1,
+        "storage_slots": 10
+      },
+      "rest": {
+        "duration_seconds": 1800,
+        "restore_stamina": 8,
+        "restore_energy": 8,
+        "daily_limit": 2
+      },
+      "key": "residence.town_room",
+      "record_type": "residence",
+      "status": "active"
+    },
+    {
+      "name": "小院",
+      "desc": "带有数间静室与小片灵田的独门院落，适合长期修整和栽种灵植。",
+      "aliases": [],
+      "requirements": [
+        {
+          "type": "reputation",
+          "reputation_key": "local.xuantian.new_town",
+          "min": 40
+        }
+      ],
+      "rent": {
+        "currency_key": "currency.spirit_stone",
+        "amount": 80,
+        "period_days": 7
+      },
+      "capacity": {
+        "rest_slots": 2,
+        "plots": 1,
+        "storage_slots": 20
+      },
+      "rest": {
+        "duration_seconds": 1800,
+        "restore_stamina": 8,
+        "restore_energy": 8,
+        "daily_limit": 2
+      },
+      "key": "residence.courtyard",
+      "record_type": "residence",
+      "status": "active"
+    },
+    {
+      "name": "灵圃小院",
+      "desc": "带两垄灵田与静室的院落，适合长期栽种灵稻、打理灵圃。",
+      "aliases": ["灵圃", "双垄小院"],
+      "requirements": [
+        {
+          "type": "reputation",
+          "reputation_key": "local.xuantian.new_town",
+          "min": 60
+        }
+      ],
+      "rent": {
+        "currency_key": "currency.spirit_stone",
+        "amount": 150,
+        "period_days": 7
+      },
+      "capacity": {
+        "rest_slots": 2,
+        "plots": 2,
+        "storage_slots": 24
+      },
+      "rest": {
+        "duration_seconds": 1800,
+        "restore_stamina": 8,
+        "restore_energy": 8,
+        "daily_limit": 2
+      },
+      "key": "residence.herb_court",
+      "record_type": "residence",
+      "status": "active"
+    },
+    {
+      "name": "止血草",
+      "desc": "容易照料的常见药草，成熟后可采下止血草供炼药使用。",
+      "aliases": ["血草", "blood_grass"],
+      "requirements": [
+        {
+          "type": "residence_plot",
+          "status": "active"
+        }
+      ],
+      "seed": {
+        "item_key": "item.herb.blood_grass",
+        "quantity": 1
+      },
+      "growth_seconds": 14400,
+      "maintenance": {
+        "energy": 1,
+        "minimum_count": 1
+      },
+      "harvest": [
+        {
+          "item_key": "item.herb.blood_grass",
+          "quantity": 3
+        }
+      ],
+      "unmaintained_harvest": [
+        {
+          "item_key": "item.herb.blood_grass",
+          "quantity": 1
+        }
+      ],
+      "daily_limit": 2,
+      "reputation": {
+        "key": "local.xuantian.new_town",
+        "amount": 1
+      },
+      "key": "crop.blood_grass",
+      "record_type": "crop",
+      "status": "active"
+    },
+    {
+      "name": "灵叶",
+      "desc": "喜受灵气滋养的灵植，悉心照料后可收获灵叶与少量阵材。",
+      "aliases": ["spirit_leaf"],
+      "requirements": [
+        {
+          "type": "residence_key",
+          "value": "residence.courtyard"
+        },
+        {
+          "type": "residence_key",
+          "value": "residence.herb_court"
+        }
+      ],
+      "seed": {
+        "item_key": "item.herb.spirit_leaf",
+        "quantity": 1
+      },
+      "growth_seconds": 28800,
+      "random_pool": "livelihood.harvest",
+      "maintenance": {
+        "energy": 2,
+        "minimum_count": 2
+      },
+      "harvest": [
+        {
+          "item_key": "item.herb.spirit_leaf",
+          "quantity": 3
+        },
+        {
+          "item_key": "item.mat.array_sand",
+          "quantity_range": [
+            0,
+            1
+          ]
+        }
+      ],
+      "unmaintained_harvest": [
+        {
+          "item_key": "item.herb.spirit_leaf",
+          "quantity": 1
+        }
+      ],
+      "daily_limit": 1,
+      "key": "crop.spirit_leaf",
+      "record_type": "crop",
+      "status": "active"
+    },
+    {
+      "name": "云纹稻",
+      "desc": "灵圃中才养得住的灵稻，收割后可得云纹稻谷，再以文火慢蒸成饭。",
+      "aliases": ["云稻", "cloud_rice"],
+      "requirements": [
+        {
+          "type": "residence_key",
+          "value": "residence.herb_court"
+        }
+      ],
+      "seed": {
+        "item_key": "item.grain.cloud_rice",
+        "quantity": 1
+      },
+      "growth_seconds": 21600,
+      "maintenance": {
+        "energy": 1,
+        "minimum_count": 2
+      },
+      "harvest": [
+        {
+          "item_key": "item.grain.cloud_rice",
+          "quantity": 4
+        },
+        {
+          "item_key": "item.herb.spirit_leaf",
+          "quantity": 1
+        }
+      ],
+      "unmaintained_harvest": [
+        {
+          "item_key": "item.grain.cloud_rice",
+          "quantity": 2
+        }
+      ],
+      "daily_limit": 2,
+      "reputation": {
+        "key": "local.xuantian.new_town",
+        "amount": 2
+      },
+      "key": "crop.cloud_rice",
+      "record_type": "crop",
+      "status": "active"
+    },
+    {
+      "name": "止血草供应",
+      "desc": "药铺收购新鲜止血草，按约交货可换取灵石与青石镇的认可。",
+      "inputs": [
+        {
+          "item_key": "item.herb.blood_grass",
+          "quantity": 3
+        }
+      ],
+      "reward": {
+        "currency_key": "currency.spirit_stone",
+        "amount": 18,
+        "reputation_key": "local.xuantian.new_town",
+        "reputation": 3,
+        "service_reputation": 1
+      },
+      "stock": 200,
+      "aliases": ["草药供应"],
+      "stock_bonus_key": "town_commission.stock_bonus",
+      "reward_bonus_key": "town_commission.herb_reward_bonus",
+      "duration_seconds": 43200,
+      "key": "town_commission.herb_supply",
+      "record_type": "commission",
+      "status": "active"
+    },
+    {
+      "name": "工具修缮",
+      "desc": "镇中工匠收购木材与铁石，用以修补日常生产工具。",
+      "inputs": [
+        {
+          "item_key": "item.mat.wood",
+          "quantity": 2
+        },
+        {
+          "item_key": "item.ore.ironstone",
+          "quantity": 1
+        }
+      ],
+      "reward": {
+        "currency_key": "currency.spirit_stone",
+        "amount": 25,
+        "reputation_key": "local.xuantian.new_town",
+        "reputation": 4,
+        "service_reputation": 1
+      },
+      "stock": 120,
+      "stock_bonus_key": "town_commission.stock_bonus",
+      "duration_seconds": 43200,
+      "key": "town_commission.repair_tools",
+      "record_type": "commission",
+      "status": "active"
+    },
+    {
+      "name": "灵米饭供应",
+      "desc": "食肆收购现做的灵米饭，为往来修士备下充饥餐食。",
+      "inputs": [
+        {
+          "item_key": "item.food.spirit_rice",
+          "quantity": 2
+        }
+      ],
+      "reward": {
+        "currency_key": "currency.spirit_stone",
+        "amount": 20,
+        "reputation_key": "local.xuantian.new_town",
+        "reputation": 3,
+        "service_reputation": 1
+      },
+      "stock": 150,
+      "stock_bonus_key": "town_commission.stock_bonus",
+      "duration_seconds": 43200,
+      "key": "town_commission.meal_service",
+      "record_type": "commission",
+      "status": "active"
+    },
+    {
+      "name": "灵泉谷灵叶收集",
+      "desc": "灵泉谷商户收购灵叶，用于调制灵植养护药露。",
+      "inputs": [
+        {
+          "item_key": "item.herb.spirit_leaf",
+          "quantity": 1
+        }
+      ],
+      "reward": {
+        "currency_key": "currency.spirit_stone",
+        "amount": 30,
+        "reputation_key": "local.xuantian.new_town",
+        "reputation": 4,
+        "service_reputation": 2
+      },
+      "stock": 80,
+      "stock_bonus_key": "town_commission.stock_bonus",
+      "duration_seconds": 43200,
+      "unlock_key": "commission.town.extra_offer",
+      "key": "town_commission.spirit_leaf",
+      "record_type": "commission",
+      "status": "active"
+    },
+    {
+      "name": "云城商会·云铁供应",
+      "desc": "云城商会收购云铁，供器坊与阵堂补充日常炼制所需。",
+      "aliases": ["云铁供应", "云铁供货"],
+      "inputs": [
+        {
+          "item_key": "item.material.cloud_iron",
+          "quantity": 5
+        }
+      ],
+      "reward": {
+        "currency_key": "currency.spirit_stone",
+        "amount": 180,
+        "reputation_key": "local.xuantian.cloud_city",
+        "reputation": 6,
+        "service_reputation": 2
+      },
+      "stock": 80,
+      "duration_seconds": 86400,
+      "unlock_key": "commission.cloud_city.extra_order",
+      "requirements_any": [
+        {
+          "type": "realm",
+          "realm_key": "foundation",
+          "min_layer": 1
+        },
+        {
+          "type": "local_reputation",
+          "reputation_key": "local.xuantian.cloud_city",
+          "minimum": 150
+        }
+      ],
+      "key": "guild.cloud_iron_supply",
+      "record_type": "commission",
+      "status": "active"
+    },
+    {
+      "name": "教学采集协助",
+      "desc": "协助初学者熟悉近郊采集，可获得少量报酬。",
+      "aliases": ["采集协助"],
+      "requirements": [
+        {
+          "type": "service_reputation",
+          "min": 10
+        }
+      ],
+      "cost": {
+        "stamina": 3
+      },
+      "reward": {
+        "currency_key": "currency.spirit_stone",
+        "amount": 15
+      },
+      "publisher_outputs": {
+        "item.herb.blood_grass": 1
+      },
+      "failure_stamina_refund": 1,
+      "requires_same_location": true,
+      "duration_seconds": 86400,
+      "daily_limit": 3,
+      "key": "service.gather_help",
+      "record_type": "service",
+      "status": "active"
+    },
+    {
+      "name": "烹饪服务",
+      "desc": "备好粗糙灵米，为镇中食肆烹制灵米饭并领取酬劳。",
+      "aliases": ["烹饪"],
+      "requirements": [
+        {
+          "type": "teaching",
+          "key": "guide.choose_service",
+          "service": "cooking"
+        }
+      ],
+      "cost": {
+        "energy": 2,
+        "inputs": [
+          {
+            "item_key": "item.food.coarse_spirit_rice",
+            "quantity": 2
+          }
+        ]
+      },
+      "reward": {
+        "currency_key": "currency.spirit_stone",
+        "default_amount": 20,
+        "min_amount": 1,
+        "max_amount": 100
+      },
+      "publisher_outputs": {
+        "item.food.spirit_rice": 2
+      },
+      "failure_provider_refund": {
+        "item.food.coarse_spirit_rice": 1
+      },
+      "requires_same_location": false,
+      "duration_seconds": 86400,
+      "daily_limit": 5,
+      "key": "service.cook_meal",
+      "record_type": "service",
+      "status": "active"
+    },
+    {
+      "name": "青石镇至近郊短途运输",
+      "desc": "将镇中货物运往近郊，途中可能遇上天气或山路耽搁。",
+      "aliases": ["短途运输", "青石镇近郊运输"],
+      "source_location": "xuantian.new_town",
+      "destination_location": "xuantian.outskirts",
+      "allowed_stages": ["mortal", "seeker", "cultivator"],
+      "random_pool": "route.town",
+      "cost": {
+        "stamina": 2
+      },
+      "duration_seconds": 600,
+      "reward": {
+        "currency_key": "currency.spirit_stone",
+        "amount": 12,
+        "reputation_key": "local.xuantian.new_town",
+        "reputation": 2
+      },
+      "cargo": {
+        "default_item_key": "item.herb.blood_grass",
+        "max_value": 100,
+        "unit_values": {
+          "item.food.coarse_spirit_rice": 5,
+          "item.food.spirit_rice": 12,
+          "item.herb.blood_grass": 10,
+          "item.herb.spirit_leaf": 18,
+          "item.mat.wood": 8,
+          "item.ore.ironstone": 15,
+          "item.mat.array_sand": 20
+        },
+        "aliases": {
+          "粗糙灵米": "item.food.coarse_spirit_rice",
+          "灵米饭": "item.food.spirit_rice",
+          "止血草": "item.herb.blood_grass",
+          "血草": "item.herb.blood_grass",
+          "灵叶": "item.herb.spirit_leaf",
+          "木材": "item.mat.wood",
+          "木头": "item.mat.wood",
+          "铁石": "item.ore.ironstone",
+          "阵砂": "item.mat.array_sand"
+        }
+      },
+      "daily_limit": 3,
+      "delay_chance_bp": 1000,
+      "delay_seconds": 600,
+      "key": "route.new_town_outskirts",
+      "record_type": "route",
+      "status": "active"
+    },
+    {
+      "name": "新镇灵井",
+      "desc": "汇聚木材修复灵井，使新镇委托得到更多库存。",
+      "effect_desc": "灵井修复期间，青石镇委托可提供更多库存。",
+      "aliases": ["灵井"],
+      "requirements": {
+        "item.mat.wood": 100
+      },
+      "contribution_resources": ["item.mat.wood"],
+      "effect_key": "town_commission.stock_bonus",
+      "reward": {
+        "spirit_stones": 30,
+        "local_reputation": 5
+      },
+      "codex_entry_key": "codex.dao.service_public_works",
+      "local_reputation_key": "local.xuantian.new_town",
+      "reputation_location_key": "xuantian.new_town",
+      "key": "project.town_well",
+      "record_type": "public_project",
+      "status": "active"
+    },
+    {
+      "name": "商路修缮",
+      "desc": "补齐云铁与灵石，令往来商路少受风沙阻滞。",
+      "effect_desc": "商路修缮完成后，云城商路的风沙险象有所减少。",
+      "aliases": ["商路"],
+      "requirements": {
+        "item.material.cloud_iron": 60,
+        "currency.spirit_stone": 3000
+      },
+      "contribution_resources": ["item.material.cloud_iron", "currency.spirit_stone"],
+      "effect_key": "route.delay_weight_reduction",
+      "reward": {
+        "service_reputation": 3,
+        "item": "item.token.transport_coupon"
+      },
+      "codex_entry_key": "codex.dao.service_public_works",
+      "key": "project.market_road",
+      "record_type": "public_project",
+      "status": "active"
+    },
+    {
+      "name": "百草园",
+      "desc": "整饬灵田与药圃，让灵草委托收成更丰。",
+      "effect_desc": "百草园建成后，青石镇草药委托的收获有所增加。",
+      "aliases": ["灵草园"],
+      "requirements": {
+        "item.herb.spirit_leaf": 120
+      },
+      "contribution_resources": ["item.herb.spirit_leaf"],
+      "effect_key": "town_commission.herb_reward_bonus",
+      "reward": {
+        "item": "item.seed.herb_bundle"
+      },
+      "codex_entry_key": "codex.dao.service_public_works",
+      "key": "project.herb_garden",
+      "record_type": "public_project",
+      "status": "active"
+    },
+    {
+      "name": "领域避难所",
+      "desc": "修筑避难所，守护领域内的百姓与行旅。",
+      "effect_desc": "避难所建成后，领域前线周边的低风险委托有所增加。",
+      "requirements": {
+        "item.mat.wood": 60,
+        "item.food.coarse_spirit_rice": 60,
+        "item.pill.healing_low": 20
+      },
+      "contribution_resources": [
+        "item.mat.wood",
+        "item.food.coarse_spirit_rice",
+        "item.pill.healing_low"
+      ],
+      "effect_key": "domain_refuge.low_risk_stock_bonus",
+      "reward": {
+        "local_reputation": 8,
+        "service_reputation": 3,
+        "item": "item.token.construction_coupon"
+      },
+      "codex_entry_key": "codex.dao.service_public_works",
+      "local_reputation_key": "local.xuantian.domain_front",
+      "reputation_location_key": "xuantian.domain_front",
+      "required_sect_level": 4,
+      "required_access_key": "access.project.domain_refuge",
+      "service_sources": [
+        {
+          "service_key": "service.transport",
+          "operation_names": ["livelihood.settle_route"],
+          "contribution_points": 20
+        }
+      ],
+      "key": "project.domain_refuge",
+      "record_type": "public_project",
+      "status": "active"
+    },
+    {
+      "name": "魔渊净化工程",
+      "desc": "以血草和阵砂净化魔渊边缘的侵蚀。",
+      "effect_desc": "净化工程建成后，魔渊集市商路遭遇延误的机会降低。",
+      "requirements": {
+        "item.herb.blood_grass": 60,
+        "item.mat.array_sand": 60
+      },
+      "contribution_resources": ["item.herb.blood_grass", "item.mat.array_sand"],
+      "effect_key": "abyss_purification.route_delay_reduction",
+      "reward": {
+        "local_reputation": 8,
+        "service_reputation": 3,
+        "item": "item.token.construction_coupon"
+      },
+      "codex_entry_key": "codex.dao.service_public_works",
+      "local_reputation_key": "local.demon.abyss_market",
+      "reputation_location_key": "demon.abyss_market",
+      "required_faction": "demon",
+      "required_faction_reputation": 300,
+      "required_access_key": "access.project.abyss_purification",
+      "service_sources": [
+        {
+          "service_key": "service.purification",
+          "operation_names": ["production.purify_pollution"],
+          "contribution_points": 15
+        }
+      ],
+      "key": "project.abyss_purification",
+      "record_type": "public_project",
+      "status": "active"
+    },
+    {
+      "name": "祖灵栖地修复",
+      "desc": "补足灵米与灵叶，修复祖灵栖地的生息之地。",
+      "effect_desc": "栖地修复完成后，万兽山商路委托可提供更多名额。",
+      "requirements": {
+        "item.food.coarse_spirit_rice": 60,
+        "item.herb.spirit_leaf": 60
+      },
+      "contribution_resources": ["item.food.coarse_spirit_rice", "item.herb.spirit_leaf"],
+      "effect_key": "ancestral_habitat.commission_stock_bonus",
+      "reward": {
+        "local_reputation": 8,
+        "service_reputation": 3,
+        "item": "item.token.construction_coupon"
+      },
+      "codex_entry_key": "codex.dao.service_public_works",
+      "local_reputation_key": "local.beast.three_realms_trade_port",
+      "reputation_location_key": "beast.three_realms_trade_port",
+      "required_faction": "beast",
+      "required_faction_reputation": 300,
+      "required_access_key": "access.project.ancestral_habitat",
+      "service_sources": [
+        {
+          "service_key": "service.taming",
+          "operation_names": ["companion.bond", "companion.feed"],
+          "contribution_points": 15
+        },
+        {
+          "service_key": "service.repair",
+          "operation_names": ["companion.rest"],
+          "contribution_points": 15
+        }
+      ],
+      "key": "project.ancestral_habitat",
+      "record_type": "public_project",
+      "status": "active"
+    },
+    {
+      "name": "矿区看守",
+      "desc": "替云铁矿区看守矿脉与工具，按期收得云铁与灵石。",
+      "aliases": [
+        "矿区看守",
+        "看守矿区"
+      ],
+      "duration_seconds": 21600,
+      "cost": {
+        "stamina": 0,
+        "energy": 2
+      },
+      "daily_limit": 1,
+      "requirements": {
+        "stage": "cultivator",
+        "realm": {
+          "key": "foundation",
+          "min_layer": 4
+        }
+      },
+      "reward_pool_key": "reward_pool.idle.cloud_mine_watch",
+      "fallback_reward_pool_key": "reward_pool.idle.cloud_mine_watch.fallback",
+      "durability_cost_bp": 0,
+      "key": "idle.cloud_mine_watch",
+      "record_type": "idle_route",
+      "status": "active"
+    },
+    {
+      "name": "云城店铺",
+      "desc": "在云城店铺中看顾往来生意，积攒灵石与云城名望。",
+      "aliases": [
+        "云城看店",
+        "店铺看守"
+      ],
+      "duration_seconds": 28800,
+      "cost": {
+        "stamina": 0,
+        "energy": 0
+      },
+      "daily_limit": 1,
+      "requirements": {
+        "stage": "cultivator",
+        "local_reputation": {
+          "local.xuantian.cloud_city": 200
+        }
+      },
+      "reward_pool_key": "reward_pool.idle.cloud_city_shop",
+      "fallback_reward_pool_key": "reward_pool.idle.cloud_city_shop.fallback",
+      "durability_cost_bp": 0,
+      "key": "idle.cloud_city_shop",
+      "record_type": "idle_route",
+      "status": "active"
+    },
+    {
+      "name": "魔界驿所",
+      "desc": "看守魔界驿所的货栈与契书，收得灵石与魔渊集市名望。",
+      "aliases": [
+        "魔界驿所看守",
+        "驿所值守"
+      ],
+      "duration_seconds": 28800,
+      "cost": {
+        "stamina": 2,
+        "energy": 0
+      },
+      "daily_limit": 1,
+      "requirements": {
+        "stage": "cultivator",
+        "required_permit": "permit.demon_trade"
+      },
+      "reward_pool_key": "reward_pool.idle.demon_trade_post",
+      "fallback_reward_pool_key": "reward_pool.idle.demon_trade_post.fallback",
+      "durability_cost_bp": 0,
+      "key": "idle.demon_trade_post",
+      "record_type": "idle_route",
+      "status": "active"
+    },
+    {
+      "name": "妖界栖地",
+      "desc": "在妖界栖地照看灵田与兽群，收得灵米、灵叶与贸易口名望。",
+      "aliases": [
+        "妖界栖地看守",
+        "栖地看护"
+      ],
+      "duration_seconds": 28800,
+      "cost": {
+        "stamina": 2,
+        "energy": 0
+      },
+      "daily_limit": 1,
+      "requirements": {
+        "stage": "cultivator",
+        "required_permit": "permit.beast_trade"
+      },
+      "reward_pool_key": "reward_pool.idle.beast_habitat_watch",
+      "fallback_reward_pool_key": "reward_pool.idle.beast_habitat_watch.fallback",
+      "durability_cost_bp": 0,
+      "key": "idle.beast_habitat_watch",
+      "record_type": "idle_route",
+      "status": "active"
+    },
+    {
+      "name": "领域避难所看守",
+      "desc": "在领域避难所照看物资与工事，收得灵石、建设券与领域前线的名望。",
+      "aliases": [
+        "避难所看守",
+        "据点看守"
+      ],
+      "duration_seconds": 36000,
+      "cost": {
+        "stamina": 3,
+        "energy": 0
+      },
+      "daily_limit": 1,
+      "requirements": {
+        "stage": "cultivator",
+        "project_contribution": {
+          "project_key": "project.domain_refuge",
+          "min_points": 10
+        }
+      },
+      "reward_pool_key": "reward_pool.idle.domain_refuge_watch",
+      "fallback_reward_pool_key": "reward_pool.idle.domain_refuge_watch.fallback",
+      "durability_cost_bp": 0,
+      "key": "idle.domain_refuge_watch",
+      "record_type": "idle_route",
+      "status": "active"
+    },
+    {
+      "name": "虚空补给看守",
+      "desc": "在虚空航道沿线看守补给与锚点，收得灵石与建设券。",
+      "aliases": [
+        "虚空补给看守",
+        "航道看守"
+      ],
+      "duration_seconds": 43200,
+      "cost": {
+        "stamina": 4,
+        "energy": 0
+      },
+      "daily_limit": 1,
+      "requirements": {
+        "stage": "cultivator",
+        "realm": {
+          "key": "void_refining",
+          "min_layer": 1
+        }
+      },
+      "reward_pool_key": "reward_pool.idle.void_supply_watch",
+      "fallback_reward_pool_key": "reward_pool.idle.void_supply_watch.fallback",
+      "durability_cost_bp": 0,
+      "key": "idle.void_supply_watch",
+      "record_type": "idle_route",
+      "status": "active"
+    },
+    {
+      "name": "道统据点看守",
+      "desc": "替已定道统的宗门看守据点事务，收得灵石、建设券与道统服务名望。",
+      "aliases": [
+        "道统据点看守",
+        "据点值守"
+      ],
+      "duration_seconds": 43200,
+      "cost": {
+        "stamina": 4,
+        "energy": 0
+      },
+      "daily_limit": 1,
+      "requirements": {
+        "stage": "cultivator",
+        "dao_route": true
+      },
+      "reward_pool_key": "reward_pool.idle.dao_settlement_watch",
+      "fallback_reward_pool_key": "reward_pool.idle.dao_settlement_watch.fallback",
+      "durability_cost_bp": 0,
+      "key": "idle.dao_settlement_watch",
+      "record_type": "idle_route",
+      "status": "active"
+    },
+    {
+      "name": "灵田照看",
+      "desc": "在自家灵田照看灵草长势，收得灵草与一份灵田见闻。",
+      "aliases": [
+        "灵田照看",
+        "照看灵田"
+      ],
+      "duration_seconds": 14400,
+      "cost": {
+        "stamina": 0,
+        "energy": 1
+      },
+      "daily_limit": 1,
+      "requirements": {
+        "stage": "seeker",
+        "active_residence": true
+      },
+      "reward_pool_key": "reward_pool.idle.seeker_herb_tending",
+      "fallback_reward_pool_key": "reward_pool.idle.seeker_herb_tending.fallback",
+      "durability_cost_bp": 0,
+      "key": "idle.seeker_herb_tending",
+      "record_type": "idle_route",
+      "status": "active"
+    },
+    {
+      "name": "镇中问询",
+      "desc": "在青石镇中替乡邻问询杂务，积攒灵石与青石镇名望。",
+      "aliases": [
+        "镇中问询",
+        "问询杂务"
+      ],
+      "duration_seconds": 10800,
+      "cost": {
+        "stamina": 1,
+        "energy": 0
+      },
+      "daily_limit": 1,
+      "requirements": {
+        "stage": "seeker",
+        "local_reputation": {
+          "local.xuantian.new_town": 10
+        }
+      },
+      "reward_pool_key": "reward_pool.idle.seeker_town_inquiry",
+      "fallback_reward_pool_key": "reward_pool.idle.seeker_town_inquiry.fallback",
+      "durability_cost_bp": 0,
+      "key": "idle.seeker_town_inquiry",
+      "record_type": "idle_route",
+      "status": "active"
+    },
+    {
+      "name": "青石镇至百草坡短途运输",
+      "desc": "沿药圃路线把草药运往百草坡，途中可能遇上天气或山路耽搁。",
+      "aliases": [
+        "百草运输",
+        "青石镇百草坡运输"
+      ],
+      "source_location": "xuantian.new_town",
+      "destination_location": "xuantian.herb_vale",
+      "allowed_stages": [
+        "mortal",
+        "seeker",
+        "cultivator"
+      ],
+      "random_pool": "route.herb_vale",
+      "cost": {
+        "stamina": 3
+      },
+      "duration_seconds": 900,
+      "reward": {
+        "currency_key": "currency.spirit_stone",
+        "amount": 18,
+        "reputation_key": "local.xuantian.new_town",
+        "reputation": 3
+      },
+      "cargo": {
+        "default_item_key": "item.herb.spirit_leaf",
+        "max_value": 120,
+        "unit_values": {
+          "item.herb.spirit_leaf": 18,
+          "item.herb.blood_grass": 10,
+          "item.mat.array_sand": 20
+        },
+        "aliases": {
+          "灵叶": "item.herb.spirit_leaf",
+          "止血草": "item.herb.blood_grass",
+          "血草": "item.herb.blood_grass",
+          "阵砂": "item.mat.array_sand"
+        }
+      },
+      "daily_limit": 2,
+      "delay_chance_bp": 1000,
+      "delay_seconds": 600,
+      "unlock_key": "hint.herb_route",
+      "key": "route.town_herb_vale",
+      "record_type": "route",
+      "status": "active"
+    },
+    {
+      "name": "云城至魔界深渊门商路",
+      "desc": "自云城启程，沿战线外缘的商路把货物押送到魔界深渊门。",
+      "aliases": [
+        "深渊商路",
+        "云城深渊运输"
+      ],
+      "source_location": "xuantian.cloud_city",
+      "destination_location": "demon.abyss_gate",
+      "allowed_stages": [
+        "cultivator"
+      ],
+      "random_pool": "route.cloud_abyss",
+      "cost": {
+        "stamina": 6
+      },
+      "duration_seconds": 1800,
+      "reward": {
+        "currency_key": "currency.spirit_stone",
+        "amount": 45,
+        "reputation_key": "local.xuantian.cloud_city",
+        "reputation": 4
+      },
+      "cargo": {
+        "default_item_key": "item.material.cloud_iron",
+        "max_value": 200,
+        "unit_values": {
+          "item.material.cloud_iron": 40,
+          "item.mat.array_sand": 20,
+          "item.herb.spirit_leaf": 18
+        },
+        "aliases": {
+          "云铁": "item.material.cloud_iron",
+          "阵砂": "item.mat.array_sand",
+          "灵叶": "item.herb.spirit_leaf"
+        }
+      },
+      "daily_limit": 1,
+      "delay_chance_bp": 1500,
+      "delay_seconds": 900,
+      "unlock_key": "encyclopedia.domain_tactics",
+      "key": "route.cloud_to_abyss_gate",
+      "record_type": "route",
+      "status": "active"
+    },
+    {
+      "name": "寻道问诊",
+      "desc": "替镇中药铺奔走问诊，寻道期弟子才能接下这份跑腿。",
+      "aliases": [
+        "问诊",
+        "镇中问诊"
+      ],
+      "duration_seconds": 3600,
+      "daily_limit": 2,
+      "cost": {
+        "stamina": 2
+      },
+      "risk_pool": "dispatch.seeker",
+      "requirements": {
+        "stage": "seeker"
+      },
+      "risk": {
+        "weights": {
+          "success": 8000,
+          "delayed": 1200,
+          "partial": 800
+        }
+      },
+      "rewards": {
+        "success": {
+          "spirit_stones": 45,
+          "item.herb.blood_grass": 2,
+          "local.xuantian.new_town": 4
+        },
+        "partial": {
+          "spirit_stones": 20,
+          "local.xuantian.new_town": 1
+        }
+      },
+      "key": "dispatch.seeker.clinic_run",
+      "record_type": "dispatch",
+      "status": "active"
+    },
+    {
+      "name": "入道后药圃督运",
+      "desc": "入道修士才能押运的药圃物资，需以灵力护持沿途灵植。",
+      "aliases": [
+        "药圃督运",
+        "督运"
+      ],
+      "duration_seconds": 5400,
+      "daily_limit": 2,
+      "cost": {
+        "stamina": 4
+      },
+      "risk_pool": "dispatch.cultivator",
+      "requirements": {
+        "stage": "cultivator"
+      },
+      "risk": {
+        "weights": {
+          "success": 7000,
+          "delayed": 1200,
+          "partial": 1200,
+          "failed": 600
+        }
+      },
+      "failure_refunds": {
+        "stamina": 2
+      },
+      "rewards": {
+        "success": {
+          "spirit_stones": 90,
+          "item.herb.spirit_leaf": 3,
+          "item.mat.array_sand": 1,
+          "local.xuantian.new_town": 6
+        },
+        "partial": {
+          "spirit_stones": 40,
+          "item.herb.spirit_leaf": 1
+        }
+      },
+      "key": "dispatch.cultivator.herb_convoy",
+      "record_type": "dispatch",
+      "status": "active"
+    },
+    {
+      "name": "妖兽观察",
+      "desc": "凭异兽徽记辨认山野妖兽的踪迹，记下观测见闻。",
+      "aliases": [
+        "观兽",
+        "妖兽观察"
+      ],
+      "duration_seconds": 7200,
+      "cost": {
+        "stamina": 1,
+        "energy": 0
+      },
+      "daily_limit": 1,
+      "requirements": {
+        "stage": "seeker",
+        "codex_unlock": "display.codex_creature_badge"
+      },
+      "reward_pool_key": "reward_pool.idle.beast_observation",
+      "fallback_reward_pool_key": "reward_pool.idle.beast_observation.fallback",
+      "durability_cost_bp": 0,
+      "key": "idle.beast_observation",
+      "record_type": "idle_route",
+      "status": "active"
+    },
+    {
+      "name": "塔外守望",
+      "desc": "依塔路提示在雾隐塔外守候，留意试炼塔的出入见闻。",
+      "aliases": [
+        "守望雾隐塔",
+        "塔外守望"
+      ],
+      "duration_seconds": 10800,
+      "cost": {
+        "stamina": 2,
+        "energy": 0
+      },
+      "daily_limit": 1,
+      "requirements": {
+        "stage": "seeker",
+        "codex_unlock": "hint.tower_route"
+      },
+      "reward_pool_key": "reward_pool.idle.tower_watch",
+      "fallback_reward_pool_key": "reward_pool.idle.tower_watch.fallback",
+      "durability_cost_bp": 0,
+      "key": "idle.tower_watch",
+      "record_type": "idle_route",
+      "status": "active"
+    }
+  ],
+  "schema": "xiuxian.content"
+}

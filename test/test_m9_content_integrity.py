@@ -42,7 +42,7 @@ def test_m9_content_references_are_closed() -> None:
     # sync by the slice that grows the inventory).
     assert summary["locations"] == 34
     assert summary["exploration_modes"] == 27
-    assert summary["bounties"] == 53
+    assert summary["bounties"] == 54
     assert summary["recipes"] == 37
     assert summary["sources"] == 17
     assert summary["combat_enemies"] == 68
