@@ -3426,6 +3426,88 @@
       "reputation_key": "local.xuantian.domain_front",
       "first_clear_reward": {"spirit_stones": 40, "local_reputation": 3, "service_reputation": 1},
       "repeat_reward": {"spirit_stones": 4}
+    },
+    {
+      "key": "domain_frontier.habitat.1",
+      "story_key": "story.mainline.domain_frontier",
+      "chapter": 5,
+      "stage": 1,
+      "name": "重巡万兽山",
+      "desc": "栖地修复不是一纸名册，先沿山路复核兽群迁徙后的新界线。",
+      "body": "护祖备案之后，三界贸易口送来栖地近况：几支兽群已经沿新路迁回万兽山，旧有巡线却还留着风灾前的记号。重巡万兽山不是再争一场胜负，而是沿公开山路走到迁徙地，把仍可通行的路径重新核准。抵达后，才能接下后续的夜值与补给交接。",
+      "objectives": [
+        {"key": "reach_habitat", "type": "travel_arrival", "label": "结算行程抵达万兽山", "destination_key": "beast.ten_thousand_hills"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "万兽山", "description": "从三界贸易口循已开放的山路前往万兽山，并结算抵达。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.habitat.1"]},
+      "next_stage_key": "domain_frontier.habitat.2",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "尚未结算抵达万兽山的行程时，关卡保持进行中且不扣主线奖励；恢复体力后沿三界贸易口的公开山路重新启程。"},
+      "status": "open",
+      "aliases": ["重巡万兽山"],
+      "reputation_key": "local.beast.three_realms_trade_port",
+      "required_realm": "soul_transformation",
+      "required_layer": 1,
+      "prerequisites": ["domain_frontier.protect.6"],
+      "first_clear_reward": {"spirit_stones": 20, "local_reputation": 2},
+      "repeat_reward": {"spirit_stones": 4}
+    },
+    {
+      "key": "domain_frontier.habitat.2",
+      "story_key": "story.mainline.domain_frontier",
+      "chapter": 5,
+      "stage": 2,
+      "name": "栖地夜值",
+      "desc": "完整交接一轮栖地闲居所得，确认新补给能够进入公共账册。",
+      "body": "迁徙线复核无误后，栖地管事请你值守一轮，把灵米与灵叶的收获按实交到公共账册。先完成妖界引导并取得仍有效的妖界贸易许可，再安排妖界栖地闲居；满八小时后及时完整领取。逾时领取只有保底，不能代替这次完整交班，路上也不会替你累积第二轮的离线时间。",
+      "objectives": [
+        {"key": "claim_habitat_watch", "type": "idle_claim", "label": "完整领取一次妖界栖地闲居", "route_key": "idle.beast_habitat_watch"}
+      ],
+      "actions": [
+        {"command": "申请贸易许可", "argument": "妖界", "description": "完成妖界引导、具备至少八十点妖界声望并准备五百灵石后申请七日贸易许可。"},
+        {"command": "挂机预览", "argument": "妖界栖地", "description": "确认许可有效后查看栖地闲居的耗时、次数与完整所得。"},
+        {"command": "开始挂机", "argument": "妖界栖地", "description": "开始八小时栖地看守，并在完整领取窗口内交班。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.habitat.2"]},
+      "next_stage_key": "domain_frontier.habitat.3",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "关卡只认开始之后完整领取的妖界栖地安排；取消、仍在运行或逾时保底均不计。错过完整领取窗口时，先领逾时保底，次日再开始一轮新的八小时看守。"},
+      "status": "open",
+      "aliases": ["栖地夜值"],
+      "reputation_key": "local.beast.three_realms_trade_port",
+      "required_realm": "soul_transformation",
+      "required_layer": 1,
+      "prerequisites": ["domain_frontier.habitat.1"],
+      "first_clear_reward": {"spirit_stones": 25, "local_reputation": 2, "service_reputation": 1},
+      "repeat_reward": {"spirit_stones": 4}
+    },
+    {
+      "key": "domain_frontier.habitat.3",
+      "story_key": "story.mainline.domain_frontier",
+      "chapter": 5,
+      "stage": 3,
+      "name": "灵粮入册",
+      "desc": "把本人新收的灵米与灵叶交入栖地工程，完成一次可核验的公共补给。",
+      "body": "夜值所得已经记在本人仓中，最后一步是把补给真正交进祖灵栖地修复工程。护祖终关已授予项目权限，但项目仍按原规矩要求至少三百点妖界声望；尚未达到时，可继续万兽山狩猎或完成已开放的妖界栖地悬赏，不能用闲居名望代替阵营声望。项目开启后，把这轮新得的灵米与灵叶各贡献一份，个人贡献账本新增两点即可交卷，不要求独自建成全服工程。",
+      "objectives": [
+        {"key": "supply_ancestral_habitat", "type": "public_project_contribution", "label": "向祖灵栖地项目新增至少两点本人贡献", "project_key": "project.ancestral_habitat", "min_points": 2}
+      ],
+      "actions": [
+        {"command": "公共项目", "argument": "", "description": "确认护祖权限、妖界声望与本周祖灵栖地项目状态；项目完成后等下一业务周再贡献。"},
+        {"command": "贡献公共项目", "argument": "project.ancestral_habitat 灵米 1", "description": "将闲居所得的一份灵米交入栖地工程。"},
+        {"command": "贡献公共项目", "argument": "project.ancestral_habitat 灵叶 1", "description": "将闲居所得的一份灵叶交入栖地工程。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.habitat.3"]},
+      "next_stage_key": "",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "只统计本关开始后本人对 project.ancestral_habitat 的新贡献，不读闲居前的存货、他人账本或项目总进度；权限与妖界声望不足、贡献未到账或本周项目已完成时均零写入主线奖励，补足前置或等下个业务周后再交即可。"},
+      "status": "open",
+      "aliases": ["灵粮入册"],
+      "reputation_key": "local.beast.three_realms_trade_port",
+      "required_realm": "soul_transformation",
+      "required_layer": 1,
+      "prerequisites": ["domain_frontier.habitat.2"],
+      "first_clear_reward": {"spirit_stones": 30, "local_reputation": 3, "service_reputation": 1},
+      "repeat_reward": {"spirit_stones": 4}
     }
   ]
 }
