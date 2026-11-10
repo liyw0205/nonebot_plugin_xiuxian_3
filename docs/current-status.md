@@ -77,6 +77,20 @@ M5 最终当前树本地阶段验收、审查与提交推送已完成；保留�
 主线剧情与离线成长首个真实纵向切片已推送 `42d1772`；不扩成 84 条主线批量填充，
 不重做 M9 数据，不把现存 PvP 入口描述成完整开放世界竞技生态。
 
+本轮在 `develop` 补上聚气段唯一缺失的指路内容。核对结果：`qi_gathering` 在主线 0 关、
+任务 0 条、引导 0 条，而相邻境界都有内容；主线补章需要把 ch3–ch13 整体重编号，故改用既有
+引导载体增量补两条——`guide.qi_gathering_breath`（命令 `聚气`）与 `guide.qi_gathering_ascent`
+（命令 `登阶`），都是 `intro_flag` 产出、无消耗、可重复。引导 schema 只有 `stage`/`location`
+两种门槛且必须恰好一条 stage，`_SUPPORTED_STAGES` 仅到 `cultivator`，所以这两条按修行阶段
+（而非具体境界）设门，这个边界已写入
+[玩家内容 v0.1](foundation/player/content-v0.1.md) §5.1。可读正文落在 `desc`（渲染取 `desc`，
+JSON 的 `content` 不被消费），`test/test_qi_gathering_guides.py` 逐项比对文案引用的
+修为阈值 180/380/620/900/1220/1580/1980/2420/2900 与 `cross_realm_total_cultivation 4260`
+同 `境界.json` 一致。聚焦证据：新测试 5 passed；受影响回归（guide_seeker_stage /
+guide_stage2_content / world_intro_content / player_interaction / content_completeness）
+29 passed。同时修正一处既有过期断言：服务教学完成后提示指向下一条 seeker 引导
+（`完成引导 道途指引`）而非 `选择道途`，该断言在 `fc4f4a6` 上原本就是红的。未跑全量、未部署。
+
 本轮在 `develop` 给仓库最大的未守护数据面——装备目录——加合同测试
 `test/test_equipment_catalog.py`（5 条）：1866 条带 `equipment_slot` 的 item 必须槽位与 key 前缀
 一致、`path_key` 属于六道途、成长引用解析到 `equipment_growth` 且不重复声明

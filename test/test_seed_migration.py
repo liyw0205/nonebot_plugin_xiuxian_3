@@ -713,6 +713,8 @@ def old_official_guides() -> bytes:
             "guide.seeker_path_hint",
             "guide.seeker_sect_gate",
             "guide.idle_entry",
+            "guide.qi_gathering_breath",
+            "guide.qi_gathering_ascent",
         }
     ]
     for record in document["records"]:

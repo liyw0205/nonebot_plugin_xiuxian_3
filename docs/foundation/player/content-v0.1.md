@@ -103,6 +103,23 @@ new_user
 `返回新手城`；前往近郊消耗 2 点体力，返回新手城消耗 1 点体力。地点错误、体力/精力
 不足和阶段错误均不改变引导标记或库存。
 
+### 5.1 修行阶段的指路引导（`stage=cultivator`）
+
+`guide` 的门槛只有 `{"type":"stage"}` 与 `{"type":"location"}` 两种，且**必须恰好一条
+stage**；`_SUPPORTED_STAGES` 只到 `new_user`/`mortal`/`seeker`/`cultivator`。因此引导**无法**
+按具体境界（如聚气）单独设门——凡修行阶段都共享 `cultivator`，这是既有 schema 的边界，不是遗漏。
+
+聚气段原本主线、任务、引导三者皆空，而相邻境界都有内容；主线补章需要把 ch3–ch13 整体重编号，
+所以改用既有引导载体增量补齐两条：`guide.qi_gathering_breath`（命令 `聚气`）与
+`guide.qi_gathering_ascent`（命令 `登阶`）。两者都是 `intro_flag` 产出、`cost` 为空、
+`repeatable`，完成后把自身键写入 `intro_json.flags`。
+
+两条引导的可读正文写在 `desc` 上——`intro_use_cases._guide_body` 渲染的是 `desc`，
+JSON 里的 `content` 字段加载器并不消费，所以玩家看得见的数值必须落在 `desc`。
+`test/test_qi_gathering_guides.py` 逐项比对 `desc` 引用的修为阈值与
+`境界.json` 的 `qi_gathering.layer_thresholds`（180/380/620/900/1220/1580/1980/2420/2900）
+以及 `cross_realm_total_cultivation`（4260），防止文案与数据漂移。
+
 ## 6. 体系分支与入道：`player.enter_cultivation`
 
 `seeker` 选择一个首要体系分支，选择成功即进入 `cultivator`、公共境界 `qi_sensing` L1（感气一层/入门）。首版选择免费且不可免费切换；首次选择不是随机抽取。层数、段位和后续跨境规则以 [境界十层与段位规范](../progression/layers.md) 为准。
