@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.19
 
 ### Added
 
@@ -10,6 +10,22 @@
   目标分别是抵达 `beast.ten_thousand_hills`、`explore.beast_hunt` 结算取得 `item.beast_blood`、
   以及该模式的遭遇战胜利。万兽山入口需妖界声望 200 或 `access.beast_ten_thousand_hills`，
   `desc`/`retry` 明写「近郊探索 → 阅读妖界史 → 完成妖界引导」与云舟渡口路线，不把入口说成可直达。
+- 敌人内容化：`enemy.iron_boar`、`enemy.beast_guardian`、`enemy.tribulation_heaven` 补齐
+  `combat_profile`，内容里写的 `stats` 此前被静默忽略（`enemy_definition` 回落到代码表）；
+  战斗数值一字未改。现在 62 条敌人中 50 条由内容持有，18 条 `enemy.void_spire.*` 由塔内容解析。
+- 内容完整性合同：`test/test_content_completeness.py` 校验「探索模式 → 地点 action → 遭遇池 →
+  奖励池 → 境界门槛」五段链，外加主线目标可支付性、敌人来源闭合、模式/地点元数据与状态面。
+- 装备目录完整性合同：`test/test_equipment_catalog.py` 校验 1866 条装备的槽位与 key 前缀、
+  道途、成长档案、词条属性名（取自 `stats/rules.py` 自身表）、境界门槛，以及 12 个矩阵家族
+  各 144 条与统一的成长档位分布。
+- 聚气段指路引导：`guide.qi_gathering_breath`（命令 `聚气`）与 `guide.qi_gathering_ascent`
+  （命令 `登阶`）补上此前主线、任务、引导三者皆空的聚气段；正文引用的修为阈值与
+  `cross_realm_total_cultivation 4260` 由测试逐项对照 `境界.json`，防止文案漂移。
+
+## Unreleased
+
+### Added
+
 - 元婴主线补全：`chapter.10.stage.1`–`chapter.12.stage.3` 九关（云城问舟、渡口候船、云舟北渡、
   入门问契、契阁残页、遗迹守卫、门备材料、归舟回城、回镇结卷）把 `chapter.9.stage.3` 接到
   魔渊入口、堕落遗迹与归途。目标为真实抵达（含云舟抵达 `demon.abyss_gate`）、
