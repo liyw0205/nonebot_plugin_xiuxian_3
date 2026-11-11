@@ -4087,6 +4087,80 @@
       "prerequisites": ["seeker_echoes.2"],
       "first_clear_reward": {"spirit_stones": 30, "service_reputation": 1},
       "repeat_reward": {"spirit_stones": 7}
+    },
+    {
+      "key": "livelihood_echoes.1",
+      "story_key": "story.mainline.livelihood_echoes",
+      "chapter": 1,
+      "stage": 1,
+      "name": "镇中行旅",
+      "desc": "在青石镇完成一段真实的镇中行旅，把公开生活的第一声回响记入行册。",
+      "body": "青石镇的石板路不只通往远方，也承载着每日往来的柴米与人情。抵达青石镇后，先从公开的挂机预览确认镇中行旅仍在当日名额内，再由本人开始并完整领取这段两小时安排；查看、提前领取、逾时保底、旧安排或他人记录，都不能替代这一段真实的生活见闻。",
+      "objectives": [
+        {"key": "claim_town_errand", "type": "idle_claim", "label": "本关开始后完整领取一次镇中行旅", "route_key": "idle.town_errand"}
+      ],
+      "actions": [
+        {"command": "挂机预览", "argument": "镇中行旅", "description": "确认已在青石镇、凡人阶段、两小时窗口和当日次数后再安排。"},
+        {"command": "开始挂机", "argument": "镇中行旅", "description": "本关开始后由本人开始镇中行旅，完整窗口结束后领取生活所得。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.livelihood_echoes:livelihood_echoes.1"]},
+      "next_stage_key": "livelihood_echoes.2",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "只统计本关开始后的本人镇中行旅完整领取；提前、逾时、旧或他人安排、地点或日限不足都不推进，补足原闲居条件后可重试。"},
+      "status": "open",
+      "aliases": ["镇中行旅回响"],
+      "prerequisites": ["player.start_seeking"],
+      "reputation_key": "local.xuantian.new_town",
+      "first_clear_reward": {"spirit_stones": 18, "local_reputation": 2},
+      "repeat_reward": {"spirit_stones": 4}
+    },
+    {
+      "key": "livelihood_echoes.2",
+      "story_key": "story.mainline.livelihood_echoes",
+      "chapter": 1,
+      "stage": 2,
+      "name": "灵圃看护",
+      "desc": "在有效居所完整照看灵圃，让安顿下来的日子长出可见的收获。",
+      "body": "镇中的脚步熟悉之后，真正需要耐心的是自己的院落。有效居所才有灵圃看护的名额；本关开始后必须新建一段灵圃看护，在四小时完整窗口结束后由本人领取。逾时保底、取消、旧安排、他人领取或日限已用尽，都只能留下未完成的行册，不能提前写下看护回响。",
+      "objectives": [
+        {"key": "claim_herb_watch", "type": "idle_claim", "label": "本关开始后完整领取一次灵圃看护", "route_key": "idle.herb_watch"}
+      ],
+      "actions": [
+        {"command": "挂机预览", "argument": "灵圃看护", "description": "确认有效居所、四小时窗口、每日一次限额与完整/逾时所得。"},
+        {"command": "开始挂机", "argument": "灵圃看护", "description": "本关开始后安排灵圃看护，完整窗口结束后领取收获。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.livelihood_echoes:livelihood_echoes.2"]},
+      "next_stage_key": "livelihood_echoes.3",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "只统计本关开始后的本人灵圃看护完整领取；逾时、取消、旧或他人安排、居所或日限不足都不推进，按闲居原合同补足条件后可重试。"},
+      "status": "open",
+      "aliases": ["灵圃看护回响"],
+      "prerequisites": ["livelihood_echoes.1"],
+      "first_clear_reward": {"spirit_stones": 24, "service_reputation": 1},
+      "repeat_reward": {"spirit_stones": 5}
+    },
+    {
+      "key": "livelihood_echoes.3",
+      "story_key": "story.mainline.livelihood_echoes",
+      "chapter": 1,
+      "stage": 3,
+      "name": "作坊值守",
+      "desc": "在作坊完整值守一轮，把炉锤与阵材的日常守成一段可靠回响。",
+      "body": "灵圃有了着落，作坊的炉火也需要有人看守。作坊值守保留原有的基础炉具、铁锤和 artifice 设施门槛；本关开始后由本人新建安排，完整三小时窗口结束后领取，才会把炉锤与阵材的回响记入行册。工具、设施、日限不足以及逾时保底都不消耗剧情次数，也不替代完整值守。",
+      "objectives": [
+        {"key": "claim_workshop_care", "type": "idle_claim", "label": "本关开始后完整领取一次作坊值守", "route_key": "idle.workshop_care"}
+      ],
+      "actions": [
+        {"command": "挂机预览", "argument": "作坊值守", "description": "确认基础炉具、铁锤、artifice 设施、三小时窗口和当日名额。"},
+        {"command": "开始挂机", "argument": "作坊值守", "description": "本关开始后安排作坊值守，完整窗口结束后领取所得。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.livelihood_echoes:livelihood_echoes.3"]},
+      "next_stage_key": null,
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "只统计本关开始后的本人作坊值守完整领取；逾时、取消、旧或他人安排、工具/设施/日限不足都不发主线奖励，补足原闲居条件并安排新的完整值守后重试。"},
+      "status": "open",
+      "aliases": ["作坊值守回响"],
+      "prerequisites": ["livelihood_echoes.2"],
+      "first_clear_reward": {"spirit_stones": 32, "local_reputation": 3},
+      "repeat_reward": {"spirit_stones": 7},
+      "reputation_key": "local.xuantian.new_town"
     }
   ]
 }
