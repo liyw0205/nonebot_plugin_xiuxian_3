@@ -66,11 +66,12 @@ M6 首采集与 QQ 配置以及分类帮助/悬赏蓝字已完成。用户新授
 ## 4. 唯一工作队列
 
 最新状态（2026-11-11）：`v0.1.22` 已正式发布，tag 指向 main `f39b8d6d73b7b04754920d047d403c78be6c9507`；
-远端 `develop` 为 `acbee00c3a32445d7b1a256100a78f4e550cae08`，分支职责不变。祖灵栖地后记完整交付已归档；
-当前在 develop 推进净渊终关后的魔渊驿路后记，复用已绿悬赏/避难所/栖地证据，不重跑其完整组。官方种子变更
-须登记真实 Git 来源；此阶段不部署、不发真实 QQ 消息。正式发布、包资产和 v0.1.22 CI 证据见本节最新 checkpoint。
+净渊后记功能阶段已在 develop 完成，`17248406a8b31720864299d9a4ccddd172210dc4` 的精确 SHA CI
+`42942393693` 已通过 install-smoke、quality 3.11/3.12，release job 按 tag-only 规则跳过；下一步是
+提交本 checkpoint、再次验证该精确 SHA 后普通合 main，再递增并发布下一未占用版本。官方种子变更须登记真实
+Git 来源；此阶段不部署、不发真实 QQ 消息。正式发布、包资产和 v0.1.22 CI 证据见本节最新 checkpoint。
 
-当前工作项为 **净渊后记：魔渊驿路、闲居值守与净化工程**。缺口来自 `domain_frontier.purify.6` 已授予
+已交付阶段为 **净渊后记：魔渊驿路、闲居值守与净化工程**。缺口来自 `domain_frontier.purify.6` 已授予
 `access.project.abyss_purification`，但现有剧情没有消费实际魔渊集市抵达、魔界驿所完整闲居或净化工程个人贡献。
 三关可选线固定为：公开抵达 `demon.abyss_market` → 有效 `permit.demon_trade` 下新建并完整领取
 `idle.demon_trade_post` → 向 `project.abyss_purification` 新增至少 1 点本人贡献。市场仍要求元婴 L1、
@@ -90,7 +91,8 @@ M6 首采集与 QQ 配置以及分类帮助/悬赏蓝字已完成。用户新授
 闲居路线有开放完整奖池与逾时保底奖池。新阶段专项 `test/test_domain_purification_epilogue.py` 5 passed；
 受影响主线/闲居/许可/公共项目/种子迁移组 73 passed in 491.36s。当前迁移表已登记主线
 `8cb194e5…` → `d6b7143e…`、引导 `e99be84e…` → `1f624035…`，均 provenance 到上述数据提交；
-业务代码、合同文档和状态收尾尚未提交推送，未宣称阶段完成。
+业务代码、合同文档和专项测试已随 `17248406a8b31720864299d9a4ccddd172210dc4` 提交并普通推送 develop；
+精确 SHA CI `42942393693` 的三项必需 job 均成功，未宣称 main 合并或正式发布完成。
 
 悬赏交付 checkpoint：`develop a76f4b7` 精确 CI `42896081431` 与普通合并 `main a781659`
 精确 CI `42896996424` 均为两组 quality、install-smoke 全绿；分支 release 正确跳过。
