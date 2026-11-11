@@ -3522,6 +3522,96 @@
       "prerequisites": ["domain_frontier.habitat.2"],
       "first_clear_reward": {"spirit_stones": 30, "local_reputation": 3, "service_reputation": 1},
       "repeat_reward": {"spirit_stones": 4}
+    },
+    {
+      "key": "domain_frontier.purification.1",
+      "story_key": "story.mainline.domain_frontier",
+      "chapter": 6,
+      "stage": 1,
+      "name": "驿路复核",
+      "desc": "净渊防线稳住后，沿公开商路回访魔渊集市，核实驿所往来是否恢复。",
+      "body": "浊潮退去，净渊终关留下的通行文书也终于送到驿所。商队想知道魔渊集市是否仍按旧契往来，不能只凭前线的回报下结论。先从魔渊入口沿公开商路抵达集市，亲自核对行程与路牌；集市仍按魔界阵营声望和既有旅费准入，净渊文书不会代替移动门槛。",
+      "objectives": [
+        {"key": "reach_abyss_market", "type": "travel_arrival", "label": "结算行程抵达魔渊集市", "destination_key": "demon.abyss_market"}
+      ],
+      "actions": [
+        {"command": "移动预览", "argument": "魔渊集市", "description": "查看境界、魔界阵营声望、体力与旅费是否满足公开商路准入。"},
+        {"command": "前往", "argument": "魔渊集市", "description": "从魔渊入口循开放路线前往集市，并在行程结束后结算抵达。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.purification.1"]},
+      "next_stage_key": "domain_frontier.purification.2",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "未结算抵达魔渊集市的行程时关卡保持进行中且不发奖励；境界、魔界阵营声望、体力或旅费不足时先补足公开准入，再从魔渊入口重新启程。"},
+      "status": "open",
+      "aliases": ["驿路复核"],
+      "lane": "purification",
+      "lane_name": "魔渊驿路",
+      "reputation_key": "local.demon.abyss_market",
+      "required_realm": "soul_transformation",
+      "required_layer": 1,
+      "prerequisites": ["domain_frontier.purify.6"],
+      "first_clear_reward": {"spirit_stones": 20, "local_reputation": 2},
+      "repeat_reward": {"spirit_stones": 4}
+    },
+    {
+      "key": "domain_frontier.purification.2",
+      "story_key": "story.mainline.domain_frontier",
+      "chapter": 6,
+      "stage": 2,
+      "name": "驿所夜值",
+      "desc": "用一轮完整值守把驿路消息与集市名望带回净渊名册。",
+      "body": "集市管事把货栈钥牌交给你，请你值守一夜并把实际结算记入名册。先在魔界深渊门完成魔界引导，再以至少八十点魔界阵营声望和五百灵石申请七日贸易许可；驿所闲居消耗两点体力、每日一次，八小时后完整领取可得八十至一百三十灵石与三点魔渊集市地方名望。逾时只有四十灵石保底，不计这次交班。",
+      "objectives": [
+        {"key": "claim_demon_trade_post", "type": "idle_claim", "label": "本关开始后完整领取一次魔界驿所闲居", "route_key": "idle.demon_trade_post"}
+      ],
+      "actions": [
+        {"command": "接受魔界引导", "argument": "确认风险", "description": "在魔界深渊门完成引导，取得申请贸易许可所需的凭证。"},
+        {"command": "申请贸易许可", "argument": "魔界", "description": "具备引导凭证、至少八十点魔界阵营声望和五百灵石后申请七日许可。"},
+        {"command": "挂机预览", "argument": "魔界驿所", "description": "确认有效许可、两点体力、八小时安排与当日次数。"},
+        {"command": "开始挂机", "argument": "魔界驿所", "description": "开始本关后的驿所值守，八小时后在完整领取窗口内交班。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.purification.2"]},
+      "next_stage_key": "domain_frontier.purification.3",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "只认本关开始后的新安排及完整领取；旧安排、取消、仍在运行或逾时保底都不计。许可失效时重新满足引导、声望和灵石门槛后申请；错过完整窗口先领取保底，次日再安排。闲居所得的集市地方名望不等同于净化工程要求的魔界阵营声望。"},
+      "status": "open",
+      "aliases": ["驿所夜值"],
+      "lane": "purification",
+      "lane_name": "魔渊驿路",
+      "reputation_key": "local.demon.abyss_market",
+      "required_realm": "soul_transformation",
+      "required_layer": 1,
+      "prerequisites": ["domain_frontier.purification.1"],
+      "first_clear_reward": {"spirit_stones": 25, "local_reputation": 2, "service_reputation": 1},
+      "repeat_reward": {"spirit_stones": 4}
+    },
+    {
+      "key": "domain_frontier.purification.3",
+      "story_key": "story.mainline.domain_frontier",
+      "chapter": 6,
+      "stage": 3,
+      "name": "净化入册",
+      "desc": "把本人新投入的材料或净化服务记入魔渊工程，完成驿路交接。",
+      "body": "驿所的往来已核实，最后要把净渊承诺落到工程账上。净渊终关已经授予魔渊净化工程权限，但工程仍要求三百点魔界阵营声望；驿所给的集市地方名望不会代替它。声望不足时可沿已开放的魔界探索与悬赏继续积累。工程开放后，亲自贡献一份血草或阵砂，或完成本人有效的污染净化服务；只认本关开始后的个人新增贡献，不要求独自建成全服工程。",
+      "objectives": [
+        {"key": "contribute_abyss_purification", "type": "public_project_contribution", "label": "向魔渊净化工程新增至少一点本人贡献", "project_key": "project.abyss_purification", "min_points": 1}
+      ],
+      "actions": [
+        {"command": "公共项目", "argument": "", "description": "确认净渊授权、魔界阵营声望门槛与本周工程状态。"},
+        {"command": "贡献公共项目", "argument": "魔渊净化工程 血草 1", "description": "贡献本人取得的一份血草；近郊采集可正常取得血草。"},
+        {"command": "贡献公共项目", "argument": "魔渊净化工程 阵砂 1", "description": "贡献本人取得的一份阵砂；领域前线文书接力可正常取得阵砂。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.domain_frontier:domain_frontier.purification.3"]},
+      "next_stage_key": null,
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "只统计本关开始后本人向 project.abyss_purification 的新贡献；不读旧贡献、他人账本或全服进度。工程权限不足、魔界阵营声望未达三百、材料未取得、日额度不足或本周工程已完成时都不发主线奖励；先补对应条件，已满额则等额度或下一业务周恢复后重试。"},
+      "status": "open",
+      "aliases": ["净化入册"],
+      "lane": "purification",
+      "lane_name": "魔渊驿路",
+      "reputation_key": "local.demon.abyss_market",
+      "required_realm": "soul_transformation",
+      "required_layer": 1,
+      "prerequisites": ["domain_frontier.purification.2"],
+      "first_clear_reward": {"spirit_stones": 40, "local_reputation": 3, "service_reputation": 1},
+      "repeat_reward": {"spirit_stones": 4}
     }
   ]
 }
