@@ -2,6 +2,50 @@
   "kind": "reward",
   "records": [
     {
+      "key": "reward_pool.idle.herb_vale_gather", "name": "百草坡采药所得", "desc": "留根采叶后的日常药材与采药行记。",
+      "status": "active", "pool_type": "weighted", "outcomes": [
+        {"weight": 3, "rewards": {"item.herb.blood_grass": 2, "codex.story.herb_vale_gather": 1}},
+        {"weight": 1, "rewards": {"item.herb.blood_grass": 3, "item.herb.spirit_leaf": 1, "codex.story.herb_vale_gather": 1}}
+      ]
+    },
+    {
+      "key": "reward_pool.idle.herb_vale_gather.fallback", "name": "百草坡采药逾时所得", "desc": "受潮后挑出的少量止血草。",
+      "status": "active", "pool_type": "weighted", "outcomes": [{"weight": 1, "rewards": {"item.herb.blood_grass": 1}}]
+    },
+    {
+      "key": "reward_pool.idle.ironwood_gather", "name": "铁木林拾材所得", "desc": "供木作锻制的木材、铁石与樵匠行记。",
+      "status": "active", "pool_type": "weighted", "outcomes": [
+        {"weight": 3, "rewards": {"item.mat.wood": 2, "item.ore.ironstone": 1, "codex.story.ironwood_gather": 1}},
+        {"weight": 1, "rewards": {"item.mat.wood": 3, "item.ore.ironstone": 2, "codex.story.ironwood_gather": 1}}
+      ]
+    },
+    {
+      "key": "reward_pool.idle.ironwood_gather.fallback", "name": "铁木林拾材逾时所得", "desc": "林雾后保存下的一段干木。",
+      "status": "active", "pool_type": "weighted", "outcomes": [{"weight": 1, "rewards": {"item.mat.wood": 1}}]
+    },
+    {
+      "key": "reward_pool.idle.basalt_sifting", "name": "玄武岩径筛砂所得", "desc": "筛净的阵砂、铁石与石匠行记。",
+      "status": "active", "pool_type": "weighted", "outcomes": [
+        {"weight": 3, "rewards": {"item.mat.array_sand": 2, "item.ore.ironstone": 1, "codex.story.basalt_sifting": 1}},
+        {"weight": 1, "rewards": {"item.mat.array_sand": 3, "item.ore.ironstone": 2, "codex.story.basalt_sifting": 1}}
+      ]
+    },
+    {
+      "key": "reward_pool.idle.basalt_sifting.fallback", "name": "玄武岩径筛砂逾时所得", "desc": "山风中保住的一小包阵砂。",
+      "status": "active", "pool_type": "weighted", "outcomes": [{"weight": 1, "rewards": {"item.mat.array_sand": 1}}]
+    },
+    {
+      "key": "reward_pool.idle.spring_gleaning", "name": "灵泉谷拾穗所得", "desc": "泉边脱粒的食材与谷守行记。",
+      "status": "active", "pool_type": "weighted", "outcomes": [
+        {"weight": 3, "rewards": {"item.food.coarse_spirit_rice": 2, "codex.story.spring_gleaning": 1}},
+        {"weight": 1, "rewards": {"item.food.coarse_spirit_rice": 3, "codex.story.spring_gleaning": 1}}
+      ]
+    },
+    {
+      "key": "reward_pool.idle.spring_gleaning.fallback", "name": "灵泉谷拾穗逾时所得", "desc": "阿禾从灶边留下的一份干米。",
+      "status": "active", "pool_type": "weighted", "outcomes": [{"weight": 1, "rewards": {"item.food.coarse_spirit_rice": 1}}]
+    },
+    {
       "name": "领域前线个人嘉奖",
       "desc": "为领域前线稳住战局后所得的领域核心碎片与世界功勋。",
       "operation": "event.domain_front.claim",
