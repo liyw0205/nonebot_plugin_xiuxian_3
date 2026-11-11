@@ -3778,6 +3778,87 @@
       "prerequisites": ["dao_settlement.2"],
       "first_clear_reward": {"codex.story.dao_service_origin": 1, "spirit_stones": 40, "service_reputation": 1},
       "repeat_reward": {"spirit_stones": 4}
+    },
+    {
+      "key": "codex_echoes.1",
+      "story_key": "story.mainline.codex_echoes",
+      "chapter": 1,
+      "stage": 1,
+      "name": "近郊寻迹",
+      "desc": "从青石镇沿公开山路抵达玄天近郊，开始追踪图鉴中的山野见闻。",
+      "body": "青石镇的闲居记录提到，寻道期的观兽徽记并不是凭空得到的：先沿公开山路抵达玄天近郊，才能在历练中辨认铁鬃野猪的冲痕。近郊对凡人与求道者开放，行程必须真实结算；尚在路上或只查看预览，都不会把这一段寻迹写入主线。抵达后可以恢复体力，再从近郊短历练开始寻找下一页见闻。",
+      "objectives": [
+        {"key": "reach_outskirts", "type": "travel_arrival", "label": "本关开始后结算行程抵达玄天近郊", "destination_key": "xuantian.outskirts"}
+      ],
+      "actions": [
+        {"command": "移动预览", "argument": "玄天近郊", "description": "确认从青石镇出发的公开路线、境界、体力与旅费。"},
+        {"command": "前往", "argument": "近郊", "description": "从青石镇沿公开山路启程，等待行程结束后结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.codex_echoes:codex_echoes.1"]},
+      "next_stage_key": "codex_echoes.2",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "尚未结算抵达玄天近郊时主线保持进行中且不发奖励；补足体力或旅费后从青石镇重新启程，完成真实移动即可重试。"},
+      "status": "open",
+      "aliases": ["近郊寻迹"],
+      "required_realm": "qi_sensing",
+      "required_layer": 3,
+      "first_clear_reward": {"spirit_stones": 12},
+      "repeat_reward": {"spirit_stones": 3}
+    },
+    {
+      "key": "codex_echoes.2",
+      "story_key": "story.mainline.codex_echoes",
+      "chapter": 1,
+      "stage": 2,
+      "name": "两页见闻",
+      "desc": "在近郊历练与雾隐洞天秘境中取得两份真实图鉴记录。",
+      "body": "铁鬃野猪的冲痕沿着近郊山道一路通向雾隐洞天。两页见闻必须由你亲自补全：在本关开始后完成近郊短历练并结算铁鬃野猪战斗记录，再持公开取得的基础洞天凭证完成雾隐洞天秘境首通。图鉴只接受结算事务写入的本人记录，失败遭遇、未结算探索、他人的图鉴或开始前的旧条目都不能替代。每一步都可按原合同恢复后重试，不会扣主线奖励。",
+      "objectives": [
+        {"key": "discover_iron_boar", "type": "codex_discovery", "label": "本关开始后取得铁鬃野猪图鉴记录", "entry_key": "codex.creature.iron_boar"},
+        {"key": "discover_mist_grotto", "type": "codex_discovery", "label": "本关开始后完成雾隐洞天秘境并取得图鉴记录", "entry_key": "codex.instance.mist_grotto"}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "近郊短历练", "description": "在玄天近郊完成真实历练并结算铁鬃野猪的战斗记录。"},
+        {"command": "进入秘境", "argument": "雾隐洞天秘境", "description": "持公开取得的基础洞天凭证进入一层，完成秘境结算后取得雾隐图鉴记录。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.codex_echoes:codex_echoes.2"]},
+      "next_stage_key": "codex_echoes.3",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "只统计本关开始后的本人图鉴入库；战斗失败、秘境未结算、门票或体力不足以及他人或旧记录均不推进，按近郊历练和雾隐秘境原合同恢复后重试。"},
+      "status": "open",
+      "aliases": ["两页见闻"],
+      "required_realm": "qi_gathering",
+      "required_layer": 4,
+      "prerequisites": ["codex_echoes.1"],
+      "first_clear_reward": {"spirit_stones": 20},
+      "repeat_reward": {"spirit_stones": 5}
+    },
+    {
+      "key": "codex_echoes.3",
+      "story_key": "story.mainline.codex_echoes",
+      "chapter": 1,
+      "stage": 3,
+      "name": "守望成册",
+      "desc": "完整领取观兽与塔外守望，把寻道期的两条闲居见闻写入图鉴册。",
+      "body": "两页图鉴亮起后，观兽徽记与塔路提示终于能够在寻道期闲居中派上用场。先按既有门槛开始妖兽观察，再开始塔外守望；两条安排都必须在本关开始后完整领取，完整窗口之外的逾时保底、取消、旧安排、他人结算和同日次数不足都不算交班。闲居本身仍按原路线消耗体力、每日限额和完整/逾时奖池，主线只记录真实领取结果，不替玩家创造图鉴或路线所得。",
+      "objectives": [
+        {"key": "claim_beast_observation", "type": "idle_claim", "label": "本关开始后完整领取一次妖兽观察", "route_key": "idle.beast_observation"},
+        {"key": "claim_tower_watch", "type": "idle_claim", "label": "本关开始后完整领取一次塔外守望", "route_key": "idle.tower_watch"}
+      ],
+      "actions": [
+        {"command": "挂机预览", "argument": "观兽", "description": "确认铁鬃野猪图鉴解锁、寻道期门槛、体力、时长与当日次数。"},
+        {"command": "开始挂机", "argument": "观兽", "description": "开始妖兽观察，完整窗口结束后领取，不以逾时保底替代。"},
+        {"command": "挂机预览", "argument": "塔外守望", "description": "确认雾隐洞天图鉴解锁、寻道期门槛、体力、时长与当日次数。"},
+        {"command": "开始挂机", "argument": "塔外守望", "description": "开始塔外守望，完整窗口结束后领取并完成主线交班。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.codex_echoes:codex_echoes.3"]},
+      "next_stage_key": null,
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "只统计本关开始后的本人完整领取；逾时保底、取消、旧或他人安排、路线门槛或日限不足都不发主线奖励，按闲居原合同补足条件并安排新的完整值守后重试。"},
+      "status": "open",
+      "aliases": ["守望成册"],
+      "required_realm": "qi_gathering",
+      "required_layer": 4,
+      "prerequisites": ["codex_echoes.2"],
+      "first_clear_reward": {"spirit_stones": 35, "service_reputation": 1},
+      "repeat_reward": {"spirit_stones": 8}
     }
   ]
 }

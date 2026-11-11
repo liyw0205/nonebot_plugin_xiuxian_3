@@ -20,6 +20,7 @@ from .combat.use_cases import CombatApplication
 from .adventures.use_cases import AdventuresApplication
 from .adventures.mainline_use_cases import AdventuresMainlineApplication
 from .adventures.mainline import (
+    CODEX_ECHOES_STORY_KEY,
     DAO_SETTLEMENT_STORY_KEY,
     DOMAIN_FRONTIER_STORY_KEY,
     VOID_ARCHIVE_STORY_KEY,
@@ -132,6 +133,10 @@ _HELP_PAGES = {
         "\n\n虚空档案归乡后，补给回响会开放第一航道：先"
         f"{command_link('前往 虚空第一航道', '前往 虚空第一航道')}，再用"
         f"{command_link('开始探索 虚空航道历练', '开始探索 虚空航道历练')}取得已结算的航道所得。"
+        "\n\n寻道期的图鉴回响从玄天近郊开始：先"
+        f"{command_link('图鉴回响主线', '图鉴回响主线')}查看关卡，"
+        f"再{command_link('开始图鉴回响主线 近郊寻迹', '开始图鉴回响主线 近郊寻迹')}沿公开山路抵达近郊；"
+        "近郊历练与雾隐洞天秘境的真实结算会补全两页图鉴。"
     ),
     "悬赏": (
         "**悬赏**\n\n"
@@ -171,6 +176,9 @@ _HELP_PAGES = {
         f"先{command_link('开始道统余响主线 抵达服务处', '开始道统余响主线 抵达服务处')}，"
         "再按关卡指引完整领取道统据点看守，并成功结算道统服务派遣；"
         "只认本关开始后的本人记录，失败或逾时可按既有日限重试。\n\n"
+        "图鉴回响两页记录完成后，寻道期可按既有门槛使用观兽与塔外守望：先"
+        f"{command_link('挂机预览 观兽', '挂机预览 观兽')}和{command_link('挂机预览 塔外守望', '挂机预览 塔外守望')}确认门槛，"
+        "两条路线都要在主线开始后完整领取，逾时保底不替代主线交班。\n\n"
         f"{command_link('每日修行', '每日修行')}记下日常安排，"
         f"{command_link('道历问安', '道历问安')}领取当日问安所得。\n\n"
         f"{command_link('灵兽状态', '灵兽状态')}可查看同行灵兽与灵骑；"
@@ -234,6 +242,13 @@ class XiuxianApplication:
             title="道统余响主线",
             start_command="开始道统余响主线",
             claim_command="领取道统余响主线奖励",
+        )
+        self.codex_echoes_mainline = AdventuresMainlineApplication(
+            repository,
+            story_key=CODEX_ECHOES_STORY_KEY,
+            title="图鉴回响主线",
+            start_command="开始图鉴回响主线",
+            claim_command="领取图鉴回响主线奖励",
         )
         self.dao_echoes = DaoEchoesApplication(repository)
         self.three_realms = ThreeRealmsApplication(repository)
@@ -1407,6 +1422,27 @@ class XiuxianApplication:
             context,
             lambda: self.dao_settlement_mainline.claim_reward(context),
             write_message="此刻无缘收取道统余响主线所得。",
+        )
+
+    async def get_codex_echoes_mainline_status(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.codex_echoes_mainline.get_status(context),
+            require_write=False,
+        )
+
+    async def start_codex_echoes_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.codex_echoes_mainline.start_stage(context),
+            write_message="此刻无缘踏入图鉴回响主线。",
+        )
+
+    async def claim_codex_echoes_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.codex_echoes_mainline.claim_reward(context),
+            write_message="此刻无缘收取图鉴回响主线所得。",
         )
 
     async def preview_final_arena(self, context: CommandContext) -> CommandResult:

@@ -13,6 +13,7 @@ MAINLINE_STORY_KEY = "story.mainline.xuantian"
 DOMAIN_FRONTIER_STORY_KEY = "story.mainline.domain_frontier"
 VOID_ARCHIVE_STORY_KEY = "story.mainline.void_archive"
 DAO_SETTLEMENT_STORY_KEY = "story.mainline.dao_settlement"
+CODEX_ECHOES_STORY_KEY = "story.mainline.codex_echoes"
 MAINLINE_TOWN_COMMISSION_DELIVERED = "livelihood.town_commission.delivered"
 
 MAINLINE_LOCKED = "locked"
@@ -195,6 +196,9 @@ _VERTICAL_SLICE_STAGES = frozenset(
         "dao_settlement.1",
         "dao_settlement.2",
         "dao_settlement.3",
+        "codex_echoes.1",
+        "codex_echoes.2",
+        "codex_echoes.3",
         "lane.builder.chapter.01",
         "lane.builder.chapter.02",
         "lane.builder.chapter.03",
@@ -303,6 +307,19 @@ def _story_objectives(
                 except KeyError as exc:
                     raise ContentError(f"mainline {key} objective references unknown location {destination}") from exc
             normalized = {"key": str(objective_key), "type": kind, "label": label.strip(), "destination_key": destination}
+        elif kind == "codex_discovery":
+            if set(objective) != {"key", "type", "label", "entry_key"}:
+                raise ContentError(f"mainline {key} objective {objective_key} has an invalid codex shape")
+            entry_key = objective.get("entry_key")
+            if not isinstance(entry_key, str) or not entry_key.strip():
+                raise ContentError(f"mainline {key} objective {objective_key} requires entry_key")
+            if bundle is not None and bundle.get("codex_entry", entry_key, include_locked=False) is None:
+                raise ContentError(
+                    f"mainline {key} objective {objective_key} references an inactive codex entry"
+                )
+            normalized = {
+                "key": str(objective_key), "type": kind, "label": label.strip(), "entry_key": entry_key,
+            }
         elif kind == "exploration_reward":
             if set(objective) != {"key", "type", "label", "mode_key", "location_key", "item_key", "quantity"}:
                 raise ContentError(f"mainline {key} objective {objective_key} has an invalid exploration shape")

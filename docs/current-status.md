@@ -65,35 +65,45 @@ M6 首采集与 QQ 配置以及分类帮助/悬赏蓝字已完成。用户新授
 
 ## 4. 唯一工作队列
 
-最新状态（2026-11-11）：`v0.1.24` 已正式发布，tag 指向 main
-`eb9f757e9c0c8d4acf9eb192ecfc20363bb0725f`；Quality and Release CI
-`42961424590`（同 SHA 的重复触发 `42960757949`）全部通过。Release 唯一资产
-`project.tar.gz` 为 3,114,904 bytes；本地完整下载核验为 2,614,759 bytes、SHA-256
-`e1b36e7a27d4fa686aaea126e8eba56882985f1ae6df30f6d4c36fdaf443b090`；包内版本为 `0.1.24`，
-主线种子为发布前的 `04b71715…`，与 tag 一致。官方种子变更须登记真实 Git 来源；此阶段不部署、
-不发真实 QQ 消息。完整正式发布证据已在本节记录，旧 tag 保持不动。
+最新状态（2026-11-11）：`v0.1.25` 已正式发布，tag 指向 main 合并提交
+`77c17c388a49324eb1e9e2ac4b1223d6e7c8cf3f`；develop 版本准备 CI
+`42970731462`、main CI `42971500535`、tag/release CI `42972323643` 全部通过，质量、安装烟测和
+发布 job 均成功。Release 唯一资产为 `project.tar.gz`，大小 `3,120,264` bytes；Release API
+显示的本地下载在有界超时内受网络截断（curl 18），未把不完整文件当作资产或伪造本地 SHA；tag、
+Release、工作流均已按精确 SHA 核对。包内版本与 tag 为 `0.1.25`，官方主线种子旧
+`04b71715…` → 新 `75e2f588…`，provenance 为数据提交 `dc98152c23ff24a8235e19178043297875dd779f`。
+此阶段不部署、不发真实 QQ 消息，旧 tag 保持不动。
 
-当前阶段为 **道统余响：道源服务处抵达、据点值守与公开轮值**。缺口来自开放的
-`dao.origin_gate`、`dao_service`、`idle.dao_settlement_watch` 与 `dispatch.dao_service` 尚未被
-一条可领取主线消费。三关依赖冻结为：从道源门沿公开边抵达服务处 → 本关开始后完整领取十二小时
-道统据点看守 → 本关开始后本人成功结算一次道统服务派遣。只复用现有移动、闲居、派遣、账本和
-奖励池；不开放 locked 道统地点，不改时长、限额、风险、成本或经济规则。
+当前阶段为 **寻道图鉴回响：公开寻迹、图鉴解锁与双线闲居**。真实缺口来自已有公开内容
+`enemy.iron_boar`、`instance.secret_realm.mist_grotto`、`idle.beast_observation` 和
+`idle.tower_watch`：敌人与秘境已有可取得来源及完整/逾时奖池，但还没有一条可领取剧情把公开抵达、
+两份图鉴记录和两条寻道期闲居完整领取串成玩家可反馈的闭环。三关依赖冻结为：公开抵达玄天近郊，
+再在本关开始后沿近郊历练与雾隐洞天秘境取得 `codex.creature.iron_boar`、
+`codex.instance.mist_grotto`，最后在开始后完整领取一次观兽和一次塔外守望。保留既有境界、
+门票、图鉴解锁、路线时长/日限/体力、奖励池和逾时保底；不开放 locked 地点或未来图鉴内容。
 
 阶段交付与验收：
 
 | 关联交付项 | 可测验收 |
 |:--|:--|
-| 三关数据与玩家入口 | 主线正文、行动、目标、奖励、重试齐全；`dao.origin_gate` 沿公开边抵达 `dao_service`，生活/派遣帮助给出真实路径 |
-| 严格来源与共享消费者 | 主线严格解析开放地点、`idle.dao_settlement_watch` 完整奖池和 `dispatch.dao_service`；复用移动、闲居、派遣、快照与账本 |
-| 拒绝、恢复与幂等 | 提前/逾时闲居、未结算/失败/partial 派遣、旧/他人事件不推进且零写；事务失败可重试，重复 operation 只回放 |
-| 种子与交付 | 主线官方数据 `dc98152c23ff24a8235e19178043297875dd779f`：旧 `04b71715…` → 新 `75e2f588…`；定向组 `63 passed`，develop 精确 SHA CI `42969665807` 已全绿，待合 main CI 与下一版本 |
+| 三关数据与玩家入口 | 主线正文、行动、目标、奖励、重试齐全；公开移动、近郊历练、雾隐秘境和两条闲居帮助可指路，双适配器入口复用同一 application |
+| 严格来源与共享消费者 | 新 `codex_discovery` 目标严格只认本关开始后本人图鉴入库；复用移动、战斗、秘境、闲居、快照和图鉴事务，不把测试注入物当来源 |
+| 拒绝、恢复与幂等 | 旧/他人图鉴、战斗失败、秘境未结算、逾时闲居和日限不足不推进且零写；事务失败可重试，重复 operation 只回放 |
+| 种子与交付 | 官方主线数据先取得真实 Git provenance 并登记新旧 hash；定向组、develop 精确 SHA CI、main CI 与下一未占用正式包逐项补记 |
 
-实现 checkpoint（2026-11-11）：数据提交 `dc98152` 已加入三关；业务实现、玩家入口、严格
-`dispatch_success` 快照目标和专项测试已在 `77d0919` 完成。`test/test_dao_settlement_epilogue.py`、主线内容/垂直切片、
-闲居/派遣、帮助、文档和种子迁移定向组共 `63 passed in 502.55s`，均使用独立 venv 与共享锁；精确 SHA
-`77d09195e28b9dc5f4b121cd566c760a6b60ddbc` 的 CI `42969665807` 已通过，待普通合 main、main CI
-和 `v0.1.25` 正式资产验证。合同见
-[道统余响](gameplay/adventures/dao-settlement-epilogue.md)。
+实现 checkpoint（2026-11-11）：道统余响数据 `dc98152c23ff24a8235e19178043297875dd779f`、业务
+`77d09195e28b9dc5f4b121cd566c760a6b60ddbc` 已合入 main，`v0.1.25` 的精确 CI 与 Release 证据见上。
+图鉴阶段已开始实现；合同、数据 provenance、定向测试和后续 SHA 在本节追加，合同文件为
+[寻道图鉴回响](gameplay/adventures/codex-seeker-echoes.md)。官方主线数据提交
+`0ba8c851ed14f3374f1f60bcbfc7cd3327fed38e` 将 `75e2f588…` 更新为
+`19628f2415…`，迁移表保留旧记录并登记该真实来源。当前业务工作树已接入
+`codex_discovery` 快照目标、公开探索遭遇冻结、双适配器图鉴回响命令与帮助入口；业务提交
+`48c647b9724aad3424fe4c99019832e4a4d9566c` 的精确 SHA CI `42985747343` 已通过
+quality 3.11/3.12、install-smoke，分支 release 正确跳过。专项 `test/test_codex_seeker_echoes.py`
+2 passed，受影响主线/闲居/探索/迁移组 35 passed，
+补充主线/图鉴/闲居/内容组首跑 26 passed、1 个既有路线夹具失败；已将该测试前置修正为合同已有
+的 `demon.abyss_gate` 后单项 1 passed，生产地图与旅行规则未改。后续 checkpoint 补业务 SHA、
+精确 develop/main CI 与正式包校验。
 
 已交付阶段为 **虚空补给回响：航道抵达、补给看守与锚点取回**。其数据提交 `cb25be1`、业务实现
 与专项测试已在 `v0.1.24` 正式发布中交付；三关严格消费公开第一航道抵达、十二小时完整闲居和
