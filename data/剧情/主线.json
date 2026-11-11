@@ -3937,6 +3937,83 @@
       "prerequisites": ["cloud_mine_echoes.2"],
       "first_clear_reward": {"spirit_stones": 35, "service_reputation": 1},
       "repeat_reward": {"spirit_stones": 8}
+    },
+    {
+      "key": "cloud_city_echoes.1",
+      "story_key": "story.mainline.cloud_city_echoes",
+      "chapter": 1,
+      "stage": 1,
+      "name": "云城听更",
+      "desc": "沿公开路线抵达云城，听见巡夜更鼓里的商路回声。",
+      "body": "青石镇的商旅把云城夜市说得热闹，却没有人能替你留下真正的脚印。云城店铺回响第一关只认本关开始后本人结算的公开行程；预览路线、尚在途中、停在云城之外或只听传闻都不算抵达。备好体力后沿现有相邻通路启程，抵达云城即可把巡夜资格写入自己的行册。",
+      "objectives": [
+        {"key": "reach_cloud_city", "type": "travel_arrival", "label": "本关开始后结算行程抵达云城", "destination_key": "xuantian.cloud_city"}
+      ],
+      "actions": [
+        {"command": "移动预览", "argument": "云城", "description": "确认从当前公开相邻地点前往云城的境界、体力与行程。"},
+        {"command": "前往", "argument": "云城", "description": "沿现有公开通路启程，等待行程结束后结算抵达。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.cloud_city_echoes:cloud_city_echoes.1"]},
+      "next_stage_key": "cloud_city_echoes.2",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "尚未结算抵达云城时主线保持进行中且不发奖励；恢复体力后沿公开通路重新启程，其他地点或未结算行程不能替代本关记录。"},
+      "status": "open",
+      "aliases": ["云城听更"],
+      "required_realm": "golden_core",
+      "required_layer": 1,
+      "first_clear_reward": {"spirit_stones": 22, "local_reputation": 3},
+      "repeat_reward": {"spirit_stones": 5},
+      "reputation_key": "local.xuantian.cloud_city"
+    },
+    {
+      "key": "cloud_city_echoes.2",
+      "story_key": "story.mainline.cloud_city_echoes",
+      "chapter": 1,
+      "stage": 2,
+      "name": "巡夜见锋",
+      "desc": "在云城巡夜中赢下一场真实遭遇战，替店铺护住第一盏灯。",
+      "body": "云城的灯火并不只照着柜台，也照着夜巷里试探商路的劫修与妖兽。本关开始后，你要身在云城按公开规则开始云城巡夜，并等服务端结算一场真实遭遇战胜利。未结算、战败、只取得普通巡夜所得或把旧战绩带入行囊都不能冒充本次见锋；补足境界与体力后按原日限重试即可。",
+      "objectives": [
+        {"key": "win_cloud_city_patrol", "type": "exploration_battle_victory", "label": "本关开始后在云城巡夜中赢得一场遭遇战", "mode_key": "explore.cloud_city_patrol", "location_key": "xuantian.cloud_city"}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "云城巡夜", "description": "在云城按既有 8 体力与每日次数规则开始巡夜，等待真实遭遇战结算。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.cloud_city_echoes:cloud_city_echoes.2"]},
+      "next_stage_key": "cloud_city_echoes.3",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "只统计本关开始后的本人云城巡夜 settled 且 battle_outcome=won 记录；战败、未结算、日限或境界不足均不推进，按巡夜原合同恢复后可重试。"},
+      "status": "open",
+      "aliases": ["巡夜见锋"],
+      "required_realm": "golden_core",
+      "required_layer": 1,
+      "prerequisites": ["cloud_city_echoes.1"],
+      "first_clear_reward": {"spirit_stones": 28},
+      "repeat_reward": {"spirit_stones": 6}
+    },
+    {
+      "key": "cloud_city_echoes.3",
+      "story_key": "story.mainline.cloud_city_echoes",
+      "chapter": 1,
+      "stage": 3,
+      "name": "店铺交班",
+      "desc": "完整领取一次云城店铺闲居，把巡夜的灯火交给白日商路。",
+      "body": "巡夜留下的名册已经送到店铺掌柜手中，最后一关是把夜里守住的秩序交给白日生意。云城店铺要求真实积累两百点云城地方名望；本关开始后新建的安排必须在八小时完整窗口内领取。逾时保底、取消、旧安排、他人领取或当日额度已用尽都不能替代交班；先按闲居原合同收取保底，次日恢复额度后重新安排完整店铺即可继续。",
+      "objectives": [
+        {"key": "claim_cloud_city_shop", "type": "idle_claim", "label": "本关开始后完整领取一次云城店铺", "route_key": "idle.cloud_city_shop"}
+      ],
+      "actions": [
+        {"command": "挂机预览", "argument": "云城店铺", "description": "确认云城地方名望 200、八小时窗口、每日一次限额与完整/逾时所得。"},
+        {"command": "开始挂机", "argument": "云城店铺", "description": "本关开始后安排店铺看守，完整窗口结束后领取并完成交班。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.cloud_city_echoes:cloud_city_echoes.3"]},
+      "next_stage_key": null,
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "只统计本关开始后的本人云城店铺完整领取；逾时保底、取消、旧或他人安排及名望/日限不足都不发主线奖励，按闲居原合同补足条件并安排新的完整店铺后重试。"},
+      "status": "open",
+      "aliases": ["店铺交班"],
+      "required_realm": "golden_core",
+      "required_layer": 1,
+      "prerequisites": ["cloud_city_echoes.2"],
+      "first_clear_reward": {"spirit_stones": 42, "service_reputation": 1},
+      "repeat_reward": {"spirit_stones": 8}
     }
   ]
 }

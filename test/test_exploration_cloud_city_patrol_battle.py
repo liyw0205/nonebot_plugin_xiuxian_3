@@ -51,7 +51,7 @@ def test_cloud_city_patrol_declares_a_battle_pool() -> None:
     assert mode["enemy_pool_key"] == POOL
     pool = bundle.require("encounter_pool", POOL)
     candidates = {row["enemy_key"] for row in pool["candidates"]}
-    assert candidates == {"enemy.bandit_apprentice", "enemy.wood_rat"}
+    assert candidates == {"enemy.bandit_apprentice"}
     for enemy in candidates:
         assert bundle.get("enemy", enemy, include_locked=False) is not None, enemy
 
@@ -93,7 +93,7 @@ def test_cloud_city_patrol_settles_through_a_real_battle() -> None:
                         (user,),
                     ).fetchall()
                 assert len(rows) == 1, f"expected exactly one battle, got {rows}"
-                assert rows[0][0] in {"enemy.bandit_apprentice", "enemy.wood_rat"}, rows
+                assert rows[0][0] == "enemy.bandit_apprentice", rows
             finally:
                 await runtime.close()
 

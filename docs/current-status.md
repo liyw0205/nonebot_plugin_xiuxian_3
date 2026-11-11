@@ -65,51 +65,57 @@ M6 首采集与 QQ 配置以及分类帮助/悬赏蓝字已完成。用户新授
 
 ## 4. 唯一工作队列
 
-最新状态（2026-11-11）：`v0.1.26` 已正式发布，tag 指向
-`dd0cfc6add5df760c7d191b1013e8d3b84839034`；寻道图鉴阶段 develop CI
-`42986576120`、main CI `42987828157`、版本准备 CI `42988997850` 与 tag/release CI
-`42990112149` 全部通过，质量、安装烟测和发布 job 均成功。Release 唯一资产为
-`project.tar.gz`，大小 `3,126,615` bytes，SHA-256
-`67ac0a79d32161e432bd3f86b80db22c6af34a93640c65c156b4bdc242eb2e7e`；包内版本为 `0.1.26`，
-tag、SHA、包内主线 hash/provenance 已逐项核对。官方主线种子 `75e2f588…` → `19628f2415…`，
-provenance 为数据提交 `0ba8c851ed14f3374f1f60bcbfc7cd3327fed38e`。不部署、不发真实 QQ 消息，旧 tag 保持不动。
+最新状态（2026-11-11）：`v0.1.27` 已正式发布，tag 指向
+`6e782316e22779fa1db3d929968b754a3d571a9c`；云铁守望阶段 develop CI
+`43001704769`、`43002805572`、`43004114481`，main CI `43005742892` 与 tag/release CI
+`43006782804` 全部通过，质量、安装烟测和发布 job 均成功。Release 唯一资产为
+`project.tar.gz`，大小 `3,131,004` bytes，SHA-256
+`554f40398bba11be0d8542940fb70f69ec3084b1dbb2968762f6f565efe717b`；包内版本为 `0.1.27`，
+主线 hash `efa3428a72f07324ee8f7fd1cb8573877b2adc46948670b9a3c98f6f67f8d249` 与 provenance
+`379f0a28698c113153116eaea1952d86663ada2f:data/剧情/主线.json` 已核对。不部署、不发真实 QQ 消息，旧 tag 保持不动。
 
 已交付阶段 **寻道图鉴回响：公开寻迹、图鉴解锁与双线闲居**。业务提交
 `48c647b9724aad3424fe4c99019832e4a4d9566c`，状态 checkpoint
 `48b23d16e5c169a52f368a25114299d013bdad98`；`codex_discovery` 快照目标、真实探索/秘境来源、
 双适配器入口和两条闲居完整领取已验收并随 `v0.1.26` 发布。旧图鉴、悬赏、M9、聚气和装备范围不重开。
 
-当前阶段为 **云铁守望回响：矿区抵达、云铁采掘与矿区看守**。真实缺口来自已有开放
-`xuantian.cloud_mine`、`explore.cloud_mine`、`idle.cloud_mine_watch`：地点移动、云铁探索和闲居
-均有实际准入/奖池/消费者，但尚无剧情把三者串成玩家反馈闭环。冻结三关为：公开抵达云铁矿区 →
-本关开始后在云铁矿区探索结算取得云铁 → 本关开始后完整领取一次矿区看守。保留筑基四层、许可/矿镐或
-采矿辅修、8 体力/2 精力探索成本、6 小时/每日一次闲居、完整与逾时奖池；不开放锁定地点或改经济规则。
+已交付阶段 **云铁守望回响：矿区抵达、云铁采掘与矿区看守**。数据提交
+`379f0a28698c113153116eaea1952d86663ada2f`、业务提交 `c78efa528887461d051dcef62b71b61c0b9cd311`、
+状态 checkpoint `6512343e885aff06ad7d37d458e8458bc42ec5f0` 已随 `v0.1.27` 发布；旧云铁、图鉴、悬赏、
+M9、聚气和装备范围不重开。
+
+当前阶段为 **云城店铺回响：云城抵达、巡夜胜场与店铺交班**。真实缺口来自已有 open/active
+`xuantian.cloud_city`、`explore.cloud_city_patrol`、`idle.cloud_city_shop`：地点、巡夜和闲居各自
+有真实入口、准入与奖池，但尚无剧情闭合三者。冻结三关为：本关开始后公开抵达云城 → 云城巡夜真实
+遭遇战胜利 → 本关开始后完整领取云城店铺。保留金丹一层、巡夜 8 体力/每日 4 次、店铺 200 点云城
+地方名望/8 小时/每日一次及原奖池；不开放 locked 内容或改经济规则。
 
 阶段交付与验收：
 
 | 关联交付项 | 可测验收 |
 |:--|:--|
-| 三关数据与玩家入口 | 主线正文、行动、目标、奖励、重试齐全；公开移动、云铁探索和矿区看守帮助可指路，QQ/OneBot 入口复用同一 application |
-| 严格来源与共享消费者 | `travel_arrival`、`exploration_reward`、`idle_claim` 只认本关开始后本人已结算记录；复用移动、探索、闲居、快照和奖励事务，不读背包净数量或测试注入物 |
-| 拒绝、恢复与幂等 | 未抵达/未结算/战斗失败/逾时闲居/日限不足/他人记录不推进且零写；事务失败可用原 operation 重试，重复 operation 只回放 |
+| 三关数据与玩家入口 | 主线正文、行动、目标、奖励、重试齐全；公开移动、云城巡夜和店铺帮助可指路，QQ/OneBot 入口复用同一 application |
+| 严格来源与共享消费者 | `travel_arrival`、`exploration_battle_victory`、`idle_claim` 只认本关开始后本人已结算记录；复用移动、探索、闲居、快照和奖励事务，不读背包净数量或测试注入物 |
+| 拒绝、恢复与幂等 | 未抵达/未结算/战斗失败/逾时闲居/门槛或日限不足/他人记录不推进且零写；事务失败可用原 operation 重试，重复 operation 只回放 |
 | 种子与交付 | 官方主线数据先取得真实 Git provenance 并登记新旧 hash；定向组、develop 精确 SHA CI、main CI 与下一未占用正式包逐项补记 |
 
-实现 checkpoint（2026-11-11）：图鉴阶段已完成并发布；专项 `test/test_codex_seeker_echoes.py`
-2 passed，受影响主线/闲居/探索/迁移组 35 passed，补充主线/图鉴/闲居/内容组及旧路线夹具修正后
-通过。完整数据 provenance、精确 CI 与 `project.tar.gz` 校验见上。本阶段开始前不重复这些已绿组，
-只补云铁守望受影响数据、主线消费者、帮助/入口与拒绝/重放定向验收。
+云铁守望阶段实现 checkpoint（2026-11-11）：数据/业务/状态提交与专项 `test/test_cloud_mine_echoes.py`
+3 passed、主线/完整性 21 passed、探索/闲居受影响组 24 passed、种子迁移 33 passed 均已完成；
+其 develop/main 精确 CI、`v0.1.27` tag 与 Release 资产证据见上。本阶段只补云城店铺受影响数据、
+主线消费者、帮助/入口与拒绝/重放定向验收。
 
-云铁守望阶段实现 checkpoint（2026-11-11）：官方主线数据先以单文件提交
-`379f0a28698c113153116eaea1952d86663ada2f` 建立 provenance，内容 SHA-256 为
-`efa3428a72f07324ee8f7fd1cb8573877b2adc46948670b9a3c98f6f67f8d249`；迁移表保留旧 hash，
-并登记新 hash 到 `379f0a2:data/剧情/主线.json`。三关主线 application、双适配器入口、帮助和
-`travel_arrival`/`exploration_reward`/`idle_claim` 严格来源消费者已接通；战败保底云铁不推进
-剧情，逾时看守不推进且可次日完整重试。专项 `test/test_cloud_mine_echoes.py` 3 passed，
-主线/完整性 21 passed，探索/闲居受影响组 24 passed，种子迁移 33 passed；编译、JSON、diff
-检查通过。既有云铁 OneBot 战斗夹具曾只按遭遇概率选种子却硬断言首个敌人，已补为同时冻结
-`enemy.cloud_beast`，未改运行时规则。业务提交 `c78efa528887461d051dcef62b71b61c0b9cd311` 的
-develop 精确 CI `43001704769` 已通过 quality 3.11/3.12、install-smoke，release 按 tag-only
-跳过；普通合 main、版本递增和正式包仍待完成。
+云城店铺阶段实现 checkpoint（2026-11-11）：官方主线数据单文件提交 `b0f1e13`，内容 SHA-256
+`eb3d11231a364e63aa165cb2cd52f52608b1076e2fdaa5f62c0fc44cb8908b2b`；迁移表保留 v0.1.27 的
+`efa3428a…` 并登记 `b0f1e13:data/剧情/主线.json`。巡夜遭遇池原有近郊 `enemy.wood_rat` 混入云城
+池，导致严格地点校验在部分真实结算时返回 `PERSISTENCE_ERROR`；数据提交 `d3170b8` 移除该无效候选，
+新 SHA `e3784344bc04e5e4c404305231e64af78cc8c894162b4549c27c30c88fc9469b`，迁移表保留旧
+`0a4798…` 并登记 `d3170b8:data/战斗/遭遇池.json`，不改变奖励池或探索成本。
+三关 `cloud_city_echoes` 主线、双适配器入口、探索/生活帮助和严格来源消费者已接通；专项
+`test/test_cloud_city_shop_echoes.py` 4 passed，云城巡夜/战斗/专项合计 9 passed，种子迁移 33 passed，
+编译、JSON、`git diff --check` 已通过。受影响主线/内容/闲居/帮助组共 56 passed；旧
+`test/test_mainline_chapter_nine.py` 两项仍失败，因为它固定断言第 9 章终止且期望 27 条章节，而现行
+主线已公开第 10–13 章（责任方为该历史测试，未修改主线或降低断言）。当前仅剩业务提交、develop
+精确 SHA CI、普通合 `main`/CI、下一未占用正式版本与 `project.tar.gz` 证据；此前已绿的云铁/图鉴组不重跑。
 
 已交付阶段为 **虚空补给回响：航道抵达、补给看守与锚点取回**。其数据提交 `cb25be1`、业务实现
 与专项测试已在 `v0.1.24` 正式发布中交付；三关严格消费公开第一航道抵达、十二小时完整闲居和
