@@ -1800,6 +1800,10 @@ class AdventuresRepositoryMixin:
             )
             snapshot = {
                 "started_at": now_text,
+                "baseline_idle_assignment_id": int(connection.execute(
+                    "SELECT COALESCE(MAX(id), 0) FROM idle_assignments WHERE player_id=?",
+                    (row["id"],),
+                ).fetchone()[0]),
                 "stage": str(row["stage"]),
                 "realm_key": str(row["realm_key"]),
                 "realm_layer": player_integer(row, "realm_layer"),
@@ -2081,6 +2085,9 @@ class AdventuresRepositoryMixin:
                     if isinstance(item, dict)
                 )
             datetime.fromisoformat(started_at)
+            idle_baseline = snapshot.get("baseline_idle_assignment_id", 0)
+            if isinstance(idle_baseline, bool) or not isinstance(idle_baseline, int) or idle_baseline < 0:
+                raise ValueError("mainline idle baseline is invalid")
         except (TypeError, json.JSONDecodeError, ValueError) as exc:
             raise ValueError("mainline run snapshot is invalid") from exc
 
@@ -2175,8 +2182,8 @@ class AdventuresRepositoryMixin:
             elif kind == "idle_claim":
                 found = connection.execute(
                     "SELECT 1 FROM idle_assignments WHERE player_id=? AND route_key=? "
-                    "AND status='claimed' AND starts_at>=? LIMIT 1",
-                    (player_id, objective["route_key"], started_at),
+                    "AND status='claimed' AND starts_at>=? AND id>? LIMIT 1",
+                    (player_id, objective["route_key"], started_at, idle_baseline),
                 ).fetchone()
             elif kind == "dispatch_success":
                 found = connection.execute(

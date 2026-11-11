@@ -11,6 +11,8 @@
 净渊终关后可推进[净渊后记](demon-purification-epilogue.md)：抵达魔渊集市、完整领取魔界驿所闲居，
 再向魔渊净化工程提交本人本关开始后的新贡献。
 
+青石镇常驻生活可推进[常驻生计回响](livelihood-echoes.md)：镇中行旅、灵圃看护与作坊值守。
+
 当前开放草药补给、生产订单、v0.2 云铁矿区/洞天精英悬赏、v0.3 魔界救援与妖界栖地悬赏、v0.1 两个秘境、v0.2 雾隐洞天二层与云舟秘境、v0.3 `instance.secret_realm.boundary_rift` 界隙裂隙秘境、`instance.secret_realm.demon_abyss` 魔界深渊秘境、v0.4 `instance.secret_realm.ancient_domain` 远古洞天和 `instance.secret_realm.ancestral_hall` 祖灵殿、v0.5 `instance.secret_realm.void_ruins` 虚空遗迹与 `instance.secret_realm.time_fort` 时序堡垒、v0.6 `instance.secret_realm.dao_origin` 道源秘境、`instance.secret_realm.heaven_echo` 天劫回音，v0.7 `instance.secret_realm.ironwood_trial` 铁木试炼、`instance.secret_realm.time_garden_echo` 时序残响与 `instance.secret_realm.ancestral_vein` 祖灵支脉，以及 `instance.legacy.demon_reliquary` 和 `instance.legacy.demon_abyss_echo` 两条线索驱动遗府。v0.10 `instance.secret_realm.abyss_market_run` 魔渊契约集市与 `instance.secret_realm.trade_port_convoy` 三界货栈把两个已开放却无活动的贸易端点接上通用秘境。虚空遗迹使用独立仓储、专用 2–5 人队伍、十节点路线、两场自动战、托管锚和系统补偿；专项 QQ 官方/OneBot V11 双方向与重启恢复测试见 `test/test_void_ruins_secret_realm_v05.py`。祖灵殿专项见 `test/test_ancestral_hall_secret_realm_v04.py`，时序堡垒专项见 `test/test_time_fort_secret_realm_v05.py`，道源秘境专项见 `test/test_dao_origin_secret_realm_v06.py`。遗府使用遗府专属仓储和稳定键隔离，现无已登记且规则闭合的后续副本待办。斗法记录分享和尚未定义合同的后续内容仍保持锁定；世界/社交域以其他稳定键独立开放的副本不代表相应秘境合同已开放；具名遭遇和天劫试炼的战斗会话由战斗域统一管理，状态总表见[当前开发状态](../../current-status.md)。
 
 当前运行时已开放 v0.1 的 `bounty.herb_supply`、`bounty.craft_order`，v0.2 的 `bounty.cloud_mine`，感气阶段的

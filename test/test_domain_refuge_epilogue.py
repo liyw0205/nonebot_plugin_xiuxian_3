@@ -208,14 +208,14 @@ def test_only_new_personal_project_or_full_watch_evidence_counts(kind, player, k
         connection.executescript("""
             CREATE TABLE livelihood_projects(project_id TEXT,project_key TEXT);
             CREATE TABLE livelihood_project_contributions(project_id TEXT,player_id INTEGER,contribution_points INTEGER,created_at TEXT);
-            CREATE TABLE idle_assignments(player_id INTEGER,route_key TEXT,status TEXT,starts_at TEXT);
+            CREATE TABLE idle_assignments(id INTEGER PRIMARY KEY AUTOINCREMENT,player_id INTEGER,route_key TEXT,status TEXT,starts_at TEXT);
         """)
         definition = next(row for row in mainline_definitions(story_key=STORY) if row.key == PREFIX + ("2" if kind == "project" else "3"))
         if kind == "project":
             connection.execute("INSERT INTO livelihood_projects VALUES ('week-1',?)", (key,))
             connection.execute("INSERT INTO livelihood_project_contributions VALUES ('week-1',?,?,?)", (player, points, when))
         else:
-            connection.execute("INSERT INTO idle_assignments VALUES (?,?,?,?)", (player, key, status, when))
+            connection.execute("INSERT INTO idle_assignments(player_id,route_key,status,starts_at) VALUES (?,?,?,?)", (player, key, status, when))
         run = {"snapshot_json": json.dumps({"started_at": "2026-11-11", "definition": {"objectives": list(definition.objectives)}})}
         missing = AdventuresRepositoryMixin._mainline_missing_objectives(connection, 1, run)
         assert (not missing) is complete
