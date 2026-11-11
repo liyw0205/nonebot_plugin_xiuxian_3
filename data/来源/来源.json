@@ -148,6 +148,16 @@
       "status": "active"
     },
     {
+      "key": "source.item.beast_habitat_rations",
+      "name": "灵兽栖地巡护物资来源",
+      "desc": "已结缘灵兽在玄天近郊巡护后带回粗糙灵米与灵叶，分别可用于灵粮喂养和既有生产。",
+      "asset_keys": ["item.food.coarse_spirit_rice", "item.herb.spirit_leaf"],
+      "channels": [
+        {"operation": "livelihood.settle", "reference": "reward_pool.idle.beast_habitat_patrol"}
+      ],
+      "status": "active"
+    },
+    {
       "key": "source.equipment.quality_bounty",
       "name": "装备来源",
       "desc": "基础至高阶装备由按境界与道途过滤的悬赏品质奖池公开抽取；未声明来源的未来效果仍锁定。",
