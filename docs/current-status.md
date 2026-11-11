@@ -99,6 +99,18 @@ provenance 为数据提交 `0ba8c851ed14f3374f1f60bcbfc7cd3327fed38e`。不部�
 通过。完整数据 provenance、精确 CI 与 `project.tar.gz` 校验见上。本阶段开始前不重复这些已绿组，
 只补云铁守望受影响数据、主线消费者、帮助/入口与拒绝/重放定向验收。
 
+云铁守望阶段实现 checkpoint（2026-11-11）：官方主线数据先以单文件提交
+`379f0a28698c113153116eaea1952d86663ada2f` 建立 provenance，内容 SHA-256 为
+`efa3428a72f07324ee8f7fd1cb8573877b2adc46948670b9a3c98f6f67f8d249`；迁移表保留旧 hash，
+并登记新 hash 到 `379f0a2:data/剧情/主线.json`。三关主线 application、双适配器入口、帮助和
+`travel_arrival`/`exploration_reward`/`idle_claim` 严格来源消费者已接通；战败保底云铁不推进
+剧情，逾时看守不推进且可次日完整重试。专项 `test/test_cloud_mine_echoes.py` 3 passed，
+主线/完整性 21 passed，探索/闲居受影响组 24 passed，种子迁移 33 passed；编译、JSON、diff
+检查通过。既有云铁 OneBot 战斗夹具曾只按遭遇概率选种子却硬断言首个敌人，已补为同时冻结
+`enemy.cloud_beast`，未改运行时规则。业务提交 `c78efa528887461d051dcef62b71b61c0b9cd311` 的
+develop 精确 CI `43001704769` 已通过 quality 3.11/3.12、install-smoke，release 按 tag-only
+跳过；普通合 main、版本递增和正式包仍待完成。
+
 已交付阶段为 **虚空补给回响：航道抵达、补给看守与锚点取回**。其数据提交 `cb25be1`、业务实现
 与专项测试已在 `v0.1.24` 正式发布中交付；三关严格消费公开第一航道抵达、十二小时完整闲居和
 真实探索锚点，逾时/未结算/非本人来源保持零写，旧来源和自定义 JSON 已保留。合同见
