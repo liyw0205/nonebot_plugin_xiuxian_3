@@ -21,6 +21,7 @@ from .adventures.use_cases import AdventuresApplication
 from .adventures.mainline_use_cases import AdventuresMainlineApplication
 from .adventures.mainline import (
     CODEX_ECHOES_STORY_KEY,
+    CLOUD_MINE_ECHOES_STORY_KEY,
     DAO_SETTLEMENT_STORY_KEY,
     DOMAIN_FRONTIER_STORY_KEY,
     VOID_ARCHIVE_STORY_KEY,
@@ -179,6 +180,10 @@ _HELP_PAGES = {
         "图鉴回响两页记录完成后，寻道期可按既有门槛使用观兽与塔外守望：先"
         f"{command_link('挂机预览 观兽', '挂机预览 观兽')}和{command_link('挂机预览 塔外守望', '挂机预览 塔外守望')}确认门槛，"
         "两条路线都要在主线开始后完整领取，逾时保底不替代主线交班。\n\n"
+        "筑基四层后可接云铁守望回响：先"
+        f"{command_link('云铁守望回响主线', '云铁守望回响主线')}查看关卡，"
+        f"再{command_link('开始云铁守望回响主线 矿口听风', '开始云铁守望回响主线 矿口听风')}沿公开山道抵达云铁矿区；"
+        "之后按关卡提示结算云铁矿区采掘，并在本关开始后完整领取矿区看守。逾时保底不替代主线交接。\n\n"
         f"{command_link('每日修行', '每日修行')}记下日常安排，"
         f"{command_link('道历问安', '道历问安')}领取当日问安所得。\n\n"
         f"{command_link('灵兽状态', '灵兽状态')}可查看同行灵兽与灵骑；"
@@ -249,6 +254,13 @@ class XiuxianApplication:
             title="图鉴回响主线",
             start_command="开始图鉴回响主线",
             claim_command="领取图鉴回响主线奖励",
+        )
+        self.cloud_mine_echoes_mainline = AdventuresMainlineApplication(
+            repository,
+            story_key=CLOUD_MINE_ECHOES_STORY_KEY,
+            title="云铁守望回响主线",
+            start_command="开始云铁守望回响主线",
+            claim_command="领取云铁守望回响主线奖励",
         )
         self.dao_echoes = DaoEchoesApplication(repository)
         self.three_realms = ThreeRealmsApplication(repository)
@@ -1443,6 +1455,27 @@ class XiuxianApplication:
             context,
             lambda: self.codex_echoes_mainline.claim_reward(context),
             write_message="此刻无缘收取图鉴回响主线所得。",
+        )
+
+    async def get_cloud_mine_echoes_mainline_status(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.cloud_mine_echoes_mainline.get_status(context),
+            require_write=False,
+        )
+
+    async def start_cloud_mine_echoes_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.cloud_mine_echoes_mainline.start_stage(context),
+            write_message="此刻无缘踏入云铁守望回响主线。",
+        )
+
+    async def claim_cloud_mine_echoes_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.cloud_mine_echoes_mainline.claim_reward(context),
+            write_message="此刻无缘收取云铁守望回响主线所得。",
         )
 
     async def preview_final_arena(self, context: CommandContext) -> CommandResult:

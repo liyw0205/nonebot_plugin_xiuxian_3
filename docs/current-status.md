@@ -65,45 +65,51 @@ M6 首采集与 QQ 配置以及分类帮助/悬赏蓝字已完成。用户新授
 
 ## 4. 唯一工作队列
 
-最新状态（2026-11-11）：`v0.1.25` 已正式发布，tag 指向 main 合并提交
-`77c17c388a49324eb1e9e2ac4b1223d6e7c8cf3f`；develop 版本准备 CI
-`42970731462`、main CI `42971500535`、tag/release CI `42972323643` 全部通过，质量、安装烟测和
-发布 job 均成功。Release 唯一资产为 `project.tar.gz`，大小 `3,120,264` bytes；Release API
-显示的本地下载在有界超时内受网络截断（curl 18），未把不完整文件当作资产或伪造本地 SHA；tag、
-Release、工作流均已按精确 SHA 核对。包内版本与 tag 为 `0.1.25`，官方主线种子旧
-`04b71715…` → 新 `75e2f588…`，provenance 为数据提交 `dc98152c23ff24a8235e19178043297875dd779f`。
-此阶段不部署、不发真实 QQ 消息，旧 tag 保持不动。
+最新状态（2026-11-11）：`v0.1.26` 已正式发布，tag 指向
+`dd0cfc6add5df760c7d191b1013e8d3b84839034`；寻道图鉴阶段 develop CI
+`42986576120`、main CI `42987828157`、版本准备 CI `42988997850` 与 tag/release CI
+`42990112149` 全部通过，质量、安装烟测和发布 job 均成功。Release 唯一资产为
+`project.tar.gz`，大小 `3,126,615` bytes，SHA-256
+`67ac0a79d32161e432bd3f86b80db22c6af34a93640c65c156b4bdc242eb2e7e`；包内版本为 `0.1.26`，
+tag、SHA、包内主线 hash/provenance 已逐项核对。官方主线种子 `75e2f588…` → `19628f2415…`，
+provenance 为数据提交 `0ba8c851ed14f3374f1f60bcbfc7cd3327fed38e`。不部署、不发真实 QQ 消息，旧 tag 保持不动。
 
-当前阶段为 **寻道图鉴回响：公开寻迹、图鉴解锁与双线闲居**。真实缺口来自已有公开内容
-`enemy.iron_boar`、`instance.secret_realm.mist_grotto`、`idle.beast_observation` 和
-`idle.tower_watch`：敌人与秘境已有可取得来源及完整/逾时奖池，但还没有一条可领取剧情把公开抵达、
-两份图鉴记录和两条寻道期闲居完整领取串成玩家可反馈的闭环。三关依赖冻结为：公开抵达玄天近郊，
-再在本关开始后沿近郊历练与雾隐洞天秘境取得 `codex.creature.iron_boar`、
-`codex.instance.mist_grotto`，最后在开始后完整领取一次观兽和一次塔外守望。保留既有境界、
-门票、图鉴解锁、路线时长/日限/体力、奖励池和逾时保底；不开放 locked 地点或未来图鉴内容。
+已交付阶段 **寻道图鉴回响：公开寻迹、图鉴解锁与双线闲居**。业务提交
+`48c647b9724aad3424fe4c99019832e4a4d9566c`，状态 checkpoint
+`48b23d16e5c169a52f368a25114299d013bdad98`；`codex_discovery` 快照目标、真实探索/秘境来源、
+双适配器入口和两条闲居完整领取已验收并随 `v0.1.26` 发布。旧图鉴、悬赏、M9、聚气和装备范围不重开。
+
+当前阶段为 **云铁守望回响：矿区抵达、云铁采掘与矿区看守**。真实缺口来自已有开放
+`xuantian.cloud_mine`、`explore.cloud_mine`、`idle.cloud_mine_watch`：地点移动、云铁探索和闲居
+均有实际准入/奖池/消费者，但尚无剧情把三者串成玩家反馈闭环。冻结三关为：公开抵达云铁矿区 →
+本关开始后在云铁矿区探索结算取得云铁 → 本关开始后完整领取一次矿区看守。保留筑基四层、许可/矿镐或
+采矿辅修、8 体力/2 精力探索成本、6 小时/每日一次闲居、完整与逾时奖池；不开放锁定地点或改经济规则。
 
 阶段交付与验收：
 
 | 关联交付项 | 可测验收 |
 |:--|:--|
-| 三关数据与玩家入口 | 主线正文、行动、目标、奖励、重试齐全；公开移动、近郊历练、雾隐秘境和两条闲居帮助可指路，双适配器入口复用同一 application |
-| 严格来源与共享消费者 | 新 `codex_discovery` 目标严格只认本关开始后本人图鉴入库；复用移动、战斗、秘境、闲居、快照和图鉴事务，不把测试注入物当来源 |
-| 拒绝、恢复与幂等 | 旧/他人图鉴、战斗失败、秘境未结算、逾时闲居和日限不足不推进且零写；事务失败可重试，重复 operation 只回放 |
+| 三关数据与玩家入口 | 主线正文、行动、目标、奖励、重试齐全；公开移动、云铁探索和矿区看守帮助可指路，QQ/OneBot 入口复用同一 application |
+| 严格来源与共享消费者 | `travel_arrival`、`exploration_reward`、`idle_claim` 只认本关开始后本人已结算记录；复用移动、探索、闲居、快照和奖励事务，不读背包净数量或测试注入物 |
+| 拒绝、恢复与幂等 | 未抵达/未结算/战斗失败/逾时闲居/日限不足/他人记录不推进且零写；事务失败可用原 operation 重试，重复 operation 只回放 |
 | 种子与交付 | 官方主线数据先取得真实 Git provenance 并登记新旧 hash；定向组、develop 精确 SHA CI、main CI 与下一未占用正式包逐项补记 |
 
-实现 checkpoint（2026-11-11）：道统余响数据 `dc98152c23ff24a8235e19178043297875dd779f`、业务
-`77d09195e28b9dc5f4b121cd566c760a6b60ddbc` 已合入 main，`v0.1.25` 的精确 CI 与 Release 证据见上。
-图鉴阶段已开始实现；合同、数据 provenance、定向测试和后续 SHA 在本节追加，合同文件为
-[寻道图鉴回响](gameplay/adventures/codex-seeker-echoes.md)。官方主线数据提交
-`0ba8c851ed14f3374f1f60bcbfc7cd3327fed38e` 将 `75e2f588…` 更新为
-`19628f2415…`，迁移表保留旧记录并登记该真实来源。当前业务工作树已接入
-`codex_discovery` 快照目标、公开探索遭遇冻结、双适配器图鉴回响命令与帮助入口；业务提交
-`48c647b9724aad3424fe4c99019832e4a4d9566c` 的精确 SHA CI `42985747343` 已通过
-quality 3.11/3.12、install-smoke，分支 release 正确跳过。专项 `test/test_codex_seeker_echoes.py`
-2 passed，受影响主线/闲居/探索/迁移组 35 passed，
-补充主线/图鉴/闲居/内容组首跑 26 passed、1 个既有路线夹具失败；已将该测试前置修正为合同已有
-的 `demon.abyss_gate` 后单项 1 passed，生产地图与旅行规则未改。后续 checkpoint 补业务 SHA、
-精确 develop/main CI 与正式包校验。
+实现 checkpoint（2026-11-11）：图鉴阶段已完成并发布；专项 `test/test_codex_seeker_echoes.py`
+2 passed，受影响主线/闲居/探索/迁移组 35 passed，补充主线/图鉴/闲居/内容组及旧路线夹具修正后
+通过。完整数据 provenance、精确 CI 与 `project.tar.gz` 校验见上。本阶段开始前不重复这些已绿组，
+只补云铁守望受影响数据、主线消费者、帮助/入口与拒绝/重放定向验收。
+
+云铁守望阶段实现 checkpoint（2026-11-11）：官方主线数据先以单文件提交
+`379f0a28698c113153116eaea1952d86663ada2f` 建立 provenance，内容 SHA-256 为
+`efa3428a72f07324ee8f7fd1cb8573877b2adc46948670b9a3c98f6f67f8d249`；迁移表保留旧 hash，
+并登记新 hash 到 `379f0a2:data/剧情/主线.json`。三关主线 application、双适配器入口、帮助和
+`travel_arrival`/`exploration_reward`/`idle_claim` 严格来源消费者已接通；战败保底云铁不推进
+剧情，逾时看守不推进且可次日完整重试。专项 `test/test_cloud_mine_echoes.py` 3 passed，
+主线/完整性 21 passed，探索/闲居受影响组 24 passed，种子迁移 33 passed；编译、JSON、diff
+检查通过。既有云铁 OneBot 战斗夹具曾只按遭遇概率选种子却硬断言首个敌人，已补为同时冻结
+`enemy.cloud_beast`，未改运行时规则。业务提交 `c78efa528887461d051dcef62b71b61c0b9cd311` 的
+develop 精确 CI `43001704769` 已通过 quality 3.11/3.12、install-smoke，release 按 tag-only
+跳过；普通合 main、版本递增和正式包仍待完成。
 
 已交付阶段为 **虚空补给回响：航道抵达、补给看守与锚点取回**。其数据提交 `cb25be1`、业务实现
 与专项测试已在 `v0.1.24` 正式发布中交付；三关严格消费公开第一航道抵达、十二小时完整闲居和
