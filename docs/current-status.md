@@ -65,31 +65,39 @@ M6 首采集与 QQ 配置以及分类帮助/悬赏蓝字已完成。用户新授
 
 ## 4. 唯一工作队列
 
-最新状态（2026-11-11）：`v0.1.23` 已正式发布，tag 指向 main `a790fd6655dcdf7003ba22d7ec782341aab4fbff`；
-main CI `42948164083` 与正式 tag 工作流 `42949144050` 全部通过。Release 唯一资产
-`project.tar.gz` 为 3,109,285 bytes，SHA-256 `b3bbb5afed434998581a9eb2150244c6b6940a4f55fe9c22365ab2bc7e92d0e4`；
-包内版本为 `0.1.23`，主线种子为发布前的 `d6b7143e…`，与 tag 一致。官方种子变更须登记真实 Git 来源；
-此阶段不部署、不发真实 QQ 消息。完整正式发布证据已在本节记录，旧 tag 保持不动。
+最新状态（2026-11-11）：`v0.1.24` 已正式发布，tag 指向 main
+`eb9f757e9c0c8d4acf9eb192ecfc20363bb0725f`；Quality and Release CI
+`42961424590`（同 SHA 的重复触发 `42960757949`）全部通过。Release 唯一资产
+`project.tar.gz` 为 3,114,904 bytes；本地完整下载核验为 2,614,759 bytes、SHA-256
+`e1b36e7a27d4fa686aaea126e8eba56882985f1ae6df30f6d4c36fdaf443b090`；包内版本为 `0.1.24`，
+主线种子为发布前的 `04b71715…`，与 tag 一致。官方种子变更须登记真实 Git 来源；此阶段不部署、
+不发真实 QQ 消息。完整正式发布证据已在本节记录，旧 tag 保持不动。
 
-当前阶段为 **虚空补给回响：航道抵达、补给看守与锚点取回**。缺口来自 `void_archive.return.8` 已完成公开
-虚空档案归乡，但开放的 `void.first_route`、`idle.void_supply_watch` 与 `item.void_anchor` 探索奖励没有剧情消费。
-三关依赖冻结为：归乡终关 → 本关开始后抵达第一航道 → 本关开始后完整领取十二小时补给看守 → 本关开始后在第一航道
-探索结算取得一枚虚空锚。只复用现有移动、闲居完整/逾时奖池、探索次数与奖励池；不开放 `void.sect_fortress`、
-`void.void_market`，不改成本、限额、权重或经济规则。
+当前阶段为 **道统余响：道源服务处抵达、据点值守与公开轮值**。缺口来自开放的
+`dao.origin_gate`、`dao_service`、`idle.dao_settlement_watch` 与 `dispatch.dao_service` 尚未被
+一条可领取主线消费。三关依赖冻结为：从道源门沿公开边抵达服务处 → 本关开始后完整领取十二小时
+道统据点看守 → 本关开始后本人成功结算一次道统服务派遣。只复用现有移动、闲居、派遣、账本和
+奖励池；不开放 locked 道统地点，不改时长、限额、风险、成本或经济规则。
 
 阶段交付与验收：
 
 | 关联交付项 | 可测验收 |
 |:--|:--|
-| 三关数据与玩家入口 | 主线正文、行动、目标、奖励、重试齐全；`return.8` 正确交接 `supply.1`；探索/生活帮助说明真实公开路径 |
-| 严格来源与共享消费者 | 主线严格解析开放地点、模式、锚点奖励、闲居 full/fallback 奖池；复用既有移动、闲居、探索、快照与账本 |
-| 拒绝、恢复与幂等 | 旧/提前/逾时闲居、未结算探索和非本关来源不推进且零写；事务失败可重试，重复 operation 只回放 |
-| 种子与交付 | 主线数据先以 `cb25be1969a192e6dd44135ed91a67056b7a1f33` 建立 provenance，迁移表登记旧 `d6b7143e…` → 新 `04b71715…`；专项及受影响回归在独立 venv/共享锁下完成后再推送 develop、CI、合 main 和下一版本 |
+| 三关数据与玩家入口 | 主线正文、行动、目标、奖励、重试齐全；`dao.origin_gate` 沿公开边抵达 `dao_service`，生活/派遣帮助给出真实路径 |
+| 严格来源与共享消费者 | 主线严格解析开放地点、`idle.dao_settlement_watch` 完整奖池和 `dispatch.dao_service`；复用移动、闲居、派遣、快照与账本 |
+| 拒绝、恢复与幂等 | 提前/逾时闲居、未结算/失败/partial 派遣、旧/他人事件不推进且零写；事务失败可重试，重复 operation 只回放 |
+| 种子与交付 | 主线官方数据 `dc98152c23ff24a8235e19178043297875dd779f`：旧 `04b71715…` → 新 `75e2f588…`；定向组 `63 passed`，待 develop 精确 SHA CI、合 main CI 与下一版本 |
 
-实现 checkpoint（2026-11-11）：数据提交 `cb25be1` 已加入三关与 `return.8` 后续链接；业务实现与专项测试仍在 develop
-工作树待收口。`test/test_void_supply_epilogue.py` 当前 5 passed，覆盖真实抵达、完整闲居、逾时/提前拒绝、真实探索锚点、
-目标不足零写、快照和 operation replay；主线内容 13 passed、内容完整性 8 passed、探索帮助 6 passed、帮助 1 passed，
-种子迁移修正后的定向组已通过。合同见[虚空补给回响](gameplay/adventures/void-supply-epilogue.md)。
+实现 checkpoint（2026-11-11）：数据提交 `dc98152` 已加入三关；业务实现、玩家入口、严格
+`dispatch_success` 快照目标和专项测试已在工作树完成。`test/test_dao_settlement_epilogue.py`、主线内容/垂直切片、
+闲居/派遣、帮助、文档和种子迁移定向组共 `63 passed in 502.55s`，均使用独立 venv 与共享锁；待白名单提交、
+develop 精确 SHA CI、普通合 main、main CI 和 `v0.1.25` 正式资产验证。合同见
+[道统余响](gameplay/adventures/dao-settlement-epilogue.md)。
+
+已交付阶段为 **虚空补给回响：航道抵达、补给看守与锚点取回**。其数据提交 `cb25be1`、业务实现
+与专项测试已在 `v0.1.24` 正式发布中交付；三关严格消费公开第一航道抵达、十二小时完整闲居和
+真实探索锚点，逾时/未结算/非本人来源保持零写，旧来源和自定义 JSON 已保留。合同见
+[虚空补给回响](gameplay/adventures/void-supply-epilogue.md)。
 
 已交付阶段为 **净渊后记：魔渊驿路、闲居值守与净化工程**。缺口来自 `domain_frontier.purify.6` 已授予
 `access.project.abyss_purification`，但现有剧情没有消费实际魔渊集市抵达、魔界驿所完整闲居或净化工程个人贡献。
@@ -157,7 +165,7 @@ provenance 误记（引导旧来源、主线三条旧来源、敌人旧来源、
 [v0.1.21 发布记录](https://github.com/liyw0205/nonebot_plugin_xiuxian_3/releases/tag/v0.1.21)，
 由本入口引用，旧 tag 保持不动。本阶段不包含部署或真实 QQ 验收。
 
-当前阶段为 **护祖后记：万兽山巡护、妖界栖地闲居与祖灵栖地补给**。缺口来自已开放的
+已交付阶段为 **护祖后记：万兽山巡护、妖界栖地闲居与祖灵栖地补给**。缺口来自已开放的
 `domain_frontier.protect.6`：它已授予 `access.project.ancestral_habitat` 并抵达三界贸易口，
 但后记只消费了守界线的避难所权限；妖界栖地工程仍没有主线消费。现有工程接收灵米/灵叶，
 也接受本人成功的灵兽结缘/喂养/休养服务；`idle.beast_habitat_watch` 完整奖励恰含工程所需的

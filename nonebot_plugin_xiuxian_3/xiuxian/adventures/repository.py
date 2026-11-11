@@ -2152,6 +2152,22 @@ class AdventuresRepositoryMixin:
                     "AND status='claimed' AND starts_at>=? LIMIT 1",
                     (player_id, objective["route_key"], started_at),
                 ).fetchone()
+            elif kind == "dispatch_success":
+                found = connection.execute(
+                    """
+                    SELECT 1
+                    FROM activity_events e
+                    JOIN dispatch_assignments d ON d.settle_operation_id = e.source_operation_id
+                    WHERE e.player_id=?
+                      AND e.event_key='specials.dispatch.settled'
+                      AND e.occurred_at>?
+                      AND d.dispatch_key=?
+                      AND d.status='settled'
+                      AND json_extract(e.payload_json, '$.outcome')='success'
+                    LIMIT 1
+                    """,
+                    (player_id, started_at, objective["dispatch_key"]),
+                ).fetchone()
             else:
                 raise ValueError("mainline snapshot objective type is invalid")
             if found is None:
@@ -2249,6 +2265,12 @@ class AdventuresRepositoryMixin:
                         set(objective) == {"key", "type", "label", "route_key"}
                         and isinstance(objective["route_key"], str)
                         and bool(objective["route_key"].strip())
+                    )
+                if objective["type"] == "dispatch_success":
+                    return (
+                        set(objective) == {"key", "type", "label", "dispatch_key"}
+                        and isinstance(objective["dispatch_key"], str)
+                        and bool(objective["dispatch_key"].strip())
                     )
                 return False
 
