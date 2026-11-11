@@ -65,12 +65,34 @@ M6 首采集与 QQ 配置以及分类帮助/悬赏蓝字已完成。用户新授
 
 ## 4. 唯一工作队列
 
-最新状态（2026-11-11）：版本源已准备 `0.1.22`；本地与远端 `main` 均为 `a0f152a`，本地与远端
-`develop` 均为 `be06f0f`。最新正式 tag 仍是 `v0.1.21`；`v0.1.22` 待正式 tag 工作流完成。
-避难所后记完整交付已归档于本节下方。当前在 develop 推进护祖终关后的祖灵栖地运营后记，
-定向验收后普通推送 develop，精确 SHA CI 全绿后普通合 main 并核验 main CI，再按既有授权发布下一
-未占用版本。复用已绿基线，不重跑避难所/悬赏组；官方种子变更须登记真实 Git 来源。此阶段不部署、
-不发真实 QQ 消息。
+最新状态（2026-11-11）：`v0.1.22` 已正式发布，tag 指向 main `f39b8d6d73b7b04754920d047d403c78be6c9507`；
+净渊后记功能阶段已在 develop 完成，`17248406a8b31720864299d9a4ccddd172210dc4` 的精确 SHA CI
+`42942393693` 已通过 install-smoke、quality 3.11/3.12，release job 按 tag-only 规则跳过；下一步是
+提交本 checkpoint、再次验证该精确 SHA 后普通合 main，再递增并发布下一未占用版本。官方种子变更须登记真实
+Git 来源；此阶段不部署、不发真实 QQ 消息。正式发布、包资产和 v0.1.22 CI 证据见本节最新 checkpoint。
+
+已交付阶段为 **净渊后记：魔渊驿路、闲居值守与净化工程**。缺口来自 `domain_frontier.purify.6` 已授予
+`access.project.abyss_purification`，但现有剧情没有消费实际魔渊集市抵达、魔界驿所完整闲居或净化工程个人贡献。
+三关可选线固定为：公开抵达 `demon.abyss_market` → 有效 `permit.demon_trade` 下新建并完整领取
+`idle.demon_trade_post` → 向 `project.abyss_purification` 新增至少 1 点本人贡献。市场仍要求元婴 L1、
+200 魔界阵营声望、12 体力和 500 灵石；许可仍要求 `quest.demon_intro`、80 阵营声望、500 灵石并有效七日；
+工程仍要求原权限和 300 阵营声望。驿所 +3 是 `local.demon.abyss_market` 地方名望，不能替代阵营声望；
+不开放魔渊深层，不改原奖池、限额、轮换或成本。
+
+| 关联交付项 | 可测验收 |
+|:--|:--|
+| 驿路三关与玩家入口 | 主线正文、目标、公开行动、奖励、重试齐全；主线开始快照冻结；旧净渊/避难所/栖地路线不改 |
+| 真实来源与共享消费者 | 市场移动、许可、完整闲居及净化材料/服务贡献走现有 application/repository；闲居 full/fallback 奖池和开放项目引用加载时严格校验 |
+| 拒绝、恢复与幂等 | 旧/他人/逾时闲居、旧贡献、阵营声望不足、项目未开放或额度不足均零写；重启/回滚后原请求可重试，重复 operation 只回放 |
+| 来源迁移与交付 | 主线/引导数据先取得真实 Git provenance，再登记新旧 hash；定向测试后 develop 精确 SHA CI、普通合 main CI、下一未占用正式包及 `project.tar.gz` 校验 |
+
+实现 checkpoint（2026-11-11）：数据单文件提交 `5a9951ebb9313fda7f7ed6034e5014fe37a4f58a` 新增
+`domain_frontier.purification.1-.3` 和闲居真实准入/所得帮助；主线严格校验现要求公开项目有真实资源、
+闲居路线有开放完整奖池与逾时保底奖池。新阶段专项 `test/test_domain_purification_epilogue.py` 5 passed；
+受影响主线/闲居/许可/公共项目/种子迁移组 73 passed in 491.36s。当前迁移表已登记主线
+`8cb194e5…` → `d6b7143e…`、引导 `e99be84e…` → `1f624035…`，均 provenance 到上述数据提交；
+业务代码、合同文档和专项测试已随 `17248406a8b31720864299d9a4ccddd172210dc4` 提交并普通推送 develop；
+精确 SHA CI `42942393693` 的三项必需 job 均成功，未宣称 main 合并或正式发布完成。
 
 悬赏交付 checkpoint：`develop a76f4b7` 精确 CI `42896081431` 与普通合并 `main a781659`
 精确 CI `42896996424` 均为两组 quality、install-smoke 全绿；分支 release 正确跳过。
@@ -152,8 +174,9 @@ Release 资产与 hash 逐项补在此处。
 `be06f0f30a840ef6892208c207a237a3f7356758`，develop CI `42930248563` 全绿。功能普通合并 main
 提交 `d750e5028c67763b3966deff44c332f5106ee708` 的 CI `42929732380` 全绿；含 `0.1.22` 版本源的
 普通 main 合并提交 `a0f152a40b5769221c5403b75f1735cdd2b75319` 的 CI `42931239759` 全绿。
-release job 在四次分支 CI 中均按 tag-only 策略跳过；正式 `v0.1.22` tag、Release 资产及其 SHA-256
-仍待既有 tag 工作流执行后登记。本阶段无部署、生产库写入或真实 QQ 消息。
+release job 在四次分支 CI 中均按 tag-only 策略跳过；正式 `v0.1.22` tag 指向 `f39b8d6d73b7b04754920d047d403c78be6c9507`，
+tag workflow CI `42934532099` 全绿，Release 唯一资产 `project.tar.gz` 为 3,103,307 bytes，SHA-256
+`20824b7531939f2fa31ad9d07dba3e783463923eb816bb660254d741c00c334c`。本阶段无部署、生产库写入或真实 QQ 消息。
 
 已交付阶段（2026-11-11，基线 `d059955` / v0.1.19）为 **全部开放境界的悬赏覆盖与真实目标可达性**，
 已随 `v0.1.20` 发布；数据提交 `aed38e6`、业务提交 `eadd0c8`，独立远端 SHA 核验一致。
