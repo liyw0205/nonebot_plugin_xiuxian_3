@@ -36,11 +36,14 @@ from .idle_rules import (
     idle_route_order,
     idle_reward_label,
     journal_from_snapshot,
+    patrol_journal_from_snapshot,
     reward_for,
     reward_local_reputation_maximums,
     reward_ranges,
     resolve_route,
 )
+from ..companions.interaction_content import companion_interaction_definition
+from ..companions.rules import companion_definition, level_after_experience
 from .codex_projection import record_codex_discovery, record_material_discoveries
 from ..adventures.rules import meets_realm
 from ..utils.assets import inventory_amount
@@ -79,7 +82,9 @@ class IdleRepositoryMixin:
                 max_claim_at=str(row["max_claim_at"]), cancel_until=str(row["cancel_until"]),
                 cost=self._required_json_object(row["cost_json"], "idle cost"),
                 tool_key=snapshot.get("tool_key"), facility_slot_key=snapshot.get("facility_slot_key"),
-                journal=journal_from_snapshot(snapshot),
+                companion_instance_id=snapshot.get("companion_instance_id"),
+                companion_label=snapshot.get("companion_label"),
+                journal={**journal_from_snapshot(snapshot), **patrol_journal_from_snapshot(snapshot)},
             )
             return IdleStatusRecord(
                 assignment=assignment,
@@ -188,6 +193,10 @@ class IdleRepositoryMixin:
             connection, int(player["id"]), definition.required_unlock
         ):
             missing.append("需要已领取的图鉴见闻")
+        if definition.required_companion_kind:
+            companion = self._idle_select_companion(connection, player, definition, None)
+            if companion is None:
+                missing.append("需要一只可用的灵兽")
         selected_tool = self._idle_select_tool(connection, player, definition, None)
         facility = self._idle_select_facility(connection, player, definition, None)
         if definition.required_tool_keys and selected_tool is None and facility is None:
@@ -251,6 +260,9 @@ class IdleRepositoryMixin:
                 "full_reward_ranges": reward_ranges(definition.pool_key, self.content),
                 "fallback_reward_ranges": reward_ranges(definition.fallback_pool_key, self.content),
                 "gathering_journal": definition.gathering_journal,
+                "required_companion_kind": definition.required_companion_kind,
+                "companion_progress": dict(definition.companion_progress),
+                "patrol_journal": dict(definition.patrol_journal),
             },
         )
 
@@ -300,10 +312,15 @@ class IdleRepositoryMixin:
             definition = resolve_route(route_key, self.content)
             player = self._require_player(connection, platform, platform_user_id)
             self._idle_validate(connection, player, definition, tool_or_facility, now)
-            tool = self._idle_select_tool(connection, player, definition, tool_or_facility)
+            companion = self._idle_select_companion(connection, player, definition, tool_or_facility)
+            tool = self._idle_select_tool(
+                connection, player, definition, None if definition.required_companion_kind else tool_or_facility
+            )
             facility = None
             if tool is None:
-                facility = self._idle_select_facility(connection, player, definition, tool_or_facility)
+                facility = self._idle_select_facility(
+                    connection, player, definition, None if definition.required_companion_kind else tool_or_facility
+                )
             cost = {
                 "stamina": definition.stamina_cost,
                 "energy": definition.energy_cost,
@@ -324,6 +341,24 @@ class IdleRepositoryMixin:
                 key: bundle.require("codex_entry", key, include_locked=False)
                 for key in reward_keys if key.startswith("codex.")
             }
+            companion_snapshot: dict[str, Any] | None = None
+            if companion is not None:
+                companion_def = companion_definition(str(companion["companion_key"]), self.content)
+                affinity_cap = companion_interaction_definition(
+                    "interaction.companion.company", self.content
+                ).affinity_cap
+                companion_snapshot = {
+                    "instance_id": str(companion["instance_id"]),
+                    "companion_key": str(companion["companion_key"]),
+                    "companion_label": companion_def.label,
+                    "kind": str(companion["kind"]),
+                    "status_before": str(companion["status"]),
+                    "level_before": int(companion["level"]),
+                    "experience_before": int(companion["experience"]),
+                    "affinity_before": int(companion["affinity"]),
+                    "affinity_cap": int(affinity_cap),
+                    "progress": dict(definition.companion_progress),
+                }
             snapshot = {
                 "route_key": definition.key,
                 "label": definition.label,
@@ -342,6 +377,10 @@ class IdleRepositoryMixin:
                 "gathering_journal": definition.gathering_journal,
                 "reward_labels": {key: idle_reward_label(key, self.content) for key in reward_keys},
                 "codex_entries": codex_entries,
+                "companion_instance_id": companion_snapshot["instance_id"] if companion_snapshot else None,
+                "companion_label": companion_snapshot["companion_label"] if companion_snapshot else None,
+                "companion": companion_snapshot,
+                "patrol_journal": definition.patrol_journal,
             }
             spend_player_state(
                 connection,
@@ -353,6 +392,13 @@ class IdleRepositoryMixin:
                     "energy": -definition.energy_cost,
                 },
             )
+            if companion_snapshot is not None:
+                connection.execute(
+                    "UPDATE companion_instances SET status = 'travelling', updated_at = ? WHERE id = ? AND status IN ('active', 'available')",
+                    (now_text, companion["id"]),
+                )
+                if connection.execute("SELECT changes()").fetchone()[0] != 1:
+                    raise IdleRequirementError("requested companion is no longer available")
             connection.execute(
                 """
                 INSERT INTO idle_assignments(
@@ -394,7 +440,10 @@ class IdleRepositoryMixin:
                 "cost": cost,
                 "tool_key": snapshot["tool_key"],
                 "facility_slot_key": snapshot["facility_slot_key"],
+                "companion_instance_id": snapshot["companion_instance_id"],
+                "companion_label": snapshot["companion_label"],
                 "journal": definition.gathering_journal,
+                "patrol_journal": definition.patrol_journal,
             }
             self._record_idle_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
             return self._assignment_from_payload(payload)
@@ -436,7 +485,7 @@ class IdleRepositoryMixin:
             if status != "running":
                 raise IdleAlreadySettledError("idle assignment is not running")
             snapshot = self._required_json_object(assignment["snapshot_json"], "idle snapshot")
-            journal = journal_from_snapshot(snapshot)
+            journal = {**journal_from_snapshot(snapshot), **patrol_journal_from_snapshot(snapshot)}
             expected_claim_at = datetime.fromisoformat(str(assignment["claim_at"]))
             expected_max_claim_at = datetime.fromisoformat(str(assignment["max_claim_at"]))
             if now < expected_claim_at:
@@ -508,12 +557,95 @@ class IdleRepositoryMixin:
                 snapshot=snapshot,
                 content=self.content,
             )
+            companion_progress: dict[str, int] = {"experience": 0, "affinity": 0}
+            companion_snapshot = snapshot.get("companion")
+            if snapshot.get("companion_instance_id") and companion_snapshot is None:
+                raise ValueError("idle snapshot companion_instance_id has no companion snapshot")
+            if companion_snapshot is not None:
+                if not isinstance(companion_snapshot, dict):
+                    raise ValueError("idle snapshot companion must be an object")
+                required = {
+                    "instance_id", "companion_key", "companion_label", "kind", "status_before",
+                    "level_before", "experience_before", "affinity_before", "affinity_cap", "progress",
+                }
+                if set(companion_snapshot) != required:
+                    raise ValueError("idle snapshot companion has invalid fields")
+                if snapshot.get("companion_instance_id") != companion_snapshot.get("instance_id"):
+                    raise ValueError("idle snapshot companion instance does not match assignment")
+                if any(
+                    not isinstance(companion_snapshot[field], str) or not companion_snapshot[field].strip()
+                    for field in ("instance_id", "companion_key", "companion_label", "kind", "status_before")
+                ):
+                    raise ValueError("idle snapshot companion identity is invalid")
+                if companion_snapshot["status_before"] not in {"active", "available", "bonded"}:
+                    raise ValueError("idle snapshot companion status is invalid")
+                for field in ("level_before", "experience_before", "affinity_before", "affinity_cap"):
+                    if isinstance(companion_snapshot[field], bool) or not isinstance(companion_snapshot[field], int):
+                        raise ValueError(f"idle snapshot companion {field} is invalid")
+                if any(
+                    companion_snapshot[field] < 0
+                    for field in ("level_before", "experience_before", "affinity_before", "affinity_cap")
+                ):
+                    raise ValueError("idle snapshot companion progress baseline is invalid")
+                instance = connection.execute(
+                    "SELECT * FROM companion_instances WHERE player_id = ? AND instance_id = ?",
+                    (player["id"], str(companion_snapshot["instance_id"])),
+                ).fetchone()
+                if instance is None or str(instance["status"]) != "travelling":
+                    raise IdleRequirementError("巡护灵兽状态已变化，未结算本次安排")
+                if (
+                    str(instance["companion_key"]) != companion_snapshot["companion_key"]
+                    or str(instance["kind"]) != companion_snapshot["kind"]
+                ):
+                    raise IdleRequirementError("巡护灵兽实体已变化，未结算本次安排")
+                if (
+                    int(instance["level"]) != int(companion_snapshot["level_before"])
+                    or int(instance["experience"]) != int(companion_snapshot["experience_before"])
+                    or int(instance["affinity"]) != int(companion_snapshot["affinity_before"])
+                ):
+                    raise IdleRequirementError("巡护灵兽成长数据已变化，未结算本次安排")
+                progress = companion_snapshot["progress"]
+                if not isinstance(progress, dict):
+                    raise ValueError("idle snapshot companion progress must be an object")
+                if set(progress) != {"experience", "affinity"}:
+                    raise ValueError("idle snapshot companion progress has invalid fields")
+                if any(
+                    isinstance(progress[field], bool) or not isinstance(progress[field], int) or progress[field] < 0
+                    for field in ("experience", "affinity")
+                ):
+                    raise ValueError("idle snapshot companion progress is invalid")
+                if not fallback:
+                    companion_progress = {
+                        "experience": int(progress.get("experience", 0)),
+                        "affinity": int(progress.get("affinity", 0)),
+                    }
+                companion_def = companion_definition(str(companion_snapshot["companion_key"]), self.content)
+                updated_experience = int(instance["experience"]) + companion_progress["experience"]
+                updated_level = level_after_experience(companion_def, updated_experience)
+                updated_affinity = min(
+                    int(companion_snapshot["affinity_cap"]),
+                    int(instance["affinity"]) + companion_progress["affinity"],
+                )
+                companion_progress["experience"] = updated_experience - int(instance["experience"])
+                companion_progress["affinity"] = updated_affinity - int(instance["affinity"])
+                connection.execute(
+                    "UPDATE companion_instances SET status = ?, experience = ?, level = ?, affinity = ?, updated_at = ? WHERE id = ?",
+                    (
+                        str(companion_snapshot["status_before"]),
+                        updated_experience,
+                        updated_level,
+                        updated_affinity,
+                        now_text,
+                        instance["id"],
+                    ),
+                )
             result = {
                 **actual_reward,
                 "fallback": fallback,
                 "claimed_at": now_text,
                 "tool_durability_before": durability_before,
                 "tool_durability_after": durability_after,
+                "companion_progress": companion_progress,
             }
             settled_status = "expired" if fallback else "claimed"
             connection.execute(
@@ -535,6 +667,9 @@ class IdleRepositoryMixin:
                 "tool_durability_after": durability_after,
                 "journal": journal,
                 "reward_labels": snapshot.get("reward_labels", {}),
+                "companion_instance_id": snapshot.get("companion_instance_id"),
+                "companion_label": snapshot.get("companion_label"),
+                "companion_progress": companion_progress,
             }
             self._record_idle_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
             return IdleRepositoryMixin._settlement_from_payload(payload)
@@ -593,6 +728,21 @@ class IdleRepositoryMixin:
                     "energy": player["energy_max"],
                 },
             )
+            companion_snapshot = snapshot.get("companion")
+            if companion_snapshot is not None:
+                if not isinstance(companion_snapshot, dict) or not companion_snapshot.get("instance_id"):
+                    raise ValueError("idle snapshot companion is invalid")
+                restored = connection.execute(
+                    "UPDATE companion_instances SET status = ?, updated_at = ? WHERE player_id = ? AND instance_id = ? AND status = 'travelling'",
+                    (
+                        str(companion_snapshot.get("status_before", "active")),
+                        now_text,
+                        player["id"],
+                        str(companion_snapshot["instance_id"]),
+                    ),
+                )
+                if restored.rowcount != 1:
+                    raise IdleRequirementError("巡护灵兽状态已变化，无法撤回安排")
             connection.execute(
                 "UPDATE idle_assignments SET status = 'cancelled', cancel_operation_id = ?, result_json = ?, updated_at = ? WHERE id = ? AND status = 'running'",
                 (operation_id, json.dumps({"refunded": cost}, ensure_ascii=False, sort_keys=True), now_text, assignment["id"]),
@@ -608,6 +758,8 @@ class IdleRepositoryMixin:
                 "status": "cancelled",
                 "refunded": cost,
                 "returned_tool_key": str(tool_key) if tool_key else None,
+                "companion_instance_id": snapshot.get("companion_instance_id"),
+                "companion_label": snapshot.get("companion_label"),
             }
             self._record_idle_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
             return IdleRepositoryMixin._cancel_from_payload(payload)
@@ -633,12 +785,21 @@ class IdleRepositoryMixin:
             raise IdleRequirementError("energy is insufficient")
         if definition.stamina_cost and player_integer(player, "stamina") < definition.stamina_cost:
             raise IdleRequirementError("stamina is insufficient")
-        selected_tool = self._idle_select_tool(connection, player, definition, tool_or_facility)
-        selected_facility = self._idle_select_facility(connection, player, definition, tool_or_facility)
-        if tool_or_facility and selected_tool is None and selected_facility is None:
+        selected_tool = self._idle_select_tool(
+            connection, player, definition, None if definition.required_companion_kind else tool_or_facility
+        )
+        selected_facility = self._idle_select_facility(
+            connection, player, definition, None if definition.required_companion_kind else tool_or_facility
+        )
+        selected_companion = self._idle_select_companion(
+            connection, player, definition, tool_or_facility
+        )
+        if tool_or_facility and not definition.required_companion_kind and selected_tool is None and selected_facility is None:
             raise IdleRequirementError("requested tool or facility is unavailable")
         if definition.required_tool_keys and selected_tool is None and selected_facility is None:
             raise IdleRequirementError("tool or facility is unavailable")
+        if definition.required_companion_kind and selected_companion is None:
+            raise IdleRequirementError("requested companion is unavailable")
 
     @staticmethod
     def _has_codex_unlock(connection: sqlite3.Connection, player_id: int, unlock_key: str) -> bool:
@@ -665,6 +826,51 @@ class IdleRepositoryMixin:
         if not isinstance(decoded, dict):
             raise ValueError(f"{label} must be an object")
         return dict(decoded)
+
+    def _idle_select_companion(
+        self,
+        connection: sqlite3.Connection,
+        player: sqlite3.Row,
+        definition: IdleRouteDefinition,
+        requested: str | None,
+    ) -> sqlite3.Row | None:
+        kind = definition.required_companion_kind
+        if kind is None:
+            return None
+        predicates = [
+            "player_id = ?",
+            "kind = ?",
+            "status IN ('active', 'available')",
+            "status <> 'retired'",
+        ]
+        values: list[object] = [player["id"], kind]
+        if requested:
+            predicates.append("(instance_id = ? OR companion_key = ?)")
+            values.extend([str(requested), str(requested)])
+        rows = connection.execute(
+            f"SELECT * FROM companion_instances WHERE {' AND '.join(predicates)} ORDER BY id",
+            tuple(values),
+        ).fetchall()
+        for row in rows:
+            if self._idle_companion_reserved(connection, int(player["id"]), str(row["instance_id"])):
+                continue
+            return row
+        return None
+
+    @staticmethod
+    def _idle_companion_reserved(connection: sqlite3.Connection, player_id: int, instance_id: str) -> bool:
+        rows = connection.execute(
+            "SELECT snapshot_json FROM idle_assignments WHERE player_id = ? AND status IN ('assigned', 'running')",
+            (player_id,),
+        ).fetchall()
+        for row in rows:
+            try:
+                snapshot = json.loads(str(row["snapshot_json"]))
+            except (TypeError, ValueError):
+                continue
+            if isinstance(snapshot, dict) and snapshot.get("companion_instance_id") == instance_id:
+                return True
+        return False
 
     @staticmethod
     def _idle_select_tool(connection: sqlite3.Connection, player: sqlite3.Row, definition: IdleRouteDefinition, requested: str | None) -> dict[str, object] | None:
@@ -756,8 +962,10 @@ class IdleRepositoryMixin:
             cost={str(key): int(value) for key, value in dict(payload.get("cost", {})).items()},
             tool_key=payload.get("tool_key"),
             facility_slot_key=payload.get("facility_slot_key"),
+            companion_instance_id=payload.get("companion_instance_id"),
+            companion_label=payload.get("companion_label"),
             already_completed=replay,
-            journal=dict(payload.get("journal", {})),
+            journal={**dict(payload.get("journal", {})), **dict(payload.get("patrol_journal", {}))},
         )
 
     @staticmethod
@@ -775,6 +983,9 @@ class IdleRepositoryMixin:
             already_completed=replay,
             journal=dict(payload.get("journal", {})),
             reward_labels=dict(payload.get("reward_labels", {})),
+            companion_progress={
+                str(key): int(value) for key, value in dict(payload.get("companion_progress", {})).items()
+            },
         )
 
     @staticmethod
