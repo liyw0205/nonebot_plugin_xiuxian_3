@@ -19,7 +19,11 @@ from .exploration.use_cases import ExplorationApplication
 from .combat.use_cases import CombatApplication
 from .adventures.use_cases import AdventuresApplication
 from .adventures.mainline_use_cases import AdventuresMainlineApplication
-from .adventures.mainline import DOMAIN_FRONTIER_STORY_KEY, VOID_ARCHIVE_STORY_KEY
+from .adventures.mainline import (
+    DAO_SETTLEMENT_STORY_KEY,
+    DOMAIN_FRONTIER_STORY_KEY,
+    VOID_ARCHIVE_STORY_KEY,
+)
 from .adventures.dao_echoes_use_cases import DaoEchoesApplication
 from .adventures.three_realms_use_cases import ThreeRealmsApplication
 from .adventures.secret_realm_use_cases import SecretRealmApplication
@@ -162,6 +166,11 @@ _HELP_PAGES = {
         "虚空档案归乡后的补给回响需要炼虚一层：在第一航道完成主线抵达后，"
         f"可用{command_link('挂机预览 虚空补给看守', '挂机预览 虚空补给看守')}查看十二小时完整窗口，"
         f"再{command_link('开始挂机 虚空补给看守', '开始挂机 虚空补给看守')}；完整领取才计入主线，逾时保底不替代交接。\n\n"
+        "道源门抵达道统服务处后，可用"
+        f"{command_link('道统余响主线', '道统余响主线')}查看公开轮值后记；"
+        f"先{command_link('开始道统余响主线 抵达服务处', '开始道统余响主线 抵达服务处')}，"
+        "再按关卡指引完整领取道统据点看守，并成功结算道统服务派遣；"
+        "只认本关开始后的本人记录，失败或逾时可按既有日限重试。\n\n"
         f"{command_link('每日修行', '每日修行')}记下日常安排，"
         f"{command_link('道历问安', '道历问安')}领取当日问安所得。\n\n"
         f"{command_link('灵兽状态', '灵兽状态')}可查看同行灵兽与灵骑；"
@@ -218,6 +227,13 @@ class XiuxianApplication:
             title="虚空档案主线",
             start_command="开始虚空档案主线",
             claim_command="领取虚空档案主线奖励",
+        )
+        self.dao_settlement_mainline = AdventuresMainlineApplication(
+            repository,
+            story_key=DAO_SETTLEMENT_STORY_KEY,
+            title="道统余响主线",
+            start_command="开始道统余响主线",
+            claim_command="领取道统余响主线奖励",
         )
         self.dao_echoes = DaoEchoesApplication(repository)
         self.three_realms = ThreeRealmsApplication(repository)
@@ -1370,6 +1386,27 @@ class XiuxianApplication:
             context,
             lambda: self.void_archive_mainline.claim_reward(context),
             write_message="此刻无缘收取虚空档案主线所得。",
+        )
+
+    async def get_dao_settlement_mainline_status(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.dao_settlement_mainline.get_status(context),
+            require_write=False,
+        )
+
+    async def start_dao_settlement_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.dao_settlement_mainline.start_stage(context),
+            write_message="此刻无缘踏入道统余响主线。",
+        )
+
+    async def claim_dao_settlement_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.dao_settlement_mainline.claim_reward(context),
+            write_message="此刻无缘收取道统余响主线所得。",
         )
 
     async def preview_final_arena(self, context: CommandContext) -> CommandResult:

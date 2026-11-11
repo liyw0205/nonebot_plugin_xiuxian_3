@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nonebot-plugin-xiuxian-3"
-version = "0.1.24"
+version = "0.1.25"
 description = "A maintainable NoneBot cultivation text game, implemented from scratch."
 readme = "README.md"
 requires-python = ">=3.11"

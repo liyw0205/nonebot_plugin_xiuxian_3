@@ -12,6 +12,7 @@ from ..routine.rules import honor_title
 MAINLINE_STORY_KEY = "story.mainline.xuantian"
 DOMAIN_FRONTIER_STORY_KEY = "story.mainline.domain_frontier"
 VOID_ARCHIVE_STORY_KEY = "story.mainline.void_archive"
+DAO_SETTLEMENT_STORY_KEY = "story.mainline.dao_settlement"
 MAINLINE_TOWN_COMMISSION_DELIVERED = "livelihood.town_commission.delivered"
 
 MAINLINE_LOCKED = "locked"
@@ -191,6 +192,9 @@ _VERTICAL_SLICE_STAGES = frozenset(
         "void_archive.supply.1",
         "void_archive.supply.2",
         "void_archive.supply.3",
+        "dao_settlement.1",
+        "dao_settlement.2",
+        "dao_settlement.3",
         "lane.builder.chapter.01",
         "lane.builder.chapter.02",
         "lane.builder.chapter.03",
@@ -435,6 +439,29 @@ def _story_objectives(
                         )
             normalized = {
                 "key": str(objective_key), "type": kind, "label": label.strip(), "route_key": route_key,
+            }
+        elif kind == "dispatch_success":
+            if set(objective) != {"key", "type", "label", "dispatch_key"}:
+                raise ContentError(f"mainline {key} objective {objective_key} has an invalid dispatch shape")
+            dispatch_key = objective.get("dispatch_key")
+            if not isinstance(dispatch_key, str) or not dispatch_key.strip():
+                raise ContentError(f"mainline {key} objective {objective_key} requires dispatch_key")
+            if bundle is not None:
+                from ..specials.dispatch_rules import resolve_dispatch
+
+                try:
+                    resolved = resolve_dispatch(dispatch_key, bundle)
+                except ValueError as exc:
+                    raise ContentError(
+                        f"mainline {key} objective {objective_key} references unknown dispatch"
+                    ) from exc
+                if resolved.key != dispatch_key:
+                    raise ContentError(
+                        f"mainline {key} objective {objective_key} must use a dispatch key"
+                    )
+            normalized = {
+                "key": str(objective_key), "type": kind, "label": label.strip(),
+                "dispatch_key": dispatch_key,
             }
         else:
             raise ContentError(f"mainline {key} objective {objective_key} has unsupported type {kind}")
@@ -929,6 +956,7 @@ __all__ = [
     "MAINLINE_STORY_KEY",
     "DOMAIN_FRONTIER_STORY_KEY",
     "VOID_ARCHIVE_STORY_KEY",
+    "DAO_SETTLEMENT_STORY_KEY",
     "MAINLINE_TOWN_COMMISSION_DELIVERED",
     "MainlineDefinition",
     "MainlineStageDefinition",
