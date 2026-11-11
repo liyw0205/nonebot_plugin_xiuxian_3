@@ -215,7 +215,8 @@ class AdventuresMainlineApplication:
                 f"- **状态**：进行中\n"
                 f"- **剧情**：{record.body or record.description}\n"
                 + ("\n" + "\n".join(
-                    f"- **行动**：`{item['command']} {item['argument']}` · {item['description']}"
+                    f"- **行动**：`{item['command']}"
+                    f"{' ' + item['argument'] if item['argument'] else ''}` · {item['description']}"
                     for item in record.actions
                 ) if record.actions else "")
                 + f"\n\n> 完成目标后发送 `{self.claim_command} {record.stage_key}` 领取所得。"

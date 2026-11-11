@@ -161,6 +161,9 @@ _VERTICAL_SLICE_STAGES = frozenset(
         "domain_frontier.refuge.1",
         "domain_frontier.refuge.2",
         "domain_frontier.refuge.3",
+        "domain_frontier.habitat.1",
+        "domain_frontier.habitat.2",
+        "domain_frontier.habitat.3",
         "void_archive.recorder.1",
         "void_archive.recorder.2",
         "void_archive.recorder.3",
@@ -245,7 +248,13 @@ def _story_actions(value: object, key: str, *, required: bool) -> tuple[Mapping[
     for index, action in enumerate(value):
         if not isinstance(action, dict) or set(action) != {"command", "argument", "description"}:
             raise ContentError(f"mainline {key} actions[{index}] has an invalid shape")
-        if any(not isinstance(action[field], str) or not action[field].strip() for field in action):
+        if (
+            not isinstance(action["command"], str)
+            or not action["command"].strip()
+            or not isinstance(action["argument"], str)
+            or not isinstance(action["description"], str)
+            or not action["description"].strip()
+        ):
             raise ContentError(f"mainline {key} actions[{index}] fields must be non-empty strings")
         actions.append({field: action[field].strip() for field in ("command", "argument", "description")})
     return tuple(actions)
