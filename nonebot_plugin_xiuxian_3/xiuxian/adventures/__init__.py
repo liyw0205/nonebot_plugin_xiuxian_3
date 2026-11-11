@@ -10,6 +10,7 @@ from .mainline_models import (
 from .mainline import (
     MAINLINE_STAGE_COUNT,
     MAINLINE_STORY_KEY,
+    CODEX_ECHOES_STORY_KEY,
     DOMAIN_FRONTIER_STORY_KEY,
     DAO_SETTLEMENT_STORY_KEY,
     MainlineDefinition,
@@ -42,6 +43,7 @@ __all__ = [
     "MainlineStatusRecord",
     "MAINLINE_STAGE_COUNT",
     "MAINLINE_STORY_KEY",
+    "CODEX_ECHOES_STORY_KEY",
     "DOMAIN_FRONTIER_STORY_KEY",
     "DAO_SETTLEMENT_STORY_KEY",
     "MainlineDefinition",

@@ -1805,6 +1805,13 @@ class AdventuresRepositoryMixin:
                 "realm_layer": player_integer(row, "realm_layer"),
                 "location_key": str(row["location_key"]),
                 "intro_flags": list(SQLitePlayerRepository._json_object(row["intro_json"], {}).get("flags", [])),
+                "baseline_codex_entry_keys": [
+                    str(item["entry_key"])
+                    for item in connection.execute(
+                        "SELECT entry_key FROM codex_entries WHERE player_id=?",
+                        (row["id"],),
+                    ).fetchall()
+                ],
                 "definition": {
                     "key": definition.key,
                     "story_key": definition.story_key,
@@ -2096,6 +2103,15 @@ class AdventuresRepositoryMixin:
                         "AND destination=? AND starts_at>=? LIMIT 1",
                         (player_id, objective.get("destination_key"), started_at),
                     ).fetchone()
+            elif kind == "codex_discovery":
+                baseline = set(snapshot.get("baseline_codex_entry_keys", []))
+                found = connection.execute(
+                    "SELECT 1 FROM codex_entries WHERE player_id=? AND entry_key=? "
+                    "AND first_seen_at>=? LIMIT 1",
+                    (player_id, objective.get("entry_key"), started_at),
+                ).fetchone()
+                if objective.get("entry_key") in baseline:
+                    found = None
             elif kind == "exploration_reward":
                 rows = connection.execute(
                     "SELECT result_json FROM exploration_sessions WHERE player_id=? "
@@ -2224,6 +2240,12 @@ class AdventuresRepositoryMixin:
                         set(objective) == {"key", "type", "label", "destination_key"}
                         and isinstance(objective["destination_key"], str)
                         and bool(objective["destination_key"].strip())
+                    )
+                if objective["type"] == "codex_discovery":
+                    return (
+                        set(objective) == {"key", "type", "label", "entry_key"}
+                        and isinstance(objective["entry_key"], str)
+                        and bool(objective["entry_key"].strip())
                     )
                 if objective["type"] == "exploration_reward":
                     quantity = objective.get("quantity")

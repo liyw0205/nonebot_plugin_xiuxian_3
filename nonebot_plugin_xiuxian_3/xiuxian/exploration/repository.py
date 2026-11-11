@@ -92,6 +92,7 @@ from ..exploration.rules import (
     cloud_boat_storm_roll_bp,
     exploration_definitions_by_location,
     exploration_discovery_weight_bp,
+    exploration_encounter_selection,
     has_cloud_mine_access,
     battle_roll_bp,
     exploration_definition,
@@ -519,6 +520,18 @@ class ExplorationRepositoryMixin:
                 "skills": self._battle_skill_snapshot(connection, player_id, str(player_state["path_key"] or "")),
                 "companions": companion_snapshots,
             }
+            # Freeze the weighted, realm-eligible encounter with the exploration
+            # snapshot so combat and codex projection consume the same source
+            # even if the live content changes before settlement.
+            encounter_enemy_key, encounter_candidates = exploration_encounter_selection(
+                definition.key,
+                seed=operation_id,
+                realm_key=str(player_state["realm_key"]),
+                realm_layer=int(player_state["realm_layer"]),
+                content=self.content,
+            )
+            snapshot["encounter_enemy_key"] = encounter_enemy_key
+            snapshot["encounter_candidates"] = encounter_candidates
             snapshot["exploration_discovery_bp"] = exploration_discovery_weight_bp(
                 snapshot["constitution_effect"], companion_snapshots
             )
@@ -595,6 +608,7 @@ class ExplorationRepositoryMixin:
                 # only the fields exposed by ExplorationStartRecord.
                 "reward_pool_key": snapshot.get("reward_pool_key"),
                 "random_seed": snapshot.get("random_seed"),
+                "encounter_enemy_key": snapshot.get("encounter_enemy_key"),
                 "frozen_result": dict(snapshot.get("frozen_result", {})),
             }
             connection.execute(
@@ -804,6 +818,8 @@ class ExplorationRepositoryMixin:
                 or start_payload.get("mode_key") != session["mode_key"]
                 or start_payload.get("location_key") != session["location_key"]
                 or start_payload.get("random_seed") != snapshot.get("random_seed")
+                or start_payload.get("encounter_enemy_key")
+                != snapshot.get("encounter_enemy_key")
                 or start_payload.get("reward_pool_key") != snapshot.get("reward_pool_key")
                 or start_payload.get("stamina_cost") != snapshot.get("stamina_cost")
                 or start_payload.get("energy_cost") != snapshot.get("energy_cost")
@@ -820,7 +836,11 @@ class ExplorationRepositoryMixin:
             ):
                 raise RewardContentError("exploration start operation does not match its snapshot")
 
-            expected_enemy_key = exploration_enemy_key(str(session["mode_key"]), self.content)
+            expected_enemy_key = snapshot.get("encounter_enemy_key")
+            if not isinstance(expected_enemy_key, str) or not expected_enemy_key:
+                # Sessions created before encounter freezing remain settleable;
+                # new sessions always carry the selected key above.
+                expected_enemy_key = exploration_enemy_key(str(session["mode_key"]), self.content)
             expected_battle_start_id = f"exploration.battle:{exploration_id}"
             expected_battle_resolve_id = f"battle.resolve:{battle_id}"
             battle_snapshot = self._strict_exploration_object(

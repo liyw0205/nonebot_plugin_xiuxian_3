@@ -389,7 +389,7 @@ def test_place_codex_keys_come_from_location_content_on_both_adapters() -> None:
         with TemporaryDirectory() as data_dir:
             runtime = create_runtime(data_dir=data_dir, clock=clock)
             destinations = (
-                ("demon.abyss_market", "demon.fallen_ruins", "魔渊集市", "codex.place.demon_market"),
+                ("demon.abyss_market", "demon.abyss_gate", "魔渊集市", "codex.place.demon_market"),
                 ("beast.ten_thousand_hills", "xuantian.floating_boat", "万兽山", "codex.place.beast_hills"),
             )
             for adapter in ("qq.official", "onebot.v11"):

@@ -191,10 +191,33 @@ class CombatRepositoryMixin:
 
         from ..exploration.rules import exploration_enemy_key
 
-        enemy_key = exploration_enemy_key(mode_key, self.content)
+        await self.initialize()
+        enemy_key: str | None = None
+        # The exploration start transaction freezes the selected encounter. Read
+        # that snapshot before opening the battle; old sessions fall back to the
+        # historical first candidate for backwards compatibility.
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT id FROM players WHERE platform = ? AND platform_user_id = ?",
+                (platform, platform_user_id),
+            ).fetchone()
+            if row is not None:
+                exploration = connection.execute(
+                    "SELECT mode_key, snapshot_json FROM exploration_sessions "
+                    "WHERE exploration_id = ? AND player_id = ?",
+                    (exploration_id, row["id"]),
+                ).fetchone()
+                if exploration is not None:
+                    if str(exploration["mode_key"]) != mode_key:
+                        raise BattleRequirementError("exploration mode differs from battle request")
+                    snapshot = decode_json_strict(exploration["snapshot_json"])
+                    frozen_enemy = snapshot.get("encounter_enemy_key")
+                    if isinstance(frozen_enemy, str) and frozen_enemy:
+                        enemy_key = frozen_enemy
+        if enemy_key is None:
+            enemy_key = exploration_enemy_key(mode_key, self.content)
         if enemy_key is None:
             raise BattleRequirementError("exploration mode has no battle encounter")
-        await self.initialize()
         async with self._inflight:
             return await asyncio.to_thread(
                 self._retry_sync,
@@ -418,6 +441,9 @@ class CombatRepositoryMixin:
                     enemy.required_layer,
                 ):
                     raise BattleRequirementError("exploration snapshot does not meet encounter requirement")
+                frozen_enemy_key = exploration_snapshot.get("encounter_enemy_key")
+                if isinstance(frozen_enemy_key, str) and frozen_enemy_key and frozen_enemy_key != enemy_key:
+                    raise BattleRequirementError("battle enemy differs from exploration snapshot")
             elif not self._meets_enemy_requirement(player, enemy.required_realm, enemy.required_layer):
                 raise BattleRequirementError("realm requirement is not met")
             if exploration is not None:
