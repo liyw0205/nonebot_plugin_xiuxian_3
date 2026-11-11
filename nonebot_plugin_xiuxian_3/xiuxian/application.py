@@ -24,6 +24,7 @@ from .adventures.mainline import (
     CLOUD_MINE_ECHOES_STORY_KEY,
     CLOUD_CITY_ECHOES_STORY_KEY,
     SEEKER_ECHOES_STORY_KEY,
+    LIVELIHOOD_ECHOES_STORY_KEY,
     DAO_SETTLEMENT_STORY_KEY,
     DOMAIN_FRONTIER_STORY_KEY,
     VOID_ARCHIVE_STORY_KEY,
@@ -146,6 +147,10 @@ _HELP_PAGES = {
         f"{command_link('寻道闲居回响主线', '寻道闲居回响主线')}查看三关，"
         f"再{command_link('开始寻道闲居回响主线 回镇听雨', '开始寻道闲居回响主线 回镇听雨')}沿公开通路结算抵达青石镇；"
         "后续两关分别消费镇中问询与灵田照看的完整领取。"
+        "\n\n青石镇常驻生计回响会消费三条凡人阶段的公开闲居：先"
+        f"{command_link('青石镇常驻生计回响主线', '青石镇常驻生计回响主线')}查看三关，"
+        f"再{command_link('开始青石镇常驻生计回响主线 镇中行旅', '开始青石镇常驻生计回响主线 镇中行旅')}在青石镇完整领取镇中行旅；"
+        "后续按关卡准备有效居所，再持基础炉具或铁锤之一（也可使用本人可用炼器台），分别完整领取灵圃看护和作坊值守。"
     ),
     "悬赏": (
         "**悬赏**\n\n"
@@ -201,6 +206,14 @@ _HELP_PAGES = {
         f"再{command_link('挂机预览 镇中问询', '挂机预览 镇中问询')}确认青石镇名望十点与三小时窗口，"
         f"以及{command_link('挂机预览 灵田照看', '挂机预览 灵田照看')}确认有效居所与四小时窗口；"
         "两条路线都要在对应主线开始后完整领取，逾时保底不替代主线交班。\n\n"
+        "凡人阶段的常驻生计回响另走独立三关：先在青石镇用"
+        f"{command_link('挂机预览 镇中行旅', '挂机预览 镇中行旅')}确认地点与日限，"
+        f"再{command_link('青石镇常驻生计回响主线', '青石镇常驻生计回响主线')}开始并完整领取；"
+        f"第二关用{command_link('挂机预览 灵圃看护', '挂机预览 灵圃看护')}确认有效居所，"
+        f"第二关尚无居所时可{command_link('租住居所 客房', '租住居所 客房')}；"
+        f"第三关用{command_link('挂机预览 作坊值守', '挂机预览 作坊值守')}确认基础炉具或铁锤之一，或本人可用的炼器台。"
+        "器修入道可取得铁锤，辅修炼丹或炼器可取得对应工具；"
+        "逾时保底不替代剧情交班。\n\n"
         f"{command_link('每日修行', '每日修行')}记下日常安排，"
         f"{command_link('道历问安', '道历问安')}领取当日问安所得。\n\n"
         f"{command_link('灵兽状态', '灵兽状态')}可查看同行灵兽与灵骑；"
@@ -292,6 +305,13 @@ class XiuxianApplication:
             title="寻道闲居回响主线",
             start_command="开始寻道闲居回响主线",
             claim_command="领取寻道闲居回响主线奖励",
+        )
+        self.livelihood_echoes_mainline = AdventuresMainlineApplication(
+            repository,
+            story_key=LIVELIHOOD_ECHOES_STORY_KEY,
+            title="青石镇常驻生计回响主线",
+            start_command="开始青石镇常驻生计回响主线",
+            claim_command="领取青石镇常驻生计回响主线奖励",
         )
         self.dao_echoes = DaoEchoesApplication(repository)
         self.three_realms = ThreeRealmsApplication(repository)
@@ -1549,6 +1569,27 @@ class XiuxianApplication:
             context,
             lambda: self.seeker_echoes_mainline.claim_reward(context),
             write_message="此刻无缘收取寻道闲居回响主线所得。",
+        )
+
+    async def get_livelihood_echoes_mainline_status(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.livelihood_echoes_mainline.get_status(context),
+            require_write=False,
+        )
+
+    async def start_livelihood_echoes_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.livelihood_echoes_mainline.start_stage(context),
+            write_message="此刻无缘踏入青石镇常驻生计回响主线。",
+        )
+
+    async def claim_livelihood_echoes_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.livelihood_echoes_mainline.claim_reward(context),
+            write_message="此刻无缘收取青石镇常驻生计回响主线所得。",
         )
 
     async def preview_final_arena(self, context: CommandContext) -> CommandResult:
