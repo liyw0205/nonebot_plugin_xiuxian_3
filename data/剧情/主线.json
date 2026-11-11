@@ -3694,6 +3694,90 @@
       "prerequisites": ["void_archive.supply.2"],
       "first_clear_reward": {"codex.void.route_ruins": 1, "spirit_stones": 40, "service_reputation": 1},
       "repeat_reward": {"spirit_stones": 4}
+    },
+    {
+      "key": "dao_settlement.1",
+      "story_key": "story.mainline.dao_settlement",
+      "chapter": 1,
+      "stage": 1,
+      "name": "抵达服务处",
+      "desc": "从道源门沿公开边抵达道统服务处，确认轮值登记仍在运转。",
+      "body": "道源门的试炼回声尚未散去，服务处却已经排起了轮值长队。道统余响第一关不要求另造入口，只要求你本人从道源门沿公开边抵达道统服务处，并在行程结算后留下可追溯的抵达记录。没有真实抵达时不扣主线所得，补足体力后沿同一条公开边重走即可。",
+      "objectives": [
+        {"key": "reach_dao_service", "type": "travel_arrival", "label": "结算行程抵达道统服务处", "destination_key": "dao_service"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "道统服务处", "description": "从道源门沿区域公开边抵达服务处，并在行程结束后结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.dao_settlement:dao_settlement.1"]},
+      "next_stage_key": "dao_settlement.2",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "尚未结算抵达道统服务处时关卡保持进行中且不发奖励；恢复体力后从道源门重新启程，其他地点或未结算行程不能替代本关记录。"},
+      "status": "open",
+      "aliases": ["抵达服务处"],
+      "lane": "settlement",
+      "lane_name": "道统余响",
+      "required_realm": "dao_union",
+      "required_layer": 1,
+      "prerequisites": ["player.start_seeking"],
+      "first_clear_reward": {"codex.story.dao_service_origin": 1, "spirit_stones": 20},
+      "repeat_reward": {"spirit_stones": 4}
+    },
+    {
+      "key": "dao_settlement.2",
+      "story_key": "story.mainline.dao_settlement",
+      "chapter": 1,
+      "stage": 2,
+      "name": "据点值守",
+      "desc": "在本关开始后完整领取一次道统据点看守，交接真实轮值所得。",
+      "body": "服务处登记了你的道统路线，下一项轮值必须由本人完成。道统余响第二关会冻结开始时的目标，只认本关开始后新安排的道统据点看守，并在完整十二小时窗口内领取所得。提前领取、取消、旧安排或逾时保底都不能替代完整交接；错过窗口先领保底，恢复日限后可重新安排新的看守。",
+      "objectives": [
+        {"key": "claim_dao_watch", "type": "idle_claim", "label": "本关开始后完整领取一次道统据点看守", "route_key": "idle.dao_settlement_watch"}
+      ],
+      "actions": [
+        {"command": "挂机预览", "argument": "道统据点看守", "description": "确认道统路线、体力、每日一次限额与完整/逾时所得。"},
+        {"command": "开始挂机", "argument": "道统据点看守", "description": "本关开始后安排据点值守，十二小时后在完整领取窗口内交接。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.dao_settlement:dao_settlement.2"]},
+      "next_stage_key": "dao_settlement.3",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "只认本关开始后的新安排及完整领取；旧安排、仍在运行、取消或逾时保底均不计。错过完整窗口先领取保底，次日再安排新的十二小时值守。"},
+      "status": "open",
+      "aliases": ["据点值守"],
+      "lane": "settlement",
+      "lane_name": "道统余响",
+      "required_realm": "dao_union",
+      "required_layer": 1,
+      "prerequisites": ["dao_settlement.1"],
+      "first_clear_reward": {"codex.story.dao_service_origin": 1, "spirit_stones": 25, "service_reputation": 1},
+      "repeat_reward": {"spirit_stones": 4}
+    },
+    {
+      "key": "dao_settlement.3",
+      "story_key": "story.mainline.dao_settlement",
+      "chapter": 1,
+      "stage": 3,
+      "name": "公开轮值",
+      "desc": "成功结算一次道统服务派遣，把公开轮值记入道统账册。",
+      "body": "据点的建设券与灵石已经交接，最后要把公开轮值写入服务账册。道统余响终关只认本关开始后由本人接受并成功结算的道统服务派遣；失败、延误、部分交付、提前结算、他人 assignment 或旧事件都不推进。恢复服务信誉、体力或长时行动后可按现有日限重新接受，派遣自身的成本、风险与奖励池保持不变。",
+      "objectives": [
+        {"key": "settle_dao_service", "type": "dispatch_success", "label": "本关开始后成功结算一次道统服务派遣", "dispatch_key": "dispatch.dao_service"}
+      ],
+      "actions": [
+        {"command": "派遣预览", "argument": "道统服务", "description": "确认道统路线、服务信誉、体力与每日两次轮值门槛。"},
+        {"command": "接受派遣", "argument": "道统服务", "description": "本关开始后接受道统服务，等待既有时长结束后结算。"},
+        {"command": "结算派遣", "argument": "", "description": "到期后结算成功轮值；失败或部分结果按派遣原合同处理并可重试。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.dao_settlement:dao_settlement.3"]},
+      "next_stage_key": null,
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "只统计本关开始后本人 dispatch.dao_service 的 settled/success 事件；失败、partial、旧记录、他人派遣或未到期都不发主线奖励，满足门槛并按现有日限重新接受后可重试。"},
+      "status": "open",
+      "aliases": ["公开轮值"],
+      "lane": "settlement",
+      "lane_name": "道统余响",
+      "required_realm": "dao_union",
+      "required_layer": 1,
+      "prerequisites": ["dao_settlement.2"],
+      "first_clear_reward": {"codex.story.dao_service_origin": 1, "spirit_stones": 40, "service_reputation": 1},
+      "repeat_reward": {"spirit_stones": 4}
     }
   ]
 }
