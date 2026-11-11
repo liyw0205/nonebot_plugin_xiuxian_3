@@ -116,7 +116,12 @@ def write_player_values(
         key = str(raw_key)
         if key == "id" or not _PLAYER_COLUMN.fullmatch(key):
             raise ValueError(f"invalid player column: {key!r}")
-        assignments[key] = value
+        # Decimal bytes avoid INTEGER affinity converting oversized balances to REAL.
+        assignments[key] = (
+            str(value).encode("ascii")
+            if type(value) is int and not -(2 ** 63) <= value < 2 ** 63
+            else value
+        )
     assignments["updated_at"] = updated_at
     columns = sorted(assignments)
     connection.execute(

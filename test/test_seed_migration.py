@@ -871,6 +871,10 @@ RECIPE_FILE = Path("生产/配方.json")
 
 PLACE_CODEX_ADDED = frozenset(
     {
+        "codex.story.herb_vale_gather",
+        "codex.story.ironwood_gather",
+        "codex.story.basalt_sifting",
+        "codex.story.spring_gleaning",
         "codex.place.sect_gate",
         "codex.place.mist_grotto",
         "codex.place.abyss_gate",

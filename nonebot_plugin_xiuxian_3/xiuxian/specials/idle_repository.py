@@ -6,10 +6,12 @@ import asyncio
 import json
 import sqlite3
 from datetime import datetime, timedelta
+from math import ceil
 from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
+from ..content import bundled_content
 from ..persistence.errors import (
     IdleAlreadySettledError,
     IdleBusyError,
@@ -24,6 +26,7 @@ from .idle_models import (
     IdleCancelRecord,
     IdleRoutePreviewRecord,
     IdleSettlementRecord,
+    IdleStatusRecord,
 )
 from .idle_rules import (
     ABSOLUTE_MAX_SECONDS,
@@ -31,8 +34,11 @@ from .idle_rules import (
     MAX_CLAIM_EXTENSION_SECONDS,
     IdleRouteDefinition,
     idle_route_order,
+    idle_reward_label,
+    journal_from_snapshot,
     reward_for,
     reward_local_reputation_maximums,
+    reward_ranges,
     resolve_route,
 )
 from .codex_projection import record_codex_discovery, record_material_discoveries
@@ -50,6 +56,60 @@ from ..utils.player import (
 
 
 class IdleRepositoryMixin:
+    async def get_idle_status(self, *, platform: str, platform_user_id: str) -> IdleStatusRecord | None:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(self._get_idle_status_once, platform, platform_user_id)
+
+    def _get_idle_status_once(self, platform: str, platform_user_id: str) -> IdleStatusRecord | None:
+        now = self._now()
+        with self._connect() as connection:
+            player = self._require_player(connection, platform, platform_user_id, writable=False)
+            row = connection.execute(
+                "SELECT * FROM idle_assignments WHERE player_id = ? AND status = 'running' ORDER BY id DESC LIMIT 1",
+                (player["id"],),
+            ).fetchone()
+            if row is None:
+                return None
+            snapshot = self._required_json_object(row["snapshot_json"], "idle snapshot")
+            assignment = IdleAssignmentRecord(
+                player=self._row_to_player(player), assignment_id=str(row["assignment_id"]),
+                route_key=str(row["route_key"]), label=str(snapshot["label"]), status=str(row["status"]),
+                starts_at=str(row["starts_at"]), claim_at=str(row["claim_at"]),
+                max_claim_at=str(row["max_claim_at"]), cancel_until=str(row["cancel_until"]),
+                cost=self._required_json_object(row["cost_json"], "idle cost"),
+                tool_key=snapshot.get("tool_key"), facility_slot_key=snapshot.get("facility_slot_key"),
+                journal=journal_from_snapshot(snapshot),
+            )
+            return IdleStatusRecord(
+                assignment=assignment,
+                remaining_seconds=max(0, ceil((datetime.fromisoformat(assignment.claim_at) - now).total_seconds())),
+                claimable=now >= datetime.fromisoformat(assignment.claim_at),
+                fallback=now > datetime.fromisoformat(assignment.max_claim_at),
+                cancellable=now <= datetime.fromisoformat(assignment.cancel_until),
+            )
+
+    async def get_idle_journals(self, *, platform: str, platform_user_id: str) -> tuple[dict[str, Any], ...]:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(self._get_idle_journals_once, platform, platform_user_id)
+
+    def _get_idle_journals_once(self, platform: str, platform_user_id: str) -> tuple[dict[str, Any], ...]:
+        with self._connect() as connection:
+            player = self._require_player(connection, platform, platform_user_id, writable=False)
+            rows = connection.execute(
+                "SELECT route_key, snapshot_json FROM idle_assignments WHERE id IN "
+                "(SELECT MIN(id) FROM idle_assignments WHERE player_id = ? AND status = 'claimed' GROUP BY route_key) ORDER BY id",
+                (player["id"],),
+            ).fetchall()
+            journals = []
+            for row in rows:
+                snapshot = self._required_json_object(row["snapshot_json"], "idle snapshot")
+                journal = journal_from_snapshot(snapshot)
+                if journal:
+                    journals.append({"route_key": str(row["route_key"]), "label": str(snapshot["label"]), **journal})
+            return tuple(journals)
+
     async def preview_idle(
         self, *, platform: str, platform_user_id: str, route_key: str | None
     ) -> tuple[IdleRoutePreviewRecord, ...]:
@@ -78,9 +138,10 @@ class IdleRepositoryMixin:
         missing: list[str] = []
         stage_order = {"new_user": 0, "mortal": 1, "seeker": 2, "cultivator": 3, "suspended": -1}
         if stage_order.get(str(player["stage"]), -1) < stage_order.get(definition.required_stage, 1):
-            missing.append("角色尚未完成入道")
+            stage_labels = {"mortal": "开始修仙", "seeker": "寻仙问道", "cultivator": "入道"}
+            missing.append(f"角色尚未完成{stage_labels.get(definition.required_stage, '入道')}")
         if definition.required_location and str(player["location_key"]) != definition.required_location:
-            missing.append("所在地点不符")
+            missing.append(f"所在地点不符（需要抵达{(self.content or bundled_content()).label('location', definition.required_location)}）")
         local_reputation = player_reputation_state(connection, int(player["id"])).local
         for reputation_key, minimum in definition.required_local_reputation:
             if int(local_reputation.get(reputation_key, 0)) < minimum:
@@ -92,7 +153,7 @@ class IdleRepositoryMixin:
             definition.required_layer,
             self.content,
         ):
-            missing.append("境界不足")
+            missing.append(f"境界不足（需要{(self.content or bundled_content()).label('realm', definition.required_realm)} L{definition.required_layer}）")
         if definition.required_permit and connection.execute(
             "SELECT 1 FROM trade_permits WHERE player_id = ? AND permit_key = ? AND expires_at > ? LIMIT 1",
             (player["id"], definition.required_permit, serialize_datetime(now)),
@@ -131,6 +192,10 @@ class IdleRepositoryMixin:
         facility = self._idle_select_facility(connection, player, definition, None)
         if definition.required_tool_keys and selected_tool is None and facility is None:
             missing.append("需要基础工具或作坊槽")
+        if player_integer(player, "energy") < definition.energy_cost:
+            missing.append(f"精力不足（需要 {definition.energy_cost}）")
+        if player_integer(player, "stamina") < definition.stamina_cost:
+            missing.append(f"体力不足（需要 {definition.stamina_cost}）")
         return missing
 
     def _idle_preview(
@@ -183,6 +248,9 @@ class IdleRepositoryMixin:
                 "required_tool_keys": list(definition.required_tool_keys),
                 "facility_kind": definition.facility_kind,
                 "pool_key": definition.pool_key,
+                "full_reward_ranges": reward_ranges(definition.pool_key, self.content),
+                "fallback_reward_ranges": reward_ranges(definition.fallback_pool_key, self.content),
+                "gathering_journal": definition.gathering_journal,
             },
         )
 
@@ -229,10 +297,7 @@ class IdleRepositoryMixin:
             replay = self._idle_operation(connection, operation_id, operation_name, request_hash)
             if replay is not None:
                 return self._assignment_from_payload(replay, replay=True)
-            try:
-                definition = resolve_route(route_key, self.content)
-            except ValueError as exc:
-                raise IdleRequirementError(str(exc)) from exc
+            definition = resolve_route(route_key, self.content)
             player = self._require_player(connection, platform, platform_user_id)
             self._idle_validate(connection, player, definition, tool_or_facility, now)
             tool = self._idle_select_tool(connection, player, definition, tool_or_facility)
@@ -253,6 +318,12 @@ class IdleRepositoryMixin:
             full_reward = reward_for(definition, random_seed, fallback=False, content=self.content)
             fallback_reward = reward_for(definition, random_seed, fallback=True, content=self.content)
             reputation_maximums = reward_local_reputation_maximums(definition, self.content)
+            reward_keys = set(full_reward) | set(fallback_reward)
+            bundle = self.content or bundled_content()
+            codex_entries = {
+                key: bundle.require("codex_entry", key, include_locked=False)
+                for key in reward_keys if key.startswith("codex.")
+            }
             snapshot = {
                 "route_key": definition.key,
                 "label": definition.label,
@@ -268,6 +339,9 @@ class IdleRepositoryMixin:
                 "facility_slot_key": str(facility["slot_key"]) if facility else None,
                 "location_key": str(player["location_key"]),
                 "random_seed": random_seed,
+                "gathering_journal": definition.gathering_journal,
+                "reward_labels": {key: idle_reward_label(key, self.content) for key in reward_keys},
+                "codex_entries": codex_entries,
             }
             spend_player_state(
                 connection,
@@ -320,6 +394,7 @@ class IdleRepositoryMixin:
                 "cost": cost,
                 "tool_key": snapshot["tool_key"],
                 "facility_slot_key": snapshot["facility_slot_key"],
+                "journal": definition.gathering_journal,
             }
             self._record_idle_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
             return self._assignment_from_payload(payload)
@@ -361,6 +436,7 @@ class IdleRepositoryMixin:
             if status != "running":
                 raise IdleAlreadySettledError("idle assignment is not running")
             snapshot = self._required_json_object(assignment["snapshot_json"], "idle snapshot")
+            journal = journal_from_snapshot(snapshot)
             expected_claim_at = datetime.fromisoformat(str(assignment["claim_at"]))
             expected_max_claim_at = datetime.fromisoformat(str(assignment["max_claim_at"]))
             if now < expected_claim_at:
@@ -412,13 +488,16 @@ class IdleRepositoryMixin:
                 if actual:
                     actual_reward[key] = actual
             for codex_key in codex_keys:
+                entry = snapshot.get("codex_entries", {}).get(codex_key, {})
                 record_codex_discovery(
                     connection,
                     player_id=int(player["id"]),
                     entry_key=codex_key,
                     operation_id=operation_id,
                     occurred_at=now,
-                    snapshot=snapshot,
+                    snapshot={**snapshot, **({"label": entry["name"]} if entry else {})},
+                    content=self.content,
+                    category_snapshot=entry.get("category"),
                 )
             record_material_discoveries(
                 connection,
@@ -427,6 +506,7 @@ class IdleRepositoryMixin:
                 occurred_at=now,
                 reward=actual_reward,
                 snapshot=snapshot,
+                content=self.content,
             )
             result = {
                 **actual_reward,
@@ -453,6 +533,8 @@ class IdleRepositoryMixin:
                 "fallback": fallback,
                 "tool_durability_before": durability_before,
                 "tool_durability_after": durability_after,
+                "journal": journal,
+                "reward_labels": snapshot.get("reward_labels", {}),
             }
             self._record_idle_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
             return IdleRepositoryMixin._settlement_from_payload(payload)
@@ -675,6 +757,7 @@ class IdleRepositoryMixin:
             tool_key=payload.get("tool_key"),
             facility_slot_key=payload.get("facility_slot_key"),
             already_completed=replay,
+            journal=dict(payload.get("journal", {})),
         )
 
     @staticmethod
@@ -690,6 +773,8 @@ class IdleRepositoryMixin:
             tool_durability_before=(int(payload["tool_durability_before"]) if payload.get("tool_durability_before") is not None else None),
             tool_durability_after=(int(payload["tool_durability_after"]) if payload.get("tool_durability_after") is not None else None),
             already_completed=replay,
+            journal=dict(payload.get("journal", {})),
+            reward_labels=dict(payload.get("reward_labels", {})),
         )
 
     @staticmethod

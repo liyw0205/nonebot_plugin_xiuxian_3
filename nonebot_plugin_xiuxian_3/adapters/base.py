@@ -513,6 +513,8 @@ def register_core_commands(router: CommandRouter, application: XiuxianApplicatio
     router.register("领取竞技场结果", application.claim_arena_result, aliases=("确认竞技场结果",))
     router.register("切磋", application.spar_players)
     router.register("挂机预览", application.preview_idle, aliases=("查看挂机",))
+    router.register("挂机状态", application.get_idle_status)
+    router.register("采集行记", application.get_idle_journals)
     router.register("开始挂机", application.start_idle)
     router.register("领取挂机", application.claim_idle)
     router.register("取消挂机", application.cancel_idle)

@@ -2,6 +2,66 @@
   "kind": "livelihood",
   "records": [
     {
+      "key": "idle.herb_vale_gather", "record_type": "idle_route", "status": "active",
+      "name": "百草坡采药", "desc": "跟随姜婆辨认坡地药草，留根采叶，为日常疗伤炼药攒下材料。",
+      "aliases": ["坡地采药"], "duration_seconds": 14400,
+      "cost": {"stamina": 2, "energy": 1}, "daily_limit": 1,
+      "requirements": {"stage": "mortal", "location_key": "xuantian.herb_vale"},
+      "reward_pool_key": "reward_pool.idle.herb_vale_gather",
+      "fallback_reward_pool_key": "reward_pool.idle.herb_vale_gather.fallback", "durability_cost_bp": 0,
+      "gathering_journal": {
+        "start_text": "姜婆把空药篓递来，领你绕开新芽，沿百草坡背阴处逐株辨认止血草。她嘱咐只取成叶，根须还要留给来年。",
+        "complete_text": "日影移过坡顶，你将药草分束晾好。姜婆拈起一片叶子点头：认得药性，也得记得留根。药篓与这句叮嘱一同带回。",
+        "expired_text": "错过了晾草的时辰，篓中大半药叶已受潮。姜婆替你挑出一束尚好的止血草，约你下次天晴再来。",
+        "recipe_keys": ["recipe.pill.healing_low", "recipe.pill.focus_low"]
+      }
+    },
+    {
+      "key": "idle.ironwood_gather", "record_type": "idle_route", "status": "active",
+      "name": "铁木林拾材", "desc": "随老樵匠收拣风折铁木与浅层铁石，供木作和工具锻制使用。",
+      "aliases": ["林中拾材"], "duration_seconds": 21600,
+      "cost": {"stamina": 3, "energy": 1}, "daily_limit": 1,
+      "requirements": {"stage": "cultivator", "realm": {"key": "qi_sensing", "min_layer": 1}, "location_key": "xuantian.ironwood_grove"},
+      "reward_pool_key": "reward_pool.idle.ironwood_gather",
+      "fallback_reward_pool_key": "reward_pool.idle.ironwood_gather.fallback", "durability_cost_bp": 0,
+      "gathering_journal": {
+        "start_text": "老樵匠在林口敲了敲一截枯枝，听出木心仍实。他带你拾取风折的铁木，再沿树根翻找混在碎土中的铁石。",
+        "complete_text": "你把木料按纹理捆齐，将铁石装进小袋。老樵匠说，顺纹做柄才不易折，山中拾来的材料也能做一把可靠的矿镐。",
+        "expired_text": "林雾浸透了未收拢的木料，大半已经霉软。老樵匠替你留下一段干木，提醒你下次赶在雾起前收束。",
+        "recipe_keys": ["recipe.tool.mining_pickaxe", "recipe.weapon.wood_sword"]
+      }
+    },
+    {
+      "key": "idle.basalt_sifting", "record_type": "idle_route", "status": "active",
+      "name": "玄武岩径筛砂", "desc": "与石匠在黑石坡筛选阵砂和铁石，为布阵及工具制作积攒矿料。",
+      "aliases": ["山径筛砂"], "duration_seconds": 28800,
+      "cost": {"stamina": 4, "energy": 2}, "daily_limit": 1,
+      "requirements": {"stage": "cultivator", "realm": {"key": "qi_gathering", "min_layer": 1}, "location_key": "xuantian.basalt_pass"},
+      "reward_pool_key": "reward_pool.idle.basalt_sifting",
+      "fallback_reward_pool_key": "reward_pool.idle.basalt_sifting.fallback", "durability_cost_bp": 0,
+      "gathering_journal": {
+        "start_text": "石匠把筛盘架在背风处，教你从黑石碎屑里挑出能承灵纹的砂粒。岩径风硬，得先压稳筛脚再动手。",
+        "complete_text": "筛过的阵砂在盘底微微发亮，旁边另有一袋铁石。石匠笑说，阵法要稳，起头这捧砂就不能掺进松脆的碎石。",
+        "expired_text": "山风卷散了还没封口的矿料，只剩筛底一小包阵砂。石匠替你扎紧袋口，让你下回来时记住先收料再歇脚。",
+        "recipe_keys": ["recipe.array.gathering_basic", "recipe.tool.mining_pickaxe"]
+      }
+    },
+    {
+      "key": "idle.spring_gleaning", "record_type": "idle_route", "status": "active",
+      "name": "灵泉谷拾穗", "desc": "帮谷守阿禾清理泉边旧稻畦，拾取成熟散穗，留作旅途饭食。",
+      "aliases": ["泉边拾穗"], "duration_seconds": 14400,
+      "cost": {"stamina": 2, "energy": 1}, "daily_limit": 1,
+      "requirements": {"stage": "cultivator", "realm": {"key": "qi_sensing", "min_layer": 2}, "location_key": "xuantian.spirit_field"},
+      "reward_pool_key": "reward_pool.idle.spring_gleaning",
+      "fallback_reward_pool_key": "reward_pool.idle.spring_gleaning.fallback", "durability_cost_bp": 0,
+      "gathering_journal": {
+        "start_text": "阿禾挽起裤脚疏通稻畦边的水口，请你捡回已经垂熟的散穗。泉水只引过田埂，不去惊动谷底新抽的嫩芽。",
+        "complete_text": "散穗脱成一小袋粗糙灵米，水口也重新畅通。阿禾舀起泉水说，路再远也得按时吃饭，这袋米正好带去煮两碗。",
+        "expired_text": "露水把未脱粒的散穗浸湿了。阿禾从灶边替你留下一小份干米，其余只好还给稻畦做肥。",
+        "recipe_keys": ["recipe.food.spirit_rice", "recipe.pill.healing_low"]
+      }
+    },
+    {
       "name": "镇中行旅",
       "desc": "替镇中商铺照看往来，积攒些许灵石与青石镇名望。",
       "aliases": ["城镇跑腿", "看店"],

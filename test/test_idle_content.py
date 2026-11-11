@@ -238,8 +238,8 @@ def test_idle_claim_rejects_malformed_reputation_and_retries_same_operation(tmp_
                     ).fetchone()
                     stones_before = row["spirit_stones"]
                 operation = f"{user}-claim"
-                failed = await _command(runtime, adapter, user, operation, "领取挂机")
-                assert failed.code == "PERSISTENCE_ERROR"
+                with pytest.raises(ValueError):
+                    await _command(runtime, adapter, user, operation, "领取挂机")
                 with runtime.repository._connect() as connection:
                     state = connection.execute(
                         "SELECT status FROM idle_assignments WHERE player_id = "
@@ -297,8 +297,8 @@ def test_idle_claim_ledger_failure_rolls_back_and_retries(monkeypatch, tmp_path:
                     before_local = connection.execute(
                         "SELECT local_json FROM player_reputations WHERE player_id = ?", (row["id"],)
                     ).fetchone()
-                failed = await _command(runtime, adapter, user, operation, "领取挂机")
-                assert failed.code == "PERSISTENCE_ERROR"
+                with pytest.raises(sqlite3.OperationalError, match="injected ledger failure"):
+                    await _command(runtime, adapter, user, operation, "领取挂机")
                 with runtime.repository._connect() as connection:
                     row = connection.execute(
                         "SELECT id, spirit_stones FROM players WHERE platform = ? AND platform_user_id = ?",

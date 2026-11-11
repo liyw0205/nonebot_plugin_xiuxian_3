@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from ..content import ContentBundle, ContentError, bundled_content
+from ..persistence.errors import IdleRouteNotFoundError
 from ..rewards.rules import (
     RewardContentError,
     local_reputation_maximum,
@@ -44,6 +45,7 @@ class IdleRouteDefinition:
     facility_kind: str | None
     durability_cost_bp: int
     required_unlock: str | None = None
+    gathering_journal: dict[str, Any] = field(default_factory=dict)
 
 
 _STAGE_ORDER = {
@@ -87,7 +89,7 @@ def resolve_route(value: str | None, content: ContentBundle | None = None) -> Id
     try:
         return selectors[(value or "").strip()]
     except KeyError as exc:
-        raise ValueError(f"unsupported idle route: {value}") from exc
+        raise IdleRouteNotFoundError(f"unsupported idle route: {value}") from exc
 
 
 def reward_for(
@@ -114,6 +116,53 @@ def reward_local_reputation_maximums(
         if key.startswith("local.")
     }
     return {key: local_reputation_maximum(key, bundle) for key in keys}
+
+
+def reward_ranges(pool_key: str, content: ContentBundle | None = None) -> dict[str, tuple[int, int]]:
+    outcomes = reward_pool_outcomes(pool_key, content or bundled_content())
+    keys = dict.fromkeys(key for _, reward in outcomes for key in reward)
+    return {
+        key: (min(reward.get(key, 0) for _, reward in outcomes), max(reward.get(key, 0) for _, reward in outcomes))
+        for key in keys
+    }
+
+
+def idle_reward_label(key: str, content: ContentBundle | None = None) -> str:
+    bundle = content or bundled_content()
+    if key == "spirit_stones":
+        return "灵石"
+    if key.startswith("item."):
+        return bundle.label("item", key)
+    if key.startswith("local."):
+        return bundle.label("location", key.removeprefix("local.")) + "名望"
+    if key.startswith("codex."):
+        return bundle.label("codex_entry", key)
+    return {"stamina": "体力", "energy": "精力"}[key]
+
+
+def journal_from_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
+    if "gathering_journal" not in snapshot:
+        return {}
+    value = snapshot["gathering_journal"]
+    if not isinstance(value, dict):
+        raise ValueError("idle snapshot gathering_journal must be an object")
+    if not value:
+        return {}
+    if set(value) != {"start_text", "complete_text", "expired_text", "uses"}:
+        raise ValueError("idle snapshot gathering_journal has invalid fields")
+    for field in ("start_text", "complete_text", "expired_text"):
+        if not isinstance(value[field], str) or not value[field].strip():
+            raise ValueError(f"idle snapshot gathering_journal.{field} must be non-empty text")
+    uses = value["uses"]
+    if not isinstance(uses, list) or not uses:
+        raise ValueError("idle snapshot gathering_journal.uses must be a non-empty list")
+    for use in uses:
+        if (
+            not isinstance(use, dict) or set(use) != {"recipe_key", "label", "command"}
+            or any(not isinstance(text, str) or not text.strip() for text in use.values())
+        ):
+            raise ValueError("idle snapshot gathering_journal.uses contains an invalid recipe")
+    return dict(value)
 
 
 def _parse_route(row: dict[str, Any], bundle: ContentBundle) -> IdleRouteDefinition:
@@ -246,6 +295,9 @@ def _parse_route(row: dict[str, Any], bundle: ContentBundle) -> IdleRouteDefinit
     fallback_pool_key = _required_string(row.get("fallback_reward_pool_key"), key, "fallback_reward_pool_key")
     _validate_pool(pool_key, bundle, key, fallback=False)
     _validate_pool(fallback_pool_key, bundle, key, fallback=True)
+    journal = _parse_gathering_journal(row.get("gathering_journal"), bundle, key, pool_key, fallback_pool_key)
+    if journal and required_location is None:
+        raise ContentError(f"idle route {key} gathering_journal requires a location")
     return IdleRouteDefinition(
         key=key,
         label=name.strip(),
@@ -270,7 +322,48 @@ def _parse_route(row: dict[str, Any], bundle: ContentBundle) -> IdleRouteDefinit
         facility_kind=facility_kind,
         durability_cost_bp=durability_cost,
         required_unlock=required_unlock,
+        gathering_journal=journal,
     )
+
+
+def _parse_gathering_journal(
+    value: Any, bundle: ContentBundle, key: str, pool_key: str, fallback_pool_key: str,
+) -> dict[str, Any]:
+    if value is None:
+        return {}
+    fields = {"start_text", "complete_text", "expired_text", "recipe_keys"}
+    if not isinstance(value, dict) or set(value) != fields:
+        raise ContentError(f"idle route {key} gathering_journal requires {sorted(fields)}")
+    journal = {
+        field: _required_string(value[field], key, f"gathering_journal.{field}").strip()
+        for field in fields - {"recipe_keys"}
+    }
+    if not all(journal.values()):
+        raise ContentError(f"idle route {key} gathering_journal text cannot be blank")
+    recipes = value["recipe_keys"]
+    if (
+        not isinstance(recipes, list) or not recipes
+        or any(not isinstance(recipe, str) or not recipe for recipe in recipes)
+        or len(set(recipes)) != len(recipes)
+    ):
+        raise ContentError(f"idle route {key} gathering_journal.recipe_keys must be unique recipe keys")
+    outcomes = reward_pool_outcomes(pool_key, bundle)
+    materials = {item for _, reward in outcomes for item in reward if item.startswith("item.")}
+    from ..production.rules import recipe_definitions
+
+    definitions = recipe_definitions(bundle)
+    uses = []
+    for recipe_key in recipes:
+        _require_active_record(bundle, "recipe", recipe_key, key, "gathering_journal.recipe_keys")
+        recipe = definitions[recipe_key]
+        if not materials.intersection(recipe.inputs):
+            raise ContentError(f"idle route {key} recipe {recipe_key} does not consume gathered materials")
+        uses.append({"recipe_key": recipe_key, "label": recipe.name, "command": f"生产预览 {recipe.name}"})
+    if any(any(item.startswith("codex.") for item in reward) for _, reward in reward_pool_outcomes(fallback_pool_key, bundle)):
+        raise ContentError(f"idle route {key} gathering fallback cannot grant a complete journal")
+    if not all(any(item.startswith("codex.") for item in reward) for _, reward in outcomes):
+        raise ContentError(f"idle route {key} full gathering rewards require a journal discovery")
+    return {**journal, "uses": uses}
 
 
 def _validate_pool(pool_key: str, bundle: ContentBundle, route_key: str, *, fallback: bool) -> None:
