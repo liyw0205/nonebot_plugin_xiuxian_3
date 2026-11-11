@@ -153,7 +153,16 @@ class CompanionApplication:
             return CommandResult(False, "COMPANION_NOT_FOUND", "没有找到这只灵兽。", context.request_id, operation_id)
         except CompanionInjuredError:
             return CommandResult(False, "COMPANION_RESTING", "灵兽正在休养，暂不能喂养。", context.request_id, operation_id)
-        except CompanionRequirementError:
+        except CompanionRequirementError as exc:
+            if "travelling" in str(exc):
+                return CommandResult(
+                    False,
+                    "COMPANION_BUSY",
+                    "灵兽正在巡护，未改变灵兽状态。",
+                    context.request_id,
+                    operation_id,
+                    data={"reason": str(exc), "subject": context.command_args[0]},
+                )
             return CommandResult(False, "COMPANION_NOT_FEEDABLE", "这只灵骑不适用灵粮喂养。", context.request_id, operation_id)
         except ResourceInsufficientError:
             return CommandResult(False, "COMPANION_FEED_INSUFFICIENT", "灵粮不足，未改变灵兽状态。", context.request_id, operation_id)
@@ -198,7 +207,16 @@ class CompanionApplication:
                 context.request_id,
                 operation_id,
             )
-        except CompanionRequirementError:
+        except CompanionRequirementError as exc:
+            if "travelling" in str(exc):
+                return CommandResult(
+                    False,
+                    "COMPANION_BUSY",
+                    "灵兽正在巡护，未改变灵兽状态。",
+                    context.request_id,
+                    operation_id,
+                    data={"reason": str(exc), "subject": context.command_args[0]},
+                )
             return CommandResult(
                 False,
                 "COMPANION_COMPANY_SPENT",

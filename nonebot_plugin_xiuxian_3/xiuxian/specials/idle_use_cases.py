@@ -117,6 +117,8 @@ class IdleApplication:
             "cost": dict(record.cost),
             "tool_key": record.tool_key,
             "facility_slot_key": record.facility_slot_key,
+            "companion_instance_id": record.companion_instance_id,
+            "companion_label": record.companion_label,
             "idempotent_replay": record.already_completed,
         }
 
@@ -149,6 +151,13 @@ class IdleApplication:
                     lines.append(f"地点：{bundle.label('location', conditions['required_location'])}")
                 if conditions["required_realm"]:
                     lines.append(f"境界：{bundle.label('realm', conditions['required_realm'])} L{conditions['required_layer']} 起")
+                if conditions.get("required_companion_kind"):
+                    lines.append("同行：已结缘且可用的灵兽（安排时填写实例编号）")
+                    progress = conditions.get("companion_progress", {})
+                    if progress.get("experience") or progress.get("affinity"):
+                        lines.append(
+                            f"完整领取成长：经验 +{progress.get('experience', 0)}、亲和 +{progress.get('affinity', 0)}；逾时不成长"
+                        )
                 lines.extend([
                     f"花费：体力 {record.stamina_cost}、精力 {record.energy_cost}",
                     f"本日已结算：{record.daily_used}/{record.daily_limit}",
@@ -159,7 +168,8 @@ class IdleApplication:
                 if journal:
                     lines.extend(["", journal["start_text"], f"材料去向：{self._uses_text(journal)}"])
                 if record.ready:
-                    actions = (CommandAction("安排此项闲居", f"开始挂机 {record.label}", enter=True),)
+                    suffix = " <灵兽编号>" if conditions.get("required_companion_kind") else ""
+                    actions = (CommandAction("安排此项闲居", f"开始挂机 {record.label}{suffix}", enter=True),)
         lines.extend(["", command_link("当前安排", "挂机状态")])
         return CommandResult(True, "IDLE_PREVIEW", "\n".join(lines), context.request_id, data=data, actions=actions)
 
@@ -175,6 +185,8 @@ class IdleApplication:
         item = record.assignment
         state = "逾时，可领保底" if record.fallback else "可领取完整所得" if record.claimable else f"还需 {record.remaining_seconds} 秒"
         lines = [f"**{item.label}**", "", state, f"可领取：{item.claim_at}", f"完整领取截止：{item.max_claim_at}"]
+        if item.companion_label:
+            lines.append(f"同行灵兽：{item.companion_label}")
         if item.journal:
             lines.extend(["", item.journal["start_text"]])
         actions = ()
@@ -247,15 +259,23 @@ class IdleApplication:
             label = record.reward_labels[key] if key in record.reward_labels else self._reward_label(key)
             reward_parts.append(f"记下「{label}」" if key.startswith("codex.") else f"{label} +{value}")
         reward_text = "、".join(reward_parts) or "无额外所得"
+        progress = record.companion_progress
+        growth_text = ""
+        if progress:
+            growth_text = (
+                f"\n灵兽成长：经验 +{progress.get('experience', 0)}、亲和 +{progress.get('affinity', 0)}"
+                if any(progress.values())
+                else "\n灵兽成长：本次逾时，仅恢复同行状态"
+            )
         late = "（逾时所得）" if record.fallback else ""
         narrative = record.journal.get("expired_text" if record.fallback else "complete_text", "")
-        followup = f"\n\n材料去向：{self._uses_text(record.journal)}" if record.journal else ""
-        if record.journal and not record.fallback:
+        followup = f"\n\n材料去向：{self._uses_text(record.journal)}" if "uses" in record.journal else ""
+        if "uses" in record.journal and not record.fallback:
             followup += f"\n{command_link('回看采集行记', '采集行记')}"
         return CommandResult(
             True,
             "IDLE_CLAIMED",
-            f"**闲居所得已收取{late}**\n\n{record.label}\n{narrative}\n所得：{reward_text}{followup}",
+            f"**闲居所得已收取{late}**\n\n{record.label}\n{narrative}\n所得：{reward_text}{growth_text}{followup}",
             context.request_id,
             operation_id,
             data={
@@ -266,6 +286,7 @@ class IdleApplication:
                 "fallback": record.fallback,
                 "tool_durability_before": record.tool_durability_before,
                 "tool_durability_after": record.tool_durability_after,
+                "companion_progress": dict(progress),
                 "idempotent_replay": record.already_completed,
             },
         )

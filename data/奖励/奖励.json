@@ -1878,6 +1878,28 @@
       "status": "active"
     },
     {
+      "name": "灵兽栖地巡护所得",
+      "desc": "灵兽巡护近郊栖地所得的粗糙灵米与灵叶。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 3, "rewards": {"item.food.coarse_spirit_rice": 1, "item.herb.spirit_leaf": 1}},
+        {"weight": 2, "rewards": {"item.food.coarse_spirit_rice": 2, "item.herb.spirit_leaf": 1}},
+        {"weight": 1, "rewards": {"item.food.coarse_spirit_rice": 1, "item.herb.spirit_leaf": 2}}
+      ],
+      "key": "reward_pool.idle.beast_habitat_patrol",
+      "status": "active"
+    },
+    {
+      "name": "灵兽栖地巡护保底所得",
+      "desc": "逾时后仍可收取的一片灵叶。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 1, "rewards": {"item.herb.spirit_leaf": 1}}
+      ],
+      "key": "reward_pool.idle.beast_habitat_patrol.fallback",
+      "status": "active"
+    },
+    {
       "name": "领域避难所看守保底所得",
       "desc": "逾时后仍可领取的少量灵石。",
       "pool_type": "weighted",

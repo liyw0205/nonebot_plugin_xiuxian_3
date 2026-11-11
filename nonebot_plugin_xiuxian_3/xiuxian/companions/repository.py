@@ -321,6 +321,8 @@ class CompanionRepositoryMixin:
             definition = companion_definition(str(instance["companion_key"]), getattr(self, "content", None))
             if definition.kind != "beast" or not definition.feed_item_key:
                 raise CompanionRequirementError("this entity cannot be fed")
+            if str(instance["status"]) == "travelling":
+                raise CompanionRequirementError("travelling companion cannot be fed")
             if str(instance["status"]) in {"injured", "resting", "retired"}:
                 raise CompanionInjuredError("companion is resting")
             spent = {definition.feed_item_key: 1}
@@ -386,6 +388,8 @@ class CompanionRepositoryMixin:
             status = str(instance["status"])
             if status == "retired":
                 raise CompanionNotFoundError("companion is retired")
+            if status == "travelling":
+                raise CompanionRequirementError("travelling companion cannot be companied")
             if status in {"injured", "resting"}:
                 raise CompanionInjuredError("companion is resting")
             used_today = int(

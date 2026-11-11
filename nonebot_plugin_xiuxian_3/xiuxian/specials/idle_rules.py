@@ -46,6 +46,9 @@ class IdleRouteDefinition:
     durability_cost_bp: int
     required_unlock: str | None = None
     gathering_journal: dict[str, Any] = field(default_factory=dict)
+    required_companion_kind: str | None = None
+    companion_progress: dict[str, int] = field(default_factory=dict)
+    patrol_journal: dict[str, str] = field(default_factory=dict)
 
 
 _STAGE_ORDER = {
@@ -163,6 +166,17 @@ def journal_from_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
         ):
             raise ValueError("idle snapshot gathering_journal.uses contains an invalid recipe")
     return dict(value)
+
+
+def patrol_journal_from_snapshot(snapshot: dict[str, Any]) -> dict[str, str]:
+    value = snapshot.get("patrol_journal")
+    if value is None or value == {}:
+        return {}
+    if not isinstance(value, dict) or set(value) != {"start_text", "complete_text", "expired_text"}:
+        raise ValueError("idle snapshot patrol_journal has invalid fields")
+    if any(not isinstance(value[field], str) or not value[field].strip() for field in value):
+        raise ValueError("idle snapshot patrol_journal text must be non-empty")
+    return {str(field): str(value[field]) for field in value}
 
 
 def _parse_route(row: dict[str, Any], bundle: ContentBundle) -> IdleRouteDefinition:
@@ -291,6 +305,27 @@ def _parse_route(row: dict[str, Any], bundle: ContentBundle) -> IdleRouteDefinit
         ):
             raise ContentError(f"idle route {key} references an unknown codex unlock")
 
+    companion_kind = requirements.get("companion_kind")
+    if companion_kind is not None:
+        if companion_kind not in {"beast", "mount"}:
+            raise ContentError(f"idle route {key} has an unsupported companion kind")
+        if not any(
+            row.get("kind") == companion_kind and row.get("status") in {"active", "open"}
+            for row in bundle.list("companion", include_locked=False)
+        ):
+            raise ContentError(f"idle route {key} has no active companion of the required kind")
+
+    companion_progress = row.get("companion_progress", {})
+    if not isinstance(companion_progress, dict) or set(companion_progress) - {"experience", "affinity"}:
+        raise ContentError(f"idle route {key} companion_progress has invalid fields")
+    progress = {
+        field: _non_negative_integer(companion_progress.get(field, 0), key, f"companion_progress.{field}")
+        for field in ("experience", "affinity")
+    }
+    if companion_kind is None and any(progress.values()):
+        raise ContentError(f"idle route {key} companion_progress requires companion_kind")
+    patrol_journal = _parse_patrol_journal(row.get("patrol_journal"), key, companion_kind)
+
     pool_key = _required_string(row.get("reward_pool_key"), key, "reward_pool_key")
     fallback_pool_key = _required_string(row.get("fallback_reward_pool_key"), key, "fallback_reward_pool_key")
     _validate_pool(pool_key, bundle, key, fallback=False)
@@ -323,7 +358,22 @@ def _parse_route(row: dict[str, Any], bundle: ContentBundle) -> IdleRouteDefinit
         durability_cost_bp=durability_cost,
         required_unlock=required_unlock,
         gathering_journal=journal,
+        required_companion_kind=companion_kind,
+        companion_progress=progress,
+        patrol_journal=patrol_journal,
     )
+
+
+def _parse_patrol_journal(value: Any, route_key: str, companion_kind: str | None) -> dict[str, str]:
+    if value is None:
+        if companion_kind is not None:
+            raise ContentError(f"idle route {route_key} companion routes require patrol_journal")
+        return {}
+    if companion_kind is None or not isinstance(value, dict) or set(value) != {"start_text", "complete_text", "expired_text"}:
+        raise ContentError(f"idle route {route_key} patrol_journal has invalid fields")
+    if any(not isinstance(value[field], str) or not value[field].strip() for field in value):
+        raise ContentError(f"idle route {route_key} patrol_journal text cannot be blank")
+    return {field: value[field].strip() for field in value}
 
 
 def _parse_gathering_journal(
@@ -424,4 +474,5 @@ __all__ = [
     "reward_local_reputation_maximums",
     "resolve_route",
     "reward_for",
+    "patrol_journal_from_snapshot",
 ]

@@ -1275,6 +1275,40 @@
       "status": "active"
     },
     {
+      "name": "灵兽栖地巡护",
+      "desc": "带一只已结缘灵兽巡视玄天近郊的栖地，收集灵米与灵叶，也让它在山野中磨炼亲和。",
+      "aliases": [
+        "栖地巡护",
+        "灵兽巡护"
+      ],
+      "duration_seconds": 14400,
+      "cost": {
+        "stamina": 2,
+        "energy": 0
+      },
+      "daily_limit": 1,
+      "requirements": {
+        "stage": "mortal",
+        "location_key": "xuantian.outskirts",
+        "companion_kind": "beast"
+      },
+      "companion_progress": {
+        "experience": 20,
+        "affinity": 4
+      },
+      "patrol_journal": {
+        "start_text": "你牵着灵兽沿近郊旧兽道巡行，山风里还留着昨夜雨后的草木香。",
+        "complete_text": "灵兽在石涧边找回散落的灵米，也替受惊的小兽引回栖地；这一趟巡护让彼此更懂得山路。",
+        "expired_text": "你回来得太晚，只来得及收好一片灵叶；灵兽没有得到完整的巡护磨炼。"
+      },
+      "reward_pool_key": "reward_pool.idle.beast_habitat_patrol",
+      "fallback_reward_pool_key": "reward_pool.idle.beast_habitat_patrol.fallback",
+      "durability_cost_bp": 0,
+      "key": "idle.beast_habitat_patrol",
+      "record_type": "idle_route",
+      "status": "active"
+    },
+    {
       "name": "虚空补给看守",
       "desc": "在虚空航道沿线看守补给与锚点，收得灵石与建设券。",
       "aliases": [

@@ -37,6 +37,8 @@ class IdleAssignmentRecord:
     cost: dict[str, int]
     tool_key: str | None = None
     facility_slot_key: str | None = None
+    companion_instance_id: str | None = None
+    companion_label: str | None = None
     result: dict[str, int] = field(default_factory=dict)
     fallback: bool = False
     already_completed: bool = False
@@ -57,6 +59,7 @@ class IdleSettlementRecord:
     already_completed: bool = False
     journal: dict[str, Any] = field(default_factory=dict)
     reward_labels: dict[str, str] = field(default_factory=dict)
+    companion_progress: dict[str, int] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
