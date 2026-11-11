@@ -119,11 +119,11 @@ def old_official_mainline() -> bytes:
         ):
             section, count = re.subn(pattern, "", section, count=1, flags=re.M | re.S)
             if pattern.startswith('^      "next_stage_key"'):
-                # Only the closing tail stage omits ahead reference; others must drop one.
-                # Only story-tail stages legitimately omit the ahead reference.
+                # Only story-tail stages legitimately omit the ahead reference. The
+                # archive returner now hands off to the optional supply lane, so the
+                # historical fixture must remove that link while reconstructing its old tail.
                 tail = key in (
                     "chapter.8.stage.3",
-                    "void_archive.return.8",
                     "lane.builder.chapter.10",
                     "lane.witness.chapter.10",
                     "lane.traveler.chapter.10",

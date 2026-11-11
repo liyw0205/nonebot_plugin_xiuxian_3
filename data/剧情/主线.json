@@ -1643,6 +1643,7 @@
         {"command": "前往", "argument": "虚空门户", "description": "从虚空档案遗迹返回虚空门户，等待行程结束并结算移动。"}
       ],
       "state_changes": {"activity_events": ["story.mainline.void_archive:void_archive.return.8"]},
+      "next_stage_key": "void_archive.supply.1",
       "retry": {
         "on_incomplete": "keep_running",
         "cooldown_seconds": 0,
@@ -3611,6 +3612,87 @@
       "required_layer": 1,
       "prerequisites": ["domain_frontier.purification.2"],
       "first_clear_reward": {"spirit_stones": 40, "local_reputation": 3, "service_reputation": 1},
+      "repeat_reward": {"spirit_stones": 4}
+    },
+    {
+      "key": "void_archive.supply.1",
+      "story_key": "story.mainline.void_archive",
+      "chapter": 4,
+      "stage": 1,
+      "name": "补给再临",
+      "desc": "档案归乡之后，回到第一航道核对补给锚点是否仍在运转。",
+      "body": "虚空档案已经送回门户，但航道上的补给不能只靠旧账本维持。归乡之后，补给回响一关要重新走到第一航道，查看锚点与补给标记是否仍按公开航路运转。只有本人结算抵达过这段航道，后续看守与取锚才有真实落点；未抵达时不扣主线奖励，恢复体力后沿门户的公开路线重走即可。",
+      "objectives": [
+        {"key": "reach_supply_route", "type": "travel_arrival", "label": "结算行程抵达虚空第一航道", "destination_key": "void.first_route"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "虚空第一航道", "description": "从虚空门户沿已开放航路前往第一航道，并在行程结束后结算抵达。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.void_archive:void_archive.supply.1"]},
+      "next_stage_key": "void_archive.supply.2",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "尚未结算抵达第一航道时关卡保持进行中且不发奖励；补足体力后从虚空门户重新启程，旧行程不会替代本关开始后的抵达。"},
+      "status": "open",
+      "aliases": ["补给再临"],
+      "lane": "supply",
+      "lane_name": "虚空补给",
+      "required_realm": "void_refining",
+      "required_layer": 1,
+      "prerequisites": ["void_archive.return.8"],
+      "first_clear_reward": {"codex.void.route_ruins": 1, "spirit_stones": 20},
+      "repeat_reward": {"spirit_stones": 4}
+    },
+    {
+      "key": "void_archive.supply.2",
+      "story_key": "story.mainline.void_archive",
+      "chapter": 4,
+      "stage": 2,
+      "name": "航道值守",
+      "desc": "用一轮完整补给看守确认航道上的锚点仍有可交接的来源。",
+      "body": "第一航道的补给标记没有熄灭，值守人却已经换了几轮。补给回响二关要在本关开始后安排一次真实的虚空补给看守，等完整十二小时窗口结束后回来领取，把灵石与建设券的结算写进自己的账册。提前领取、取消、旧安排或逾时保底都不能代替完整交接；错过窗口先领取保底，次日可重新安排新的看守。",
+      "objectives": [
+        {"key": "claim_supply_watch", "type": "idle_claim", "label": "本关开始后完整领取一次虚空补给看守", "route_key": "idle.void_supply_watch"}
+      ],
+      "actions": [
+        {"command": "挂机预览", "argument": "虚空补给看守", "description": "确认炼虚一层、体力、每日次数与完整/逾时所得。"},
+        {"command": "开始挂机", "argument": "虚空补给看守", "description": "本关开始后安排补给看守，十二小时后在完整领取窗口内交接。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.void_archive:void_archive.supply.2"]},
+      "next_stage_key": "void_archive.supply.3",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "只认本关开始后的新安排及完整领取；旧安排、取消、仍在运行或逾时保底均不计。错过完整窗口先领保底，次日再安排新的十二小时看守。"},
+      "status": "open",
+      "aliases": ["航道值守"],
+      "lane": "supply",
+      "lane_name": "虚空补给",
+      "required_realm": "void_refining",
+      "required_layer": 1,
+      "prerequisites": ["void_archive.supply.1"],
+      "first_clear_reward": {"codex.void.route_ruins": 1, "spirit_stones": 25, "service_reputation": 1},
+      "repeat_reward": {"spirit_stones": 4}
+    },
+    {
+      "key": "void_archive.supply.3",
+      "story_key": "story.mainline.void_archive",
+      "chapter": 4,
+      "stage": 3,
+      "name": "锚点回响",
+      "desc": "从真实航道探索取回一枚虚空锚，让补给看守留下可继续使用的落点。",
+      "body": "补给交接已经落账，最后要把锚点本身带回来。补给回响终关只认本关开始后在第一航道完成的真实探索，并从服务端结算中取得一枚虚空锚；不读取开始前存货，也不接受旁人代取或未结算的探索。航道每日两度历练，若本次没有取到锚或遭遇战败，关卡保持进行中，恢复后可继续按现有次数与奖励池重试。",
+      "objectives": [
+        {"key": "recover_supply_anchor", "type": "exploration_reward", "label": "在第一航道探索结算中取得一枚虚空锚", "mode_key": "explore.void_route", "location_key": "void.first_route", "item_key": "item.void_anchor", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "虚空航道历练", "description": "在第一航道按现有开放规则开始探索，等待结算并取得虚空锚。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.void_archive:void_archive.supply.3"]},
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "只统计本关开始后第一航道探索的已结算虚空锚；未取到、战败或尚未结算都不扣主线奖励，恢复后继续公开探索即可。开始前存货、其他地点或测试注入物品均不计。"},
+      "status": "open",
+      "aliases": ["锚点回响"],
+      "lane": "supply",
+      "lane_name": "虚空补给",
+      "required_realm": "void_refining",
+      "required_layer": 1,
+      "prerequisites": ["void_archive.supply.2"],
+      "first_clear_reward": {"codex.void.route_ruins": 1, "spirit_stones": 40, "service_reputation": 1},
       "repeat_reward": {"spirit_stones": 4}
     }
   ]
