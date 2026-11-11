@@ -4100,7 +4100,7 @@
         {"key": "claim_town_errand", "type": "idle_claim", "label": "本关开始后完整领取一次镇中行旅", "route_key": "idle.town_errand"}
       ],
       "actions": [
-        {"command": "挂机预览", "argument": "镇中行旅", "description": "确认已在青石镇、凡人阶段、两小时窗口和当日次数后再安排。"},
+        {"command": "挂机预览", "argument": "镇中行旅", "description": "确认已在青石镇、至少凡人阶段、两小时窗口和当日次数后再安排。"},
         {"command": "开始挂机", "argument": "镇中行旅", "description": "本关开始后由本人开始镇中行旅，完整窗口结束后领取生活所得。"}
       ],
       "state_changes": {"activity_events": ["story.mainline.livelihood_echoes:livelihood_echoes.1"]},
@@ -4125,6 +4125,7 @@
         {"key": "claim_herb_watch", "type": "idle_claim", "label": "本关开始后完整领取一次灵圃看护", "route_key": "idle.herb_watch"}
       ],
       "actions": [
+        {"command": "租住居所", "argument": "客房", "description": "尚无有效居所时，可花二十灵石租住三日青石镇客房；已有有效居所无需重租。"},
         {"command": "挂机预览", "argument": "灵圃看护", "description": "确认有效居所、四小时窗口、每日一次限额与完整/逾时所得。"},
         {"command": "开始挂机", "argument": "灵圃看护", "description": "本关开始后安排灵圃看护，完整窗口结束后领取收获。"}
       ],
@@ -4144,12 +4145,12 @@
       "stage": 3,
       "name": "作坊值守",
       "desc": "在作坊完整值守一轮，把炉锤与阵材的日常守成一段可靠回响。",
-      "body": "灵圃有了着落，作坊的炉火也需要有人看守。作坊值守保留原有的基础炉具、铁锤和 artifice 设施门槛；本关开始后由本人新建安排，完整三小时窗口结束后领取，才会把炉锤与阵材的回响记入行册。工具、设施、日限不足以及逾时保底都不消耗剧情次数，也不替代完整值守。",
+      "body": "灵圃有了着落，作坊的炉火也需要有人看守。作坊值守只需基础炉具或铁锤之一，也可使用本人在雾隐洞天二层启用的炼器台。尚无工具时，可完成凡人引导后选择器修取得铁锤，或选择辅修炼丹、炼器取得对应工具。本关开始后由本人新建安排，完整三小时窗口结束后领取，才会记下作坊回响。工具和设施均不可用、日限不足或逾时保底都不替代完整值守。",
       "objectives": [
         {"key": "claim_workshop_care", "type": "idle_claim", "label": "本关开始后完整领取一次作坊值守", "route_key": "idle.workshop_care"}
       ],
       "actions": [
-        {"command": "挂机预览", "argument": "作坊值守", "description": "确认基础炉具、铁锤、artifice 设施、三小时窗口和当日名额。"},
+        {"command": "挂机预览", "argument": "作坊值守", "description": "确认基础炉具或铁锤之一，或本人当前地点可用的炼器台；同时核对三小时窗口和当日名额。"},
         {"command": "开始挂机", "argument": "作坊值守", "description": "本关开始后安排作坊值守，完整窗口结束后领取所得。"}
       ],
       "state_changes": {"activity_events": ["story.mainline.livelihood_echoes:livelihood_echoes.3"]},
