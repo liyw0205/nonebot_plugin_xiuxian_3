@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any
 
 from ...contracts import PlayerView
 
@@ -39,6 +40,7 @@ class IdleAssignmentRecord:
     result: dict[str, int] = field(default_factory=dict)
     fallback: bool = False
     already_completed: bool = False
+    journal: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,6 +55,17 @@ class IdleSettlementRecord:
     tool_durability_before: int | None = None
     tool_durability_after: int | None = None
     already_completed: bool = False
+    journal: dict[str, Any] = field(default_factory=dict)
+    reward_labels: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
+class IdleStatusRecord:
+    assignment: IdleAssignmentRecord
+    remaining_seconds: int
+    claimable: bool
+    fallback: bool
+    cancellable: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,4 +85,5 @@ __all__ = [
     "IdleCancelRecord",
     "IdleRoutePreviewRecord",
     "IdleSettlementRecord",
+    "IdleStatusRecord",
 ]

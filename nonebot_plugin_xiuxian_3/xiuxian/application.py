@@ -391,6 +391,8 @@ class XiuxianApplication:
         if len(context.command_args) == 1 and context.command_args[0] in _HELP_PAGES:
             category = context.command_args[0]
             body = _HELP_PAGES[category]
+            if category in {"生活", "探索"}:
+                body += "\n\n" + self._gathering_help_lines()
             if category == "探索":
                 body += "\n\n" + self._exploration_mode_lines()
                 secret_lines = self._secret_realm_help_lines()
@@ -451,6 +453,22 @@ class XiuxianApplication:
             _HELP_OVERVIEW,
             context.request_id,
         )
+
+    def _gathering_help_lines(self) -> str:
+        from .content import bundled_content
+        from .specials.idle_rules import idle_route_order
+
+        bundle = self.content or bundled_content()
+        lines = ["**山野采集行记**", "先沿通路抵达当地，再查看路线详情。"]
+        for route in idle_route_order(bundle):
+            if route.gathering_journal:
+                location = bundle.label("location", route.required_location)
+                lines.append(f"- {location}：{command_link(route.label, f'挂机预览 {route.label}')}，{route.duration_seconds // 3600} 小时")
+        lines.append(
+            f"{command_link('挂机状态', '挂机状态')}查看当前安排与领取窗口；"
+            f"完整领取后可用{command_link('采集行记', '采集行记')}回看人物见闻与材料去向。"
+        )
+        return "\n".join(lines)
 
     def _exploration_mode_lines(self) -> str:
         """List open exploration modes grouped by location for the help page.
@@ -2880,6 +2898,12 @@ class XiuxianApplication:
 
     async def preview_idle(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.idle.preview(context), require_write=False)
+
+    async def get_idle_status(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.idle.status(context), require_write=False)
+
+    async def get_idle_journals(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.idle.journals(context), require_write=False)
 
     async def start_idle(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.idle.start(context), write_message="当前事件不允许开始挂机。")

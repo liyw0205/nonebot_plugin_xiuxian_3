@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from ...contracts import CommandContext, CommandResult
+import logging
+
+from ...contracts import CommandAction, CommandContext, CommandResult
 from ..content import bundled_content
 from ..persistence.errors import (
     IdleAlreadySettledError,
@@ -12,6 +14,7 @@ from ..persistence.errors import (
     IdleDailyLimitError,
     IdleNotFoundError,
     IdleRequirementError,
+    IdleRouteNotFoundError,
     OperationConflictError,
     PlayerNotFoundError,
     PlayerSuspendedError,
@@ -19,7 +22,11 @@ from ..persistence.errors import (
 )
 from .idle_models import IdleAssignmentRecord, IdleRoutePreviewRecord
 from .idle_repository import IdleRepositoryMixin
-from .idle_rules import resolve_route
+from .idle_rules import idle_reward_label
+from ..utils.text import command_link
+
+
+logger = logging.getLogger(__name__)
 
 
 class IdleApplication:
@@ -36,11 +43,12 @@ class IdleApplication:
         return f"{operation_name}:{context.adapter}:{context.user_id}:{key}"
 
     @staticmethod
-    def _error(context: CommandContext, operation_id: str, exc: Exception) -> CommandResult:
+    def _error(context: CommandContext, operation_id: str, exc: Exception, *, command: str) -> CommandResult:
         errors = {
             PlayerNotFoundError: ("PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。"),
             PlayerSuspendedError: ("PLAYER_SUSPENDED", "当前角色暂不能安排闲居历练。"),
             IdleRequirementError: ("IDLE_REQUIREMENT_MISSING", "当前路线的地点、资源或设施条件未满足。"),
+            IdleRouteNotFoundError: ("IDLE_ROUTE_NOT_FOUND", "没有找到这条闲居路线。"),
             IdleBusyError: ("IDLE_BUSY", "当前角色已有进行中的长时行动，请先结算或取消。"),
             IdleDailyLimitError: ("IDLE_DAILY_LIMIT", "该路线今日结算次数已用尽。"),
             IdleNotFoundError: ("IDLE_NOT_FOUND", "眼下没有待领取的闲居安排。"),
@@ -52,8 +60,19 @@ class IdleApplication:
         }
         for error_type, (code, message) in errors.items():
             if isinstance(exc, error_type):
-                return CommandResult(False, code, message, context.request_id, operation_id or None, retryable=error_type is RepositoryBusyError)
-        return CommandResult(False, "PERSISTENCE_ERROR", "闲居安排未能落定，请稍后再试。", context.request_id, operation_id or None, retryable=True)
+                if isinstance(exc, IdleRequirementError):
+                    message = f"无法安排闲居：{exc}。"
+                return CommandResult(
+                    False, code, message, context.request_id, operation_id or None,
+                    retryable=error_type is RepositoryBusyError,
+                    data={"reason": str(exc), "subject": context.command_args[0] if context.command_args else "本人闲居安排"},
+                )
+        logger.error(
+            "idle command failed command=%s adapter=%s request=%s operation=%s args=%r",
+            command, context.adapter, context.request_id, operation_id, context.command_args,
+            exc_info=(type(exc), exc, exc.__traceback__),
+        )
+        raise exc
 
     @staticmethod
     def _preview_data(record: IdleRoutePreviewRecord) -> dict[str, object]:
@@ -72,18 +91,18 @@ class IdleApplication:
         }
 
     def _reward_label(self, key: str) -> str:
-        content = self.repository.content or bundled_content()
-        fixed_labels = {"spirit_stones": "灵石", "stamina": "体力", "energy": "精力"}
-        if key in fixed_labels:
-            return fixed_labels[key]
-        if key.startswith("item."):
-            return content.label("item", key)
-        if key.startswith("local."):
-            location_key = key.removeprefix("local.")
-            return f"{content.label('location', location_key)}名望"
-        if key.startswith("codex."):
-            return content.label("codex_entry", key)
-        return key
+        return idle_reward_label(key, self.repository.content)
+
+    @staticmethod
+    def _uses_text(journal: dict) -> str:
+        return "、".join(command_link(use["label"], use["command"]) for use in journal.get("uses", []))
+
+    def _ranges_text(self, ranges: dict) -> str:
+        return "、".join(
+            f"{self._reward_label(key)} {low}" if low == high
+            else f"{self._reward_label(key)} {low}-{high}"
+            for key, (low, high) in ranges.items()
+        )
 
     @staticmethod
     def _assignment_data(record: IdleAssignmentRecord) -> dict[str, object]:
@@ -104,11 +123,6 @@ class IdleApplication:
     async def preview(self, context: CommandContext) -> CommandResult:
         if len(context.command_args) > 1:
             return CommandResult(False, "INVALID_IDLE_COMMAND", "一次只可查看一条路线。", context.request_id)
-        if context.command_args:
-            try:
-                resolve_route(context.command_args[0], self.repository.content)
-            except ValueError:
-                return CommandResult(False, "IDLE_ROUTE_NOT_FOUND", "没有找到这条闲居路线。", context.request_id)
         try:
             records = await self.repository.preview_idle(
                 platform=context.adapter,
@@ -116,16 +130,79 @@ class IdleApplication:
                 route_key=context.command_args[0] if context.command_args else None,
             )
         except Exception as exc:
-            return self._error(context, "", exc)
+            return self._error(context, "", exc, command="挂机预览")
         data = {"routes": [self._preview_data(record) for record in records]}
-        lines = ["## 闲居路线", ""]
+        lines = ["**闲居路线**", ""]
+        actions = ()
         for record in records:
             state = "可开始" if record.ready else f"不可开始：{'、'.join(record.missing)}"
             lines.append(
                 f"- **{record.label}** · {record.description} · "
                 f"{record.duration_seconds // 3600} 小时 · {state}"
             )
-        return CommandResult(True, "IDLE_PREVIEW", "\n".join(lines), context.request_id, data=data)
+            if not context.command_args:
+                lines.append(command_link("查看详情", f"挂机预览 {record.label}"))
+            else:
+                conditions = record.requirements
+                bundle = self.repository.content or bundled_content()
+                if conditions["required_location"]:
+                    lines.append(f"地点：{bundle.label('location', conditions['required_location'])}")
+                if conditions["required_realm"]:
+                    lines.append(f"境界：{bundle.label('realm', conditions['required_realm'])} L{conditions['required_layer']} 起")
+                lines.extend([
+                    f"花费：体力 {record.stamina_cost}、精力 {record.energy_cost}",
+                    f"本日已结算：{record.daily_used}/{record.daily_limit}",
+                    f"完整所得：{self._ranges_text(conditions['full_reward_ranges'])}",
+                    f"逾时所得：{self._ranges_text(conditions['fallback_reward_ranges'])}",
+                ])
+                journal = conditions["gathering_journal"]
+                if journal:
+                    lines.extend(["", journal["start_text"], f"材料去向：{self._uses_text(journal)}"])
+                if record.ready:
+                    actions = (CommandAction("安排此项闲居", f"开始挂机 {record.label}", enter=True),)
+        lines.extend(["", command_link("当前安排", "挂机状态")])
+        return CommandResult(True, "IDLE_PREVIEW", "\n".join(lines), context.request_id, data=data, actions=actions)
+
+    async def status(self, context: CommandContext) -> CommandResult:
+        if context.command_args:
+            return CommandResult(False, "INVALID_IDLE_COMMAND", "挂机状态只查看本人当前安排，无需填写参数。", context.request_id)
+        try:
+            record = await self.repository.get_idle_status(platform=context.adapter, platform_user_id=context.user_id)
+        except Exception as exc:
+            return self._error(context, "", exc, command="挂机状态")
+        if record is None:
+            return CommandResult(True, "IDLE_STATUS", f"眼下没有待领取的闲居安排。\n\n{command_link('挑选路线', '挂机预览')}", context.request_id, data={"assignment": None})
+        item = record.assignment
+        state = "逾时，可领保底" if record.fallback else "可领取完整所得" if record.claimable else f"还需 {record.remaining_seconds} 秒"
+        lines = [f"**{item.label}**", "", state, f"可领取：{item.claim_at}", f"完整领取截止：{item.max_claim_at}"]
+        if item.journal:
+            lines.extend(["", item.journal["start_text"]])
+        actions = ()
+        if record.claimable:
+            actions = (CommandAction("领取保底" if record.fallback else "领取所得", "领取挂机", enter=True),)
+        elif record.cancellable:
+            actions = (CommandAction("撤回安排", "取消挂机", enter=True),)
+        return CommandResult(
+            True, "IDLE_STATUS", "\n".join(lines), context.request_id,
+            data={"assignment": self._assignment_data(item), "remaining_seconds": record.remaining_seconds,
+                  "claimable": record.claimable, "fallback": record.fallback, "cancellable": record.cancellable},
+            actions=actions,
+        )
+
+    async def journals(self, context: CommandContext) -> CommandResult:
+        if context.command_args:
+            return CommandResult(False, "INVALID_IDLE_COMMAND", "采集行记无需填写参数。", context.request_id)
+        try:
+            records = await self.repository.get_idle_journals(platform=context.adapter, platform_user_id=context.user_id)
+        except Exception as exc:
+            return self._error(context, "", exc, command="采集行记")
+        lines = ["**山野采集行记**", ""]
+        for item in records:
+            lines.extend([f"**{item['label']}**", item["complete_text"], f"材料去向：{self._uses_text(item)}", ""])
+        if not records:
+            lines.append("尚未完整收回山野采集所得。")
+        lines.append(command_link("挑选路线", "挂机预览"))
+        return CommandResult(True, "IDLE_JOURNALS", "\n".join(lines), context.request_id, data={"journals": list(records)})
 
     async def start(self, context: CommandContext) -> CommandResult:
         if not 1 <= len(context.command_args) <= 2:
@@ -140,14 +217,16 @@ class IdleApplication:
                 operation_id=operation_id,
             )
         except Exception as exc:
-            return self._error(context, operation_id, exc)
+            return self._error(context, operation_id, exc, command="开始挂机")
         return CommandResult(
             True,
             "IDLE_STARTED",
-            f"## 闲居安排已定\n\n- **路线**：{record.label}\n- **可领取**：{record.claim_at}\n- **最迟领取**：{record.max_claim_at}\n- **开始后 60 秒内可撤回**：是",
+            f"**闲居安排已定**\n\n{record.label}\n{record.journal.get('start_text', '')}\n"
+            f"可领取：{record.claim_at}\n完整领取截止：{record.max_claim_at}\n\n{command_link('当前安排', '挂机状态')}",
             context.request_id,
             operation_id,
             data=self._assignment_data(record),
+            actions=() if record.already_completed else (CommandAction("撤回安排", "取消挂机", enter=True),),
         )
 
     async def claim(self, context: CommandContext) -> CommandResult:
@@ -162,17 +241,21 @@ class IdleApplication:
                 operation_id=operation_id,
             )
         except Exception as exc:
-            return self._error(context, operation_id, exc)
-        reward_text = "、".join(
-            f"记下「{self._reward_label(key)}」" if key.startswith("codex.")
-            else f"{self._reward_label(key)} +{value}"
-            for key, value in record.reward.items()
-        ) or "无额外所得"
+            return self._error(context, operation_id, exc, command="领取挂机")
+        reward_parts = []
+        for key, value in record.reward.items():
+            label = record.reward_labels[key] if key in record.reward_labels else self._reward_label(key)
+            reward_parts.append(f"记下「{label}」" if key.startswith("codex.") else f"{label} +{value}")
+        reward_text = "、".join(reward_parts) or "无额外所得"
         late = "（逾时所得）" if record.fallback else ""
+        narrative = record.journal.get("expired_text" if record.fallback else "complete_text", "")
+        followup = f"\n\n材料去向：{self._uses_text(record.journal)}" if record.journal else ""
+        if record.journal and not record.fallback:
+            followup += f"\n{command_link('回看采集行记', '采集行记')}"
         return CommandResult(
             True,
             "IDLE_CLAIMED",
-            f"## 闲居所得已收取{late}\n\n- **路线**：{record.label}\n- **所得**：{reward_text}",
+            f"**闲居所得已收取{late}**\n\n{record.label}\n{narrative}\n所得：{reward_text}{followup}",
             context.request_id,
             operation_id,
             data={
@@ -199,7 +282,7 @@ class IdleApplication:
                 operation_id=operation_id,
             )
         except Exception as exc:
-            return self._error(context, operation_id, exc)
+            return self._error(context, operation_id, exc, command="取消挂机")
         refunds = [f"{self._reward_label(key)} +{value}" for key, value in record.refunded.items() if value]
         if record.returned_tool_key:
             refunds.append(f"{self._reward_label(record.returned_tool_key)} ×1")

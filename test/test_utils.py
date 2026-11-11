@@ -607,6 +607,34 @@ def test_asset_transition_exposes_one_validated_before_after_pair() -> None:
         asset_transition(0, {}, {"spirit_stones": -1}, mode="delta")
 
 
+def test_oversized_player_writes_preserve_precision_and_transaction_rollback() -> None:
+    connection = sqlite3.connect(":memory:")
+    connection.row_factory = sqlite3.Row
+    connection.execute(
+        "CREATE TABLE players (id INTEGER PRIMARY KEY, spirit_stones INTEGER NOT NULL, "
+        "total_cultivation INTEGER NOT NULL, inventory_json TEXT NOT NULL, updated_at TEXT NOT NULL)"
+    )
+    connection.execute("INSERT INTO players VALUES (1, 10, 20, '{}', 'before')")
+    connection.commit()
+    huge = 10 ** 100
+    with pytest.raises(RuntimeError, match="rollback"):
+        with connection:
+            write_player_values(connection, 1, {"spirit_stones": huge, "total_cultivation": huge + 7}, "large")
+            row = connection.execute("SELECT * FROM players").fetchone()
+            assert player_integer(row, "total_cultivation") == huge + 7
+            assert player_currency(row) == huge
+            raise RuntimeError("rollback")
+    row = connection.execute("SELECT * FROM players").fetchone()
+    assert row["spirit_stones"] == 10 and row["total_cultivation"] == 20
+    grant_player_assets(connection, row, {"spirit_stones": huge}, "granted")
+    row = connection.execute("SELECT * FROM players").fetchone()
+    assert player_currency(row) == huge + 10
+    spend_player_assets(connection, row, {"spirit_stones": huge}, "spent")
+    row = connection.execute("SELECT * FROM players").fetchone()
+    assert row["spirit_stones"] == 10 and isinstance(row["spirit_stones"], int)
+    connection.close()
+
+
 def test_player_asset_mutations_share_transactional_persistence() -> None:
     connection = sqlite3.connect(":memory:")
     connection.row_factory = sqlite3.Row
