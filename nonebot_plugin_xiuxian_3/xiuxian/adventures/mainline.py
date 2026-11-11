@@ -390,7 +390,12 @@ def _story_objectives(
                 raise ContentError(f"mainline {key} objective {objective_key} min_points must be positive")
             if bundle is not None:
                 project = bundle.get("livelihood", project_key, include_locked=False)
-                if project is None or project.get("record_type") != "public_project":
+                if (
+                    project is None
+                    or project.get("record_type") != "public_project"
+                    or not isinstance(project.get("contribution_resources"), list)
+                    or not project.get("contribution_resources")
+                ):
                     raise ContentError(f"mainline {key} objective {objective_key} references unknown project")
             normalized = {
                 "key": str(objective_key), "type": kind, "label": label.strip(),
@@ -406,6 +411,25 @@ def _story_objectives(
                 route = bundle.get("livelihood", route_key, include_locked=False)
                 if route is None or route.get("record_type") != "idle_route":
                     raise ContentError(f"mainline {key} objective {objective_key} references unknown idle route")
+                reward_pool_key = route.get("reward_pool_key")
+                fallback_pool_key = route.get("fallback_reward_pool_key")
+                if not isinstance(reward_pool_key, str) or not reward_pool_key.strip():
+                    raise ContentError(f"mainline {key} objective {objective_key} idle route has no full reward pool")
+                if not isinstance(fallback_pool_key, str) or not fallback_pool_key.strip():
+                    raise ContentError(f"mainline {key} objective {objective_key} idle route has no fallback reward pool")
+                try:
+                    full_pool = bundle.require("reward", reward_pool_key, include_locked=False)
+                    fallback_pool = bundle.require("reward", fallback_pool_key, include_locked=False)
+                except KeyError as exc:
+                    raise ContentError(
+                        f"mainline {key} objective {objective_key} idle route references an inactive reward pool"
+                    ) from exc
+                for pool_name, pool in (("full", full_pool), ("fallback", fallback_pool)):
+                    outcomes = pool.get("outcomes")
+                    if not isinstance(outcomes, list) or not outcomes:
+                        raise ContentError(
+                            f"mainline {key} objective {objective_key} {pool_name} idle reward pool is empty"
+                        )
             normalized = {
                 "key": str(objective_key), "type": kind, "label": label.strip(), "route_key": route_key,
             }
