@@ -22,6 +22,7 @@ from .adventures.mainline_use_cases import AdventuresMainlineApplication
 from .adventures.mainline import (
     CODEX_ECHOES_STORY_KEY,
     CLOUD_MINE_ECHOES_STORY_KEY,
+    CLOUD_CITY_ECHOES_STORY_KEY,
     DAO_SETTLEMENT_STORY_KEY,
     DOMAIN_FRONTIER_STORY_KEY,
     VOID_ARCHIVE_STORY_KEY,
@@ -129,6 +130,8 @@ _HELP_PAGES = {
         "云铁矿区需达到筑基；采矿辅修、矿镐或登记许可均可作为准入凭据。"
         f"准备矿镐或许可前，可{command_link('生产预览 基础矿镐', '生产预览 基础矿镐')}"
         f"或{command_link('生产预览 矿区登记', '生产预览 矿区登记')}查看材料。"
+        "\n\n云城巡夜需金丹一层且身在云城；按现有日限完成真实遭遇战后才会结算胜场。"
+        f"可先{command_link('开始探索 云城巡夜', '开始探索 云城巡夜')}，再{command_link('结算探索', '结算探索')}领取结果。"
         "\n\n守界终关之后，可从领域前线主线的归镇筹粮开始避难所后记：返镇、实际贡献，再完整交班。"
         f"{command_link('领域前线主线', '领域前线主线')}会记下已解锁的关卡。"
         "\n\n虚空档案归乡后，补给回响会开放第一航道：先"
@@ -184,6 +187,10 @@ _HELP_PAGES = {
         f"{command_link('云铁守望回响主线', '云铁守望回响主线')}查看关卡，"
         f"再{command_link('开始云铁守望回响主线 矿口听风', '开始云铁守望回响主线 矿口听风')}沿公开山道抵达云铁矿区；"
         "之后按关卡提示结算云铁矿区采掘，并在本关开始后完整领取矿区看守。逾时保底不替代主线交接。\n\n"
+        "金丹一层后可接云城店铺回响：先"
+        f"{command_link('云城店铺回响主线', '云城店铺回响主线')}查看关卡，"
+        f"再{command_link('开始云城店铺回响主线 云城听更', '开始云城店铺回响主线 云城听更')}沿公开路线抵达云城；"
+        "随后按关卡提示完成云城巡夜真实胜场，并在云城地方名望达到 200 后完整领取店铺闲居。逾时保底不替代主线交班。\n\n"
         f"{command_link('每日修行', '每日修行')}记下日常安排，"
         f"{command_link('道历问安', '道历问安')}领取当日问安所得。\n\n"
         f"{command_link('灵兽状态', '灵兽状态')}可查看同行灵兽与灵骑；"
@@ -261,6 +268,13 @@ class XiuxianApplication:
             title="云铁守望回响主线",
             start_command="开始云铁守望回响主线",
             claim_command="领取云铁守望回响主线奖励",
+        )
+        self.cloud_city_echoes_mainline = AdventuresMainlineApplication(
+            repository,
+            story_key=CLOUD_CITY_ECHOES_STORY_KEY,
+            title="云城店铺回响主线",
+            start_command="开始云城店铺回响主线",
+            claim_command="领取云城店铺回响主线奖励",
         )
         self.dao_echoes = DaoEchoesApplication(repository)
         self.three_realms = ThreeRealmsApplication(repository)
@@ -1476,6 +1490,27 @@ class XiuxianApplication:
             context,
             lambda: self.cloud_mine_echoes_mainline.claim_reward(context),
             write_message="此刻无缘收取云铁守望回响主线所得。",
+        )
+
+    async def get_cloud_city_echoes_mainline_status(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.cloud_city_echoes_mainline.get_status(context),
+            require_write=False,
+        )
+
+    async def start_cloud_city_echoes_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.cloud_city_echoes_mainline.start_stage(context),
+            write_message="此刻无缘踏入云城店铺回响主线。",
+        )
+
+    async def claim_cloud_city_echoes_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.cloud_city_echoes_mainline.claim_reward(context),
+            write_message="此刻无缘收取云城店铺回响主线所得。",
         )
 
     async def preview_final_arena(self, context: CommandContext) -> CommandResult:
