@@ -97,8 +97,10 @@ Release、工作流均已按精确 SHA 核对。包内版本与 tag 为 `0.1.25`
 [寻道图鉴回响](gameplay/adventures/codex-seeker-echoes.md)。官方主线数据提交
 `0ba8c851ed14f3374f1f60bcbfc7cd3327fed38e` 将 `75e2f588…` 更新为
 `19628f2415…`，迁移表保留旧记录并登记该真实来源。当前业务工作树已接入
-`codex_discovery` 快照目标、公开探索遭遇冻结、双适配器图鉴回响命令与帮助入口；专项
-`test/test_codex_seeker_echoes.py` 2 passed，受影响主线/闲居/探索/迁移组 35 passed，
+`codex_discovery` 快照目标、公开探索遭遇冻结、双适配器图鉴回响命令与帮助入口；业务提交
+`48c647b9724aad3424fe4c99019832e4a4d9566c` 的精确 SHA CI `42985747343` 已通过
+quality 3.11/3.12、install-smoke，分支 release 正确跳过。专项 `test/test_codex_seeker_echoes.py`
+2 passed，受影响主线/闲居/探索/迁移组 35 passed，
 补充主线/图鉴/闲居/内容组首跑 26 passed、1 个既有路线夹具失败；已将该测试前置修正为合同已有
 的 `demon.abyss_gate` 后单项 1 passed，生产地图与旅行规则未改。后续 checkpoint 补业务 SHA、
 精确 develop/main CI 与正式包校验。
