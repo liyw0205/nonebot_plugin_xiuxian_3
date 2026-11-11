@@ -12,7 +12,10 @@ from combat_fixtures import BALANCED_QUALIFICATION
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
-from nonebot_plugin_xiuxian_3.xiuxian.exploration.rules import battle_roll_bp
+from nonebot_plugin_xiuxian_3.xiuxian.exploration.rules import (
+    battle_roll_bp,
+    exploration_encounter_selection,
+)
 
 
 ADAPTERS = ("qq.official", "onebot.v11")
@@ -100,11 +103,21 @@ async def _send(runtime, adapter: str, user: str, operation_id: str, command: st
 
 
 def _operation_for_battle(adapter: str, *, encounter: bool) -> str:
-    return next(
-        f"{adapter}-cloud-mine-{index}"
-        for index in range(1_000)
-        if (battle_roll_bp(f"{adapter}-cloud-mine-{index}:battle") < 3_000) == encounter
-    )
+    for index in range(1_000):
+        operation = f"{adapter}-cloud-mine-{index}"
+        if (battle_roll_bp(f"{operation}:battle") < 3_000) != encounter:
+            continue
+        if encounter:
+            enemy_key, _ = exploration_encounter_selection(
+                "explore.cloud_mine",
+                seed=operation,
+                realm_key="foundation",
+                realm_layer=1,
+            )
+            if enemy_key != "enemy.cloud_beast":
+                continue
+        return operation
+    raise AssertionError("could not find a deterministic cloud-mine operation")
 
 
 def _expire(runtime, exploration_id: str) -> None:

@@ -2130,6 +2130,16 @@ class AdventuresRepositoryMixin:
                         result = result_json.get("result")
                     except (TypeError, json.JSONDecodeError):
                         continue
+                    # A cloud-mine battle can have a contractual fallback item
+                    # on defeat.  Story progress still requires a successful
+                    # exploration outcome, so failure rewards never satisfy a
+                    # material objective.
+                    if (
+                        isinstance(result_json, dict)
+                        and result_json.get("battle_outcome") is not None
+                        and result_json.get("battle_outcome") != "won"
+                    ):
+                        continue
                     amount = result.get(objective.get("item_key")) if isinstance(result, dict) else None
                     if isinstance(amount, int) and not isinstance(amount, bool) and amount >= int(objective.get("quantity", 0)):
                         found = session
