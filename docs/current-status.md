@@ -86,12 +86,13 @@ M6 首采集与 QQ 配置以及分类帮助/悬赏蓝字已完成。用户新授
 | 三关数据与玩家入口 | 主线正文、行动、目标、奖励、重试齐全；`dao.origin_gate` 沿公开边抵达 `dao_service`，生活/派遣帮助给出真实路径 |
 | 严格来源与共享消费者 | 主线严格解析开放地点、`idle.dao_settlement_watch` 完整奖池和 `dispatch.dao_service`；复用移动、闲居、派遣、快照与账本 |
 | 拒绝、恢复与幂等 | 提前/逾时闲居、未结算/失败/partial 派遣、旧/他人事件不推进且零写；事务失败可重试，重复 operation 只回放 |
-| 种子与交付 | 主线官方数据 `dc98152c23ff24a8235e19178043297875dd779f`：旧 `04b71715…` → 新 `75e2f588…`；定向组 `63 passed`，待 develop 精确 SHA CI、合 main CI 与下一版本 |
+| 种子与交付 | 主线官方数据 `dc98152c23ff24a8235e19178043297875dd779f`：旧 `04b71715…` → 新 `75e2f588…`；定向组 `63 passed`，develop 精确 SHA CI `42969665807` 已全绿，待合 main CI 与下一版本 |
 
 实现 checkpoint（2026-11-11）：数据提交 `dc98152` 已加入三关；业务实现、玩家入口、严格
-`dispatch_success` 快照目标和专项测试已在工作树完成。`test/test_dao_settlement_epilogue.py`、主线内容/垂直切片、
-闲居/派遣、帮助、文档和种子迁移定向组共 `63 passed in 502.55s`，均使用独立 venv 与共享锁；待白名单提交、
-develop 精确 SHA CI、普通合 main、main CI 和 `v0.1.25` 正式资产验证。合同见
+`dispatch_success` 快照目标和专项测试已在 `77d0919` 完成。`test/test_dao_settlement_epilogue.py`、主线内容/垂直切片、
+闲居/派遣、帮助、文档和种子迁移定向组共 `63 passed in 502.55s`，均使用独立 venv 与共享锁；精确 SHA
+`77d09195e28b9dc5f4b121cd566c760a6b60ddbc` 的 CI `42969665807` 已通过，待普通合 main、main CI
+和 `v0.1.25` 正式资产验证。合同见
 [道统余响](gameplay/adventures/dao-settlement-epilogue.md)。
 
 已交付阶段为 **虚空补给回响：航道抵达、补给看守与锚点取回**。其数据提交 `cb25be1`、业务实现
