@@ -3859,6 +3859,84 @@
       "prerequisites": ["codex_echoes.2"],
       "first_clear_reward": {"spirit_stones": 35, "service_reputation": 1},
       "repeat_reward": {"spirit_stones": 8}
+    },
+    {
+      "key": "cloud_mine_echoes.1",
+      "story_key": "story.mainline.cloud_mine_echoes",
+      "chapter": 1,
+      "stage": 1,
+      "name": "矿口听风",
+      "desc": "沿公开山道抵达云铁矿区，听见矿脉深处的回响。",
+      "body": "云城北侧的山风带着铁腥味，矿监在山道尽头等你递上行脚记录。云铁矿区已经对筑基修士开放，但只认真正走完并结算的行程；预览路线、半途停留或只在云城听闻矿讯，都不能算作入山。备足脚力后从云城或青石镇启程，抵达矿口即可把这次守望记在自己的行册上，尚未结算时恢复体力再走一趟便是。",
+      "objectives": [
+        {"key": "reach_cloud_mine", "type": "travel_arrival", "label": "本关开始后结算行程抵达云铁矿区", "destination_key": "xuantian.cloud_mine"}
+      ],
+      "actions": [
+        {"command": "移动预览", "argument": "云铁矿区", "description": "确认筑基四层、公开山道和行程体力门槛。"},
+        {"command": "前往", "argument": "云铁矿区", "description": "从云城或青石镇启程，等待行程结束后结算移动。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.cloud_mine_echoes:cloud_mine_echoes.1"]},
+      "next_stage_key": "cloud_mine_echoes.2",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "尚未结算抵达云铁矿区时主线保持进行中且不发奖励；恢复体力后从公开山道重新启程，完成真实移动即可重试。"},
+      "status": "open",
+      "aliases": ["矿口听风"],
+      "reputation_key": "local.xuantian.cloud_city",
+      "required_realm": "foundation",
+      "required_layer": 4,
+      "prerequisites": ["player.start_seeking"],
+      "first_clear_reward": {"spirit_stones": 20, "local_reputation": 3},
+      "repeat_reward": {"spirit_stones": 5}
+    },
+    {
+      "key": "cloud_mine_echoes.2",
+      "story_key": "story.mainline.cloud_mine_echoes",
+      "chapter": 1,
+      "stage": 2,
+      "name": "云铁试掘",
+      "desc": "在云铁矿区完成一次真实采掘，带回完整云铁。",
+      "body": "矿监把旧矿镐递到你手里，只叮嘱一句：矿脉会记住每一次真正的采掘。本关开始后，你必须身在云铁矿区，按公开的许可、矿镐或采矿辅修准入完成一次云铁探索，并等服务端结算收获。战斗遭遇失败、探索仍在途中、每日次数用尽或只把旧云铁放进行囊，都不能冒充这次试掘；补足准入和体力后按原合同重新开工即可。",
+      "objectives": [
+        {"key": "mine_cloud_iron", "type": "exploration_reward", "label": "本关开始后在云铁矿区探索结算中取得云铁", "mode_key": "explore.cloud_mine", "location_key": "xuantian.cloud_mine", "item_key": "item.material.cloud_iron", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "开始探索", "argument": "云铁矿区采集", "description": "在矿区备好许可、矿镐或采矿辅修，等待探索结算并取得云铁。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.cloud_mine_echoes:cloud_mine_echoes.2"]},
+      "next_stage_key": "cloud_mine_echoes.3",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "只统计本关开始后的本人云铁探索结算；战斗失败、尚未结算、准入或每日次数不足均不推进，按探索原合同恢复后重新采掘即可重试。"},
+      "status": "open",
+      "aliases": ["云铁试掘"],
+      "required_realm": "foundation",
+      "required_layer": 4,
+      "prerequisites": ["cloud_mine_echoes.1"],
+      "first_clear_reward": {"item.material.cloud_iron": 2},
+      "repeat_reward": {"item.material.cloud_iron": 1}
+    },
+    {
+      "key": "cloud_mine_echoes.3",
+      "story_key": "story.mainline.cloud_mine_echoes",
+      "chapter": 1,
+      "stage": 3,
+      "name": "长夜守脉",
+      "desc": "完整领取一次矿区看守，把云铁矿脉的夜班交接入册。",
+      "body": "矿脉入册后，矿监才肯把夜班钥牌交给你。云铁守望的终关只认本关开始后由本人新安排的矿区看守，并在六小时完整窗口内领取云铁与灵石；逾时保底、取消、旧安排、他人交接和同日次数不足都不能替代长夜守脉。错过窗口先按闲居原合同领取保底，次日恢复额度后重新安排完整看守即可继续。",
+      "objectives": [
+        {"key": "claim_cloud_mine_watch", "type": "idle_claim", "label": "本关开始后完整领取一次矿区看守", "route_key": "idle.cloud_mine_watch"}
+      ],
+      "actions": [
+        {"command": "挂机预览", "argument": "矿区看守", "description": "确认筑基四层、精力、六小时窗口、每日一次限额与完整/逾时所得。"},
+        {"command": "开始挂机", "argument": "矿区看守", "description": "本关开始后安排矿区看守，完整窗口结束后领取并完成交接。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.cloud_mine_echoes:cloud_mine_echoes.3"]},
+      "next_stage_key": null,
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "只统计本关开始后的本人完整矿区看守领取；逾时保底、取消、旧或他人安排及日限不足都不发主线奖励，按闲居原合同补足条件并安排新的完整值守后重试。"},
+      "status": "open",
+      "aliases": ["长夜守脉"],
+      "required_realm": "foundation",
+      "required_layer": 4,
+      "prerequisites": ["cloud_mine_echoes.2"],
+      "first_clear_reward": {"spirit_stones": 35, "service_reputation": 1},
+      "repeat_reward": {"spirit_stones": 8}
     }
   ]
 }
