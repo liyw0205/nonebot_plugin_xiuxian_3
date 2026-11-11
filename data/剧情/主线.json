@@ -4014,6 +4014,79 @@
       "prerequisites": ["cloud_city_echoes.2"],
       "first_clear_reward": {"spirit_stones": 42, "service_reputation": 1},
       "repeat_reward": {"spirit_stones": 8}
+    },
+    {
+      "key": "seeker_echoes.1",
+      "story_key": "story.mainline.seeker_echoes",
+      "chapter": 1,
+      "stage": 1,
+      "name": "回镇听雨",
+      "desc": "沿公开山路回到青石镇，把寻道期的第一段脚步重新落在故土。",
+      "body": "寻仙问道之后，青石镇并没有把旧日的门扉关上。你从近郊的山风里回望镇口，才发现寻道期的路不只向远方延伸，也需要在熟悉的石板上重新认出自己的脚印。本关开始后必须沿现有公开通路启程并结算抵达青石镇；只查看预览、停在近郊、抵达其他地点或把旧行程算入本关，都不会写入回镇见闻。",
+      "objectives": [
+        {"key": "return_new_town", "type": "travel_arrival", "label": "本关开始后结算行程抵达青石镇", "destination_key": "xuantian.new_town"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "青石镇", "description": "从当前公开相邻地点启程，等待行程结束后结算抵达青石镇。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.seeker_echoes:seeker_echoes.1"]},
+      "next_stage_key": "seeker_echoes.2",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "尚未结算抵达青石镇时主线保持进行中且不发奖励；沿公开通路完成真实移动后即可重试，其他地点或旧行程不能替代本关记录。"},
+      "status": "open",
+      "aliases": ["回镇听雨"],
+      "prerequisites": ["player.start_seeking"],
+      "reputation_key": "local.xuantian.new_town",
+      "first_clear_reward": {"spirit_stones": 16, "local_reputation": 2},
+      "repeat_reward": {"spirit_stones": 4}
+    },
+    {
+      "key": "seeker_echoes.2",
+      "story_key": "story.mainline.seeker_echoes",
+      "chapter": 1,
+      "stage": 2,
+      "name": "镇中问询",
+      "desc": "完整领取一次镇中问询，把青石镇的人情声息写入寻道行册。",
+      "body": "镇中问询不是把几句传闻抄进纸上，而是以真实的闲居安排换来一段能被行册承认的见闻。本关开始后必须满足青石镇地方名望至少十点，并新建镇中问询，在完整窗口结束后由本人领取；逾时保底、取消、旧安排、他人领取或当日次数已用尽都不能替代本关交班。",
+      "objectives": [
+        {"key": "claim_seeker_town_inquiry", "type": "idle_claim", "label": "本关开始后完整领取一次镇中问询", "route_key": "idle.seeker_town_inquiry"}
+      ],
+      "actions": [
+        {"command": "挂机预览", "argument": "镇中问询", "description": "确认寻道期、青石镇名望十点、三小时窗口、每日一次限额与完整/逾时所得。"},
+        {"command": "开始挂机", "argument": "镇中问询", "description": "本关开始后安排镇中问询，完整窗口结束后领取并完成问询。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.seeker_echoes:seeker_echoes.2"]},
+      "next_stage_key": "seeker_echoes.3",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "只统计本关开始后的本人镇中问询完整领取；逾时保底、取消、旧或他人安排、名望或日限不足都不推进，按闲居原合同补足条件后可重试。"},
+      "status": "open",
+      "aliases": ["镇中问询"],
+      "prerequisites": ["seeker_echoes.1"],
+      "first_clear_reward": {"spirit_stones": 24, "local_reputation": 3},
+      "repeat_reward": {"spirit_stones": 6},
+      "reputation_key": "local.xuantian.new_town"
+    },
+    {
+      "key": "seeker_echoes.3",
+      "story_key": "story.mainline.seeker_echoes",
+      "chapter": 1,
+      "stage": 3,
+      "name": "灵田照看",
+      "desc": "完整领取一次灵田照看，让寻道期的耐心留下可见回响。",
+      "body": "问询的脚步安静下来，才听见居所灵田里草叶摩擦的细响。灵田照看要求有效居所与真实的寻道期安排；本关开始后新建的安排必须在四小时完整窗口内领取，灵草与见闻会沿闲居原事务一同到账。逾时保底、取消、旧安排、他人领取和日限不足都不能替代这一次照看。",
+      "objectives": [
+        {"key": "claim_seeker_herb_tending", "type": "idle_claim", "label": "本关开始后完整领取一次灵田照看", "route_key": "idle.seeker_herb_tending"}
+      ],
+      "actions": [
+        {"command": "挂机预览", "argument": "灵田照看", "description": "确认寻道期、有效居所、四小时窗口、每日一次限额与灵田见闻所得。"},
+        {"command": "开始挂机", "argument": "灵田照看", "description": "本关开始后安排灵田照看，完整窗口结束后领取并完成照看。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.seeker_echoes:seeker_echoes.3"]},
+      "next_stage_key": null,
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "只统计本关开始后的本人灵田照看完整领取；逾时保底、取消、旧或他人安排、居所或日限不足都不发主线奖励，按闲居原合同补足条件并安排新的完整照看后重试。"},
+      "status": "open",
+      "aliases": ["灵田照看"],
+      "prerequisites": ["seeker_echoes.2"],
+      "first_clear_reward": {"spirit_stones": 30, "service_reputation": 1},
+      "repeat_reward": {"spirit_stones": 7}
     }
   ]
 }

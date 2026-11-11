@@ -16,6 +16,7 @@ DAO_SETTLEMENT_STORY_KEY = "story.mainline.dao_settlement"
 CODEX_ECHOES_STORY_KEY = "story.mainline.codex_echoes"
 CLOUD_MINE_ECHOES_STORY_KEY = "story.mainline.cloud_mine_echoes"
 CLOUD_CITY_ECHOES_STORY_KEY = "story.mainline.cloud_city_echoes"
+SEEKER_ECHOES_STORY_KEY = "story.mainline.seeker_echoes"
 MAINLINE_TOWN_COMMISSION_DELIVERED = "livelihood.town_commission.delivered"
 
 MAINLINE_LOCKED = "locked"
@@ -207,6 +208,9 @@ _VERTICAL_SLICE_STAGES = frozenset(
         "cloud_city_echoes.1",
         "cloud_city_echoes.2",
         "cloud_city_echoes.3",
+        "seeker_echoes.1",
+        "seeker_echoes.2",
+        "seeker_echoes.3",
         "lane.builder.chapter.01",
         "lane.builder.chapter.02",
         "lane.builder.chapter.03",

@@ -23,6 +23,7 @@ from .adventures.mainline import (
     CODEX_ECHOES_STORY_KEY,
     CLOUD_MINE_ECHOES_STORY_KEY,
     CLOUD_CITY_ECHOES_STORY_KEY,
+    SEEKER_ECHOES_STORY_KEY,
     DAO_SETTLEMENT_STORY_KEY,
     DOMAIN_FRONTIER_STORY_KEY,
     VOID_ARCHIVE_STORY_KEY,
@@ -140,7 +141,11 @@ _HELP_PAGES = {
         "\n\n寻道期的图鉴回响从玄天近郊开始：先"
         f"{command_link('图鉴回响主线', '图鉴回响主线')}查看关卡，"
         f"再{command_link('开始图鉴回响主线 近郊寻迹', '开始图鉴回响主线 近郊寻迹')}沿公开山路抵达近郊；"
-        "近郊历练与雾隐洞天秘境的真实结算会补全两页图鉴。"
+        "近郊历练与雾隐洞天秘境的真实结算会补全两页图鉴。\n\n"
+        "寻道期回到青石镇后，可从"
+        f"{command_link('寻道闲居回响主线', '寻道闲居回响主线')}查看三关，"
+        f"再{command_link('开始寻道闲居回响主线 回镇听雨', '开始寻道闲居回响主线 回镇听雨')}沿公开通路结算抵达青石镇；"
+        "后续两关分别消费镇中问询与灵田照看的完整领取。"
     ),
     "悬赏": (
         "**悬赏**\n\n"
@@ -191,6 +196,11 @@ _HELP_PAGES = {
         f"{command_link('云城店铺回响主线', '云城店铺回响主线')}查看关卡，"
         f"再{command_link('开始云城店铺回响主线 云城听更', '开始云城店铺回响主线 云城听更')}沿公开路线抵达云城；"
         "随后按关卡提示完成云城巡夜真实胜场，并在云城地方名望达到 200 后完整领取店铺闲居。逾时保底不替代主线交班。\n\n"
+        "寻道期回到青石镇后可接闲居回响：先"
+        f"{command_link('寻道闲居回响主线', '寻道闲居回响主线')}查看关卡，"
+        f"再{command_link('挂机预览 镇中问询', '挂机预览 镇中问询')}确认青石镇名望十点与三小时窗口，"
+        f"以及{command_link('挂机预览 灵田照看', '挂机预览 灵田照看')}确认有效居所与四小时窗口；"
+        "两条路线都要在对应主线开始后完整领取，逾时保底不替代主线交班。\n\n"
         f"{command_link('每日修行', '每日修行')}记下日常安排，"
         f"{command_link('道历问安', '道历问安')}领取当日问安所得。\n\n"
         f"{command_link('灵兽状态', '灵兽状态')}可查看同行灵兽与灵骑；"
@@ -275,6 +285,13 @@ class XiuxianApplication:
             title="云城店铺回响主线",
             start_command="开始云城店铺回响主线",
             claim_command="领取云城店铺回响主线奖励",
+        )
+        self.seeker_echoes_mainline = AdventuresMainlineApplication(
+            repository,
+            story_key=SEEKER_ECHOES_STORY_KEY,
+            title="寻道闲居回响主线",
+            start_command="开始寻道闲居回响主线",
+            claim_command="领取寻道闲居回响主线奖励",
         )
         self.dao_echoes = DaoEchoesApplication(repository)
         self.three_realms = ThreeRealmsApplication(repository)
@@ -1511,6 +1528,27 @@ class XiuxianApplication:
             context,
             lambda: self.cloud_city_echoes_mainline.claim_reward(context),
             write_message="此刻无缘收取云城店铺回响主线所得。",
+        )
+
+    async def get_seeker_echoes_mainline_status(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.seeker_echoes_mainline.get_status(context),
+            require_write=False,
+        )
+
+    async def start_seeker_echoes_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.seeker_echoes_mainline.start_stage(context),
+            write_message="此刻无缘踏入寻道闲居回响主线。",
+        )
+
+    async def claim_seeker_echoes_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.seeker_echoes_mainline.claim_reward(context),
+            write_message="此刻无缘收取寻道闲居回响主线所得。",
         )
 
     async def preview_final_arena(self, context: CommandContext) -> CommandResult:
