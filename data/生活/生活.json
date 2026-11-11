@@ -1288,7 +1288,7 @@
       },
       "daily_limit": 1,
       "requirements": {
-        "stage": "seeker",
+        "stage": "mortal",
         "location_key": "xuantian.outskirts",
         "companion_kind": "beast"
       },
