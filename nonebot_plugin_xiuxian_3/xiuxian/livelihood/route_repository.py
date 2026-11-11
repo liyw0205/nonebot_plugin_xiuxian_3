@@ -34,11 +34,12 @@ from ..persistence.errors import (
     RouteQuotaError,
     RouteUnlockRequiredError,
 )
-from .route_models import RoutePreviewRecord, RouteSettlementRecord, RouteStartRecord
+from .route_models import RoutePreviewRecord, RouteSettlementRecord, RouteStartRecord, RouteStatusRecord
 from .route_rules import (
     RouteDefinition,
     cargo_label,
     cargo_unit_value,
+    choose_route_event,
     route_delay_roll_bp,
     route_definition,
 )
@@ -52,6 +53,43 @@ from ..companions.rules import (
 
 class RouteRepositoryMixin:
     """Own cargo locking, route sessions and route settlement."""
+
+    async def route_status(
+        self, *, platform: str, platform_user_id: str
+    ) -> RouteStatusRecord | None:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(self._route_status_once, platform, platform_user_id)
+
+    def _route_status_once(self, platform: str, platform_user_id: str) -> RouteStatusRecord | None:
+        now = self._now()
+        with self._connect() as connection:
+            player = self._require_player(connection, platform, platform_user_id, writable=False)
+            route = connection.execute(
+                "SELECT * FROM livelihood_trade_routes WHERE player_id = ? AND status = 'in_transit' ORDER BY id DESC LIMIT 1",
+                (player["id"],),
+            ).fetchone()
+            if route is None:
+                return None
+            snapshot = json_object(route["snapshot_json"])
+            event = self._event_snapshot(snapshot)
+            arrives_at = datetime.fromisoformat(str(route["arrives_at"]))
+            return RouteStatusRecord(
+                route_id=str(route["route_id"]),
+                route_key=str(route["route_key"]),
+                route_name=str(snapshot["route_name"]),
+                cargo_name=str(snapshot["cargo_name"]),
+                cargo_quantity=sum(int(value) for value in json_object(route["cargo_json"]).values()),
+                source_location=str(route["source_location"]),
+                destination_location=str(route["destination_location"]),
+                starts_at=str(route["starts_at"]),
+                arrives_at=str(route["arrives_at"]),
+                event_label=str(event["name"]),
+                event_description=str(event["description"]),
+                event_outcome=str(event["outcome"]),
+                ready=now >= arrives_at,
+                remaining_seconds=max(0, int((arrives_at - now).total_seconds())),
+            )
 
     async def replay_route_start(
         self,
@@ -227,6 +265,7 @@ class RouteRepositoryMixin:
                 mount_stamina=int(mount["stamina"]) if mount else None,
                 mount_stamina_cost=mount_stamina_cost,
                 duration_seconds_with_mount=duration_seconds if mount else None,
+                event_labels=tuple(event.label for event in definition.events),
             )
 
     async def start_route(
@@ -320,6 +359,17 @@ class RouteRepositoryMixin:
             )
             delay_roll = route_delay_roll_bp(operation_id)
             delay_seconds = definition.delay_seconds if delay_roll < delay_chance_bp else 0
+            event, event_roll = choose_route_event(definition.events, operation_id)
+            if not definition.event_effects_enabled:
+                event = replace(
+                    event,
+                    outcome="success",
+                    reward_multiplier_bp=10_000,
+                    reward_bonus_stones=0,
+                    reputation_bonus=0,
+                    cargo_return_bp=0,
+                    item_rewards={},
+                )
             starts_at = now
             arrives_at = now + timedelta(seconds=duration_seconds + delay_seconds)
             route_id = uuid4().hex
@@ -342,6 +392,19 @@ class RouteRepositoryMixin:
                 "delay_roll_bp": delay_roll,
                 "delay_chance_bp": delay_chance_bp,
                 "delay_seconds": delay_seconds,
+                "event": {
+                    "key": event.key,
+                    "name": event.label,
+                    "description": event.description,
+                    "outcome": event.outcome,
+                    "roll": event_roll,
+                    "weight": event.weight,
+                    "reward_multiplier_bp": event.reward_multiplier_bp,
+                    "reward_bonus_stones": event.reward_bonus_stones,
+                    "reputation_bonus": event.reputation_bonus,
+                    "cargo_return_bp": event.cargo_return_bp,
+                    "item_rewards": dict(event.item_rewards),
+                },
                 "mount": self._mount_snapshot(mount) if mount else None,
             }
             spend_player_state(
@@ -406,6 +469,7 @@ class RouteRepositoryMixin:
                 "stamina_cost": route_stamina_cost,
                 "reward_stones": definition.reward_stones,
                 "delay_seconds": delay_seconds,
+                "event_label": event.label,
                 "request_args": list(request_args),
                 "request_forms": self._route_request_forms(request_args, definition, cargo_key, mount, mount_ref),
                 "mount_instance_id": str(mount["instance_id"]) if mount else None,
@@ -474,6 +538,7 @@ class RouteRepositoryMixin:
                 raise RouteNotReadyError("route has not arrived")
             snapshot = json_object(route["snapshot_json"])
             cargo = json_object(route["cargo_json"])
+            event = self._event_snapshot(snapshot)
             mount_snapshot = snapshot.get("mount")
             mount_result: dict[str, Any] | None = None
             if isinstance(mount_snapshot, dict):
@@ -526,14 +591,26 @@ class RouteRepositoryMixin:
                     "injury_until": injury_until,
                 }
             local_key = str(snapshot["local_reputation_key"])
-            local_delta = int(snapshot["local_reputation"])
-            reward_stones = int(snapshot["reward_stones"])
+            local_delta = int(snapshot["local_reputation"]) + int(event["reputation_bonus"])
+            reward_stones = (
+                int(snapshot["reward_stones"]) * int(event["reward_multiplier_bp"]) // 10_000
+                + int(event["reward_bonus_stones"])
+            )
+            returned_cargo = {
+                str(key): int(quantity) * int(event["cargo_return_bp"]) // 10_000
+                for key, quantity in cargo.items()
+                if int(quantity) * int(event["cargo_return_bp"]) // 10_000 > 0
+            }
+            item_rewards = {str(key): int(value) for key, value in dict(event["item_rewards"]).items()}
+            assets = {"spirit_stones": reward_stones, **returned_cargo}
+            for key, value in item_rewards.items():
+                assets[key] = assets.get(key, 0) + value
             local_before = player_reputation_state(connection, int(player["id"])).local.get(local_key, 0)
             actual = change_player_state_actual(
                 connection,
                 player,
                 updated_at=now_text,
-                asset_values={"spirit_stones": reward_stones},
+                asset_values=assets,
                 asset_mode="grant",
                 player_values={"location_key": str(route["destination_location"])},
                 local_reputation_delta={local_key: local_delta} if local_delta else None,
@@ -551,6 +628,9 @@ class RouteRepositoryMixin:
                 "local_reputation_after": local_after,
                 "local_reputation_delta": local_after - local_before,
                 "delay_seconds": int(snapshot["delay_seconds"]),
+                "event": event,
+                "returned_cargo": returned_cargo,
+                "item_rewards": item_rewards,
                 "settled_at": now_text,
             }
             if mount_result is not None:
@@ -574,6 +654,65 @@ class RouteRepositoryMixin:
             }
             self._record_route_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
             return self._route_settlement_from_payload(payload)
+
+    @staticmethod
+    def _event_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
+        """Normalize a frozen event while keeping pre-event route snapshots valid."""
+
+        raw = snapshot.get("event")
+        if raw is None:
+            return {
+                "key": "route.event.legacy_arrival",
+                "name": "平稳抵达",
+                "description": "旧商路快照沿用原有固定报酬。",
+                "outcome": "success",
+                "roll": 0,
+                "weight": 1,
+                "reward_multiplier_bp": 10_000,
+                "reward_bonus_stones": 0,
+                "reputation_bonus": 0,
+                "cargo_return_bp": 0,
+                "item_rewards": {},
+            }
+        if not isinstance(raw, dict):
+            raise ValueError("route event snapshot is invalid")
+        required = ("key", "name", "description", "outcome")
+        if any(not isinstance(raw.get(key), str) or not str(raw[key]).strip() for key in required):
+            raise ValueError("route event snapshot identity is invalid")
+        if raw["outcome"] not in {"success", "partial", "failed"}:
+            raise ValueError("route event snapshot outcome is invalid")
+        numeric = {
+            "roll": raw.get("roll"),
+            "weight": raw.get("weight"),
+            "reward_multiplier_bp": raw.get("reward_multiplier_bp"),
+            "reward_bonus_stones": raw.get("reward_bonus_stones"),
+            "reputation_bonus": raw.get("reputation_bonus"),
+            "cargo_return_bp": raw.get("cargo_return_bp"),
+        }
+        if any(isinstance(value, bool) or not isinstance(value, int) for value in numeric.values()):
+            raise ValueError("route event snapshot numeric values are invalid")
+        if (
+            numeric["roll"] < 0 or numeric["weight"] <= 0
+            or not 0 <= numeric["reward_multiplier_bp"] <= 20_000
+            or numeric["reward_bonus_stones"] < 0 or numeric["reputation_bonus"] < 0
+            or not 0 <= numeric["cargo_return_bp"] <= 10_000
+        ):
+            raise ValueError("route event snapshot values are out of range")
+        items = raw.get("item_rewards")
+        if not isinstance(items, dict) or any(
+            not isinstance(key, str) or not key.startswith("item.")
+            or not isinstance(value, int) or isinstance(value, bool) or value <= 0
+            for key, value in items.items()
+        ):
+            raise ValueError("route event snapshot item rewards are invalid")
+        return {
+            "key": str(raw["key"]),
+            "name": str(raw["name"]),
+            "description": str(raw["description"]),
+            "outcome": str(raw["outcome"]),
+            **numeric,
+            "item_rewards": {str(key): int(value) for key, value in items.items()},
+        }
 
     def _route_mount(
         self,
@@ -823,6 +962,7 @@ class RouteRepositoryMixin:
             mount_name=(str(payload["mount_name"]) if payload.get("mount_name") else None),
             mount_level=(int(payload["mount_level"]) if payload.get("mount_level") is not None else None),
             mount_stamina_cost=int(payload.get("mount_stamina_cost", 0)),
+            event_label=(str(payload["event_label"]) if payload.get("event_label") else None),
         )
 
     def _route_settlement_from_payload(self, payload: dict[str, Any], *, replay: bool = False) -> RouteSettlementRecord:
@@ -853,6 +993,17 @@ class RouteRepositoryMixin:
             for key, value in cargo.items()
         ):
             raise ValueError("route settlement snapshot cargo is invalid")
+        event = payload.get("event", {})
+        if not isinstance(event, dict):
+            raise ValueError("route settlement snapshot event is invalid")
+        returned_cargo = payload.get("returned_cargo", {})
+        item_rewards = payload.get("item_rewards", {})
+        if not isinstance(returned_cargo, dict) or not isinstance(item_rewards, dict) or any(
+            not isinstance(value, int) or isinstance(value, bool) or value <= 0
+            for values in (returned_cargo, item_rewards)
+            for value in values.values()
+        ):
+            raise ValueError("route settlement snapshot event rewards are invalid")
         return RouteSettlementRecord(
             player=self._row_to_player(payload["player"]),
             route_id=str(payload["route_id"]),
@@ -874,6 +1025,11 @@ class RouteRepositoryMixin:
             mount_level=(int(payload["mount"].get("level_after")) if isinstance(payload.get("mount"), dict) and payload["mount"].get("level_after") is not None else None),
             mount_experience=int(payload.get("mount", {}).get("experience_gained", 0)) if isinstance(payload.get("mount"), dict) else 0,
             mount_level_after=(int(payload["mount"].get("level_after")) if isinstance(payload.get("mount"), dict) and payload["mount"].get("level_after") is not None else None),
+            event_label=(str(event.get("name")) if event.get("name") else None),
+            event_outcome=(str(event.get("outcome")) if event.get("outcome") else None),
+            event_description=(str(event.get("description")) if event.get("description") else None),
+            returned_cargo={str(key): int(value) for key, value in returned_cargo.items()},
+            item_rewards={str(key): int(value) for key, value in item_rewards.items()},
         )
 
 

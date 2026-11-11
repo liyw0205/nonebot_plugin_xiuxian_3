@@ -36,8 +36,24 @@ class RouteDefinition:
     default_cargo_key: str
     allowed_stages: tuple[str, ...]
     random_pool: str
+    events: tuple["RouteEventDefinition", ...]
+    event_effects_enabled: bool = False
     aliases: tuple[str, ...] = ()
     unlock_key: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class RouteEventDefinition:
+    key: str
+    label: str
+    description: str
+    weight: int
+    outcome: str
+    reward_multiplier_bp: int
+    reward_bonus_stones: int
+    reputation_bonus: int
+    cargo_return_bp: int
+    item_rewards: dict[str, int]
 
 
 @lru_cache(maxsize=1)
@@ -170,6 +186,10 @@ def route_definitions(content: ContentBundle | None = None) -> dict[str, RouteDe
         random_pool = row.get("random_pool")
         if not isinstance(random_pool, str) or not random_pool:
             raise ContentError(f"route {key} has invalid random_pool")
+        events = _route_events(row, bundle, key)
+        event_mode = row.get("event_mode", "legacy")
+        if event_mode not in {"legacy", "dynamic"}:
+            raise ContentError(f"route {key} has an invalid event_mode")
         unlock_key = row.get("unlock_key")
         if unlock_key is not None and (
             not isinstance(unlock_key, str)
@@ -202,12 +222,80 @@ def route_definitions(content: ContentBundle | None = None) -> dict[str, RouteDe
             default_cargo_key=default_cargo_key,
             allowed_stages=tuple(allowed_stages),
             random_pool=random_pool,
+            events=events,
+            event_effects_enabled=event_mode == "dynamic",
             aliases=tuple(alias.strip() for alias in aliases),
             unlock_key=unlock_key.strip() if isinstance(unlock_key, str) else None,
         )
     if not result:
         raise ContentError("no active route content records")
     return result
+
+
+def _route_events(row: dict[str, object], bundle: ContentBundle, route_key: str) -> tuple[RouteEventDefinition, ...]:
+    raw_events = row.get("events")
+    if not isinstance(raw_events, list) or not raw_events:
+        raise ContentError(f"route {route_key} requires a non-empty events list")
+    events: list[RouteEventDefinition] = []
+    seen: set[str] = set()
+    for raw in raw_events:
+        if not isinstance(raw, dict):
+            raise ContentError(f"route {route_key} has an invalid event")
+        event_key = raw.get("key")
+        label = raw.get("name")
+        description = raw.get("desc")
+        outcome = raw.get("outcome")
+        if (
+            not isinstance(event_key, str) or not event_key.strip() or event_key in seen
+            or not isinstance(label, str) or not label.strip()
+            or not isinstance(description, str) or not description.strip()
+            or outcome not in {"success", "partial", "failed"}
+        ):
+            raise ContentError(f"route {route_key} has an invalid event identity")
+        numeric = {
+            "weight": raw.get("weight"),
+            "reward_multiplier_bp": raw.get("reward_multiplier_bp"),
+            "reward_bonus_stones": raw.get("reward_bonus_stones", 0),
+            "reputation_bonus": raw.get("reputation_bonus", 0),
+            "cargo_return_bp": raw.get("cargo_return_bp", 0),
+        }
+        if any(isinstance(value, bool) or not isinstance(value, int) for value in numeric.values()):
+            raise ContentError(f"route {route_key} event {event_key} has invalid numeric values")
+        if (
+            numeric["weight"] <= 0
+            or not 0 <= numeric["reward_multiplier_bp"] <= 20_000
+            or numeric["reward_bonus_stones"] < 0
+            or numeric["reputation_bonus"] < 0
+            or not 0 <= numeric["cargo_return_bp"] <= 10_000
+            or (outcome == "failed" and numeric["cargo_return_bp"] == 0)
+        ):
+            raise ContentError(f"route {route_key} event {event_key} is out of range")
+        raw_items = raw.get("item_rewards", {})
+        if not isinstance(raw_items, dict):
+            raise ContentError(f"route {route_key} event {event_key} has invalid item rewards")
+        item_rewards: dict[str, int] = {}
+        for item_key, quantity in raw_items.items():
+            if (
+                not isinstance(item_key, str) or not item_key
+                or isinstance(quantity, bool) or not isinstance(quantity, int) or quantity <= 0
+                or bundle.get("item", item_key, include_locked=False) is None
+            ):
+                raise ContentError(f"route {route_key} event {event_key} references invalid item")
+            item_rewards[item_key] = quantity
+        seen.add(event_key)
+        events.append(RouteEventDefinition(
+            key=event_key,
+            label=label.strip(),
+            description=description.strip(),
+            weight=numeric["weight"],
+            outcome=str(outcome),
+            reward_multiplier_bp=numeric["reward_multiplier_bp"],
+            reward_bonus_stones=numeric["reward_bonus_stones"],
+            reputation_bonus=numeric["reputation_bonus"],
+            cargo_return_bp=numeric["cargo_return_bp"],
+            item_rewards=item_rewards,
+        ))
+    return tuple(events)
 
 
 def route_definition(value: str | None = None, content: ContentBundle | None = None) -> RouteDefinition:
@@ -274,6 +362,24 @@ def route_delay_roll_bp(operation_id: str) -> int:
     return int.from_bytes(digest, "big") % 10_000
 
 
+def route_event_roll_bp(operation_id: str) -> int:
+    digest = hashlib.blake2b((operation_id + ":event").encode("utf-8"), digest_size=2).digest()
+    return int.from_bytes(digest, "big") % 10_000
+
+
+def choose_route_event(events: tuple[RouteEventDefinition, ...], operation_id: str) -> tuple[RouteEventDefinition, int]:
+    if not events:
+        raise ValueError("route event pool is empty")
+    total = sum(event.weight for event in events)
+    roll = route_event_roll_bp(operation_id) % total
+    cursor = 0
+    for event in events:
+        cursor += event.weight
+        if roll < cursor:
+            return event, roll
+    return events[-1], roll
+
+
 def cargo_label(cargo_key: str, content: ContentBundle | None = None) -> str:
     try:
         return _bundle(content).label("item", cargo_key)
@@ -284,6 +390,8 @@ def cargo_label(cargo_key: str, content: ContentBundle | None = None) -> str:
 __all__ = [
     "ROUTE_NEW_TOWN_OUTSKIRTS",
     "RouteDefinition",
+    "RouteEventDefinition",
+    "choose_route_event",
     "cargo_label",
     "cargo_unit_value",
     "resolve_cargo",
@@ -291,4 +399,5 @@ __all__ = [
     "route_definition",
     "route_definitions",
     "route_delay_roll_bp",
+    "route_event_roll_bp",
 ]

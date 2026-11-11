@@ -302,6 +302,7 @@ def register_core_commands(router: CommandRouter, application: XiuxianApplicatio
     router.register("贡献公共项目", application.contribute_project, aliases=("贡献项目", "建设项目"))
     router.register("结算公共项目", application.settle_project, aliases=("领取公共项目奖励", "结算项目"))
     router.register("运输预览", application.preview_route, aliases=("预览运输",))
+    router.register("运输状态", application.route_status, aliases=("商路状态",))
     router.register("开始运输", application.start_route, aliases=("运输",))
     router.register("结算运输", application.settle_route)
     router.register("发布服务", application.publish_service, aliases=("发布服务订单",))
