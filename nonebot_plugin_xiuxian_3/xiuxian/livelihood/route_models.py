@@ -30,6 +30,7 @@ class RoutePreviewRecord:
     mount_stamina: int | None = None
     mount_stamina_cost: int = 0
     duration_seconds_with_mount: int | None = None
+    event_labels: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,6 +56,7 @@ class RouteStartRecord:
     mount_name: str | None = None
     mount_level: int | None = None
     mount_stamina_cost: int = 0
+    event_label: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,6 +81,29 @@ class RouteSettlementRecord:
     mount_level: int | None = None
     mount_experience: int = 0
     mount_level_after: int | None = None
+    event_label: str | None = None
+    event_outcome: str | None = None
+    event_description: str | None = None
+    returned_cargo: dict[str, int] = field(default_factory=dict)
+    item_rewards: dict[str, int] = field(default_factory=dict)
 
 
-__all__ = ["RoutePreviewRecord", "RouteSettlementRecord", "RouteStartRecord"]
+@dataclass(frozen=True, slots=True)
+class RouteStatusRecord:
+    route_id: str
+    route_key: str
+    route_name: str
+    cargo_name: str
+    cargo_quantity: int
+    source_location: str
+    destination_location: str
+    starts_at: str
+    arrives_at: str
+    event_label: str
+    event_description: str
+    event_outcome: str
+    ready: bool
+    remaining_seconds: int
+
+
+__all__ = ["RoutePreviewRecord", "RouteSettlementRecord", "RouteStartRecord", "RouteStatusRecord"]

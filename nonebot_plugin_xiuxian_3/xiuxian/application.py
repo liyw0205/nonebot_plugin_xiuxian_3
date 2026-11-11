@@ -171,6 +171,9 @@ _HELP_PAGES = {
         f"用{command_link('我的物资箱', '我的物资箱')}查看格数与存量。\n\n"
         f"想托人跑腿，可{command_link('派遣预览', '派遣预览')}查看各境界差事；"
         f"选定后{command_link('接受派遣', '接受派遣')}填写任务名，到期再{command_link('结算派遣', '结算派遣')}。\n\n"
+        f"在公开起点运送真实货物，可用{command_link('运输预览', '运输预览')}查看货值、路线和沿途传闻，"
+        f"用{command_link('开始运输', '开始运输')}锁定货物；途中用{command_link('运输状态', '运输状态')}查看抵达窗口，"
+        f"抵达后{command_link('结算运输', '结算运输')}。事件结果会在出发时冻结，成功所得可用于生产或公共项目。\n\n"
         f"想离线安排，可{command_link('挂机预览', '挂机预览')}查看闲居路线；"
         f"选定后{command_link('开始挂机', '开始挂机')}填写路线名，到时可{command_link('领取挂机', '领取挂机')}，"
         f"开始后六十秒内还能{command_link('取消挂机', '取消挂机')}。\n\n"
@@ -1883,6 +1886,9 @@ class XiuxianApplication:
 
     async def preview_route(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.route.preview_route(context), require_write=False)
+
+    async def route_status(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.route.route_status(context), require_write=False)
 
     async def start_route(self, context: CommandContext) -> CommandResult:
         return await self._invoke(

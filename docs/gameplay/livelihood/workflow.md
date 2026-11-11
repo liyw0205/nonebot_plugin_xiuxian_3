@@ -9,6 +9,11 @@ commission: published -> accepted -> delivered -> settled
 service_order: draft -> published -> accepted -> locked -> processing -> delivered -> settled
                                                           \-> failed/expired/cancelled
 trade_route: in_transit -> settled
+
+新动态商路在 `in_transit` 快照中同时冻结延误与沿途事件；`运输状态` 只读展示事件叙事和抵达
+窗口，结算按 `success`、`partial`、`failed` 快照一次性发放收益或退回货物。旧运输快照没有
+事件字段时按原固定报酬兼容。事件奖励、退货、名望、灵骑和 operation 共用一个事务，失败不
+留下部分写入。
 project: proposed -> active -> maintenance_due -> inactive
 ```
 

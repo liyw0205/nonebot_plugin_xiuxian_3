@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ...contracts import CommandContext, CommandResult
+from ...contracts import CommandAction, CommandContext, CommandResult
 from ..content import ContentError
 from ..repository import (
     OperationConflictError,
@@ -142,6 +142,7 @@ class RouteApplication:
                 f"- **基础耗时**：{record.duration_seconds // 60} 分钟\n"
                 + (f"- **随行灵骑**：{record.mount_name}（等级 {record.mount_level}，耐力 {record.mount_stamina}）\n" if record.mount_name else "")
                 + f"- **今日次数**：{record.daily_used}/{record.daily_limit}\n"
+                + f"- **沿途可能**：{'、'.join(record.event_labels)}\n"
                 f"- **当前缺少**：{missing}\n\n"
                 f"> {'发送 `开始运输 ' + record.cargo_name + '` 开始。' if record.ready else '满足条件后才可运送货物。'}"
             ),
@@ -161,7 +162,55 @@ class RouteApplication:
                 "mount_level": record.mount_level,
                 "mount_stamina": record.mount_stamina,
                 "mount_stamina_cost": record.mount_stamina_cost,
+                "event_labels": record.event_labels,
             },
+        )
+
+    async def route_status(self, context: CommandContext) -> CommandResult:
+        if context.command_args:
+            return CommandResult(False, "INVALID_ROUTE", "运输状态只查看本人进行中的商路，无需填写参数。", context.request_id)
+        try:
+            record = await self.repository.route_status(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+            )
+        except PlayerNotFoundError:
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id)
+        except PlayerSuspendedError:
+            return CommandResult(False, "PLAYER_SUSPENDED", "当前角色暂时不能查看运输。", context.request_id)
+        except RepositoryBusyError:
+            return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, retryable=True)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, retryable=True)
+        if record is None:
+            return CommandResult(True, "ROUTE_STATUS", "眼下没有进行中的运输。\n\n可用 `运输预览` 挑选一条商路。", context.request_id, data={"route": None})
+        actions = ((CommandAction("结算运输", f"结算运输 {record.route_id}", enter=True),) if record.ready else ())
+        remaining = "已抵达，可结算" if record.ready else f"还需约 {max(1, record.remaining_seconds // 60)} 分钟"
+        return CommandResult(
+            True,
+            "ROUTE_STATUS",
+            (
+                f"## {record.route_name} · 运输状态\n\n"
+                f"货物：{record.cargo_name} ×{record.cargo_quantity}\n"
+                f"沿途：{record.event_label}\n{record.event_description}\n\n"
+                f"预计抵达：{record.arrives_at}\n{remaining}\n\n"
+                f"{'现在可以结算运输。' if record.ready else '抵达后再结算运输。'}"
+            ),
+            context.request_id,
+            data={
+                "route_id": record.route_id,
+                "route_key": record.route_key,
+                "route_name": record.route_name,
+                "cargo_name": record.cargo_name,
+                "cargo_quantity": record.cargo_quantity,
+                "starts_at": record.starts_at,
+                "arrives_at": record.arrives_at,
+                "event_label": record.event_label,
+                "event_outcome": record.event_outcome,
+                "ready": record.ready,
+                "remaining_seconds": record.remaining_seconds,
+            },
+            actions=actions,
         )
 
     async def start_route(self, context: CommandContext) -> CommandResult:
@@ -242,6 +291,7 @@ class RouteApplication:
                 f"**{record.cargo_name} ×{record.cargo_quantity}**，踏上商路。\n\n"
                 f"- **路线**：{record.route_name}\n- **体力**：{record.player.stamina}/{record.player.stamina_max}\n"
                 f"- **预计抵达**：{record.arrives_at}{delay_text}\n"
+                + (f"- **沿途传闻**：{record.event_label}\n" if record.event_label else "")
                 + (f"- **随行灵骑**：{record.mount_name}（等级 {record.mount_level}）\n" if record.mount_name else "")
                 + "\n> 抵达后发送 `结算运输`。"
             ),
@@ -258,6 +308,7 @@ class RouteApplication:
                 "arrives_at": record.arrives_at,
                 "reward_stones": record.reward_stones,
                 "delay_seconds": record.delay_seconds,
+                "event_label": record.event_label,
                 "mount_instance_id": record.mount_instance_id,
                 "mount_name": record.mount_name,
                 "mount_level": record.mount_level,
@@ -305,6 +356,9 @@ class RouteApplication:
                 f"- **获得灵石**：+{record.reward_stones}\n"
                 f"- **地方名望**：+{record.local_reputation_delta}\n"
                 f"- **已交付货物**：{record.cargo_name} ×{record.cargo_quantity}"
+                + (f"\n- **沿途事件**：{record.event_label}（{record.event_outcome}）\n  {record.event_description}" if record.event_label else "")
+                + (f"\n- **退回货物**：{', '.join(f'{key} ×{value}' for key, value in record.returned_cargo.items())}" if record.returned_cargo else "")
+                + (f"\n- **额外物资**：{', '.join(f'{key} ×{value}' for key, value in record.item_rewards.items())}" if record.item_rewards else "")
                 + (f"\n- **灵骑**：{record.mount_name}获得运输经验 {record.mount_experience}。" if record.mount_name else "")
                 + "\n\n> 可查看 `公共项目`，用 `贡献公共项目 项目名 运输` 记下这份劳作；同一份运输只能贡献一次。"
             ),
@@ -320,6 +374,11 @@ class RouteApplication:
                 "local_reputation_after": record.local_reputation_after,
                 "delay_seconds": record.delay_seconds,
                 "cargo": record.cargo,
+                "event_label": record.event_label,
+                "event_outcome": record.event_outcome,
+                "event_description": record.event_description,
+                "returned_cargo": record.returned_cargo,
+                "item_rewards": record.item_rewards,
                 "mount_instance_id": record.mount_instance_id,
                 "mount_name": record.mount_name,
                 "mount_experience": record.mount_experience,

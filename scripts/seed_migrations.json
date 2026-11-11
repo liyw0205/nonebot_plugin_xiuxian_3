@@ -294,10 +294,11 @@
       "f0fcb5777b0d5bcdc5b56678ab5e24ac8c2aed097b2a5b0384cd6a56a693451c": "4b4e6e843d6789658e53efead106a7cd8918e907:data/生活/生活.json",
       "86dc97eb24602cbbc8ac24a9ccb1afdeaa3b9834e70fc5cc49bf0dba8da3aa0b": "287fa6a5ce258ac306e4826afe13e8211574fc7e:data/生活/生活.json",
       "1eb9c9f32d85511a77e9c89bb62263f7ab78053136938298b7425fe92a027774": "37849eea234c1d9b793c1819b8c5a1938c522a5d:data/生活/生活.json",
-      "8f11a4e98dd7b900d8f16b8bd8ec4ae91f218f077e14a763031b3090258eef56": "aed38e6b93702c6cf38ae58df00c2120367a80c8:data/生活/生活.json"
+      "8f11a4e98dd7b900d8f16b8bd8ec4ae91f218f077e14a763031b3090258eef56": "aed38e6b93702c6cf38ae58df00c2120367a80c8:data/生活/生活.json",
+      "1bacb7a48fafb4ff6331c242622719f50d61dbde18b5ce2b0c32396a25aa39ea": "02bd50d81a5ea41b0b62bc5376135040d92be8f4:data/生活/生活.json"
     },
-    "new_sha256": "1bacb7a48fafb4ff6331c242622719f50d61dbde18b5ce2b0c32396a25aa39ea",
-    "new_commit": "02bd50d81a5ea41b0b62bc5376135040d92be8f4"
+    "new_sha256": "fd540b3ea725442061f2fc7c679e3b4c7da75837076ba5671f4fb58d310bebeb",
+    "new_commit": "c4e7d5c840d2bcbab8eafb9983d98d7b9edd7a57"
   },
   "道历/道号.json": {
     "old_sha256": {
@@ -394,10 +395,11 @@
   "来源/来源.json": {
     "old_sha256": {
       "dc90eaf0aedfb3f7f8df46d294469c3a02c9103817628327c5764a3cb28172a9": "d059905cea0a6a777f8a122394823076f59bed40:data/来源/来源.json",
-      "3fe8407b4114484bde97dc4f8e91ed790e102b92c0622646d9d3883bbe4ea497": "9861ee6edd57d69a996ef9b7f4035ed6581885e3:data/来源/来源.json"
+      "3fe8407b4114484bde97dc4f8e91ed790e102b92c0622646d9d3883bbe4ea497": "9861ee6edd57d69a996ef9b7f4035ed6581885e3:data/来源/来源.json",
+      "694430616d6c8d0cf262f822b8435e83a8852008d92c2282d0b5ef8a67757f3e": "287fa6a5ce258ac306e4826afe13e8211574fc7e:data/来源/来源.json"
     },
-    "new_sha256": "694430616d6c8d0cf262f822b8435e83a8852008d92c2282d0b5ef8a67757f3e",
-    "new_commit": "287fa6a"
+    "new_sha256": "91b1887e8385c040b70253cc3b56a2222a49109d2b78b583e4e562c208b41f95",
+    "new_commit": "0031e0b27225a909fd8f45d423912ea4e060a09f"
   },
   "阵法/阵法.json": {
     "old_sha256": {

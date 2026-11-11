@@ -894,6 +894,44 @@
       "destination_location": "xuantian.outskirts",
       "allowed_stages": ["mortal", "seeker", "cultivator"],
       "random_pool": "route.town",
+      "events": [
+        {
+          "key": "route.town.market_favor",
+          "name": "山口收购",
+          "desc": "近郊药商临时收购随车货物，商路回报更厚。",
+          "weight": 50,
+          "outcome": "success",
+          "reward_multiplier_bp": 12000,
+          "reward_bonus_stones": 8,
+          "reputation_bonus": 1,
+          "cargo_return_bp": 0,
+          "item_rewards": {"item.herb.blood_grass": 1}
+        },
+        {
+          "key": "route.town.rain_pass",
+          "name": "山雨绕行",
+          "desc": "山雨封住旧道，只能绕行，货物平安但商价打了折扣。",
+          "weight": 35,
+          "outcome": "partial",
+          "reward_multiplier_bp": 5000,
+          "reward_bonus_stones": 0,
+          "reputation_bonus": 0,
+          "cargo_return_bp": 0,
+          "item_rewards": {}
+        },
+        {
+          "key": "route.town.broken_bridge",
+          "name": "断桥回运",
+          "desc": "断桥拦住车队，驿卒护送货物回到起点，未能完成交付。",
+          "weight": 15,
+          "outcome": "failed",
+          "reward_multiplier_bp": 0,
+          "reward_bonus_stones": 0,
+          "reputation_bonus": 0,
+          "cargo_return_bp": 10000,
+          "item_rewards": {}
+        }
+      ],
       "cost": {
         "stamina": 2
       },
@@ -1352,6 +1390,44 @@
         "cultivator"
       ],
       "random_pool": "route.herb_vale",
+      "events": [
+        {
+          "key": "route.herb_vale.herbalist_favor",
+          "name": "药圃回购",
+          "desc": "百草坡药师认出货物来路，额外回购一份止血草。",
+          "weight": 55,
+          "outcome": "success",
+          "reward_multiplier_bp": 11500,
+          "reward_bonus_stones": 10,
+          "reputation_bonus": 1,
+          "cargo_return_bp": 0,
+          "item_rewards": {"item.herb.blood_grass": 1}
+        },
+        {
+          "key": "route.herb_vale.mist_detour",
+          "name": "雾岭改道",
+          "desc": "雾岭遮住山口，车队按旧约交货，只收回一半运费。",
+          "weight": 30,
+          "outcome": "partial",
+          "reward_multiplier_bp": 5000,
+          "reward_bonus_stones": 0,
+          "reputation_bonus": 0,
+          "cargo_return_bp": 0,
+          "item_rewards": {}
+        },
+        {
+          "key": "route.herb_vale.silted_pass",
+          "name": "泥石封路",
+          "desc": "泥石流封住药道，押运队将货物完整护送回镇。",
+          "weight": 15,
+          "outcome": "failed",
+          "reward_multiplier_bp": 0,
+          "reward_bonus_stones": 0,
+          "reputation_bonus": 0,
+          "cargo_return_bp": 10000,
+          "item_rewards": {}
+        }
+      ],
       "cost": {
         "stamina": 3
       },
@@ -1386,6 +1462,82 @@
       "status": "active"
     },
     {
+      "name": "青石镇至铁木林行商",
+      "desc": "把木材与铁石送往铁木林工坊，沿山路可能遇上工匠临时收单。",
+      "aliases": ["铁木行商", "铁木林运输"],
+      "source_location": "xuantian.new_town",
+      "destination_location": "xuantian.ironwood_grove",
+      "allowed_stages": ["seeker", "cultivator"],
+      "random_pool": "route.ironwood",
+      "event_mode": "dynamic",
+      "events": [
+        {
+          "key": "route.ironwood.forge_order",
+          "name": "工坊加单",
+          "desc": "铁木林工匠临时加收木料，货款和一份阵砂随即结清。",
+          "weight": 55,
+          "outcome": "success",
+          "reward_multiplier_bp": 12500,
+          "reward_bonus_stones": 12,
+          "reputation_bonus": 2,
+          "cargo_return_bp": 0,
+          "item_rewards": {"item.mat.array_sand": 1}
+        },
+        {
+          "key": "route.ironwood.fog_trail",
+          "name": "林雾缓行",
+          "desc": "林雾压低车速，工坊按约收货，只付一半运费。",
+          "weight": 30,
+          "outcome": "partial",
+          "reward_multiplier_bp": 5000,
+          "reward_bonus_stones": 0,
+          "reputation_bonus": 0,
+          "cargo_return_bp": 0,
+          "item_rewards": {}
+        },
+        {
+          "key": "route.ironwood.rockfall_return",
+          "name": "落石回运",
+          "desc": "落石封住林道，护路队把木料和铁石原数护送回镇。",
+          "weight": 15,
+          "outcome": "failed",
+          "reward_multiplier_bp": 0,
+          "reward_bonus_stones": 0,
+          "reputation_bonus": 0,
+          "cargo_return_bp": 10000,
+          "item_rewards": {}
+        }
+      ],
+      "cost": {"stamina": 4},
+      "duration_seconds": 1200,
+      "reward": {
+        "currency_key": "currency.spirit_stone",
+        "amount": 28,
+        "reputation_key": "local.xuantian.new_town",
+        "reputation": 4
+      },
+      "cargo": {
+        "default_item_key": "item.mat.wood",
+        "max_value": 160,
+        "unit_values": {
+          "item.mat.wood": 8,
+          "item.ore.ironstone": 15,
+          "item.mat.array_sand": 20
+        },
+        "aliases": {
+          "木材": "item.mat.wood",
+          "铁石": "item.ore.ironstone",
+          "阵砂": "item.mat.array_sand"
+        }
+      },
+      "daily_limit": 2,
+      "delay_chance_bp": 1200,
+      "delay_seconds": 600,
+      "key": "route.town_ironwood_grove",
+      "record_type": "route",
+      "status": "active"
+    },
+    {
       "name": "云城至魔界深渊门商路",
       "desc": "自云城启程，沿战线外缘的商路把货物押送到魔界深渊门。",
       "aliases": [
@@ -1398,6 +1550,44 @@
         "cultivator"
       ],
       "random_pool": "route.cloud_abyss",
+      "events": [
+        {
+          "key": "route.cloud_abyss.supply_contract",
+          "name": "前线补单",
+          "desc": "深渊门补给官临时加单，随车阵砂换来额外货款与云铁。",
+          "weight": 50,
+          "outcome": "success",
+          "reward_multiplier_bp": 12500,
+          "reward_bonus_stones": 20,
+          "reputation_bonus": 2,
+          "cargo_return_bp": 0,
+          "item_rewards": {"item.material.cloud_iron": 1}
+        },
+        {
+          "key": "route.cloud_abyss.storm_shelter",
+          "name": "风沙避营",
+          "desc": "风沙迫使商队避营，货物按折价交割，地方名望不受影响。",
+          "weight": 35,
+          "outcome": "partial",
+          "reward_multiplier_bp": 5000,
+          "reward_bonus_stones": 0,
+          "reputation_bonus": 0,
+          "cargo_return_bp": 0,
+          "item_rewards": {}
+        },
+        {
+          "key": "route.cloud_abyss.gate_sealed",
+          "name": "关门回航",
+          "desc": "深渊门暂封，守军护送货物原路回航，商路没有完成交付。",
+          "weight": 15,
+          "outcome": "failed",
+          "reward_multiplier_bp": 0,
+          "reward_bonus_stones": 0,
+          "reputation_bonus": 0,
+          "cargo_return_bp": 10000,
+          "item_rewards": {}
+        }
+      ],
       "cost": {
         "stamina": 6
       },
