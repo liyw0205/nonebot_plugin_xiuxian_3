@@ -34,7 +34,8 @@
       "channels": [
         {"operation": "exploration.settle", "reference": "reward_pool.exploration.ironwood"},
         {"operation": "exploration.settle", "reference": "reward_pool.exploration.basalt_pass"},
-        {"operation": "livelihood.settle", "reference": "reward_pool.idle.workshop_care"}
+        {"operation": "livelihood.settle", "reference": "reward_pool.idle.workshop_care"},
+        {"operation": "livelihood.settle_route", "reference": "route.town_ironwood_grove"}
       ],
       "status": "active"
     },
