@@ -2256,7 +2256,11 @@ class AdventuresRepositoryMixin:
                 return (
                     isinstance(action, dict)
                     and set(action) == {"command", "argument", "description"}
-                    and all(isinstance(action.get(field), str) and action[field].strip() for field in action)
+                    and isinstance(action.get("command"), str)
+                    and bool(action["command"].strip())
+                    and isinstance(action.get("argument"), str)
+                    and isinstance(action.get("description"), str)
+                    and bool(action["description"].strip())
                 )
 
             if (
