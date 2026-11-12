@@ -726,7 +726,13 @@ def test_facility_claim_maintenance_and_order_slot_lifecycle_for_qq_and_onebot()
                     _adapter_context(adapter, user, f"facility-preview-{adapter}"),
                     "生产预览 金丹护脉丹",
                 )
-                assert preview.data["duration_seconds"] == 108
+                from nonebot_plugin_xiuxian_3.xiuxian.production.rules import recipe_definition
+                from nonebot_plugin_xiuxian_3.xiuxian.items.rules import bound_order_duration_multiplier_bp
+
+                recipe = recipe_definition("recipe.pill.golden_core_guard", runtime.content)
+                multiplier = bound_order_duration_multiplier_bp({"item.array.gathering_basic": 1}, runtime.content)
+                assert multiplier == 9000
+                assert preview.data["duration_seconds"] == recipe.duration_seconds * multiplier // 10000 == 108
                 started = await runtime.adapters.dispatch(
                     adapter,
                     _adapter_context(adapter, user, f"facility-start-{adapter}", f"facility-start-{adapter}"),

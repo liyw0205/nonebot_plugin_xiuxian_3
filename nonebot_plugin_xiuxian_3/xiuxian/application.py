@@ -169,7 +169,9 @@ _HELP_PAGES = {
     "生活": (
         "**生活**\n\n"
         f"制作前先用{command_link('生产预览', '生产预览')}填写配方名，核对材料与花费；"
-        f"备妥后{command_link('开始生产', '开始生产')}填写同一配方，到时{command_link('领取生产', '领取生产')}。\n\n"
+        f"备妥后{command_link('开始生产', '开始生产')}填写同一配方，到时{command_link('领取生产', '领取生产')}。"
+        f"常规制作可在配方后附 1 至 5 份，先{command_link('批量预览', '生产预览 配方名 份数')}核对整批投入；"
+        f"{command_link('生产状态', '生产状态')}保留离线行程，过期后可{command_link('恢复生产', '恢复生产')}。\n\n"
         f"{command_link('灵田预览', '灵田预览')}列出种源、居所、精耕/缓养投入与收成，"
         f"{command_link('灵田播种 作物 方案', '灵田播种')}可填写作物与照料方案。"
         f"{command_link('我的灵田', '我的灵田')}查看节候和收割窗口，成熟后{command_link('灵田收获', '灵田收获')}。"
@@ -1147,6 +1149,9 @@ class XiuxianApplication:
 
     async def preview_recipe(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.production.preview_recipe(context), require_write=False)
+
+    async def production_status(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.production.production_status(context), require_write=False)
 
     async def start_production(self, context: CommandContext) -> CommandResult:
         return await self._invoke(

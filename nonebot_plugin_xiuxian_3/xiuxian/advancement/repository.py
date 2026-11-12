@@ -1892,6 +1892,12 @@ class AdvancementRepositoryMixin:
         equipment_reference: str,
         now_text: str,
     ) -> sqlite3.Row:
+        instance = connection.execute(
+            "SELECT * FROM equipment_instances WHERE player_id=? AND instance_id=? AND status='active'",
+            (player["id"], equipment_reference.strip()),
+        ).fetchone()
+        if instance is not None:
+            return instance
         definition = equipment_definition(equipment_reference, self.content)
         self._materialize_equipment(connection, player, definition, now_text)
         rows = connection.execute(
@@ -1903,6 +1909,13 @@ class AdvancementRepositoryMixin:
         if len(rows) > 1:
             raise EquipmentAmbiguousError("multiple equipment instances match")
         return rows[0]
+
+    def _equipment_reference_definition(self, connection, player, reference):
+        instance = connection.execute(
+            "SELECT item_key FROM equipment_instances WHERE player_id=? AND instance_id=? AND status='active'",
+            (player["id"], reference.strip()),
+        ).fetchone()
+        return equipment_definition(instance["item_key"] if instance is not None else reference, self.content)
 
     @staticmethod
     def _equipment_source_exists(
@@ -2016,8 +2029,8 @@ class AdvancementRepositoryMixin:
                     raise OperationConflictError("operation input differs from its original request")
                 return self._loadout_from_payload(json.loads(existing["result_json"]), replay=True)
 
-            definition = equipment_definition(equipment_reference, self.content)
             player = self._require_player(connection, platform, platform_user_id)
+            definition = self._equipment_reference_definition(connection, player, equipment_reference)
             if str(player["stage"]) != "cultivator":
                 raise PlayerStageConflictError("equipment loadout requires entry into cultivation")
             if equipped and not equipment_meets_path(definition, player["path_key"]):
@@ -2192,8 +2205,8 @@ class AdvancementRepositoryMixin:
             replay_payload = operation_replay(connection, operation_id, operation_name, request_hash)
             if replay_payload is not None:
                 return self._tempering_from_payload(replay_payload, replay=True)
-            definition = equipment_definition(normalized_reference, self.content)
             player = self._require_player(connection, platform, platform_user_id)
+            definition = self._equipment_reference_definition(connection, player, normalized_reference)
             if str(player["stage"]) != "cultivator":
                 raise PlayerStageConflictError("equipment tempering requires entry into cultivation")
             if not equipment_meets_path(definition, player["path_key"]):
@@ -2213,6 +2226,9 @@ class AdvancementRepositoryMixin:
                 "SELECT * FROM equipment_instances WHERE player_id = ? AND item_key = ? AND status = 'active' ORDER BY id",
                 (player["id"], definition.key),
             ).fetchall()
+            exact = [row for row in candidates if row["instance_id"] == normalized_reference]
+            if exact:
+                candidates = exact
             if len(candidates) > 1:
                 raise EquipmentAmbiguousError("multiple equipment instances match")
             candidate = candidates[0] if candidates else None
@@ -2376,8 +2392,8 @@ class AdvancementRepositoryMixin:
             replay_payload = operation_replay(connection, operation_id, operation_name, request_hash)
             if replay_payload is not None:
                 return self._refinement_from_payload(replay_payload, replay=True)
-            definition = equipment_definition(normalized_reference, self.content)
             player = self._require_player(connection, platform, platform_user_id)
+            definition = self._equipment_reference_definition(connection, player, normalized_reference)
             if str(player["stage"]) != "cultivator":
                 raise PlayerStageConflictError("equipment refinement requires entry into cultivation")
             if not equipment_meets_path(definition, player["path_key"]):

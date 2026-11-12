@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from ...contracts import PlayerView
 
@@ -19,6 +19,12 @@ class ProductionPreviewRecord:
     inputs: dict[str, int]
     tool_key: str | None
     currency_cost: int
+    batch_count: int = 1
+    batch_supported: bool = False
+    tool_cost_bp: int = 0
+    outputs: dict[str, int] = field(default_factory=dict)
+    high_quality_bonus: dict[str, int] = field(default_factory=dict)
+    failure_refunds: dict[str, int] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,6 +39,7 @@ class ProductionOrderRecord:
     energy_cost: int
     currency_cost: int
     already_completed: bool = False
+    batch_count: int = 1
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,6 +58,7 @@ class ProductionSettlementRecord:
     tool_durability_bp: int | None
     binding_expires_at: str | None = None
     already_completed: bool = False
+    batch_count: int = 1
 
 
 @dataclass(frozen=True, slots=True)

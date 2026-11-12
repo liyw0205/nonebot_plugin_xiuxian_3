@@ -38,6 +38,7 @@ from ..production.models import (
     ProductionPreviewRecord,
     ProductionSettlementRecord,
 )
+from .rules import MAX_PRODUCTION_BATCH, ProductionBatchError, production_batch_count, production_batch_supported
 from ..advancement.equipment_rules import equipment_definition, equipment_initial_durability_bp
 from ..utils.equipment import create_equipment_instances
 from ..utils.assets import grant_player_assets, inventory_amount, player_assets_missing
@@ -155,6 +156,101 @@ from ..persistence.errors import *  # noqa: F401,F403
 
 
 class ProductionRepositoryMixin:
+    @staticmethod
+    def _batch_recipe(recipe, batch_count: int):
+        production_batch_count(batch_count)
+        if batch_count == 1:
+            return recipe
+        if not production_batch_supported(recipe):
+            raise ProductionBatchError("this recipe requires single production")
+        return replace(recipe, **{
+            field: {key: value * batch_count for key, value in getattr(recipe, field).items()}
+            for field in ("inputs", "outputs", "high_quality_bonus", "failure_refunds")
+        }, **{field: getattr(recipe, field) * batch_count for field in (
+            "energy_cost", "currency_cost", "tool_cost_bp", "duration_seconds"
+        )})
+
+    @classmethod
+    def _snapshot_batch_count(cls, snapshot: dict[str, Any]) -> int:
+        count = snapshot.get("batch_count", 1)
+        cls._production_integer(count, "batch count", minimum=1, maximum=MAX_PRODUCTION_BATCH)
+        return count
+
+    @classmethod
+    def _production_daily_units(cls, connection, player, recipe_key, now) -> int:
+        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        rows = connection.execute(
+            "SELECT * FROM production_orders WHERE player_id=? AND recipe_key=? AND starts_at>=? AND starts_at<?",
+            (player["id"], recipe_key, serialize_datetime(start), serialize_datetime(start + timedelta(days=1))),
+        ).fetchall()
+        used = 0
+        for order in rows:
+            snapshot = cls._production_json_object(order["snapshot_json"], "daily order snapshot")
+            cls._validate_production_snapshot(snapshot, order)
+            cls._validate_production_start_snapshot(connection, order, snapshot,
+                platform=player["platform"], platform_user_id=player["platform_user_id"])
+            used += cls._snapshot_batch_count(snapshot)
+        return used
+
+    async def production_status(self, *, platform: str, platform_user_id: str) -> list[dict[str, Any]]:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(self._production_status_sync, platform, platform_user_id)
+
+    def _production_status_sync(self, platform, user):
+        with self._connect() as connection:
+            connection.execute("BEGIN")
+            player = self._require_player(connection, platform, user, writable=False)
+            current = connection.execute(
+                "SELECT * FROM production_orders WHERE player_id=? AND status='processing' ORDER BY id DESC LIMIT 1",
+                (player["id"],),
+            ).fetchone()
+            overdue = connection.execute(
+                "SELECT * FROM production_orders WHERE player_id=? AND status='expired' ORDER BY created_at, id LIMIT 1",
+                (player["id"],),
+            ).fetchone()
+            orders = [order for order in (current, overdue) if order is not None]
+            if not orders:
+                latest = connection.execute(
+                    "SELECT * FROM production_orders WHERE player_id=? ORDER BY id DESC LIMIT 1", (player["id"],)
+                ).fetchone()
+                orders = [latest] if latest is not None else []
+            return [self._production_status_order(connection, order, platform, user) for order in orders]
+
+    def _production_status_order(self, connection, order, platform, user):
+        snapshot = self._production_json_object(order["snapshot_json"], "order snapshot")
+        self._validate_production_snapshot(snapshot, order)
+        self._validate_production_start_snapshot(connection, order, snapshot, platform=platform, platform_user_id=user)
+        result = self._production_json_object(order["result_json"], "order result")
+        if order["status"] in {"completed", "failed"}:
+            operation = connection.execute(
+                "SELECT * FROM operations WHERE player_id=? AND operation_name IN ('production.complete','production.recover') "
+                "AND json_extract(result_json, '$.order_id')=? LIMIT 1", (order["player_id"], order["order_id"])
+            ).fetchone()
+            if operation is None:
+                raise ValueError("settled production order has no receipt")
+            request = {"platform": platform, "platform_user_id": user}
+            if operation["request_hash"] != self._request_hash(operation["operation_name"], request):
+                raise ValueError("production settlement receipt request is invalid")
+            self._validate_production_settlement_replay(connection,
+                self._production_json_object(operation["result_json"], "settlement receipt"),
+                operation_id=operation["operation_id"], operation_name=operation["operation_name"],
+                platform=platform, platform_user_id=user)
+        elif result:
+            raise ValueError("pending production order already has a result")
+        ends = datetime.fromisoformat(order["ends_at"])
+        now = self._now()
+        pending = order["status"] in {"processing", "expired"}
+        return {
+            "order_id": order["order_id"], "recipe_name": snapshot["recipe_name"],
+            "batch_count": self._snapshot_batch_count(snapshot), "status": order["status"],
+            "starts_at": order["starts_at"], "ends_at": order["ends_at"],
+            "ready": pending and order["status"] != "expired" and ends <= now <= ends + timedelta(hours=24),
+            "recoverable": pending and now > ends + timedelta(hours=24),
+            "energy_cost": int(order["energy_cost"]), "currency_cost": int(order["currency_cost"]),
+            "inputs": snapshot["inputs"],
+        }
+
     async def preview_production(
         self,
         *,
@@ -162,6 +258,7 @@ class ProductionRepositoryMixin:
         platform_user_id: str,
         recipe_key: str,
         operation_id: str = "",
+        batch_count: int = 1,
     ) -> ProductionPreviewRecord:
         await self.initialize()
         async with self._inflight:
@@ -171,6 +268,7 @@ class ProductionRepositoryMixin:
                 platform_user_id,
                 recipe_key,
                 operation_id,
+                batch_count,
             )
 
     def _preview_production_sync(
@@ -179,24 +277,20 @@ class ProductionRepositoryMixin:
         platform_user_id: str,
         recipe_key: str,
         operation_id: str,
+        batch_count: int = 1,
     ) -> ProductionPreviewRecord:
         from ..production.rules import recipe_definition
 
-        recipe = recipe_definition(recipe_key, self.content)
+        recipe = self._batch_recipe(recipe_definition(recipe_key, self.content), batch_count)
         now = self._now()
         with self._connect() as connection:
             row = self._require_player(connection, platform, platform_user_id)
             self._check_production_requirements(connection, row, recipe)
-            day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-            day_end = day_start + timedelta(days=1)
-            used = connection.execute(
-                """
-                SELECT COUNT(*) AS count FROM production_orders
-                WHERE player_id = ? AND recipe_key = ? AND starts_at >= ? AND starts_at < ?
-                """,
-                (row["id"], recipe.key, serialize_datetime(day_start), serialize_datetime(day_end)),
-            ).fetchone()
+            used = self._production_daily_units(connection, row, recipe.key, now)
             if operation_id:
+                preview_payload = {"recipe_key": recipe.key}
+                if batch_count > 1:
+                    preview_payload["batch_count"] = batch_count
                 connection.execute(
                     """
                     INSERT OR IGNORE INTO activity_events(
@@ -205,7 +299,7 @@ class ProductionRepositoryMixin:
                     """,
                     (
                         row["id"], operation_id, serialize_datetime(now),
-                        json.dumps({"recipe_key": recipe.key}, ensure_ascii=False, sort_keys=True),
+                        json.dumps(preview_payload, ensure_ascii=False, sort_keys=True),
                     ),
                 )
             duration_seconds = self._facility_duration_seconds(row, recipe)
@@ -216,10 +310,16 @@ class ProductionRepositoryMixin:
                 energy_cost=recipe.energy_cost,
                 duration_seconds=duration_seconds,
                 daily_limit=recipe.daily_limit,
-                daily_used=int(used["count"] if used is not None else 0),
+                daily_used=used,
                 inputs=dict(recipe.inputs),
                 tool_key=recipe.tool_key,
                 currency_cost=recipe.currency_cost,
+                batch_count=batch_count,
+                batch_supported=production_batch_supported(recipe),
+                tool_cost_bp=recipe.tool_cost_bp,
+                outputs=dict(recipe.outputs),
+                high_quality_bonus=dict(recipe.high_quality_bonus),
+                failure_refunds=dict(recipe.failure_refunds),
             )
 
     async def start_production(
@@ -229,6 +329,7 @@ class ProductionRepositoryMixin:
         platform_user_id: str,
         recipe_key: str,
         operation_id: str,
+        batch_count: int = 1,
     ) -> ProductionOrderRecord:
         await self.initialize()
         async with self._inflight:
@@ -238,6 +339,7 @@ class ProductionRepositoryMixin:
                 platform_user_id,
                 recipe_key,
                 operation_id,
+                batch_count,
             )
 
     def _start_production_with_retry(
@@ -246,11 +348,12 @@ class ProductionRepositoryMixin:
         platform_user_id: str,
         recipe_key: str,
         operation_id: str,
+        batch_count: int = 1,
     ) -> ProductionOrderRecord:
         last_error: Exception | None = None
         for attempt in range(5):
             try:
-                return self._start_production_once(platform, platform_user_id, recipe_key, operation_id)
+                return self._start_production_once(platform, platform_user_id, recipe_key, operation_id, batch_count)
             except sqlite3.OperationalError as exc:
                 if "locked" not in str(exc).lower():
                     raise
@@ -266,6 +369,7 @@ class ProductionRepositoryMixin:
         platform_user_id: str,
         recipe_key: str,
         operation_id: str,
+        batch_count: int = 1,
     ) -> ProductionOrderRecord:
         from ..production.rules import TOOL_MAX_DURABILITY_BP, random_quality_bp, recipe_definition
 
@@ -274,6 +378,9 @@ class ProductionRepositoryMixin:
             "platform_user_id": platform_user_id,
             "recipe_key": recipe_key,
         }
+        production_batch_count(batch_count)
+        if batch_count > 1:
+            operation_payload["batch_count"] = batch_count
         request_hash = self._request_hash("production.start", operation_payload)
         now = self._now()
         now_text = serialize_datetime(now)
@@ -295,7 +402,7 @@ class ProductionRepositoryMixin:
                 )
                 return self._production_order_from_payload(existing, replay=True)
 
-            recipe = recipe_definition(recipe_key, self.content)
+            recipe = self._batch_recipe(recipe_definition(recipe_key, self.content), batch_count)
             row = self._require_player(connection, platform, platform_user_id)
             if row["stage"] != "cultivator":
                 raise PlayerStageConflictError("player is not ready for production")
@@ -345,16 +452,8 @@ class ProductionRepositoryMixin:
             ).fetchone()
             if retreat is not None:
                 raise ProductionBusyError("retreat is still running")
-            day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-            day_end = day_start + timedelta(days=1)
-            used = connection.execute(
-                """
-                SELECT COUNT(*) AS count FROM production_orders
-                WHERE player_id = ? AND recipe_key = ? AND starts_at >= ? AND starts_at < ?
-                """,
-                (row["id"], recipe.key, serialize_datetime(day_start), serialize_datetime(day_end)),
-            ).fetchone()
-            if used is not None and int(used["count"]) >= recipe.daily_limit:
+            used = self._production_daily_units(connection, row, recipe.key, now)
+            if used + batch_count > recipe.daily_limit:
                 raise ProductionDailyLimitError("recipe daily cap reached")
 
             facility_slot = self._facility_reserve_for_recipe(connection, row, recipe)
@@ -413,6 +512,8 @@ class ProductionRepositoryMixin:
                 "facility_slot_id": int(facility_slot["id"]) if facility_slot is not None else None,
                 "constitution_effect": constitution_effect_snapshot(connection, int(row["id"])),
             }
+            if batch_count > 1:
+                snapshot["batch_count"] = batch_count
             spend_player_state(
                 connection,
                 row,
@@ -478,6 +579,7 @@ class ProductionRepositoryMixin:
                 ends_at=ends_at,
                 energy_cost=recipe.energy_cost,
                 currency_cost=recipe.currency_cost,
+                batch_count=batch_count,
             )
 
     async def complete_production(
@@ -708,6 +810,8 @@ class ProductionRepositoryMixin:
                 "binding_expires_at": binding_expires_at,
                 "recovered": recovery,
             }
+            if "batch_count" in snapshot:
+                result["batch_count"] = self._snapshot_batch_count(snapshot)
             connection.execute(
                 "UPDATE production_orders SET status = ?, result_json = ?, updated_at = ? WHERE id = ? AND status IN ('processing', 'expired')",
                 (status, json.dumps(result, ensure_ascii=False, sort_keys=True), now_text, order["id"]),
@@ -744,6 +848,7 @@ class ProductionRepositoryMixin:
                 currency_spent=currency_spent,
                 tool_durability_bp=int(tool_durability) if tool_durability is not None else None,
                 binding_expires_at=binding_expires_at,
+                batch_count=self._snapshot_batch_count(snapshot),
             )
 
     @staticmethod
@@ -838,8 +943,9 @@ class ProductionRepositoryMixin:
             "binding_slot_limit", "currency_cost", "duration_seconds", "facility_slot_key",
             "facility_slot_id", "constitution_effect",
         }
-        if set(snapshot) != required:
+        if set(snapshot) not in (required, required | {"batch_count"}):
             raise ValueError("production order snapshot fields are invalid")
+        cls._snapshot_batch_count(snapshot)
         for field in ("recipe_key", "recipe_name", "location_key"):
             if not isinstance(snapshot[field], str) or not snapshot[field]:
                 raise ValueError(f"production snapshot {field} is invalid")
@@ -939,7 +1045,7 @@ class ProductionRepositoryMixin:
             raise ValueError("production start operation is invalid")
         order = connection.execute(
             """SELECT o.*, p.player_id AS public_player_id, p.platform, p.platform_user_id,
-                      op.player_id AS operation_player_id
+                      op.player_id AS operation_player_id, op.request_hash AS operation_request_hash
                FROM production_orders AS o JOIN players AS p ON p.id = o.player_id
                JOIN operations AS op ON op.operation_id = o.operation_id
                WHERE o.order_id = ?""",
@@ -963,6 +1069,11 @@ class ProductionRepositoryMixin:
         cls._validate_production_snapshot(operation_snapshot, order)
         if operation_snapshot != snapshot:
             raise ValueError("production start operation and order snapshots disagree")
+        request = {"platform": platform, "platform_user_id": platform_user_id, "recipe_key": snapshot["recipe_key"]}
+        if cls._snapshot_batch_count(snapshot) > 1:
+            request["batch_count"] = snapshot["batch_count"]
+        if order["operation_request_hash"] != cls._request_hash("production.start", request):
+            raise ValueError("production batch differs from its original request")
         if (
             payload["recipe_key"] != snapshot["recipe_key"]
             or payload["recipe_name"] != snapshot["recipe_name"]
@@ -988,14 +1099,10 @@ class ProductionRepositoryMixin:
             "FROM operations WHERE operation_id = ?",
             (order["operation_id"],),
         ).fetchone()
-        request_hash = cls._request_hash(
-            "production.start",
-            {
-                "platform": platform,
-                "platform_user_id": platform_user_id,
-                "recipe_key": str(order["recipe_key"]),
-            },
-        )
+        request = {"platform": platform, "platform_user_id": platform_user_id, "recipe_key": str(order["recipe_key"])}
+        if cls._snapshot_batch_count(snapshot) > 1:
+            request["batch_count"] = snapshot["batch_count"]
+        request_hash = cls._request_hash("production.start", request)
         if (
             operation is None
             or operation["operation_name"] != "production.start"
@@ -1028,8 +1135,9 @@ class ProductionRepositoryMixin:
             "random_quality_bp", "success", "outputs", "refunds", "currency_spent",
             "tool_durability_bp", "binding_expires_at", "recovered",
         }
-        if set(payload) != expected:
+        if set(payload) not in (expected, expected | {"batch_count"}):
             raise ValueError("production settlement operation has unexpected fields")
+        cls._snapshot_batch_count(payload)
         player_id = cls._validate_production_player_identity(
             payload["player"], platform=platform, platform_user_id=platform_user_id
         )
@@ -1166,6 +1274,8 @@ class ProductionRepositoryMixin:
             "binding_expires_at": expected_binding_expiry,
             "recovered": operation_name == "production.recover",
         }
+        if "batch_count" in snapshot:
+            expected_result["batch_count"] = cls._snapshot_batch_count(snapshot)
         if operation_result != expected_result:
             raise ValueError("production settlement result does not match its snapshot")
 
@@ -1199,6 +1309,7 @@ class ProductionRepositoryMixin:
             energy_cost=int(payload["energy_cost"]),
             currency_cost=int(payload["currency_cost"]),
             already_completed=replay,
+            batch_count=ProductionRepositoryMixin._snapshot_batch_count(payload["snapshot"]),
         )
     @staticmethod
     def _production_settlement_from_payload(payload: dict[str, Any], *, replay: bool) -> ProductionSettlementRecord:
@@ -1225,4 +1336,5 @@ class ProductionRepositoryMixin:
                 else None
             ),
             already_completed=replay,
+            batch_count=ProductionRepositoryMixin._snapshot_batch_count(payload),
         )

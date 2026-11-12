@@ -597,6 +597,40 @@ def test_equipment_loadout_is_idempotent_recoverable_and_adapter_neutral() -> No
     asyncio.run(run())
 
 
+def test_broken_equipment_list_does_not_offer_unavailable_instance_actions() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            user = "equipment-broken-list"
+            await _enter_cultivator(runtime, user)
+            _set_equipment_resources(runtime, user, ironstone=0, stones=0)
+            equipped = await runtime.dispatch(_context(user, "create-broken-candidate"), "穿戴法器 木纹剑")
+            assert equipped.ok
+
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                instance_id = connection.execute(
+                    "SELECT instance_id FROM equipment_instances WHERE player_id = "
+                    "(SELECT id FROM players WHERE platform='web' AND platform_user_id=?) "
+                    "AND item_key='item.weapon.wood_sword' AND status='active'",
+                    (user,),
+                ).fetchone()[0]
+                connection.execute(
+                    "UPDATE equipment_instances SET status='broken', durability_bp=0 WHERE instance_id=?",
+                    (instance_id,),
+                )
+
+            listed = await runtime.dispatch(_context(user, "list-broken"), "我的装备")
+            assert listed.ok
+            equipment = next(item for item in listed.data["equipment"] if item["instance_id"] == instance_id)
+            assert equipment["status"] == "broken" and equipment["durability_bp"] == 0
+            line = next(line for line in listed.message.splitlines() if instance_id not in line and "木纹剑" in line)
+            assert "已损坏" in line
+            assert all(action not in line for action in ("[穿戴]", "[卸下]", "[祭炼]", "[重铸]"))
+            await runtime.close()
+
+    asyncio.run(run())
+
+
 def test_equipment_loadout_replays_after_content_name_changes_for_both_adapters() -> None:
     async def run(data_dir: Path) -> None:
         adapters = ("qq.official", "onebot.v11")
