@@ -79,9 +79,14 @@ HEAD 隔离复现旧设施时长 12≠108，修正把 9000 时长倍率误作减
 legacy-message-final,facility-fixed,duration-documentation}.xml`；编译及 diff 检查通过。
 只在 develop 白名单提交；精确 SHA CI `43324976655` 已全绿（Python 3.11/3.12 quality、
 install-smoke、编译与 shell 检查），本地最终树生产/装备/完整性/合同/内容规则定向组合 `126 passed`，
-审查发现的损坏装备快捷链接已在 `478dbcf` 修复，装备与批量回归 `53 passed`。当前待普通合 main、
-递增正式版本 `0.1.38`、tag/release 与完整 Release 验包。
-未部署、操作生产/真实账号、发 QQ、安装依赖或改其它项目；全部辅助文件保留且不 stage。
+审查发现的损坏装备快捷链接已在 `478dbcf` 修复，装备与批量回归 `53 passed`；另 `test_production.py`
+`8 passed`。版本 `834a4f4` 精确 SHA CI `43326349367`、普通 main 合并
+`1d7b9277a1fedddd45db22443a894acd2173bd80` CI `43327486516`、tag/release CI `43328881013`
+均全绿。正式 `v0.1.38` 指向 main 合并提交；Release 包完整下载 `3,285,532` bytes，1288 tracked
+files、83 data、44 seed rules、176 old provenance 全部核验，无辅助文件/额外文件；本地 SHA-256
+`bbd952b130a12a54db5a581f7aa3622abcecd938640eee1596179745d54fa412` 与 GitHub asset digest 相同。
+已回 develop 留本 checkpoint；未部署、操作生产/真实账号、发 QQ、安装依赖或改其它项目；
+全部辅助文件保留且不 stage。
 
 ### 最新交付：山野共建长期工程（2026-11-13）
 
