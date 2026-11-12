@@ -235,7 +235,7 @@ def test_public_project_codex_discovery_freezes_content_and_replays_on_both_adap
         for adapter in ("qq.official", "onebot.v11"):
             with TemporaryDirectory() as temp_dir:
                 data_dir = Path(temp_dir) / "content"
-                shutil.copytree(Path(__file__).parents[1] / "data", data_dir)
+                shutil.copytree(Path(__file__).parents[1] / "data", data_dir, ignore=shutil.ignore_patterns("*.sqlite3*", "*.db*"))
                 runtime = create_runtime(
                     data_dir=data_dir,
                     clock=MutableClock(datetime(2026, 10, 12, tzinfo=timezone.utc)),

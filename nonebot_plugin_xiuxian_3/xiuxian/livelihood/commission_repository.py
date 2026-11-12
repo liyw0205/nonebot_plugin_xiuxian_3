@@ -425,10 +425,10 @@ class CommissionRepositoryMixin:
     def _ensure_commissions(self, connection: Any, business_date: str, now: datetime) -> None:
         day_start = datetime(now.year, now.month, now.day, tzinfo=now.tzinfo)
         starts_at = serialize_datetime(day_start)
-        effects = self._public_project_effects(connection, now)
+        effects = self._public_project_effect_values(connection, now)
         for definition in town_commission_definitions(self.content).values():
-            stock_multiplier = 120 if definition.stock_bonus_key in effects else 100
-            reward_multiplier = 110 if definition.reward_bonus_key in effects else 100
+            stock_multiplier = 100 + effects.get(definition.stock_bonus_key, 0)
+            reward_multiplier = 100 + effects.get(definition.reward_bonus_key, 0)
             expires = day_start + timedelta(seconds=definition.duration_seconds)
             status = "published" if now < expires else "expired"
             commission_id = f"town.new_town.{business_date}.{definition.key.rsplit('.', 1)[-1]}"

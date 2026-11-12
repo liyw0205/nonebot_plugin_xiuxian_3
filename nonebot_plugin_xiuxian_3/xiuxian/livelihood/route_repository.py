@@ -351,11 +351,11 @@ class RouteRepositoryMixin:
             self._check_route_busy(connection, int(player["id"]))
             if player_requirements_missing(player, assets={cargo_key: cargo_quantity}):
                 raise RouteCargoRequirementError("cargo is insufficient")
-            effects = self._public_project_effects(connection, now)
+            effects = self._public_project_effect_values(connection, now)
             delay_chance_bp = max(
                 0,
                 definition.delay_chance_bp
-                - (1000 if "route.delay_weight_reduction" in effects else 0),
+                - effects.get("route.delay_weight_reduction", 0),
             )
             delay_roll = route_delay_roll_bp(operation_id)
             delay_seconds = definition.delay_seconds if delay_roll < delay_chance_bp else 0

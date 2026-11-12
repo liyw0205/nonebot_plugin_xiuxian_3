@@ -161,7 +161,7 @@ def host(tmp_path: Path) -> Path:
     target = tmp_path / "host"
     target.mkdir()
     shutil.copyfile(ROOT / "examples/nonebot/pyproject.toml", target / "pyproject.toml")
-    shutil.copytree(ROOT / "data", target / "data")
+    shutil.copytree(ROOT / "data", target / "data", ignore=shutil.ignore_patterns("*.sqlite3*", "*.db*"))
     (target / ".env").write_bytes(b"preserve_env=1\n")
     (target / "data/xiuxian3.sqlite3").write_bytes(b"database-must-not-change")
     (target / "data/custom.json").write_bytes(b'{"user": "keep"}\n')
@@ -309,6 +309,62 @@ def test_cultivation_seed_upgrade_preserves_custom_and_repeats(host: Path, custo
     repeated = deploy(host)
     assert repeated.returncode == 0, repeated.stdout + repeated.stderr
     assert "种子更新 0 个" in repeated.stdout
+    preserved(host)
+
+
+def pre_construction_livelihood() -> bytes:
+    text = (ROOT / "data/生活/生活.json").read_text(encoding="utf-8")
+    decoder = json.JSONDecoder()
+    position = text.index("[", text.index('"records"')) + 1
+    records = []
+    while True:
+        while text[position].isspace() or text[position] == ",":
+            position += 1
+        if text[position] == "]":
+            break
+        start = position
+        row, position = decoder.raw_decode(text, position)
+        records.append((row["key"], start))
+    keys = [key for key, _ in records]
+    start = keys.index("project.ironwood_bridge")
+    assert keys[start:start+3] == ["project.ironwood_bridge", "project.herb_drying_house", "project.basalt_waymarker"]
+    blob = (text[:records[start][1]] + text[records[start+3][1]:]).encode("utf-8")
+    assert hashlib.sha256(blob).hexdigest() == "1eaef8b80ac72c1fc351e734f6aba2ff25adb880ed5351e1130c9e129c9644eb"
+    return blob
+
+
+@pytest.mark.parametrize("custom", [False, True])
+def test_construction_seed_upgrade_from_v0136_backup_repeat_and_custom(host: Path, custom: bool) -> None:
+    path = host / "data/生活/生活.json"
+    old = pre_construction_livelihood()
+    original = old + b"\n" if custom else old
+    path.write_bytes(original)
+    result = deploy(host)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert path.read_bytes() == (original if custom else (ROOT / "data/生活/生活.json").read_bytes())
+    backups = list((host / ".xiuxian3/backups").glob("deploy-*"))
+    assert len(backups) == 1
+    if not custom:
+        assert (backups[0] / "data/生活/生活.json").read_bytes() == old
+    repeated = deploy(host)
+    assert repeated.returncode == 0, repeated.stdout + repeated.stderr
+    assert "种子更新 0 个" in repeated.stdout
+    preserved(host)
+
+
+def test_custom_invalid_construction_phase_rolls_back_installed_source(host: Path) -> None:
+    path = host / "data/生活/生活.json"
+    document = json.loads(path.read_text(encoding="utf-8"))
+    project = next(row for row in document["records"] if row["key"] == "project.ironwood_bridge")
+    project["stages"][0]["service_points"] = True
+    original = json.dumps(document, ensure_ascii=False).encode("utf-8")
+    path.write_bytes(original)
+    old_source = (host / "src/plugins/nonebot_plugin_xiuxian_3/__init__.py").read_bytes()
+    result = deploy(host)
+    assert result.returncode != 0
+    assert "project stage" in result.stdout + result.stderr
+    assert path.read_bytes() == original
+    assert (host / "src/plugins/nonebot_plugin_xiuxian_3/__init__.py").read_bytes() == old_source
     preserved(host)
 
 

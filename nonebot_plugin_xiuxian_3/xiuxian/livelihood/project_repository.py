@@ -1,4 +1,4 @@
-"""SQLite transactions for the weekly new-town public project."""
+"""SQLite transactions for public projects and persistent construction."""
 
 from __future__ import annotations
 
@@ -27,6 +27,7 @@ from ..persistence.errors import (
     ProjectContributionLimitError,
     ProjectDailyLimitError,
     ProjectContributionRequirementError,
+    ProjectPhaseRequirementError,
     ProjectContentClosedError,
     ProjectNotFoundError,
     ProjectNotReadyError,
@@ -34,6 +35,7 @@ from ..persistence.errors import (
     ResourceInsufficientError,
 )
 from ..utils.json import json_object
+from ..content import ContentError
 from ..specials.codex_projection import record_codex_discovery
 from .project_models import ProjectContributionRecord, ProjectSettlementRecord, PublicProjectView
 from .rules import (
@@ -42,11 +44,61 @@ from .rules import (
     project_definition,
     project_resource_key,
     weekly_project_key,
+    validate_project_stages,
 )
 
 
 class ProjectRepositoryMixin:
     """Own project generation, resource contributions and reward settlement."""
+
+    async def resolve_project_selector(self, value: str) -> str | None:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(self._resolve_project_selector_sync, value)
+
+    def _resolve_project_selector_sync(self, value: str) -> str | None:
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM livelihood_projects WHERE business_week IN (?, 'persistent') ORDER BY id DESC",
+                (self._business_week(self._now()),),
+            ).fetchall()
+            for row in rows:
+                snapshot = self._project_snapshot(row)
+                if value in snapshot.get("selectors", [row["project_key"], snapshot["label"]]):
+                    return str(row["project_key"])
+        return None
+
+    async def construction_status(self, *, platform: str, platform_user_id: str) -> tuple[PublicProjectView, ...]:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(self._construction_status_sync, platform, platform_user_id)
+
+    def _construction_status_sync(self, platform: str, user: str) -> tuple[PublicProjectView, ...]:
+        with self._connect() as connection:
+            connection.execute("BEGIN")
+            player = self._require_player(connection, platform, user, writable=False)
+            projects = connection.execute(
+                "SELECT * FROM livelihood_projects WHERE business_week = 'persistent' ORDER BY id"
+            ).fetchall()
+            result = []
+            now = self._now()
+            for project in projects:
+                payload = self._project_payload(project)
+                points = connection.execute(
+                    "SELECT COALESCE(SUM(contribution_points),0), "
+                    "COALESCE(SUM(CASE WHEN substr(created_at,1,10)=? THEN contribution_points ELSE 0 END),0) "
+                    "FROM livelihood_project_contributions WHERE project_id=? AND player_id=?",
+                    (now.date().isoformat(), project["project_id"], player["id"]),
+                ).fetchone()
+                payload["personal_points"], payload["daily_points"] = map(int, points)
+                payload["rewarded"] = connection.execute(
+                    "SELECT 1 FROM livelihood_project_rewards WHERE project_id=? AND player_id=? AND eligible=1",
+                    (project["project_id"], player["id"]),
+                ).fetchone() is not None
+                if payload["status"] == "active" and now >= datetime.fromisoformat(payload["effect_ends_at"]):
+                    payload["status"] = "maintenance_due"
+                result.append(PublicProjectView(**payload))
+            return tuple(result)
 
     async def list_projects(self, *, platform: str, platform_user_id: str) -> tuple[PublicProjectView, ...]:
         await self.initialize()
@@ -115,14 +167,12 @@ class ProjectRepositoryMixin:
         operation_id: str,
         source_operation_id: str | None,
     ) -> ProjectContributionRecord:
-        try:
-            definition = project_definition(project_key, self.content) if project_key else None
-        except ValueError as exc:
-            raise ProjectContentClosedError("unsupported project") from exc
-        if source_operation_id and definition is None:
+        if source_operation_id and project_key is None:
             raise ProjectContentClosedError("service contributions require an explicit project")
         points = 0
         if not source_operation_id:
+            if isinstance(amount, bool) or not isinstance(amount, int):
+                raise ProjectContributionLimitError("contribution amount must be an integer")
             try:
                 points = int(amount)
             except (TypeError, ValueError) as exc:
@@ -135,7 +185,7 @@ class ProjectRepositoryMixin:
             {
                 "platform": platform,
                 "platform_user_id": platform_user_id,
-                "project_key": definition.key if definition else "",
+                "project_key": project_key or "",
                 "resource_key": resource_key or "",
                 "amount": points,
                 "source_operation_id": source_operation_id or "",
@@ -154,14 +204,11 @@ class ProjectRepositoryMixin:
                 connection,
                 week,
                 now,
-                definition.key if definition is not None else None,
+                project_key,
                 player=player,
             )
-            if definition is not None and definition.key != str(project["project_key"]):
+            if project_key is not None and project_key != str(project["project_key"]):
                 raise ProjectContentClosedError("project is not in this week's rotation")
-            definition = project_definition(str(project["project_key"]), self.content)
-            if definition.required_faction or definition.required_sect_level:
-                self._require_project_day_quota(connection, project, player, now, points)
             self._refresh_status(project, connection, now, now_text)
             project = connection.execute("SELECT * FROM livelihood_projects WHERE id = ?", (project["id"],)).fetchone()
             if project is None:
@@ -171,7 +218,11 @@ class ProjectRepositoryMixin:
             snapshot = self._project_snapshot(project)
             resources = tuple(str(value) for value in snapshot["contribution_resources"])
             requirements = snapshot["requirements"]
+            phase = self._construction_phase(project, snapshot)
+            if phase is not None:
+                requirements = phase["requirements"]
             resource = self._resolve_resource(resources, resource_key)
+            resource = next((key for key, label in snapshot["resource_labels"].items() if label == resource), resource)
             if source_operation_id:
                 return self._contribute_service_once(
                     connection,
@@ -192,12 +243,12 @@ class ProjectRepositoryMixin:
                 available = player_currency(player)
             else:
                 available = inventory_amount(inventory, cost_key)
-            if available < resource_amount:
-                raise ResourceInsufficientError("project resource is insufficient")
-            progress = json_object(project["progress_json"], {})
+            progress = self._project_progress(project, snapshot)
             required = int(requirements.get(cost_key, 0))
             before = int(progress.get(cost_key, 0))
             if before >= required:
+                if phase is not None:
+                    raise ProjectPhaseRequirementError("phase_material_complete", phase["name"])
                 raise ProjectContributionRequirementError("this project requirement is already complete")
             resource_amount = min(resource_amount, required - before)
             points = resource_amount if cost_key != "currency.spirit_stone" else resource_amount // 50
@@ -205,6 +256,12 @@ class ProjectRepositoryMixin:
                 raise ProjectContributionRequirementError("the contribution does not complete a resource unit")
             if points > 30:
                 raise ProjectContributionLimitError("one contribution is capped at 30 points")
+            if available < resource_amount:
+                raise ResourceInsufficientError("project resource is insufficient")
+            if snapshot.get("daily_limit") or project["project_key"] in {
+                "project.domain_refuge", "project.abyss_purification", "project.ancestral_habitat"
+            }:
+                self._require_project_day_quota(connection, project, player, now, points)
             if cost_key == "currency.spirit_stone":
                 resource_amount = points * 50
                 spend_player_assets(
@@ -217,11 +274,12 @@ class ProjectRepositoryMixin:
                 spend_player_assets(connection, player, {cost_key: resource_amount}, now_text)
             progress[cost_key] = before + resource_amount
             contribution_points = int(project["contribution_points"]) + points
-            target_points = int(project["target_points"])
-            complete = all(int(progress.get(key, 0)) >= int(value) for key, value in requirements.items())
+            complete = all(int(progress.get(key, 0)) >= int(value) for key, value in snapshot["requirements"].items())
+            if phase is not None:
+                complete = complete and int(progress.get("service.transport", 0)) >= snapshot["stages"][-1]["service_points"]
             status = "active" if complete else "proposed"
             effect_starts = now_text if complete else project["effect_starts_at"]
-            effect_ends = serialize_datetime(now + timedelta(days=7)) if complete else project["effect_ends_at"]
+            effect_ends = serialize_datetime(now + timedelta(seconds=snapshot.get("effect_duration_seconds", 604800))) if complete else project["effect_ends_at"]
             connection.execute(
                 """
                 UPDATE livelihood_projects
@@ -327,6 +385,20 @@ class ProjectRepositoryMixin:
             operation_name,
             source_payload,
         )
+        if snapshot.get("cycle") == "persistent":
+            row = connection.execute(
+                "SELECT route_id, route_key, result_json, snapshot_json FROM livelihood_trade_routes WHERE settle_operation_id=? AND player_id=?",
+                (source_operation_id, player["id"]),
+            ).fetchone()
+            self._route_settlement_from_payload(source_payload)
+            settled = self._decode_object(row["result_json"], "transport result") if row is not None else {}
+            if row is None or any(source_payload.get(key) != value for key, value in settled.items()) or any(
+                source_payload.get(key) != row[key] for key in ("route_id", "route_key")
+            ):
+                raise ProjectContributionRequirementError("transport source differs from its settled receipt")
+            event = self._event_snapshot(self._decode_object(row["snapshot_json"], "transport snapshot"))
+            if event["outcome"] != "success":
+                raise ProjectPhaseRequirementError("transport_not_successful", "运输劳作")
         used = connection.execute(
             "SELECT 1 FROM livelihood_project_contributions WHERE player_id = ? AND source_operation_id = ? LIMIT 1",
             (player["id"], source_operation_id),
@@ -336,11 +408,24 @@ class ProjectRepositoryMixin:
         points = int(source["contribution_points"])
         quantity = int(source["quantity"])
         service_key = str(source["service_key"])
+        phase = self._construction_phase(project, snapshot)
+        progress = self._project_progress(project, snapshot)
+        if phase is not None:
+            if int(progress.get("service.transport", 0)) + points > phase["service_points"]:
+                raise ProjectPhaseRequirementError("phase_labour_complete", phase["name"])
+            progress["service.transport"] = int(progress.get("service.transport", 0)) + points
         self._require_project_day_quota(connection, project, player, now, points)
         contribution_points = int(project["contribution_points"]) + points
+        complete = phase is not None and self._construction_phase(
+            {"progress_json": json.dumps(progress)}, snapshot
+        ) is None
         connection.execute(
-            "UPDATE livelihood_projects SET contribution_points = ?, updated_at = ? WHERE id = ?",
-            (contribution_points, now_text, project["id"]),
+            "UPDATE livelihood_projects SET contribution_points = ?, progress_json = ?, status = ?, "
+            "effect_starts_at = ?, effect_ends_at = ?, updated_at = ? WHERE id = ?",
+            (contribution_points, json.dumps(progress, ensure_ascii=False, sort_keys=True),
+             "active" if complete else project["status"], now_text if complete else project["effect_starts_at"],
+             serialize_datetime(now + timedelta(seconds=snapshot.get("effect_duration_seconds", 604800))) if complete else project["effect_ends_at"],
+             now_text, project["id"]),
         )
         contribution_id = uuid4().hex
         connection.execute(
@@ -479,7 +564,10 @@ class ProjectRepositoryMixin:
                 return self._project_settlement_from_payload(existing, replay=True)
             player = self._require_player(connection, platform, platform_user_id)
             if project_id:
-                project = connection.execute("SELECT * FROM livelihood_projects WHERE project_id = ?", (project_id,)).fetchone()
+                project = connection.execute(
+                    "SELECT * FROM livelihood_projects WHERE project_id=? OR (project_key=? AND business_week='persistent') ORDER BY id DESC LIMIT 1",
+                    (project_id, project_id),
+                ).fetchone()
             else:
                 project = connection.execute(
                     """
@@ -574,7 +662,9 @@ class ProjectRepositoryMixin:
 
     @staticmethod
     def _project_target(definition: PublicProjectDefinition) -> int:
-        return sum(value if key != "currency.spirit_stone" else value // 50 for key, value in definition.requirements.items())
+        return sum(value if key != "currency.spirit_stone" else value // 50 for key, value in definition.requirements.items()) + (
+            definition.stages[-1]["service_points"] if definition.stages else 0
+        )
 
     def _ensure_project(
         self,
@@ -586,13 +676,25 @@ class ProjectRepositoryMixin:
         player: Any | None = None,
     ) -> Any:
         key = weekly_project_key(week) if project_key is None else project_key
+        persistent = connection.execute(
+            "SELECT * FROM livelihood_projects WHERE project_key=? AND business_week='persistent'", (key,)
+        ).fetchone()
+        if persistent is not None:
+            return persistent
         row = connection.execute(
             "SELECT * FROM livelihood_projects WHERE project_key = ? AND business_week = ?",
             (key, week),
         ).fetchone()
         if row is not None:
             return row
-        definition = project_definition(key, self.content)
+        try:
+            definition = project_definition(key, self.content)
+        except ContentError:
+            raise
+        except ValueError as exc:
+            raise ProjectContentClosedError("project is not open") from exc
+        if definition.cycle == "persistent":
+            week = "persistent"
         if definition.required_faction or definition.required_sect_level:
             if player is None or not self._project_available(connection, player, definition):
                 raise ProjectContentClosedError("project authority is not available")
@@ -645,6 +747,13 @@ class ProjectRepositoryMixin:
                         ],
                         "codex_entry_key": definition.codex_entry_key,
                         "codex_entry_label": definition.codex_entry_label,
+                        "cycle": definition.cycle,
+                        "stages": list(definition.stages),
+                        "sources": list(definition.sources),
+                        "effect_value": definition.effect_value,
+                        "effect_duration_seconds": definition.effect_duration_seconds,
+                        "daily_limit": definition.cycle == "persistent",
+                        "selectors": list(dict.fromkeys([definition.key, definition.label, *definition.aliases])),
                     },
                     ensure_ascii=False,
                     sort_keys=True,
@@ -729,6 +838,45 @@ class ProjectRepositoryMixin:
             (now_text, now_text),
         ).fetchall()
         return frozenset(str(row["effect_key"]) for row in rows)
+
+    @classmethod
+    def _public_project_effect_values(cls, connection: Any, now: datetime) -> dict[str, int]:
+        rows = connection.execute(
+            "SELECT * FROM livelihood_projects WHERE status='active' AND effect_starts_at<=? AND effect_ends_at>?",
+            (serialize_datetime(now), serialize_datetime(now)),
+        ).fetchall()
+        legacy = {"town_commission.stock_bonus": 20, "town_commission.herb_reward_bonus": 10, "route.delay_weight_reduction": 1000}
+        values: dict[str, int] = {}
+        for row in rows:
+            snapshot = cls._project_snapshot(row)
+            key = str(row["effect_key"])
+            value = snapshot.get("effect_value")
+            if value is None:
+                value = legacy.get(key, 0)
+            values[key] = max(values.get(key, 0), value)
+        return values
+
+    @staticmethod
+    def _construction_phase(project: Any, snapshot: dict[str, Any]) -> dict[str, Any] | None:
+        progress = ProjectRepositoryMixin._project_progress(project, snapshot)
+        for stage in snapshot.get("stages", []):
+            if any(int(progress.get(key, 0)) < value for key, value in stage["requirements"].items()) or int(
+                progress.get("service.transport", 0)
+            ) < stage["service_points"]:
+                return stage
+        return None
+
+    @staticmethod
+    def _project_progress(project: Any, snapshot: dict[str, Any]) -> dict[str, int]:
+        progress = ProjectRepositoryMixin._decode_object(project["progress_json"], "project progress")
+        if snapshot.get("cycle") == "persistent":
+            maximums = {**snapshot["requirements"], "service.transport": snapshot["stages"][-1]["service_points"]}
+            if not set(snapshot["requirements"]).issubset(progress) or any(
+                key not in maximums or isinstance(value, bool) or not isinstance(value, int)
+                or not 0 <= value <= maximums[key] for key, value in progress.items()
+            ):
+                raise ValueError("construction progress is invalid")
+        return progress
 
     @staticmethod
     def _resolve_resource(resources: tuple[str, ...], resource_key: str | None) -> str:
@@ -821,6 +969,44 @@ class ProjectRepositoryMixin:
             raise ValueError("project snapshot labels are invalid")
         if not isinstance(snapshot["service_sources"], list):
             raise ValueError("project snapshot service sources are invalid")
+        if not snapshot["requirements"] or any(
+            not isinstance(key, str) or not key or isinstance(value, bool) or not isinstance(value, int) or value <= 0
+            for key, value in snapshot["requirements"].items()
+        ):
+            raise ValueError("project snapshot material quantities are invalid")
+        if snapshot.get("cycle", "weekly") not in {"weekly", "persistent"}:
+            raise ValueError("project snapshot cycle is invalid")
+        selectors = snapshot.get("selectors")
+        if selectors is not None and (
+            not isinstance(selectors, list) or any(not isinstance(value, str) or not value.strip() for value in selectors)
+            or len(set(selectors)) != len(selectors) or not {row["project_key"], snapshot["label"]}.issubset(selectors)
+        ):
+            raise ValueError("project snapshot selectors are invalid")
+        if snapshot.get("cycle") == "persistent":
+            validate_project_stages(snapshot.get("stages"), snapshot["requirements"])
+            if not isinstance(snapshot.get("sources"), list) or len(snapshot["sources"]) != len(snapshot["requirements"]) or any(
+                not isinstance(source, dict) or set(source) != {"item_key", "exploration_key", "item_label", "source_label", "location_label"}
+                or any(not isinstance(value, str) or not value.strip() for value in source.values())
+                for source in snapshot["sources"]
+            ):
+                raise ValueError("project snapshot sources are invalid")
+            if snapshot.get("daily_limit") is not True or snapshot.get("effect_value") is None:
+                raise ValueError("project snapshot construction settings are invalid")
+            if any(
+                not isinstance(source, dict) or source.get("operation_names") != ["livelihood.settle_route"]
+                or source.get("service_key") != "service.transport"
+                or isinstance(source.get("contribution_points"), bool)
+                or not isinstance(source.get("contribution_points"), int) or not 0 < source["contribution_points"] <= 30
+                for source in snapshot["service_sources"]
+            ) or not snapshot["service_sources"]:
+                raise ValueError("project snapshot construction labour is invalid")
+        value = snapshot.get("effect_value")
+        maximum = 10000 if row["effect_key"] == "route.delay_weight_reduction" else 100
+        if value is not None and (isinstance(value, bool) or not isinstance(value, int) or not 0 < value <= maximum):
+            raise ValueError("project snapshot effect value is invalid")
+        duration = snapshot.get("effect_duration_seconds", 604800)
+        if isinstance(duration, bool) or not isinstance(duration, int) or not 1 <= duration <= 2592000:
+            raise ValueError("project snapshot effect duration is invalid")
         codex_entry_key = snapshot.get("codex_entry_key")
         codex_entry_label = snapshot.get("codex_entry_label")
         if codex_entry_key is not None and (
@@ -835,6 +1021,7 @@ class ProjectRepositoryMixin:
     @staticmethod
     def _project_payload(row: Any) -> dict[str, Any]:
         snapshot = ProjectRepositoryMixin._project_snapshot(row)
+        progress = ProjectRepositoryMixin._project_progress(row, snapshot)
         return {
             "project_id": str(row["project_id"]),
             "project_key": str(row["project_key"]),
@@ -845,12 +1032,16 @@ class ProjectRepositoryMixin:
             "status": str(row["status"]),
             "contribution_points": int(row["contribution_points"]),
             "target_points": int(row["target_points"]),
-            "progress": json_object(row["progress_json"], {}),
+            "progress": progress,
             "requirements": dict(snapshot["requirements"]),
             "resource_labels": dict(snapshot["resource_labels"]),
             "reward_labels": dict(snapshot["reward_labels"]),
             "effect_key": str(row["effect_key"]),
             "effect_ends_at": str(row["effect_ends_at"] or ""),
+            "cycle": snapshot.get("cycle", "weekly"),
+            "stages": snapshot.get("stages", []),
+            "sources": snapshot.get("sources", []),
+            "service_points": int(progress.get("service.transport", 0)),
         }
 
     @staticmethod
@@ -859,6 +1050,12 @@ class ProjectRepositoryMixin:
         return PublicProjectView(**payload)
 
     def _contribution_from_payload(self, payload: dict[str, Any], *, replay: bool = False) -> ProjectContributionRecord:
+        self._validate_construction_receipt(payload["project"])
+        if payload["project"].get("cycle") == "persistent" and any(
+            isinstance(payload.get(key), bool) or not isinstance(payload.get(key), int) or payload[key] <= 0
+            for key in ("resource_amount", "contribution_points", "quantity")
+        ):
+            raise ValueError("construction contribution receipt is invalid")
         return ProjectContributionRecord(
             player=self._row_to_player(payload["player"]),
             project=PublicProjectView(**payload["project"]),
@@ -893,6 +1090,13 @@ class ProjectRepositoryMixin:
         }
 
     def _project_settlement_from_payload(self, payload: dict[str, Any], *, replay: bool = False) -> ProjectSettlementRecord:
+        self._validate_construction_receipt(payload["project"])
+        if payload["project"].get("cycle") == "persistent" and (
+            not isinstance(payload.get("eligible"), bool) or not isinstance(payload.get("rewarded"), bool)
+            or not isinstance(payload.get("reward"), dict)
+            or any(isinstance(value, bool) or not isinstance(value, int) or value <= 0 for value in payload["reward"].values())
+        ):
+            raise ValueError("construction settlement receipt is invalid")
         return ProjectSettlementRecord(
             player=self._row_to_player(payload["player"]),
             project=PublicProjectView(**payload["project"]),
@@ -904,6 +1108,22 @@ class ProjectRepositoryMixin:
             local_reputation_delta=int(payload.get("local_reputation_delta", 0)),
             already_completed=replay,
         )
+
+    @staticmethod
+    def _validate_construction_receipt(project: dict[str, Any]) -> None:
+        if project.get("cycle") != "persistent":
+            return
+        validate_project_stages(project.get("stages"), project.get("requirements"))
+        progress = ProjectRepositoryMixin._project_progress(
+            {"progress_json": json.dumps(project.get("progress"))}, project
+        )
+        for key in ("service_points", "target_points", "contribution_points"):
+            if isinstance(project.get(key), bool) or not isinstance(project.get(key), int) or project[key] < 0:
+                raise ValueError("construction receipt points are invalid")
+        if project["service_points"] != progress.get("service.transport", 0) or project["contribution_points"] != sum(progress.values()):
+            raise ValueError("construction receipt progress differs from points")
+        if project["target_points"] != sum(project["requirements"].values()) + project["stages"][-1]["service_points"]:
+            raise ValueError("construction receipt target differs from requirements")
 
     @staticmethod
     def _project_operation(connection: Any, operation_id: str, operation_name: str, request_hash: str) -> dict[str, Any] | None:

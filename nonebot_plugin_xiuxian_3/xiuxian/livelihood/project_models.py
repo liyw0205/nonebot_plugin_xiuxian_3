@@ -24,6 +24,13 @@ class PublicProjectView:
     reward_labels: dict[str, str] = field(default_factory=dict)
     effect_key: str = ""
     effect_ends_at: str = ""
+    cycle: str = "weekly"
+    stages: list[dict] = field(default_factory=list)
+    sources: list[dict] = field(default_factory=list)
+    service_points: int = 0
+    personal_points: int = 0
+    daily_points: int = 0
+    rewarded: bool = False
 
 
 @dataclass(frozen=True, slots=True)
