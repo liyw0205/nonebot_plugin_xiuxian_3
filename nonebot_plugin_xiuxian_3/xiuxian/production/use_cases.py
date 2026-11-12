@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from ...contracts import CommandContext, CommandResult
+import logging
+from datetime import datetime
+
+from ...contracts import CommandAction, CommandContext, CommandResult
 from ..repository import (
     EndgameRecipeAlreadyCreatedError,
     EndgameRecipeBusyError,
@@ -38,8 +41,10 @@ from ..repository import (
     ToolMissingError,
 )
 from .endgame_rules import resolve_endgame_recipe
-from .rules import UnknownRecipeError, item_label, resolve_recipe
+from .rules import ProductionBatchError, UnknownRecipeError, item_label, resolve_recipe, production_batch_count
 from ..utils.text import command_link
+
+logger = logging.getLogger(__name__)
 
 
 class ProductionApplication:
@@ -67,9 +72,46 @@ class ProductionApplication:
         )
 
     def _recipe_args(self, args: tuple[str, ...]) -> str | None:
-        if len(args) != 1:
+        if not args:
             return None
         return resolve_recipe(args[0], self.repository.content)
+
+    @staticmethod
+    def _batch_args(args: tuple[str, ...]) -> int:
+        try:
+            if len(args) not in (1, 2):
+                raise ProductionBatchError("unexpected production arguments")
+            return production_batch_count(int(args[1]) if len(args) == 2 else 1)
+        except ValueError as exc:
+            raise ProductionBatchError("invalid batch quantity") from exc
+
+    async def production_status(self, context: CommandContext) -> CommandResult:
+        if context.command_args:
+            return CommandResult(False, "INVALID_PRODUCTION_COMMAND", "查看生产状态无需附加参数。", context.request_id)
+        try:
+            records = await self.repository.production_status(platform=context.adapter, platform_user_id=context.user_id)
+        except PlayerNotFoundError:
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id)
+        except PlayerSuspendedError:
+            return CommandResult(False, "PLAYER_SUSPENDED", "当前角色暂时不能查看生产。", context.request_id)
+        except Exception:
+            logger.exception("production status failed request=%s user=%s", context.request_id, context.user_id)
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, retryable=True)
+        if not records:
+            return CommandResult(True, "PRODUCTION_STATUS", "## 生产行程\n\n尚无生产订单。", context.request_id, data={"order": None, "orders": []})
+        labels = {"processing": "制作中", "expired": "待恢复", "completed": "已领取", "failed": "失败已结算"}
+        lines = ["## 生产行程"]
+        commands = []
+        for record in records:
+            label = "待恢复" if record["recoverable"] else "待领取" if record["ready"] else labels[record["status"]]
+            command = "恢复生产" if record["recoverable"] else "领取生产" if record["ready"] else None
+            if command and command not in commands:
+                commands.append(command)
+            end = datetime.fromisoformat(record["ends_at"]).astimezone().strftime("%Y年%m月%d日 %H:%M:%S %Z")
+            lines.append(f"**{record['recipe_name']}** ×{record['batch_count']} 份 · {label}\n\n预计完成：{end}\n投入精力 {record['energy_cost']}、灵石 {record['currency_cost']}。")
+        return CommandResult(True, "PRODUCTION_STATUS", "\n\n".join(lines), context.request_id,
+            data={"order": records[0], "orders": records},
+            actions=tuple(CommandAction(command, command, enter=True) for command in commands))
 
     async def preview_recipe(self, context: CommandContext) -> CommandResult:
         operation_id = self._operation_id(context, "production.preview")
@@ -77,12 +119,16 @@ class ProductionApplication:
             recipe_key = self._recipe_args(context.command_args)
             if recipe_key is None:
                 raise UnknownRecipeError("recipe selector is missing")
+            batch_count = self._batch_args(context.command_args)
             record = await self.repository.preview_production(
                 platform=context.adapter,
                 platform_user_id=context.user_id,
                 recipe_key=recipe_key,
                 operation_id=operation_id,
+                batch_count=batch_count,
             )
+        except ProductionBatchError:
+            return CommandResult(False, "PRODUCTION_BATCH_INVALID", "份数须为 1 至 5；设施、契约、跨界及特殊作品须单份制作。本次没有扣费。", context.request_id)
         except UnknownRecipeError:
             return CommandResult(False, "RECIPE_NOT_FOUND", f"先用{command_link('生产预览', '生产预览')}填写配方名，例如疗伤丹；{command_link('生活篇', '修仙帮助 生活')}可查看制作流程。", context.request_id)
         except PlayerNotFoundError:
@@ -100,21 +146,31 @@ class ProductionApplication:
         except RepositoryBusyError:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, retryable=True)
         except Exception:
+            logger.exception("production preview failed request=%s operation=%s args=%s", context.request_id, operation_id, context.command_args)
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, retryable=True)
         tool_text = f"- **工具**：{item_label(record.tool_key, self.repository.content)}\n" if record.tool_key else ""
+        if record.batch_count > 1 and record.tool_key:
+            tool_text += f"- **总耐久消耗**：{record.tool_cost_bp}\n"
         return CommandResult(
             True,
             "RECIPE_PREVIEW",
             (
                 f"**{record.recipe_name} · 生产预览**\n\n"
-                f"- **精力消耗**：{record.energy_cost}\n"
+                + (f"- **制作份数**：{record.batch_count}\n" if record.batch_count > 1 else "")
+                + f"- **精力消耗**：{record.energy_cost}\n"
                 f"- **预计时长**：{record.duration_seconds} 秒\n"
-                f"- **今日次数**：{record.daily_used}/{record.daily_limit}\n"
+                f"- **今日份数**：{record.daily_used}/{record.daily_limit}\n"
                 f"- **灵石消耗**：{record.currency_cost}\n"
                 + tool_text
                 + "\n**所需材料**\n\n"
                 + "\n".join(f"- **{item_label(key, self.repository.content)}** ×{value}" for key, value in record.inputs.items())
-                + f"\n\n备妥后{command_link('开始生产 ' + record.recipe_name, '开始生产 ' + record.recipe_name)}，交付材料开始制作。"
+                + "\n\n**成功产出**\n\n"
+                + "\n".join(f"- **{item_label(key, self.repository.content)}** ×{value}" for key, value in record.outputs.items())
+                + ("\n高品质额外：" + "、".join(f"{item_label(key, self.repository.content)} ×{value}" for key, value in record.high_quality_bonus.items()) if record.high_quality_bonus else "")
+                + ("\n\n整批共用一次质量检定，失败按份返还配方材料；日限按制作份数计。" if record.batch_count > 1 else "")
+                + ("\n失败返还：" + ("、".join(f"{item_label(key, self.repository.content)} ×{value}" for key, value in record.failure_refunds.items() if value) or "无") + "；灵石、精力及工具耐久不返还。" if record.batch_count > 1 else "")
+                + f"\n\n备妥后{command_link('开始生产 ' + record.recipe_name, '开始生产 ' + record.recipe_name + (' ' + str(record.batch_count) if record.batch_count > 1 else ''))}，交付材料开始制作。"
+                + ("\n" + command_link("调整份数", f"生产预览 {record.recipe_name} 份数") if record.batch_supported else "")
             ),
             context.request_id,
             operation_id,
@@ -128,6 +184,12 @@ class ProductionApplication:
                 "inputs": record.inputs,
                 "currency_cost": record.currency_cost,
                 "idempotent_replay": False,
+                "batch_count": record.batch_count,
+                "batch_supported": record.batch_supported,
+                "tool_cost_bp": record.tool_cost_bp,
+                "outputs": record.outputs,
+                "high_quality_bonus": record.high_quality_bonus,
+                "failure_refunds": record.failure_refunds,
             },
         )
 
@@ -137,12 +199,16 @@ class ProductionApplication:
             recipe_key = self._recipe_args(context.command_args)
             if recipe_key is None:
                 raise UnknownRecipeError("recipe selector is missing")
+            batch_count = self._batch_args(context.command_args)
             record = await self.repository.start_production(
                 platform=context.adapter,
                 platform_user_id=context.user_id,
                 recipe_key=recipe_key,
                 operation_id=operation_id,
+                batch_count=batch_count,
             )
+        except ProductionBatchError:
+            return CommandResult(False, "PRODUCTION_BATCH_INVALID", "份数须为 1 至 5；设施、契约、跨界及特殊作品须单份制作。本次没有扣费。", context.request_id, operation_id)
         except UnknownRecipeError:
             return CommandResult(False, "RECIPE_NOT_FOUND", "请指定可用配方，例如 `开始生产 疗伤丹`。", context.request_id, operation_id)
         except PlayerNotFoundError:
@@ -184,6 +250,7 @@ class ProductionApplication:
         except RepositoryBusyError:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:
+            logger.exception("production start failed request=%s operation=%s args=%s", context.request_id, operation_id, context.command_args)
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
         return CommandResult(
             True,
@@ -191,10 +258,11 @@ class ProductionApplication:
             (
                 f"## 生产已开始\n\n"
                 f"**{self._display_name(record.player)}**开始制作 **{record.recipe_name}**。\n\n"
-                f"- **精力**：{record.player.energy}/{record.player.energy_max}\n"
+                + (f"- **制作份数**：{record.batch_count}\n" if record.batch_count > 1 else "")
+                + f"- **精力**：{record.player.energy}/{record.player.energy_max}\n"
                 f"- **灵石**：{record.player.spirit_stones}\n"
                 "- **状态**：制作中\n\n"
-                f"> 下一步：完成后发送 `领取生产`。"
+                f"> {command_link('生产状态', '生产状态')}查看行程，完成后{command_link('领取生产', '领取生产')}。"
             ),
             context.request_id,
             operation_id,
@@ -208,6 +276,7 @@ class ProductionApplication:
                 "energy": record.player.energy,
                 "spirit_stones": record.player.spirit_stones,
                 "idempotent_replay": record.already_completed,
+                "batch_count": record.batch_count,
             },
         )
 
@@ -236,6 +305,7 @@ class ProductionApplication:
         except RepositoryBusyError:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:
+            logger.exception("production complete failed request=%s operation=%s", context.request_id, operation_id)
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
         return self._settlement_result(context, operation_id, record)
 
@@ -262,6 +332,7 @@ class ProductionApplication:
         except RepositoryBusyError:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:
+            logger.exception("production recovery failed request=%s operation=%s", context.request_id, operation_id)
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
         return self._settlement_result(context, operation_id, record, recovered=True)
 
@@ -404,7 +475,8 @@ class ProductionApplication:
             (
                 f"## {result_text}\n\n"
                 f"**{self._display_name(record.player)}**的 **{record.recipe_name}**生产{outcome}。\n\n"
-                f"- **质量**：{record.quality_bp}/10000\n"
+                + (f"- **制作份数**：{record.batch_count}\n" if record.batch_count > 1 else "")
+                + f"- **质量**：{record.quality_bp}/10000\n"
                 f"- **获得**：{outputs}\n"
                 f"- **返还材料**：{refunds}\n"
                 f"{binding}"
@@ -423,6 +495,7 @@ class ProductionApplication:
                 "outputs": record.outputs,
                 "refunds": record.refunds,
                 "currency_spent": record.currency_spent,
+                "batch_count": record.batch_count,
                 "tool_durability_bp": record.tool_durability_bp,
                 "binding_expires_at": record.binding_expires_at,
                 "energy": record.player.energy,

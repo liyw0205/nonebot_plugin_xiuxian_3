@@ -13,6 +13,7 @@ from .recipe_models import RecipeDefinition
 
 QUALITY_SUCCESS_THRESHOLD_BP = 4500
 HIGH_QUALITY_THRESHOLD_BP = 8000
+MAX_PRODUCTION_BATCH = 5
 TOOL_MAX_DURABILITY_BP = 2000
 _RECIPE_FIELDS = frozenset(field.name for field in fields(RecipeDefinition))
 _LIST_REFERENCES = {
@@ -25,6 +26,24 @@ _SUBPROFESSION_LIST = "required_subprofession"
 
 class UnknownRecipeError(ValueError):
     """The requested stable recipe ID is absent or closed for new orders."""
+
+
+class ProductionBatchError(ValueError):
+    """The quantity or recipe is outside ordinary batch production."""
+
+
+def production_batch_count(value: Any) -> int:
+    if type(value) is not int or not 1 <= value <= MAX_PRODUCTION_BATCH:
+        raise ProductionBatchError("production batch must contain one to five units")
+    return value
+
+
+def production_batch_supported(recipe: RecipeDefinition) -> bool:
+    return not (
+        recipe.facility_kind or recipe.binding_kind or recipe.cross_realm_faction
+        or recipe.failure_refund_bp is not None or recipe.key == "recipe.fruit.soul_seed"
+        or recipe.key.startswith(("recipe.masterwork.", "recipe.permit."))
+    )
 
 
 def recipe_definitions(content: ContentBundle | None = None) -> dict[str, RecipeDefinition]:

@@ -319,10 +319,10 @@ class FacilityRepositoryMixin:
             player_inventory(row), getattr(self, "content", None)
         )
         if multiplier is None:
-            multiplier = FACILITY_DURATION_BONUS_BP
             if inventory_amount(player_inventory(row), "item.array.gathering_basic") <= 0:
                 return duration
-        return max(1, duration * (10000 - multiplier) // 10000)
+            multiplier = 10000 - FACILITY_DURATION_BONUS_BP
+        return max(1, duration * multiplier // 10000)
 
     @staticmethod
     def _facility_payload(row: sqlite3.Row) -> dict[str, Any]:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ...contracts import CommandContext, CommandResult
+from ..utils.text import command_link
 from ..content import ContentBundle, bundled_content
 from ..repository import (
     EquipmentAmbiguousError,
@@ -157,6 +158,10 @@ class EquipmentApplication:
                 state = "已穿戴" if equipment.equipped else "收纳中"
                 lines.append(
                     f"- **{equipment.label}**（{self._slot_label(equipment.slot)}）：{state}，耐久 {equipment.durability_bp / 100:.0f}%"
+                    + " · " + command_link("卸下" if equipment.equipped else "穿戴",
+                        f"{'卸下法器' if equipment.equipped else '穿戴法器'} {equipment.instance_id}")
+                    + (" · " + command_link("祭炼", f"强化法器 {equipment.instance_id}") if equipment.temper_level < equipment.max_temper_level else "")
+                    + " · " + command_link("重铸", f"重铸法器 {equipment.instance_id}")
                 )
         return CommandResult(
             True,
@@ -166,6 +171,8 @@ class EquipmentApplication:
             data={
                 "equipment": [
                     {
+                        "instance_id": equipment.instance_id,
+                        "item_key": equipment.item_key,
                         "label": equipment.label,
                         "slot": equipment.slot,
                         "status": equipment.status,
@@ -216,7 +223,7 @@ class EquipmentApplication:
         except EquipmentNotOwnedError:
             return CommandResult(False, "EQUIPMENT_NOT_OWNED", "你当前没有这件装备。", context.request_id, operation_id)
         except EquipmentAmbiguousError:
-            return CommandResult(False, "EQUIPMENT_AMBIGUOUS", "同名装备不止一件，请先处理已有装备。", context.request_id, operation_id)
+            return CommandResult(False, "EQUIPMENT_AMBIGUOUS", f"同名装备不止一件，请从{command_link('我的装备', '我的装备')}选择具体的一件。", context.request_id, operation_id)
         except EquipmentRequirementError:
             return CommandResult(False, "EQUIPMENT_REQUIREMENT_MISSING", "当前境界或道途还不能穿戴这件装备。", context.request_id, operation_id)
         except EquipmentDurabilityZeroError:
@@ -281,7 +288,7 @@ class EquipmentApplication:
         except EquipmentRequirementError:
             return CommandResult(False, "EQUIPMENT_REQUIREMENT_MISSING", "当前境界尚未达到这件装备的养成要求。", context.request_id, operation_id)
         except EquipmentAmbiguousError:
-            return CommandResult(False, "EQUIPMENT_AMBIGUOUS", "同名法器不止一件，请先处理已有法器。", context.request_id, operation_id)
+            return CommandResult(False, "EQUIPMENT_AMBIGUOUS", f"同名法器不止一件，请从{command_link('我的装备', '我的装备')}选择具体的一件。", context.request_id, operation_id)
         except EquipmentTemperingMaxedError:
             return CommandResult(False, "EQUIPMENT_MAXED", "这件法器已经达到淬炼上限。", context.request_id, operation_id)
         except ResourceInsufficientError:
