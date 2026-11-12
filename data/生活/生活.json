@@ -1145,7 +1145,7 @@
       "service_sources": [{"service_key": "service.transport", "operation_names": ["livelihood.settle_route"], "contribution_points": 20}],
       "effect_key": "town_commission.stock_bonus", "effect_value": 25, "effect_duration_seconds": 604800,
       "effect_desc": "完工后七日内，青石镇新发及未领委托的库存增加 25%；不叠加同类共建成效。",
-      "reward": {"spirit_stones": 40, "item": "item.token.transport_coupon"},
+      "reward": {"spirit_stones": 40, "item": "item.food.spirit_rice"},
       "codex_entry_key": "codex.dao.service_public_works"
     },
     {
@@ -1166,7 +1166,7 @@
       "service_sources": [{"service_key": "service.transport", "operation_names": ["livelihood.settle_route"], "contribution_points": 20}],
       "effect_key": "town_commission.herb_reward_bonus", "effect_value": 15, "effect_duration_seconds": 604800,
       "effect_desc": "完工后七日内，青石镇新接草药委托报酬增加 15%；已接委托仍按原快照，不叠加同类成效。",
-      "reward": {"spirit_stones": 40, "item": "item.seed.herb_bundle"},
+      "reward": {"spirit_stones": 40, "item": "item.herb.blood_grass"},
       "codex_entry_key": "codex.dao.service_public_works"
     },
     {
@@ -1187,7 +1187,7 @@
       "service_sources": [{"service_key": "service.transport", "operation_names": ["livelihood.settle_route"], "contribution_points": 20}],
       "effect_key": "route.delay_weight_reduction", "effect_value": 1500, "effect_duration_seconds": 604800,
       "effect_desc": "完工后七日内，新短途运输的延误概率降低 15 个百分点，最低为零；已出发运输仍按原快照，不叠加同类成效。",
-      "reward": {"spirit_stones": 40, "item": "item.token.transport_coupon"},
+      "reward": {"spirit_stones": 40, "item": "item.food.spirit_rice"},
       "codex_entry_key": "codex.dao.service_public_works"
     },
     {
