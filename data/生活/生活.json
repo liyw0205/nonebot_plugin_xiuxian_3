@@ -1128,6 +1128,69 @@
       "status": "active"
     },
     {
+      "key": "project.ironwood_bridge",
+      "record_type": "public_project", "status": "active", "cycle": "persistent",
+      "name": "铁木便桥", "aliases": ["便桥"],
+      "desc": "老樵匠把桥基勘务的刻线留在溪岸，请众修备木垒石，再将桥板沿商路送来。工程跨周保留，先立桥脚，再铺桥面。",
+      "requirements": {"item.mat.wood": 60, "item.ore.ironstone": 40},
+      "contribution_resources": ["item.mat.wood", "item.ore.ironstone"],
+      "stages": [
+        {"key": "bridge_footing", "name": "立稳桥脚", "scene": "老樵匠在溪岸校准石墩，先用半批木石支起两岸。", "complete_text": "石墩已稳，老樵匠请众修续送桥板，开始铺面。", "requirements": {"item.mat.wood": 30, "item.ore.ironstone": 20}, "service_points": 20},
+        {"key": "bridge_deck", "name": "接续桥面", "scene": "桥脚经水流试稳，老樵匠将剩余桥板逐一钉牢。", "complete_text": "便桥贯通，运货人不再绕行，青石镇委托增添库存。", "requirements": {"item.mat.wood": 60, "item.ore.ironstone": 40}, "service_points": 40}
+      ],
+      "sources": [
+        {"item_key": "item.mat.wood", "exploration_key": "explore.gather_ironwood"},
+        {"item_key": "item.ore.ironstone", "exploration_key": "explore.gather_ironwood"}
+      ],
+      "service_sources": [{"service_key": "service.transport", "operation_names": ["livelihood.settle_route"], "contribution_points": 20}],
+      "effect_key": "town_commission.stock_bonus", "effect_value": 25, "effect_duration_seconds": 604800,
+      "effect_desc": "完工后七日内，青石镇新发及未领委托的库存增加 25%；不叠加同类共建成效。",
+      "reward": {"spirit_stones": 40, "item": "item.token.transport_coupon"},
+      "codex_entry_key": "codex.dao.service_public_works"
+    },
+    {
+      "key": "project.herb_drying_house",
+      "record_type": "public_project", "status": "active", "cycle": "persistent",
+      "name": "药材晾棚", "aliases": ["晾棚"],
+      "desc": "姜婆在百草坡择了通风坡地，先试晒止血草，再添灵叶铺成分层晾架。药草须连同真实运货劳作入册，不能只捐灵石。",
+      "requirements": {"item.herb.blood_grass": 60, "item.herb.spirit_leaf": 40},
+      "contribution_resources": ["item.herb.blood_grass", "item.herb.spirit_leaf"],
+      "stages": [
+        {"key": "herb_trial", "name": "试晒药架", "scene": "姜婆先收止血草试晒，记下药性与风向。", "complete_text": "试晒不伤药性，姜婆开放灵叶层架，等待第二批运货。", "requirements": {"item.herb.blood_grass": 30}, "service_points": 20},
+        {"key": "herb_shelves", "name": "齐备层架", "scene": "药徒将灵叶与止血草分层挂起，补足常用药的晾晒存量。", "complete_text": "晾棚成了，药商愿为青石镇新发草药委托提高报酬。", "requirements": {"item.herb.blood_grass": 60, "item.herb.spirit_leaf": 40}, "service_points": 40}
+      ],
+      "sources": [
+        {"item_key": "item.herb.blood_grass", "exploration_key": "explore.gather_herb_vale"},
+        {"item_key": "item.herb.spirit_leaf", "exploration_key": "explore.spring_gather"}
+      ],
+      "service_sources": [{"service_key": "service.transport", "operation_names": ["livelihood.settle_route"], "contribution_points": 20}],
+      "effect_key": "town_commission.herb_reward_bonus", "effect_value": 15, "effect_duration_seconds": 604800,
+      "effect_desc": "完工后七日内，青石镇新接草药委托报酬增加 15%；已接委托仍按原快照，不叠加同类成效。",
+      "reward": {"spirit_stones": 40, "item": "item.seed.herb_bundle"},
+      "codex_entry_key": "codex.dao.service_public_works"
+    },
+    {
+      "key": "project.basalt_waymarker",
+      "record_type": "public_project", "status": "active", "cycle": "persistent",
+      "name": "岩径路标", "aliases": ["路标"],
+      "desc": "石匠沿玄武岩径选定立标处，先夯基，再以阵砂封缝。真实运货沿途核对刻度，为三条短途商路留下可靠路标。",
+      "requirements": {"item.ore.ironstone": 60, "item.mat.array_sand": 40},
+      "contribution_resources": ["item.ore.ironstone", "item.mat.array_sand"],
+      "stages": [
+        {"key": "marker_base", "name": "夯定标基", "scene": "石匠在黑石坡打下标基，运货人校对第一批刻度。", "complete_text": "标基已定，石匠请众修带来封缝阵砂。", "requirements": {"item.ore.ironstone": 30}, "service_points": 20},
+        {"key": "marker_seal", "name": "封缝立标", "scene": "阵砂填入石缝，第二批运货人按路标往返验路。", "complete_text": "路标清晰可辨，短途运输出发时的延误概率降低。", "requirements": {"item.ore.ironstone": 60, "item.mat.array_sand": 40}, "service_points": 40}
+      ],
+      "sources": [
+        {"item_key": "item.ore.ironstone", "exploration_key": "explore.gather_basalt_pass"},
+        {"item_key": "item.mat.array_sand", "exploration_key": "explore.gather_basalt_pass"}
+      ],
+      "service_sources": [{"service_key": "service.transport", "operation_names": ["livelihood.settle_route"], "contribution_points": 20}],
+      "effect_key": "route.delay_weight_reduction", "effect_value": 1500, "effect_duration_seconds": 604800,
+      "effect_desc": "完工后七日内，新短途运输的延误概率降低 15 个百分点，最低为零；已出发运输仍按原快照，不叠加同类成效。",
+      "reward": {"spirit_stones": 40, "item": "item.token.transport_coupon"},
+      "codex_entry_key": "codex.dao.service_public_works"
+    },
+    {
       "name": "新镇灵井",
       "desc": "汇聚木材修复灵井，使新镇委托得到更多库存。",
       "effect_desc": "灵井修复期间，青石镇委托可提供更多库存。",
