@@ -1845,6 +1845,159 @@
       "status": "active"
     },
     {
+      "key": "dispatch.herb_spring_works",
+      "name": "百草坡药泉勘务",
+      "desc": "药师沈蘅请你查明药泉渗漏处。只记泉眼可尽快交卷，备材护泉则需守到水路稳定；回报是药铺留出的草药，不改变公共药圃效果。",
+      "aliases": ["药泉勘务"],
+      "record_type": "dispatch",
+      "status": "active",
+      "duration_seconds": 3600,
+      "daily_limit": 2,
+      "requirements": {"stage": "seeker", "location_key": "xuantian.herb_vale"},
+      "cost": {"stamina": 3, "energy": 1, "item.herb.blood_grass": 1},
+      "risk_pool": "dispatch.herb_spring_works",
+      "risk": {"weights": {"success": 7800, "delayed": 1000, "partial": 1000, "failed": 200}},
+      "rewards": {"success": {"item.herb.blood_grass": 2, "item.herb.spirit_leaf": 1, "spirit_stones": 20}, "partial": {"item.herb.blood_grass": 1, "spirit_stones": 10}},
+      "failure_refunds": {"stamina": 1},
+      "planning": {
+        "npc": "沈蘅",
+        "scene": "药坡石缝间的细泉把新苗根部冲空。沈蘅将一束试水草交到你手里，指着坡下仍在排队取水的药农。",
+        "sources": [
+          {"item_key": "item.herb.blood_grass", "exploration_key": "explore.gather_herb_vale"},
+          {"item_key": "item.mat.wood", "exploration_key": "explore.gather_outskirts"}
+        ],
+        "recipe_keys": ["recipe.pill.healing_low", "recipe.food.cloud_tea"],
+        "commission_keys": ["town_commission.herb_supply", "town_commission.spirit_leaf"],
+        "plans": [
+          {
+            "key": "survey", "name": "踏勘", "desc": "用试水草标出渗漏线，一小时交卷；投入较少，只领取小份药材。",
+            "duration_seconds": 3600,
+            "cost": {"stamina": 3, "energy": 1, "item.herb.blood_grass": 1},
+            "risk": {"weights": {"success": 7800, "delayed": 1000, "partial": 1000, "failed": 200}},
+            "rewards": {"success": {"item.herb.blood_grass": 2, "item.herb.spirit_leaf": 1, "spirit_stones": 20}, "partial": {"item.herb.blood_grass": 1, "spirit_stones": 10}},
+            "failure_refunds": {"stamina": 1},
+            "start_text": "你把止血草压在泉缝边，沿染湿的叶脉记录水流。沈蘅留下空图卷，等你带回确切渗漏位置。",
+            "outcome_texts": {
+              "success": "泉线完整落在图上，药农依标记绕开松土。沈蘅核过图卷，将约定的草药与酬金交给你。",
+              "delayed": "午后雾气掩住了泉眼，你等雾散后重新校线。图卷没有缺页，沈蘅照约付足报酬，只是回程晚了半程。",
+              "partial": "上游线已查清，下游却被碎石堵住。沈蘅收下可用半卷，付小份草药；未查明的一段留给下次勘务。",
+              "failed": "试水草被突来的泥水冲散，无法辨明泉线。沈蘅不收猜测图卷，未发草药，按约补回一份体力。"
+            }
+          },
+          {
+            "key": "repair", "name": "整治", "desc": "用木楔和草束固定泉缝，守候三小时；备材更多，成功更稳，药铺留出双份收成。",
+            "duration_seconds": 10800,
+            "cost": {"stamina": 4, "energy": 2, "item.herb.blood_grass": 2, "item.mat.wood": 1},
+            "risk": {"weights": {"success": 8800, "delayed": 600, "partial": 500, "failed": 100}},
+            "rewards": {"success": {"item.herb.blood_grass": 4, "item.herb.spirit_leaf": 2, "spirit_stones": 35}, "partial": {"item.herb.blood_grass": 2, "item.herb.spirit_leaf": 1, "spirit_stones": 17}},
+            "failure_refunds": {"stamina": 2, "item.mat.wood": 1},
+            "start_text": "你将木楔打入松动石缝，以两束草根滤住细泥。沈蘅请你守完水位变化，再确认药农能否安全取水。",
+            "outcome_texts": {
+              "success": "木楔撑住泉缝，浑水转清。沈蘅收下你的护泉记录，药农挑水经过时向你致谢，约定的双份药材已装好。",
+              "delayed": "一道暗泉让第一次加固失效，你守着木楔又调了一轮。水路最终稳定，沈蘅付足报酬，守候时间延长半程。",
+              "partial": "主泉已稳，旁支仍渗。沈蘅只验收稳定部分，付半份药材与酬金；草束已用于滤泥，不再退还。",
+              "failed": "松土不断塌进泉缝，你撤下尚未钉入的木楔，停止整治。沈蘅退还这份木材并补回两份体力，未验收的工程不发奖。"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "key": "dispatch.ironwood_bridge_works",
+      "name": "铁木林桥基勘务",
+      "desc": "桥匠鲁槐要为林间旧桥核定支点。踏勘交付桥基图，整治则备材撑住松动桥脚；工坊以可再加工的木材与铁石付酬。",
+      "aliases": ["桥基勘务"], "record_type": "dispatch", "status": "active",
+      "duration_seconds": 5400, "daily_limit": 2,
+      "requirements": {"stage": "cultivator", "realm": {"key": "qi_sensing", "min_layer": 1}, "location_key": "xuantian.ironwood_grove"},
+      "cost": {"stamina": 4, "energy": 1, "item.mat.wood": 1, "item.ore.ironstone": 1},
+      "risk_pool": "dispatch.ironwood_bridge_works",
+      "risk": {"weights": {"success": 7800, "delayed": 1000, "partial": 1000, "failed": 200}},
+      "rewards": {"success": {"item.mat.wood": 2, "item.ore.ironstone": 2, "spirit_stones": 25}, "partial": {"item.mat.wood": 1, "item.ore.ironstone": 1, "spirit_stones": 12}},
+      "failure_refunds": {"stamina": 2},
+      "planning": {
+        "npc": "鲁槐", "scene": "铁木林旧桥随山风低鸣，桥脚泥痕已有半尺。鲁槐不肯让满载木料的车队冒险过桥，摊开旧图请你重新核定支点。",
+        "sources": [{"item_key": "item.mat.wood", "exploration_key": "explore.gather_ironwood"}, {"item_key": "item.ore.ironstone", "exploration_key": "explore.gather_ironwood"}],
+        "recipe_keys": ["recipe.weapon.wood_sword", "recipe.tool.mining_pickaxe"], "commission_keys": ["town_commission.repair_tools"],
+        "plans": [
+          {
+            "key": "survey", "name": "踏勘", "desc": "以木尺铁坠核量支点，九十分钟交图；省材料，但不能保证松动桥脚当场稳住。",
+            "duration_seconds": 5400, "cost": {"stamina": 4, "energy": 1, "item.mat.wood": 1, "item.ore.ironstone": 1},
+            "risk": {"weights": {"success": 7800, "delayed": 1000, "partial": 1000, "failed": 200}},
+            "rewards": {"success": {"item.mat.wood": 2, "item.ore.ironstone": 2, "spirit_stones": 25}, "partial": {"item.mat.wood": 1, "item.ore.ironstone": 1, "spirit_stones": 12}},
+            "failure_refunds": {"stamina": 2},
+            "start_text": "你削木为尺、系铁为坠，从桥面垂线探到桥脚。鲁槐封住入口，留你独自量完三处支点。",
+            "outcome_texts": {
+              "success": "三处支点与新图一一相合。鲁槐据图安排换梁，把工坊预留木材、铁石和酬金交给你。",
+              "delayed": "山风把垂线吹偏，你等风停才复核最后一柱。交图延后半程，鲁槐确认数据齐全后照付报酬。",
+              "partial": "两处桥脚可量，第三处陷入泥中。鲁槐先收可用图页，仅付半份工料和酬金，不让缺图替代实测。",
+              "failed": "垂线在腐梁旁断落，读数不能复核。鲁槐拒绝不可靠图卷，不发工料，补回两份体力后另待实测。"
+            }
+          },
+          {
+            "key": "repair", "name": "整治", "desc": "备双份木料撑柱，四小时守桥验载；投入和等待增加，完整验收可领双份工料。",
+            "duration_seconds": 14400, "cost": {"stamina": 5, "energy": 2, "item.mat.wood": 2, "item.ore.ironstone": 1},
+            "risk": {"weights": {"success": 8800, "delayed": 600, "partial": 500, "failed": 100}},
+            "rewards": {"success": {"item.mat.wood": 4, "item.ore.ironstone": 2, "spirit_stones": 40}, "partial": {"item.mat.wood": 2, "item.ore.ironstone": 1, "spirit_stones": 20}},
+            "failure_refunds": {"stamina": 2, "item.mat.wood": 1},
+            "start_text": "你架起两道木撑，以铁石压稳柱底。鲁槐把试载沙袋搬上桥头，要等桥脚整轮受力后才验收。",
+            "outcome_texts": {
+              "success": "沙袋逐次加重，桥脚未再下沉。鲁槐准许空车试过，将约定工料交给你；这次验载记录随回执保存。",
+              "delayed": "第二轮试载时木撑偏斜，你卸袋重架，额外等了半程。最终验载合格，鲁槐按完整工程付酬。",
+              "partial": "近岸桥脚撑稳，远岸仍需另换旧梁。鲁槐验收已稳部分，交出半份工料，不把未修桥段算作完工。",
+              "failed": "桥底软泥吞住支撑，你依鲁槐的信号撤离。未用的一份木材退回，另补两份体力，工程未验收不付奖。"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "key": "dispatch.basalt_watermark_works", "name": "玄武岩径水标勘务",
+      "desc": "阵师石砚请你校准山径水标。踏勘只交岩层水线，整治以阵砂稳固标石，离线守候一轮潮气；回报可用于工具与基础阵法。",
+      "aliases": ["水标勘务"], "record_type": "dispatch", "status": "active",
+      "duration_seconds": 7200, "daily_limit": 2,
+      "requirements": {"stage": "cultivator", "realm": {"key": "qi_gathering", "min_layer": 1}, "location_key": "xuantian.basalt_pass"},
+      "cost": {"stamina": 5, "energy": 2, "item.ore.ironstone": 1},
+      "risk_pool": "dispatch.basalt_watermark_works",
+      "risk": {"weights": {"success": 7800, "delayed": 1000, "partial": 1000, "failed": 200}},
+      "rewards": {"success": {"item.ore.ironstone": 2, "item.mat.array_sand": 2, "spirit_stones": 30}, "partial": {"item.ore.ironstone": 1, "item.mat.array_sand": 1, "spirit_stones": 15}},
+      "failure_refunds": {"stamina": 2},
+      "planning": {
+        "npc": "石砚", "scene": "黑岩上的旧水标被潮气磨平，挑担人难辨雨后安全线。石砚握着缺角罗盘，等你把岩层渗水的高度重新标实。",
+        "sources": [{"item_key": "item.ore.ironstone", "exploration_key": "explore.gather_basalt_pass"}, {"item_key": "item.mat.array_sand", "exploration_key": "explore.gather_basalt_pass"}],
+        "recipe_keys": ["recipe.tool.mining_pickaxe", "recipe.array.gathering_basic"], "commission_keys": ["town_commission.repair_tools"],
+        "plans": [
+          {
+            "key": "survey", "name": "踏勘", "desc": "用一份铁石刻临时标线，两小时复测；耗材少，交卷后领取小份铁石与阵砂。",
+            "duration_seconds": 7200, "cost": {"stamina": 5, "energy": 2, "item.ore.ironstone": 1},
+            "risk": {"weights": {"success": 7800, "delayed": 1000, "partial": 1000, "failed": 200}},
+            "rewards": {"success": {"item.ore.ironstone": 2, "item.mat.array_sand": 2, "spirit_stones": 30}, "partial": {"item.ore.ironstone": 1, "item.mat.array_sand": 1, "spirit_stones": 15}},
+            "failure_refunds": {"stamina": 2},
+            "start_text": "你以铁石划过黑岩，按石砚的罗盘记录三道水痕。临时标线须经过一轮潮气，才足以交卷。",
+            "outcome_texts": {
+              "success": "潮气退后，三道标线仍可清楚复核。石砚把水线图收进卷筒，付出约定铁石、阵砂与酬金。",
+              "delayed": "山雾久久不退，你多等半程才看到最高水痕。复测数据齐全，石砚按原约付足报酬。",
+              "partial": "低处标线清晰，高处被碎岩盖住。石砚仅收低处实测图，交半份材料与酬金，未测部分不作凭据。",
+              "failed": "岩屑剥落毁去标线，水位无法比较。石砚未验收图卷，不发材料，按约补回两份体力。"
+            }
+          },
+          {
+            "key": "repair", "name": "整治", "desc": "用双份铁石和阵砂固定标石，五小时观潮；较多投入换取更稳验收及双份阵砂。",
+            "duration_seconds": 18000, "cost": {"stamina": 6, "energy": 3, "item.ore.ironstone": 2, "item.mat.array_sand": 1},
+            "risk": {"weights": {"success": 8800, "delayed": 600, "partial": 500, "failed": 100}},
+            "rewards": {"success": {"item.ore.ironstone": 4, "item.mat.array_sand": 4, "spirit_stones": 45}, "partial": {"item.ore.ironstone": 2, "item.mat.array_sand": 2, "spirit_stones": 22}},
+            "failure_refunds": {"stamina": 3, "item.ore.ironstone": 1},
+            "start_text": "你将两份铁石嵌成标钉，以阵砂封住松缝。石砚要求守完潮气涨退，再取回每处标石的复核记录。",
+            "outcome_texts": {
+              "success": "标钉经潮气涨退仍纹丝不动。石砚核完三处记录，交出完整工料；挑担人循新标绕过湿滑岩面。",
+              "delayed": "一处封砂被雨打松，你重新压紧标钉并等下一轮潮气。耗时加长半程，全部验收后仍付完整工料。",
+              "partial": "两处标钉稳固，第三处岩面仍在脱层。石砚只收稳定部分，付半份工料，封砂已耗不退。",
+              "failed": "整片岩面裂开，你撤下尚未嵌牢的标钉。石砚退回一份铁石并补三份体力，不把危险标石算作成果。"
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "妖兽观察",
       "desc": "凭异兽徽记辨认山野妖兽的踪迹，记下观测见闻。",
       "aliases": [

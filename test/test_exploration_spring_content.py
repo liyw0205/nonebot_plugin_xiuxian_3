@@ -13,6 +13,7 @@ from combat_fixtures import BALANCED_QUALIFICATION
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
+from nonebot_plugin_xiuxian_3.xiuxian.rewards.rules import RewardContentError
 from nonebot_plugin_xiuxian_3.xiuxian.events.contribution_projection import record_spirit_spring_contribution
 from nonebot_plugin_xiuxian_3.xiuxian.specials.codex_projection import record_material_discoveries
 
@@ -225,8 +226,13 @@ def test_spring_invalid_content_does_not_charge_or_create_session(
         try:
             await _prepare(runtime, adapter)
             before = _state(runtime)
-            rejected = await _send(runtime, adapter, "start", "开始探索 灵泉采集")
-            assert rejected.code == "PERSISTENCE_ERROR"
+            reason = (
+                "item.missing" if "item.missing" in rewards else
+                "spring_gather.*positive integer quantities" if any(value is True for value in rewards.values()) else
+                "spring_gather.*unsupported state"
+            )
+            with pytest.raises(RewardContentError, match=reason):
+                await _send(runtime, adapter, "start", "开始探索 灵泉采集")
             assert _state(runtime) == before
         finally:
             await runtime.close()

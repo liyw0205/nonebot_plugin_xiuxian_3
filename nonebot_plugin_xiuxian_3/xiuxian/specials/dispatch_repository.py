@@ -10,7 +10,7 @@ from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
-from ..content import bundled_content
+from ..content import ContentError, bundled_content
 from ..persistence.errors import (
     DispatchAlreadySettledError,
     DispatchBusyError,
@@ -26,7 +26,11 @@ from .dispatch_models import (
     DispatchCancelRecord,
     DispatchPreviewRecord,
     DispatchSettlementRecord,
+    DispatchStatusRecord,
 )
+from .dispatch_planning import freeze_planning, select_preparation, validate_frozen_planning
+from ..utils.json_cache import decode_json_strict
+from ..utils.operations import operation_replay, record_operation
 from ..utils.assets import player_available_item_amount
 from ..rewards.rules import local_reputation_maximum
 from .dispatch_rules import (
@@ -58,19 +62,28 @@ _STAGE_REQUIREMENT_TEXT = {
 
 class DispatchRepositoryMixin:
     async def preview_dispatch(
-        self, *, platform: str, platform_user_id: str, dispatch_key: str | None
+        self, *, platform: str, platform_user_id: str, dispatch_key: str | None,
+        preparation: str | None = None,
     ) -> tuple[DispatchPreviewRecord, ...]:
         await self.initialize()
         async with self._inflight:
             return await asyncio.to_thread(
-                self._preview_dispatch_once, platform, platform_user_id, dispatch_key
+                self._preview_dispatch_once, platform, platform_user_id, dispatch_key, preparation
             )
 
     def _preview_dispatch_once(
-        self, platform: str, platform_user_id: str, dispatch_key: str | None
+        self, platform: str, platform_user_id: str, dispatch_key: str | None, preparation: str | None = None
     ) -> tuple[DispatchPreviewRecord, ...]:
         definitions = dispatch_definitions(self.content)
-        requested = (resolve_dispatch(dispatch_key, self.content),) if dispatch_key else tuple(definitions.values())
+        bundle = self.content or bundled_content()
+        if dispatch_key:
+            definition = resolve_dispatch(dispatch_key, bundle)
+            choices = definition.planning["plans"] if definition.planning and not preparation else []
+            requested = tuple(select_preparation(definition, plan["key"], bundle) for plan in choices) if choices else (
+                select_preparation(definition, preparation, bundle),
+            )
+        else:
+            requested = tuple(select_preparation(definition, None, bundle) for definition in definitions.values())
         now = self._now()
         with self._connect() as connection:
             player = self._require_player(connection, platform, platform_user_id, writable=False)
@@ -96,6 +109,8 @@ class DispatchRepositoryMixin:
         intro_flags = set(player_intro_flags(player))
         if definition.required_intro_flag and definition.required_intro_flag not in intro_flags:
             missing.append("需要完成对应引导")
+        if definition.required_location and player["location_key"] != definition.required_location:
+            missing.append(f"需要位于{(self.content or bundled_content()).label('location', definition.required_location)}")
         if definition.required_realm and definition.required_layer is not None:
             service = player_reputation_state(connection, int(player["id"])).service
             meets_realm = self._meets_realm_values(
@@ -109,7 +124,10 @@ class DispatchRepositoryMixin:
                 and service >= definition.required_service_reputation
             )
             if not meets_realm and not meets_service:
-                missing.append("需要满足道统境界或服务信誉要求")
+                realm = (self.content or bundled_content()).label("realm", definition.required_realm)
+                missing.append(f"需要{realm} L{definition.required_layer}" + (
+                    f"或服务信誉 {definition.required_service_reputation}" if definition.required_service_reputation is not None else ""
+                ))
         elif definition.required_service_reputation is not None:
             service = player_reputation_state(connection, int(player["id"])).service
             if service < definition.required_service_reputation:
@@ -148,6 +166,7 @@ class DispatchRepositoryMixin:
             costs=costs,
             ready=not missing,
             missing=tuple(missing),
+            planning=freeze_planning(definition, "success", self.content or bundled_content()),
         )
 
     @staticmethod
@@ -175,15 +194,16 @@ class DispatchRepositoryMixin:
         platform_user_id: str,
         dispatch_key: str,
         operation_id: str,
+        preparation: str | None = None,
     ) -> DispatchAssignmentRecord:
         await self.initialize()
         async with self._inflight:
             return await asyncio.to_thread(
-                self._accept_dispatch_once, platform, platform_user_id, dispatch_key, operation_id
+                self._accept_dispatch_once, platform, platform_user_id, dispatch_key, operation_id, preparation
             )
 
     def _accept_dispatch_once(
-        self, platform: str, platform_user_id: str, dispatch_key: str, operation_id: str
+        self, platform: str, platform_user_id: str, dispatch_key: str, operation_id: str, preparation: str | None = None
     ) -> DispatchAssignmentRecord:
         operation_name = "specials.accept_dispatch"
         request_payload = {
@@ -191,6 +211,8 @@ class DispatchRepositoryMixin:
             "platform_user_id": platform_user_id,
             "dispatch_key": dispatch_key.strip(),
         }
+        if preparation:
+            request_payload["preparation"] = preparation.strip()
         request_hash = self._request_hash(operation_name, request_payload)
         now = self._now()
         now_text = serialize_datetime(now)
@@ -201,7 +223,8 @@ class DispatchRepositoryMixin:
             if replay is not None:
                 return self._dispatch_assignment_from_payload(replay, replay=True)
             try:
-                definition = resolve_dispatch(dispatch_key, self.content)
+                definition = select_preparation(resolve_dispatch(dispatch_key, self.content), preparation,
+                                                self.content or bundled_content())
             except ValueError as exc:
                 raise DispatchRequirementError(str(exc)) from exc
             costs = dict(definition.costs)
@@ -255,6 +278,9 @@ class DispatchRepositoryMixin:
                 "duration_seconds": definition.duration_seconds,
                 "ends_at": serialize_datetime(ends_at),
             }
+            planning = freeze_planning(definition, outcome, self.content or bundled_content())
+            if planning is not None:
+                snapshot["planning"] = planning
             spend_player_state(
                 connection,
                 player,
@@ -305,6 +331,8 @@ class DispatchRepositoryMixin:
                 "ends_at": serialize_datetime(ends_at),
                 "cancel_until": serialize_datetime(running_at),
                 "costs": costs,
+                "label": definition.label,
+                "planning": planning,
             }
             self._record_dispatch_operation(
                 connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text
@@ -390,8 +418,8 @@ class DispatchRepositoryMixin:
             if now < ends_at:
                 raise DispatchNotReadyError("dispatch is not ready")
 
-            snapshot = self._json_object(assignment["snapshot_json"], {})
-            outcome = str(snapshot.get("outcome", assignment["outcome"]))
+            snapshot = self._dispatch_snapshot(assignment)
+            outcome = str(snapshot["outcome"])
             reward = {str(key): int(value) for key, value in self._json_object(snapshot.get("reward"), {}).items()}
             refunded: dict[str, int] = {}
             costs = self._json_object(assignment["costs_json"], {})
@@ -515,6 +543,8 @@ class DispatchRepositoryMixin:
                 "outcome": outcome,
                 "reward": actual_reward,
                 "refunded": actual_refunded,
+                "label": snapshot["label"],
+                "planning": snapshot.get("planning"),
             }
             self._record_dispatch_operation(
                 connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text
@@ -558,7 +588,8 @@ class DispatchRepositoryMixin:
                 raise DispatchAlreadySettledError("dispatch is no longer cancellable")
             if now > datetime.fromisoformat(str(assignment["cancel_until"])):
                 raise DispatchCancellationExpiredError("dispatch confirmation window expired")
-            costs = self._json_object(assignment["costs_json"], {})
+            snapshot = self._dispatch_snapshot(assignment)
+            costs = snapshot["costs"]
             grant_player_state(
                 connection,
                 player,
@@ -588,11 +619,75 @@ class DispatchRepositoryMixin:
                 "dispatch_key": str(assignment["dispatch_key"]),
                 "status": "cancelled",
                 "refunded": costs,
+                "planning": snapshot.get("planning"),
             }
             self._record_dispatch_operation(
                 connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text
             )
             return self._dispatch_cancel_from_payload(payload)
+
+    async def status_dispatch(self, *, platform: str, platform_user_id: str) -> DispatchStatusRecord | None:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(self._status_dispatch_once, platform, platform_user_id)
+
+    def _status_dispatch_once(self, platform: str, platform_user_id: str) -> DispatchStatusRecord | None:
+        now = self._now()
+        with self._connect() as connection:
+            player = self._require_player(connection, platform, platform_user_id, writable=False)
+            row = connection.execute(
+                "SELECT * FROM dispatch_assignments WHERE player_id=? "
+                "ORDER BY CASE WHEN status IN ('accepted','running') THEN 0 ELSE 1 END, id DESC LIMIT 1",
+                (player["id"],),
+            ).fetchone()
+            if row is None:
+                return None
+            snapshot = self._dispatch_snapshot(row)
+            status = str(row["status"])
+            if status == "accepted" and now >= datetime.fromisoformat(row["running_at"]):
+                status = "running"
+            record = DispatchAssignmentRecord(
+                player=self._row_to_player(player), assignment_id=str(row["assignment_id"]),
+                dispatch_key=str(row["dispatch_key"]), status=status, outcome=str(snapshot["outcome"]),
+                accepted_at=str(row["accepted_at"]), running_at=str(row["running_at"]),
+                ends_at=str(row["ends_at"]), cancel_until=str(row["cancel_until"]),
+                costs=dict(snapshot["costs"]), label=str(snapshot["label"]), planning=snapshot.get("planning"),
+            )
+            result = decode_json_strict(str(row["result_json"]))
+            if not isinstance(result, dict):
+                raise ContentError("dispatch status result must be an object")
+            for field in ("reward", "refunded"):
+                assets = result.get(field, {})
+                if not isinstance(assets, dict) or any(isinstance(v, bool) or not isinstance(v, int) or v <= 0 for v in assets.values()):
+                    raise ContentError(f"dispatch status {field} requires positive integer assets")
+            return DispatchStatusRecord(
+                record, max(0, int((datetime.fromisoformat(row["ends_at"]) - now).total_seconds())),
+                max(0, int((datetime.fromisoformat(row["cancel_until"]) - now).total_seconds())),
+                result,
+            )
+
+    @staticmethod
+    def _dispatch_snapshot(assignment: sqlite3.Row) -> dict:
+        snapshot = decode_json_strict(str(assignment["snapshot_json"]))
+        costs = decode_json_strict(str(assignment["costs_json"]))
+        if not isinstance(snapshot, dict) or snapshot.get("costs") != costs:
+            raise ContentError("dispatch snapshot costs differ from accepted costs")
+        if snapshot.get("outcome") not in {"success", "delayed", "partial", "failed"} or snapshot["outcome"] != assignment["outcome"]:
+            raise ContentError("dispatch snapshot has an invalid frozen outcome")
+        if not isinstance(snapshot.get("label"), str) or not snapshot["label"].strip():
+            raise ContentError("dispatch snapshot requires the accepted task label")
+        for field in ("costs", "reward", "failure_refunds"):
+            values = snapshot.get(field)
+            if not isinstance(values, dict) or any(not isinstance(key, str) or isinstance(amount, bool) or not isinstance(amount, int) or amount <= 0 for key, amount in values.items()):
+                raise ContentError(f"dispatch snapshot {field} requires positive integer assets")
+        if any(amount > costs.get(key, 0) for key, amount in snapshot["failure_refunds"].items()):
+            raise ContentError("dispatch snapshot refunds exceed accepted costs")
+        if "planning" in snapshot:
+            planning = validate_frozen_planning(snapshot["planning"])
+            assets = set(snapshot["costs"]) | set(snapshot["reward"]) | set(snapshot["failure_refunds"])
+            if not assets <= set(planning["asset_labels"]):
+                raise ContentError("dispatch planning is missing accepted asset labels")
+        return snapshot
 
     @staticmethod
     def _dispatch_promote_confirmations(
@@ -625,16 +720,7 @@ class DispatchRepositoryMixin:
     def _dispatch_operation(
         connection: sqlite3.Connection, operation_id: str, operation_name: str, request_hash: str
     ) -> dict[str, Any] | None:
-        row = connection.execute(
-            "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id = ?",
-            (operation_id,),
-        ).fetchone()
-        if row is None:
-            return None
-        if str(row["operation_name"]) != operation_name or str(row["request_hash"]) != request_hash:
-            raise OperationConflictError("operation input differs from its original request")
-        value = json.loads(row["result_json"])
-        return dict(value) if isinstance(value, dict) else {}
+        return operation_replay(connection, operation_id, operation_name, request_hash)
 
     @staticmethod
     def _record_dispatch_operation(
@@ -646,10 +732,7 @@ class DispatchRepositoryMixin:
         payload: dict[str, Any],
         now_text: str,
     ) -> None:
-        connection.execute(
-            "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-            (operation_id, operation_name, player_id, request_hash, json.dumps(payload, ensure_ascii=False, sort_keys=True), now_text),
-        )
+        record_operation(connection, operation_id, operation_name, player_id, request_hash, payload, now_text)
 
     @staticmethod
     def _dispatch_assignment_from_payload(
@@ -667,6 +750,8 @@ class DispatchRepositoryMixin:
             cancel_until=str(payload["cancel_until"]),
             costs={str(key): int(value) for key, value in dict(payload.get("costs", {})).items()},
             already_completed=replay,
+            label=str(payload.get("label", "")),
+            planning=validate_frozen_planning(payload["planning"]) if payload.get("planning") is not None else None,
         )
 
     @staticmethod
@@ -682,6 +767,8 @@ class DispatchRepositoryMixin:
             reward={str(key): int(value) for key, value in dict(payload.get("reward", {})).items()},
             refunded={str(key): int(value) for key, value in dict(payload.get("refunded", {})).items()},
             already_completed=replay,
+            label=str(payload.get("label", "")),
+            planning=validate_frozen_planning(payload["planning"]) if payload.get("planning") is not None else None,
         )
 
     @staticmethod
@@ -693,6 +780,7 @@ class DispatchRepositoryMixin:
             status=str(payload["status"]),
             refunded={str(key): int(value) for key, value in dict(payload.get("refunded", {})).items()},
             already_completed=replay,
+            planning=validate_frozen_planning(payload["planning"]) if payload.get("planning") is not None else None,
         )
 
 

@@ -14,6 +14,7 @@ from combat_fixtures import BALANCED_QUALIFICATION
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
+from nonebot_plugin_xiuxian_3.xiuxian.rewards.rules import RewardContentError
 from nonebot_plugin_xiuxian_3.xiuxian.exploration.rules import battle_roll_bp
 
 
@@ -97,10 +98,10 @@ def test_gather_invalid_content_does_not_charge_or_create_session(adapter: str) 
                 )).ok
                 _prepare_mortal(runtime, adapter, user)
                 before = _stored_state(runtime)
-                rejected = await runtime.adapters.dispatch(
-                    adapter, _context(adapter, user, "invalid-start"), "开始探索 近郊采集"
-                )
-                assert rejected.code == "PERSISTENCE_ERROR"
+                with pytest.raises(RewardContentError, match="item.missing"):
+                    await runtime.adapters.dispatch(
+                        adapter, _context(adapter, user, "invalid-start"), "开始探索 近郊采集"
+                    )
                 assert _stored_state(runtime) == before
             finally:
                 await runtime.close()

@@ -230,8 +230,8 @@ def test_dao_service_dispatch_records_actual_reputation_on_both_adapters(tmp_pat
                         raise sqlite3.OperationalError("injected dispatch ledger failure")
 
                     with patch.object(runtime.repository, "_record_dispatch_operation", fail):
-                        failed = await _send(runtime, adapter, user, settle_operation, "结算派遣")
-                    assert failed.code == "PERSISTENCE_ERROR"
+                        with pytest.raises(sqlite3.OperationalError, match="injected dispatch ledger failure"):
+                            await _send(runtime, adapter, user, settle_operation, "结算派遣")
                     with sqlite3.connect(runtime.settings.database_path) as connection:
                         reputation = connection.execute(
                             "SELECT local_json, service_reputation FROM player_reputations "
@@ -350,7 +350,7 @@ def test_dispatch_refund_result_uses_stamina_restored_under_cap(tmp_path: Path) 
                 assert settled.code == "DISPATCH_SETTLED"
                 assert settled.data["reward"] == {}
                 assert settled.data["refunded"] == {}
-                assert "返还 无产出" in settled.message
+                assert "收益：无" in settled.message and "返还" not in settled.message
                 replay = await _send(runtime, adapter, user, f"{user}-settle", "结算派遣")
                 assert replay.data["idempotent_replay"] is True
                 assert replay.data["refunded"] == {}
@@ -400,8 +400,8 @@ def test_dispatch_ledger_failure_rolls_back_and_retries() -> None:
                     raise sqlite3.OperationalError("injected dispatch ledger failure")
 
                 with patch.object(runtime.repository, "_record_dispatch_operation", fail):
-                    failed = await _send(runtime, "qq.official", user, "settle", "结算派遣")
-                assert failed.code == "PERSISTENCE_ERROR"
+                    with pytest.raises(sqlite3.OperationalError, match="injected dispatch ledger failure"):
+                        await _send(runtime, "qq.official", user, "settle", "结算派遣")
                 with runtime.repository._connect() as connection:
                     row = connection.execute(
                         "SELECT status FROM dispatch_assignments WHERE assignment_id = ?", (accepted.data["assignment_id"],)

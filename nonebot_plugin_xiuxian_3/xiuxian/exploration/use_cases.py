@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from ...contracts import CommandContext, CommandResult
 from ..content import bundled_content
 from ..repository import (
@@ -28,6 +30,8 @@ from ..repository import (
 from ..player.rules import LOCATION_LABELS
 from ..utils.assets import is_currency_asset_key
 from .rules import exploration_definition, resolve_exploration_mode
+
+logger = logging.getLogger(__name__)
 
 
 class ExplorationApplication:
@@ -136,7 +140,9 @@ class ExplorationApplication:
         except RepositoryBusyError:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:
-            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+            logger.exception("exploration command failed command=开始探索 adapter=%s request=%s operation=%s args=%r",
+                             context.adapter, context.request_id, operation_id, context.command_args)
+            raise
         definition = exploration_definition(record.mode_key, self.repository.content)
         return CommandResult(
             True,

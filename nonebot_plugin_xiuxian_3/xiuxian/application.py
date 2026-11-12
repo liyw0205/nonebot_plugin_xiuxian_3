@@ -126,6 +126,9 @@ _HELP_PAGES = {
         "**探索**\n\n"
         f"用{command_link('我的状态', '我的状态')}确认所在地，"
         f"再{command_link('开始探索', '开始探索')}；途中所得在{command_link('结算探索', '结算探索')}时领取。\n\n"
+        "备下药材、木石或阵砂后，可在山野现场承接勘务，选择踏勘或整治："
+        f"{command_link('药泉', '派遣预览 百草坡药泉勘务')}、{command_link('桥基', '派遣预览 铁木林桥基勘务')}、"
+        f"{command_link('水标', '派遣预览 玄武岩径水标勘务')}；{command_link('派遣状态', '派遣状态')}记录离线安排。\n\n"
         f"想深入秘境，可先{command_link('秘境预览', '秘境预览')}，"
         f"再用{command_link('进入秘境', '进入秘境')}填写秘境名。"
         f"{command_link('主线道途', '主线道途')}与{command_link('引路簿', '引路簿')}会记录你的见闻与嘉奖。\n\n"
@@ -172,7 +175,10 @@ _HELP_PAGES = {
         f"物资可{command_link('存入居所', '存入居所')}、{command_link('取回居所', '取回居所')}，"
         f"用{command_link('我的物资箱', '我的物资箱')}查看格数与存量。\n\n"
         f"想托人跑腿，可{command_link('派遣预览', '派遣预览')}查看各境界差事；"
-        f"选定后{command_link('接受派遣', '接受派遣')}填写任务名，到期再{command_link('结算派遣', '结算派遣')}。\n\n"
+        f"选定后{command_link('接受派遣', '接受派遣')}填写任务名与可选方案；"
+        f"{command_link('派遣状态', '派遣状态')}查看当前安排，到期再{command_link('结算派遣', '结算派遣')}。\n"
+        f"山野勘务：{command_link('药泉', '派遣预览 百草坡药泉勘务')}、"
+        f"{command_link('桥基', '派遣预览 铁木林桥基勘务')}、{command_link('水标', '派遣预览 玄武岩径水标勘务')}。\n\n"
         f"在公开起点运送真实货物，可用{command_link('运输预览', '运输预览')}查看货值、路线和沿途传闻，"
         f"用{command_link('开始运输', '开始运输')}锁定货物；途中用{command_link('运输状态', '运输状态')}查看抵达窗口，"
         f"抵达后{command_link('结算运输', '结算运输')}。事件结果会在出发时冻结，成功所得可用于生产或公共项目。\n\n"
@@ -521,7 +527,7 @@ class XiuxianApplication:
             definitions = [
                 definition
                 for definition in dispatch_definitions(self.content).values()
-                if definition.required_realm and definition.required_layer is not None
+                if definition.required_realm and definition.required_layer is not None and definition.planning is None
             ]
             if not definitions:
                 return ""
@@ -2932,6 +2938,9 @@ class XiuxianApplication:
 
     async def accept_dispatch(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.dispatch.accept(context), write_message="当前事件不允许接受派遣。")
+
+    async def status_dispatch(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.dispatch.status(context), require_write=False)
 
     async def settle_dispatch(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.dispatch.settle(context), write_message="当前事件不允许结算派遣。")

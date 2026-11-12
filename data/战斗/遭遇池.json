@@ -4,7 +4,7 @@
   "records": [
     {"key": "encounter.xuantian.outskirts", "name": "近郊常见遭遇", "desc": "近郊草坡间出没的常见小兽。", "status": "active", "candidates": [{"enemy_key": "enemy.wood_rat", "weight": 70}, {"enemy_key": "enemy.iron_boar", "weight": 30}]},
     {"key": "encounter.xuantian.ironwood", "name": "铁木林遭遇", "desc": "铁木林中守护林材与山径的野兽。", "status": "active", "candidates": [{"enemy_key": "enemy.wood_rat", "weight": 45}, {"enemy_key": "enemy.iron_boar", "weight": 45}, {"enemy_key": "enemy.ironwood_weasel", "weight": 10}]},
-    {"key": "encounter.xuantian.basalt_pass", "name": "玄武岩径遭遇", "desc": "玄武岩径的掘兽与守径阵偶。", "status": "active", "candidates": [{"enemy_key": "enemy.basalt_mole", "weight": 65}, {"enemy_key": "enemy.array_golem", "weight": 35}]},
+    {"key": "encounter.xuantian.basalt_pass", "name": "玄武岩径遭遇", "desc": "玄武岩径浅层幼掘兽、成年掘兽与守径阵偶；聚气初层已有合法遭遇。", "status": "active", "candidates": [{"enemy_key": "enemy.basalt_young_mole", "weight": 20}, {"enemy_key": "enemy.basalt_mole", "weight": 65}, {"enemy_key": "enemy.array_golem", "weight": 35}]},
     {"key": "encounter.cave.mist_grotto", "name": "洞天一层遭遇", "desc": "雾隐洞天一层的守卫与雾灵。", "status": "active", "candidates": [{"enemy_key": "enemy.mist_guardian", "weight": 70}, {"enemy_key": "enemy.mist_wisp", "weight": 30}]},
     {"key": "encounter.cloud_mine", "name": "云铁矿区遭遇", "desc": "云铁矿脉中的矿兽与残魂。", "status": "active", "candidates": [{"enemy_key": "enemy.cloud_beast", "weight": 75}, {"enemy_key": "enemy.cloud_miner_ghost", "weight": 25}]},
     {"key": "encounter.cave.mist_grotto_2", "name": "洞天二层遭遇", "desc": "雾隐洞天二层的精英巡守。", "status": "active", "candidates": [{"enemy_key": "enemy.mist_elite", "weight": 60}, {"enemy_key": "enemy.cave_depth_stalker", "weight": 40}]},

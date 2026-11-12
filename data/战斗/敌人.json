@@ -617,6 +617,19 @@
       "status": "active"
     },
     {
+      "name": "岩隙幼掘兽",
+      "desc": "在山径浅层松砂中拱食的幼兽，惊扰时会低头冲撞，尚未长出成年掘兽的硬甲。",
+      "location_key": "xuantian.basalt_pass",
+      "requirements": [{"type": "realm", "realm_key": "qi_gathering", "min_layer": 1}],
+      "stats": {"hp": 110, "attack": 12, "initiative": 8, "agility": 8},
+      "skills": ["enemy_skill.charge"],
+      "behavior": {"can_critical": false, "can_escape": false},
+      "reward_refs": [],
+      "combat_profile": {"random_pool_key": "battle.enemy.basalt_young_mole", "reward": {"spirit_stones": 6}, "drop_pool_key": "reward_pool.enemy.early"},
+      "key": "enemy.basalt_young_mole",
+      "status": "active"
+    },
+    {
       "name": "守径阵偶",
       "desc": "由旧阵纹驱动的石偶，会以规律重击驱散擅闯者。",
       "location_key": "xuantian.basalt_pass",

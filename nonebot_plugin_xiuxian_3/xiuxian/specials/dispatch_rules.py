@@ -43,6 +43,9 @@ class DispatchDefinition:
     required_service_reputation: int | None = None
     required_permit: str | None = None
     failure_refunds: tuple[tuple[str, int], ...] = ()
+    required_location: str | None = None
+    planning: dict | None = None
+    preparation: dict | None = None
 
     def reward_specs(self, outcome: str) -> dict[str, int | tuple[int, int]]:
         rewards = dict(self.rewards)
@@ -179,6 +182,10 @@ def _parse_dispatch(row: dict[str, Any], bundle: ContentBundle) -> DispatchDefin
     rewards = _parse_rewards(row.get("rewards"), key, bundle)
     risk_pool = _required_string(row.get("risk_pool"), key, "risk_pool")
     failure_refunds = _parse_refunds(row.get("failure_refunds", {}), key, costs)
+    location = requirements.get("location_key")
+    if location is not None and (not isinstance(location, str) or not bundle.has("location", location, include_locked=False)):
+        raise ContentError(f"dispatch {key} references unknown worksite {location!r}")
+    from .dispatch_planning import planning_definition
     return DispatchDefinition(
         key=key,
         label=label,
@@ -198,6 +205,8 @@ def _parse_dispatch(row: dict[str, Any], bundle: ContentBundle) -> DispatchDefin
         required_service_reputation=service_reputation,
         required_permit=required_permit,
         failure_refunds=tuple(failure_refunds.items()),
+        required_location=location,
+        planning=planning_definition(row, bundle),
     )
 
 

@@ -7,6 +7,19 @@
 
 ## 1. 数据与代码边界
 
+### 山野勘务派遣
+
+生活 `record_type=dispatch` 可选 `planning` 包含 `npc/scene/sources/recipe_keys/commission_keys/plans`。
+每份方案具备稳定key、名称/正文、时长、完整cost/risk/rewards/failure_refunds、开始反馈和四类
+outcome_texts；第一方案必须与原任务默认规则相同，省略选择不静默改默认。现场由requirements.location_key
+引用开放地点。source的item_key/exploration_key须能从真实探索奖池取得，成本材料逐个覆盖；
+每种物品产出须由引用的实际生产或委托inputs消费，不以来源/用途文字冒充消费者。
+接取按筹备参数冻结风险结果、奖项、成本、人物与结果正文、名称和用途。settle/cancel/status及24小时
+恢复读取同一快照，关闭只阻止新接；旧任务/快照不追补planning。种子维护真实Git来源、新旧指纹，
+未知/自定义JSON保留。内容损坏及真实异常显式失败，事务回滚，不静默退回固定派遣。
+
+### 通用边界
+
 | 内容 | 权威来源 | 示例 |
 |:--|:--|:--|
 | 内容及展示 | `data/` | 名称、`desc`、品质、技能效果、材料、装备、任务文本 |
