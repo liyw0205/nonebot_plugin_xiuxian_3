@@ -290,6 +290,28 @@ def test_migration_manifest_targets_match_current_official_seeds() -> None:
         assert all(re.fullmatch(r"[0-9a-f]{40}:data/.+\.json", provenance) for provenance in rule["old_sha256"].values())
 
 
+@pytest.mark.parametrize("custom", [False, True])
+def test_cultivation_seed_upgrade_preserves_custom_and_repeats(host: Path, custom: bool) -> None:
+    relative = Path("生活/生活.json")
+    old = (ROOT / "test/fixtures/official_seeds/livelihood_pre_reachability.json").read_bytes()
+    rule = json.loads((ROOT / "scripts/seed_migrations.json").read_text())[relative.as_posix()]
+    assert hashlib.sha256(old).hexdigest() in rule["old_sha256"]
+    original = old + b"\n" if custom else old
+    path = host / "data" / relative
+    path.write_bytes(original)
+    result = deploy(host)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert path.read_bytes() == (original if custom else (ROOT / "data" / relative).read_bytes())
+    backups = list((host / ".xiuxian3/backups").glob("deploy-*"))
+    assert len(backups) == 1
+    if not custom:
+        assert (backups[0] / "data" / relative).read_bytes() == original
+    repeated = deploy(host)
+    assert repeated.returncode == 0, repeated.stdout + repeated.stderr
+    assert "种子更新 0 个" in repeated.stdout
+    preserved(host)
+
+
 SECRET_REALM_FILE = Path("冒险/秘境专用.json")
 COMMON_SECRET_REALM_FILE = Path("冒险/秘境.json")
 

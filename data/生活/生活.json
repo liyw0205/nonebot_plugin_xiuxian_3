@@ -590,7 +590,44 @@
       },
       "key": "crop.blood_grass",
       "record_type": "crop",
-      "status": "active"
+      "status": "active",
+      "cultivation": {
+        "seed_source": {"kind": "guide", "key": "guide.gather_blood_grass", "command": "采集"},
+        "recipe_keys": ["recipe.pill.healing_low", "recipe.pill.focus_low"],
+        "commission_keys": ["town_commission.herb_supply"],
+        "plans": [
+          {
+            "key": "intensive", "name": "精耕", "desc": "分苗疏根，照料两次；姜婆收下分出的药苗，请阿禾回赠一份云纹稻种。",
+            "growth_seconds": 14400, "plant_energy": 2, "maintenance_energy": 2, "required_maintenance": 2, "harvest_window_seconds": 86400,
+            "events": [
+              {"key": "sun", "name": "晴畦分苗", "weight": 5,
+                "start_text": "姜婆在院中摆开苗盘，教你把密生的药苗分成两行。阿禾约好，苗株养稳后便带一袋自家稻种来换。",
+                "maintenance_text": "你松开药根旁的硬土，顺着苗沟浇水，让每一株都能见到日光。",
+                "complete_text": "分苗的止血草长得齐整。姜婆拣走约好的药苗，阿禾把云纹稻种交到你手中，剩下的药草也已扎成束。",
+                "fallback_text": "药苗挤在一处未能养稳，换种的约定只好延后。姜婆挑出仍能用的止血草，嘱你下次先把根疏开。",
+                "harvest": {"item.herb.blood_grass": 4, "item.grain.cloud_rice": 1}, "unmaintained_harvest": {"item.herb.blood_grass": 1}},
+              {"key": "rain", "name": "雨后扶苗", "weight": 3,
+                "start_text": "细雨压弯了药苗，姜婆递来细竹签，让你逐株扶正。阿禾说，能救活这一畦，他愿以稻种换几株药苗。",
+                "maintenance_text": "你扶直倒伏的苗，挖开积水的浅沟，再用细竹签把根旁的泥土拨松。",
+                "complete_text": "雨水退去，药苗重新挺立。阿禾如约用云纹稻种换走几株，你收下余下的止血草，记住了雨后先排水。",
+                "fallback_text": "低洼处的药苗泡坏了，换种未能成行。你与姜婆拣出一束未伤的药草，其余留作田肥。",
+                "harvest": {"item.herb.blood_grass": 3, "item.grain.cloud_rice": 1}, "unmaintained_harvest": {"item.herb.blood_grass": 1}}
+            ]
+          },
+          {
+            "key": "patient", "name": "缓养", "desc": "以落叶覆土保湿，生长六小时，只需一次照料；成熟后保留两天收割窗口。",
+            "growth_seconds": 21600, "plant_energy": 1, "maintenance_energy": 1, "required_maintenance": 1, "harvest_window_seconds": 172800,
+            "events": [
+              {"key": "dew", "name": "叶下晨露", "weight": 5,
+                "start_text": "姜婆将晒过的落叶薄薄铺在根旁，露水慢慢渗进土里。她留下一把小锄，让你闲下来再松一次土。",
+                "maintenance_text": "你翻开覆盖的落叶，松去板结的土块，再把叶层摊薄。",
+                "complete_text": "叶下的药根养得结实，你剪下成熟药草。姜婆说，慢养并非放任，留一点时辰给根，叶子自然会长好。",
+                "fallback_text": "叶层下生了几处杂草，止血草只长成两束。你收好能用的药叶，下一回得记得掀开叶层看一眼。",
+                "harvest": {"item.herb.blood_grass": 3}, "unmaintained_harvest": {"item.herb.blood_grass": 2}}
+            ]
+          }
+        ]
+      }
     },
     {
       "name": "灵叶",
@@ -638,7 +675,43 @@
       "daily_limit": 1,
       "key": "crop.spirit_leaf",
       "record_type": "crop",
-      "status": "active"
+      "status": "active",
+      "cultivation": {
+        "seed_source": {"kind": "exploration", "key": "explore.spring_gather", "command": "开始探索 灵泉采集"},
+        "recipe_keys": ["recipe.pill.qi_guard", "recipe.pill.focus_low"], "commission_keys": [],
+        "plans": [
+          {
+            "key": "intensive", "name": "精耕", "desc": "顺灵脉修剪，六小时成熟、照料三次；用较多精力换灵叶与阵砂。",
+            "growth_seconds": 21600, "plant_energy": 3, "maintenance_energy": 2, "required_maintenance": 3, "harvest_window_seconds": 86400,
+            "events": [
+              {"key": "mist", "name": "晨雾凝灵", "weight": 5,
+                "start_text": "圃师沈青沿田埂点出三处灵气滞留处，请你分次疏枝。晨雾贴着叶背，枝下的细砂泛起微光。",
+                "maintenance_text": "你依沈青所指修去枯枝，疏通叶间灵气，把落下的灵砂收进埂边浅槽。",
+                "complete_text": "叶脉终于通亮，沈青与你剪下四束灵叶，并拣出一袋能作阵材的细砂。",
+                "fallback_text": "枝条未及时疏开，灵气困在叶心。沈青保下一束灵叶，阵砂却已失了光泽。",
+                "harvest": {"item.herb.spirit_leaf": 4, "item.mat.array_sand": 1}, "unmaintained_harvest": {"item.herb.spirit_leaf": 1}},
+              {"key": "wind", "name": "风过灵枝", "weight": 3,
+                "start_text": "风把灵枝吹得互相缠绕，沈青取来细绳，请你先理顺枝条，再分次引灵护叶。",
+                "maintenance_text": "你拆开缠结的枝条，松绑后重新引灵，让新叶避过擦伤。",
+                "complete_text": "枝条恢复舒展，三束灵叶保住了药性。沈青将浅槽里凝出的阵砂一并装好。",
+                "fallback_text": "缠枝伤了大半新叶，只余一束尚可入炉。沈青让你下次遇风先理枝，不要急着引灵。",
+                "harvest": {"item.herb.spirit_leaf": 3, "item.mat.array_sand": 1}, "unmaintained_harvest": {"item.herb.spirit_leaf": 1}}
+            ]
+          },
+          {
+            "key": "patient", "name": "缓养", "desc": "遮阴养根，十二小时成熟、一次照料；不产阵砂，收割窗口两天。",
+            "growth_seconds": 43200, "plant_energy": 1, "maintenance_energy": 2, "required_maintenance": 1, "harvest_window_seconds": 172800,
+            "events": [
+              {"key": "shade", "name": "竹帘养叶", "weight": 1,
+                "start_text": "沈青在灵田上架起竹帘，让散光落在新叶上。这一畦不用追求凝砂，只要中途检查一次帘下的水分。",
+                "maintenance_text": "你卷起一角竹帘察看土色，补足根旁的水分，再把帘子落回。",
+                "complete_text": "竹帘下的灵叶虽长得慢，药性却稳。沈青与你剪下三束，留住根茎等待来日。",
+                "fallback_text": "帘下土面干了一层，两束灵叶勉强长成。你收好药叶，也把补水的时辰记在心里。",
+                "harvest": {"item.herb.spirit_leaf": 3}, "unmaintained_harvest": {"item.herb.spirit_leaf": 2}}
+            ]
+          }
+        ]
+      }
     },
     {
       "name": "云纹稻",
@@ -682,7 +755,43 @@
       },
       "key": "crop.cloud_rice",
       "record_type": "crop",
-      "status": "active"
+      "status": "active",
+      "cultivation": {
+        "seed_source": {"kind": "crop_plan", "key": "crop.blood_grass", "plan_key": "intensive", "command": "灵田播种 止血草 精耕"},
+        "recipe_keys": ["recipe.food.cloud_rice_meal"], "commission_keys": [],
+        "plans": [
+          {
+            "key": "intensive", "name": "精耕", "desc": "浅水催穗，六小时成熟、照料三次；阿禾教你用多次巡水换饱满稻谷。",
+            "growth_seconds": 21600, "plant_energy": 2, "maintenance_energy": 2, "required_maintenance": 3, "harvest_window_seconds": 86400,
+            "events": [
+              {"key": "clear", "name": "晴水催穗", "weight": 5,
+                "start_text": "阿禾沿田埂量好浅水，教你开合水口。云纹稻抽穗时最怕水太深，得分三次来察看。",
+                "maintenance_text": "你俯身看过稻根，挪开水口的小石，让浅水缓缓漫过田面。",
+                "complete_text": "穗上的云纹清晰了，阿禾与你脱出六份稻谷，又把田边成熟的一束灵叶装进袋中。",
+                "fallback_text": "水口失了照看，半畦稻穗空瘪。阿禾挑出两份能留的稻谷，催你先收好别再受潮。",
+                "harvest": {"item.grain.cloud_rice": 6, "item.herb.spirit_leaf": 1}, "unmaintained_harvest": {"item.grain.cloud_rice": 2}},
+              {"key": "shower", "name": "骤雨疏渠", "weight": 3,
+                "start_text": "骤雨冲进稻畦，阿禾挽起裤脚指给你看溢水的旧渠。先疏渠，再巡水，才能护住这一季稻穗。",
+                "maintenance_text": "你掏出水渠里的落叶，压实冲松的田埂，把多余的水引向空沟。",
+                "complete_text": "旧渠畅通，五份稻谷保住了饱满颗粒。阿禾剪下田边一束灵叶，与你把收成分袋晾干。",
+                "fallback_text": "积水伤了稻根，余下两份稻谷还可蒸饭。阿禾收起空瘪的穗子，让旧渠留着等你下次来疏。",
+                "harvest": {"item.grain.cloud_rice": 5, "item.herb.spirit_leaf": 1}, "unmaintained_harvest": {"item.grain.cloud_rice": 2}}
+            ]
+          },
+          {
+            "key": "patient", "name": "缓养", "desc": "干湿交替养穗，十小时成熟、一次照料；不采边畦灵叶，收割窗口两天。",
+            "growth_seconds": 36000, "plant_energy": 1, "maintenance_energy": 1, "required_maintenance": 1, "harvest_window_seconds": 172800,
+            "events": [
+              {"key": "slow", "name": "晚风养穗", "weight": 1,
+                "start_text": "阿禾把水口压低，让田面留出一层湿土。晚风慢慢掠过稻穗，这一畦只需中途换一次浅水。",
+                "maintenance_text": "你打开低水口，放走旧水再引进清水，轻轻扶正垄边的稻穗。",
+                "complete_text": "晚熟的稻穗垂下了头，阿禾与你脱出四份稻谷。没有赶着催穗，回来的时辰也从容些。",
+                "fallback_text": "田面没能换水，稻穗只结出两份实谷。你与阿禾慢慢脱粒，把能蒸饭的谷子一粒不落地留下。",
+                "harvest": {"item.grain.cloud_rice": 4}, "unmaintained_harvest": {"item.grain.cloud_rice": 2}}
+            ]
+          }
+        ]
+      }
     },
     {
       "name": "止血草供应",

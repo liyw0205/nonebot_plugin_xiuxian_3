@@ -36,6 +36,7 @@ from ..utils.player import (
 )
 from .models import FieldPlotRecord
 from .rules import crop_definition, crop_harvest_bonus
+from .cultivation_rules import freeze_cultivation, resolve_plan, validate_frozen_cultivation
 
 
 class FieldPlotRepositoryMixin:
@@ -49,6 +50,7 @@ class FieldPlotRepositoryMixin:
         crop_key: str,
         operation_id: str,
         plot_index: int | None = None,
+        plan_value: str = "",
     ) -> FieldPlotRecord:
         await self.initialize()
         async with self._inflight:
@@ -59,6 +61,7 @@ class FieldPlotRepositoryMixin:
                 crop_key,
                 operation_id,
                 plot_index,
+                plan_value,
             )
 
     def _plant_plot_once(
@@ -68,6 +71,7 @@ class FieldPlotRepositoryMixin:
         crop_key: str,
         operation_id: str,
         plot_index: int | None,
+        plan_value: str,
     ) -> FieldPlotRecord:
         operation_name = "livelihood.plant"
         request_value = (crop_key or "").strip() or "<default>"
@@ -78,6 +82,8 @@ class FieldPlotRepositoryMixin:
         }
         if plot_index is not None:
             request_fields["plot_index"] = plot_index
+        if plan_value:
+            request_fields["plan_value"] = plan_value
         request_hash = self._request_hash(operation_name, request_fields)
         now = self._now()
         now_text = serialize_datetime(now)
@@ -87,10 +93,20 @@ class FieldPlotRepositoryMixin:
             existing = operation_replay(connection, operation_id, operation_name, request_hash)
             if existing is not None:
                 return self._field_from_payload(existing, replay=True)
-            try:
-                crop = crop_definition(crop_key, self.content)
-            except ValueError as exc:
-                raise CropContentClosedError("unsupported crop") from exc
+            content = self.content or bundled_content()
+            # Resolve absence separately: malformed active content is not a normal refusal.
+            selectors = [item for item in content.list("livelihood", include_locked=False)
+                         if item.get("record_type") == "crop" and
+                         (not crop_key or crop_key in (item["key"], item["name"], *item.get("aliases", [])))]
+            if not selectors:
+                raise CropContentClosedError(f"没有开放作物：{crop_key}")
+            crop = crop_definition(crop_key, content)
+            plan = None
+            if plan_value:
+                try:
+                    plan = resolve_plan(crop.cultivation, plan_value)
+                except ValueError as exc:
+                    raise CropContentClosedError(str(exc)) from exc
             row = self._require_player(connection, platform, platform_user_id)
             residence = self._active_residence(connection, int(row["id"]), now, now_text)
             if residence is None:
@@ -143,16 +159,24 @@ class FieldPlotRepositoryMixin:
                 raise CropDailyLimitError("crop daily limit reached")
             inventory = player_inventory(row)
             if inventory_amount(inventory, crop.seed_key) < crop.seed_quantity:
-                raise ResourceInsufficientError("seed is insufficient")
-            if player_integer(row, "energy") < crop.maintenance_energy:
-                raise ResourceInsufficientError("energy is insufficient")
-            harvest_at = serialize_datetime(now + timedelta(seconds=crop.growth_seconds))
+                raise ResourceInsufficientError(f"{content.label('item', crop.seed_key)}不足：需要 {crop.seed_quantity}")
+            plant_energy = plan["plant_energy"] if plan else crop.maintenance_energy
+            if player_integer(row, "energy") < plant_energy:
+                raise ResourceInsufficientError(f"播种精力不足：需要 {plant_energy}")
+            growth_seconds = plan["growth_seconds"] if plan else crop.growth_seconds
+            maintenance_energy = plan["maintenance_energy"] if plan else crop.maintenance_energy
+            required_maintenance = plan["required_maintenance"] if plan else crop.required_maintenance
+            harvest_at = serialize_datetime(now + timedelta(seconds=growth_seconds))
             random_harvest = crop_harvest_bonus(crop, operation_id)
-            content = self.content or bundled_content()
+            cultivation = freeze_cultivation(crop.cultivation, plan, operation_id, content) if plan else None
+            maintained_harvest = cultivation["event"]["harvest"] if cultivation else crop.maintained_harvest
+            unmaintained_harvest = cultivation["event"]["unmaintained_harvest"] if cultivation else crop.unmaintained_harvest
+            if cultivation:
+                random_harvest = {}
             harvest_labels = {
                 key: content.label("item", key)
                 for key in sorted(
-                    set(crop.maintained_harvest) | set(crop.unmaintained_harvest)
+                    set(maintained_harvest) | set(unmaintained_harvest)
                     | set(crop.maintained_harvest_ranges or {})
                 )
             }
@@ -162,21 +186,23 @@ class FieldPlotRepositoryMixin:
                 "crop_label": crop.label,
                 "seed_key": crop.seed_key,
                 "seed_quantity": crop.seed_quantity,
-                "growth_seconds": crop.growth_seconds,
-                "required_maintenance": crop.required_maintenance,
-                "maintenance_energy": crop.maintenance_energy,
-                "maintained_harvest": crop.maintained_harvest,
-                "maintained_harvest_ranges": crop.maintained_harvest_ranges or {},
-                "unmaintained_harvest": crop.unmaintained_harvest,
-                "random_pool": crop.random_pool,
+                "growth_seconds": growth_seconds,
+                "required_maintenance": required_maintenance,
+                "maintenance_energy": maintenance_energy,
+                "maintained_harvest": maintained_harvest,
+                "maintained_harvest_ranges": {} if cultivation else (crop.maintained_harvest_ranges or {}),
+                "unmaintained_harvest": unmaintained_harvest,
+                "random_pool": None if cultivation else crop.random_pool,
                 "random_harvest": random_harvest,
                 "harvest_labels": harvest_labels,
                 "reputation_key": crop.reputation_key,
                 "reputation_delta": crop.reputation_delta,
                 "reputation_maximum": crop.reputation_maximum,
-                "wither_at": serialize_datetime(now + timedelta(seconds=crop.growth_seconds + 24 * 60 * 60)),
+                "wither_at": serialize_datetime(now + timedelta(seconds=growth_seconds + (plan["harvest_window_seconds"] if plan else 86400))),
             }
-            if crop.random_pool:
+            if cultivation:
+                snapshot["cultivation"] = cultivation
+            if crop.random_pool and not cultivation:
                 snapshot["random_seed"] = operation_id
                 snapshot["array_sand_roll"] = random_harvest.get("item.mat.array_sand", 0)
             spend_player_state(
@@ -184,7 +210,7 @@ class FieldPlotRepositoryMixin:
                 row,
                 updated_at=now_text,
                 costs={crop.seed_key: crop.seed_quantity},
-                value_delta={"energy": -crop.maintenance_energy},
+                value_delta={"energy": -plant_energy},
             )
             connection.execute(
                 """
@@ -221,10 +247,11 @@ class FieldPlotRepositoryMixin:
                 planted_at=now_text,
                 harvest_at=harvest_at,
                 maintenance_count=0,
-                required_maintenance=crop.required_maintenance,
+                required_maintenance=required_maintenance,
                 crop_label=crop.label,
                 harvest_labels=harvest_labels,
                 plot_index=int(plot_index),
+                snapshot=snapshot,
             )
             record_operation(connection, operation_id, operation_name, row["id"], request_hash, payload, now_text)
             return self._field_from_payload(payload)
@@ -295,6 +322,7 @@ class FieldPlotRepositoryMixin:
                 harvest=harvest,
                 local_reputation_delta=result["local_reputation_delta"] if status == "harvested" else 0,
                 plot_index=int(plot["plot_index"] or 1),
+                snapshot=snapshot,
             )
             return self._field_from_payload(payload)
 
@@ -350,6 +378,8 @@ class FieldPlotRepositoryMixin:
                     and current[1] not in {"growing", "harvestable"}
                 ):
                     selected[slot] = (plot, status, snapshot, harvest, reputation_delta)
+                if current and status in {"harvested", "withered"} and current[1] in {"harvested", "withered"}:
+                    selected[slot] = (plot, status, snapshot, harvest, reputation_delta)
             records: list[FieldPlotRecord] = []
             for slot in sorted(selected):
                 plot, status, snapshot, harvest, reputation_delta = selected[slot]
@@ -368,6 +398,7 @@ class FieldPlotRepositoryMixin:
                     harvest=harvest,
                     local_reputation_delta=reputation_delta,
                     plot_index=slot,
+                    snapshot=snapshot,
                 )
                 records.append(self._field_from_payload(payload))
             return plot_count, tuple(records)
@@ -485,7 +516,7 @@ class FieldPlotRepositoryMixin:
                 required = int(snapshot["required_maintenance"])
                 count = int(plot["maintenance_count"])
                 if player_integer(row, "energy") < int(snapshot["maintenance_energy"]):
-                    raise ResourceInsufficientError("energy is insufficient")
+                    raise ResourceInsufficientError(f"照料精力不足：需要 {snapshot['maintenance_energy']}")
                 count += 1
                 change_player_state(
                     connection,
@@ -513,6 +544,7 @@ class FieldPlotRepositoryMixin:
                     crop_label=str(snapshot["crop_label"]),
                     harvest_labels=snapshot["harvest_labels"],
                     plot_index=int(plot["plot_index"] or 1),
+                    snapshot=snapshot,
                 )
             else:
                 maintained = int(plot["maintenance_count"]) >= int(snapshot["required_maintenance"])
@@ -558,6 +590,7 @@ class FieldPlotRepositoryMixin:
                     harvest=harvest,
                     local_reputation_delta=reputation_delta,
                     plot_index=int(plot["plot_index"] or 1),
+                    snapshot=snapshot,
                 )
                 record_material_discoveries(
                     connection,
@@ -639,6 +672,12 @@ class FieldPlotRepositoryMixin:
         ):
             raise ValueError("invalid field plot local reputation")
         labels = self._field_harvest_labels(snapshot, ("maintained_harvest", "unmaintained_harvest", "random_harvest"))
+        if "cultivation" in snapshot:
+            cultivation = validate_frozen_cultivation(snapshot["cultivation"])
+            if (snapshot["maintained_harvest"] != cultivation["event"]["harvest"]
+                    or snapshot["unmaintained_harvest"] != cultivation["event"]["unmaintained_harvest"]
+                    or snapshot["random_harvest"] or snapshot["maintained_harvest_ranges"]):
+                raise ValueError("field cultivation harvest does not match frozen event")
         for key, bounds in snapshot["maintained_harvest_ranges"].items():
             if (
                 key not in labels or not isinstance(bounds, list) or len(bounds) != 2
@@ -665,7 +704,7 @@ class FieldPlotRepositoryMixin:
                 raise ValueError("invalid field plot harvest")
         return labels
 
-    def _field_payload(self, player: Any, *, plot_id: str, residence_id: str, crop_key: str, status: str, planted_at: str, harvest_at: str, maintenance_count: int, required_maintenance: int, crop_label: str, harvest_labels: dict[str, str], harvest: dict[str, int] | None = None, local_reputation_delta: int = 0, plot_index: int = 1) -> dict[str, Any]:
+    def _field_payload(self, player: Any, *, plot_id: str, residence_id: str, crop_key: str, status: str, planted_at: str, harvest_at: str, maintenance_count: int, required_maintenance: int, crop_label: str, harvest_labels: dict[str, str], harvest: dict[str, int] | None = None, local_reputation_delta: int = 0, plot_index: int = 1, snapshot: dict | None = None) -> dict[str, Any]:
         return {
             "player": self._player_payload(self._row_to_player(player)),
             "plot_id": plot_id,
@@ -681,10 +720,21 @@ class FieldPlotRepositoryMixin:
             "required_maintenance": required_maintenance,
             "harvest": harvest or {},
             "local_reputation_delta": local_reputation_delta,
+            "wither_at": snapshot["wither_at"] if snapshot else "",
+            "cultivation": snapshot.get("cultivation", {}) if snapshot else {},
         }
 
     def _field_from_payload(self, payload: dict[str, Any], *, replay: bool = False) -> FieldPlotRecord:
         labels = self._field_harvest_labels(payload, ("harvest",))
+        cultivation = payload.get("cultivation", {})
+        if not isinstance(cultivation, dict):
+            raise ValueError("invalid field cultivation result")
+        if cultivation:
+            validate_frozen_cultivation(cultivation)
+            if payload["status"] == "harvested":
+                maintained = payload["maintenance_count"] >= payload["required_maintenance"]
+                if payload["harvest"] != cultivation["event"]["harvest" if maintained else "unmaintained_harvest"]:
+                    raise ValueError("field harvest result does not match frozen event")
         saved_plot_index = payload.get("plot_index", 1)
         if (
             payload["status"] not in {"growing", "harvestable", "harvested", "withered"}
@@ -717,6 +767,8 @@ class FieldPlotRepositoryMixin:
             local_reputation_delta=int(payload["local_reputation_delta"]),
             plot_index=int(saved_plot_index),
             already_completed=replay,
+            wither_at=payload.get("wither_at", ""),
+            cultivation=cultivation,
         )
 
 

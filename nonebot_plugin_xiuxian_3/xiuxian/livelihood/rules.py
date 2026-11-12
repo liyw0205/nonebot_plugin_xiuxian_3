@@ -248,6 +248,7 @@ class CropDefinition:
     reputation_maximum: int | None = None
     seed_quantity: int = 1
     aliases: tuple[str, ...] = ()
+    cultivation: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -269,6 +270,7 @@ class TownCommissionDefinition:
 
 
 def crop_definitions(content: ContentBundle | None = None) -> dict[str, CropDefinition]:
+    from .cultivation_rules import cultivation_definition
     bundle = content if content is not None else _default_livelihood_content()
     residences = residence_definitions(bundle)
     result: dict[str, CropDefinition] = {}
@@ -351,6 +353,7 @@ def crop_definitions(content: ContentBundle | None = None) -> dict[str, CropDefi
             reputation_maximum=reputation_maximum,
             seed_quantity=seed_quantity,
             aliases=aliases,
+            cultivation=cultivation_definition(row, bundle),
         )
         if key in result:
             raise ContentError(f"duplicate crop key: {key}")
@@ -361,6 +364,15 @@ def crop_definitions(content: ContentBundle | None = None) -> dict[str, CropDefi
         result[key] = definition
     if not result:
         raise ContentError("no active crop records")
+    for crop in result.values():
+        visited = {crop.key}
+        current = crop
+        while current.cultivation and current.cultivation["seed_source"]["kind"] == "crop_plan":
+            source_key = current.cultivation["seed_source"]["key"]
+            if source_key in visited or source_key not in result:
+                raise ContentError(f"crop {crop.key} seed source is circular or unavailable")
+            visited.add(source_key)
+            current = result[source_key]
     return result
 
 

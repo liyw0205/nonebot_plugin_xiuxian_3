@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from ...contracts import CommandContext, CommandResult
+import logging
+
+from ...contracts import CommandAction, CommandContext, CommandResult
 from ..content import ContentError, bundled_content
 from ..repository import (
     CropContentClosedError,
@@ -47,7 +49,8 @@ from ..repository import (
     TradePermitContentClosedError,
     TradePermitRequirementError,
 )
-from .rules import resolve_commission_key
+from .rules import resolve_commission_key, crop_definitions, residence_definitions
+from ..utils.text import command_link
 from .trade_permit_rules import resolve_trade_permit
 from ..items.rules import item_aliases, item_records
 
@@ -60,6 +63,8 @@ _BLOCK_LABELS = {
     "exploration": "探索",
     "battle": "战斗",
 }
+
+logger = logging.getLogger(__name__)
 
 
 class LivelihoodApplication:
@@ -85,20 +90,93 @@ class LivelihoodApplication:
             return None
         return args[0].strip() if args else ""
 
-    def _resolve_crop(self, args: tuple[str, ...]) -> tuple[str, int | None] | None:
+    def _resolve_crop(self, args: tuple[str, ...]) -> tuple[str, int | None, str] | None:
         values = list(args)
         if not values:
-            return "", None
-        if len(values) > 2:
+            return "", None, ""
+        if len(values) > 3:
             return None
         crop = values[0].strip()
         if len(values) == 1:
-            return crop, None
+            return crop, None, ""
         raw_slot = values[1].strip()
-        if not raw_slot.isdigit():
+        if not raw_slot.isascii() or not raw_slot.isdecimal():
+            return (crop, None, raw_slot) if len(values) == 2 else None
+        if len(raw_slot) > 10:
             return None
         slot = int(raw_slot)
-        return (crop, slot) if slot >= 1 else None
+        return (crop, slot, values[2] if len(values) == 3 else "") if slot >= 1 else None
+
+    @staticmethod
+    def _field_error(context: CommandContext, operation_id: str, exc: Exception, command: str) -> CommandResult:
+        errors = {
+            CropContentClosedError: ("LIVELIHOOD_CONTENT_CLOSED", "作物或照料方案不可用"),
+            ResidenceRequiredError: ("RESIDENCE_REQUIRED", "播种需要有效居所"),
+            ResidencePlotRequiredError: ("RESIDENCE_REQUIRED", "居所不支持该作物"),
+            FieldPlotSlotError: ("INVALID_FIELD_SLOT", "田垄不在可用范围内"),
+            FieldPlotBusyError: ("FIELD_PLOT_BUSY", "田垄已有作物，请先收获"),
+            CropDailyLimitError: ("CROP_DAILY_LIMIT", "该作物今日播种次数已用尽"),
+            ResourceInsufficientError: ("RESOURCE_INSUFFICIENT", "种子或精力不足"),
+            PlayerNotFoundError: ("PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`"),
+            PlayerSuspendedError: ("PLAYER_SUSPENDED", "角色暂时不能经营灵田"),
+            FieldPlotNotFoundError: ("FIELD_PLOT_NOT_FOUND", "当前没有符合条件的灵田"),
+            FieldPlotNotReadyError: ("PLOT_NOT_READY" if command == "灵田收获" else "PLOT_MAINTENANCE_MISSED", "尚未成熟" if command == "灵田收获" else "当前没有尚需照料的生长作物"),
+            FieldPlotWitheredError: ("PLOT_WITHERED", "作物已枯萎，不能维护或收获，可重新播种"),
+            FieldPlotAlreadyHarvestedError: ("FIELD_PLOT_ALREADY_HARVESTED", "这块田已经收获过了"),
+            OperationConflictError: ("OPERATION_CONFLICT", "同一请求已用于不同的灵田安排"),
+            RepositoryBusyError: ("PERSISTENCE_BUSY", "灵田事务繁忙，请稍后重试"),
+        }
+        for kind, (code, message) in errors.items():
+            if isinstance(exc, kind):
+                return CommandResult(False, code, f"{message}：{exc}。", context.request_id, operation_id or None,
+                                     retryable=kind is RepositoryBusyError,
+                                     data={"reason": str(exc), "subject": " ".join(context.command_args) or "本人灵田"})
+        logger.error("field command failed command=%s adapter=%s request=%s operation=%s args=%r",
+                     command, context.adapter, context.request_id, operation_id, context.command_args,
+                     exc_info=(type(exc), exc, exc.__traceback__))
+        raise exc
+
+    async def preview_field(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) > 1:
+            return CommandResult(False, "INVALID_CROP", "可发送 `灵田预览` 或 `灵田预览 止血草`。", context.request_id,
+                                 data={"reason": "预览只接受一个作物参数", "subject": " ".join(context.command_args)})
+        try:
+            content = self.repository.content or bundled_content()
+            crops = crop_definitions(content)
+            residences = residence_definitions(content)
+            selector = context.command_args[0] if context.command_args else ""
+            selected = [crop for crop in crops.values() if not selector or selector in (crop.key, crop.label, *crop.aliases)]
+            if not selected:
+                raise CropContentClosedError(f"没有开放作物：{selector}")
+            lines = ["灵田筹划", ""]
+            data = []
+            for crop in selected:
+                homes = "、".join(f"{residences[key].label}（青石镇名望 {residences[key].required_local_reputation}，租金 {residences[key].rent_cost} 灵石）" for key in crop.residence_keys) or "任一有灵田的有效居所"
+                lines.extend([f"**{crop.label}** · {homes}",
+                              f"种子：{content.label('item', crop.seed_key)} ×{crop.seed_quantity}；每日最多 {crop.daily_limit} 次。",
+                              f"常规：{crop.growth_seconds // 3600} 小时，播种精力 {crop.maintenance_energy}，照料 {crop.required_maintenance} 次（每次 {crop.maintenance_energy} 精力），收割窗口 24 小时。"])
+                entry = {"crop_key": crop.key, "seed_key": crop.seed_key, "residence_keys": crop.residence_keys, "daily_limit": crop.daily_limit, "plans": []}
+                if crop.cultivation:
+                    source = crop.cultivation["seed_source"]
+                    lines.append(f"种源：{command_link(source['command'], source['command'])}，依来源门槛完成并结算；换种须充分照料后收获。" if source['kind'] == 'crop_plan' else f"种源：{command_link(source['command'], source['command'])}，依来源地点与境界门槛取得并结算。")
+                    for plan in crop.cultivation["plans"]:
+                        lines.extend([f"**{plan['name']}**：{plan['desc']}",
+                                      f"成熟 {plan['growth_seconds'] // 3600} 小时；播种精力 {plan['plant_energy']}；照料 {plan['required_maintenance']} 次 ×{plan['maintenance_energy']} 精力；收割窗口 {plan['harvest_window_seconds'] // 3600} 小时。"])
+                        for event in plan["events"]:
+                            def rewards(field):
+                                return "、".join(f"{content.label('item', key)} ×{quantity}" for key, quantity in event[field].items())
+                            lines.append(f"{event['name']}（权重 {event['weight']}）：照料齐 {rewards('harvest')}；不足 {rewards('unmaintained_harvest')}。")
+                        lines.append(command_link("播种 " + plan["name"], f"灵田播种 {crop.label} {plan['name']}"))
+                        entry["plans"].append(plan)
+                    uses = [(content.label("recipe", key), f"生产预览 {key}") for key in crop.cultivation["recipe_keys"]]
+                    uses += [(content.label("livelihood", key), f"接取委托 {key}") for key in crop.cultivation["commission_keys"]]
+                    lines.append("用途：" + "、".join(command_link(name, command) for name, command in uses))
+                    entry["seed_source"] = source
+                lines.append("")
+                data.append(entry)
+            return CommandResult(True, "FIELD_PREVIEW", "\n".join(lines).rstrip(), context.request_id, data={"crops": data})
+        except Exception as exc:
+            return self._field_error(context, "", exc, "灵田预览")
 
     @staticmethod
     def _resolve_plot_index(args: tuple[str, ...]) -> tuple[bool, int | None]:
@@ -108,7 +186,7 @@ class LivelihoodApplication:
         if len(values) > 1:
             return False, None
         raw_slot = values[0].strip()
-        if not raw_slot.isdigit():
+        if not raw_slot.isascii() or not raw_slot.isdecimal() or len(raw_slot) > 10:
             return False, None
         slot = int(raw_slot)
         if slot < 1:
@@ -519,8 +597,9 @@ class LivelihoodApplication:
     async def plant(self, context: CommandContext) -> CommandResult:
         resolved = self._resolve_crop(context.command_args)
         if resolved is None:
-            return CommandResult(False, "INVALID_CROP", "可用 `灵田播种 止血草`、`灵田播种 灵叶`，或在多垄居所补上田垄号。", context.request_id)
-        crop_key, plot_index = resolved
+            return CommandResult(False, "INVALID_CROP", "可发送 `灵田播种 止血草 缓养`，或 `灵田播种 云纹稻 2 精耕`。", context.request_id,
+                                 data={"reason": "播种参数应为作物、可选田垄和可选方案", "subject": " ".join(context.command_args)})
+        crop_key, plot_index, plan_value = resolved
         operation_id = self._operation_id(context, "livelihood.plant")
         try:
             record = await self.repository.plant_plot(
@@ -529,42 +608,26 @@ class LivelihoodApplication:
                 crop_key=crop_key,
                 operation_id=operation_id,
                 plot_index=plot_index,
+                plan_value=plan_value,
             )
-        except CropContentClosedError:
-            return CommandResult(False, "LIVELIHOOD_CONTENT_CLOSED", "该作物暂未开放。", context.request_id, operation_id)
-        except ResidenceRequiredError:
-            return CommandResult(False, "RESIDENCE_REQUIRED", "播种需要先租住有效居所。", context.request_id, operation_id)
-        except ResidencePlotRequiredError:
-            return CommandResult(False, "RESIDENCE_REQUIRED", "当前居所没有可用灵田。", context.request_id, operation_id)
-        except FieldPlotSlotError:
-            return CommandResult(False, "INVALID_FIELD_SLOT", "这块田垄不在当前居所范围内。", context.request_id, operation_id)
-        except FieldPlotBusyError:
-            return CommandResult(False, "FIELD_PLOT_BUSY", "这块灵田已有作物，请先收获。", context.request_id, operation_id)
-        except CropDailyLimitError:
-            return CommandResult(False, "CROP_DAILY_LIMIT", "该作物今日播种次数已用尽。", context.request_id, operation_id)
-        except ResourceInsufficientError:
-            return CommandResult(False, "RESOURCE_INSUFFICIENT", "种子或精力不足，无法播种。", context.request_id, operation_id)
-        except PlayerNotFoundError:
-            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
-        except PlayerSuspendedError:
-            return CommandResult(False, "PLAYER_SUSPENDED", "当前角色暂时不能经营灵田。", context.request_id, operation_id)
-        except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "此事已有安排，请重新起意。", context.request_id, operation_id)
-        except Exception:
-            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+        except Exception as exc:
+            return self._field_error(context, operation_id, exc, "灵田播种")
+        narrative = record.cultivation["event"]["start_text"] + "\n\n" if record.cultivation else ""
         return CommandResult(
             True,
             "FIELD_PLOT_PLANTED",
-            f"## 灵田已播种\n\n第 {record.plot_index} 垄已种下**{record.crop_label}**。\n\n- **预计成熟**：{record.harvest_at}\n- **维护**：需要 {record.required_maintenance} 次\n- **状态**：生长中",
+            f"灵田已播种\n\n{narrative}第 {record.plot_index} 垄 · **{record.crop_label}** · {record.cultivation.get('plan_name', '常规')}\n成熟：{record.harvest_at}\n收割截止：{record.wither_at}\n照料：需要 {record.required_maintenance} 次",
             context.request_id,
             operation_id,
-            data={"plot_id": record.plot_id, "plot_index": record.plot_index, "crop_key": record.crop_key, "status": record.status, "harvest_at": record.harvest_at, "maintenance_count": record.maintenance_count, "required_maintenance": record.required_maintenance, "idempotent_replay": record.already_completed},
+            data={"plot_id": record.plot_id, "plot_index": record.plot_index, "crop_key": record.crop_key, "status": record.status, "harvest_at": record.harvest_at, "wither_at": record.wither_at, "cultivation": record.cultivation, "maintenance_count": record.maintenance_count, "required_maintenance": record.required_maintenance, "idempotent_replay": record.already_completed},
+            actions=(CommandAction("照料", f"灵田维护 {record.plot_index}", enter=True), CommandAction("田间状态", "我的灵田", enter=True)),
         )
 
     async def maintain(self, context: CommandContext) -> CommandResult:
         valid, plot_index = self._resolve_plot_index(context.command_args)
         if not valid:
-            return CommandResult(False, "INVALID_FIELD_SLOT", "可发送 `灵田维护` 或 `灵田维护 2` 指定田垄。", context.request_id)
+            return CommandResult(False, "INVALID_FIELD_SLOT", "可发送 `灵田维护` 或 `灵田维护 2` 指定田垄。", context.request_id,
+                                 data={"reason": "田垄号应为正整数", "subject": " ".join(context.command_args)})
         operation_id = self._operation_id(context, "livelihood.maintain_plot")
         try:
             record = await self.repository.maintain_plot(
@@ -573,26 +636,13 @@ class LivelihoodApplication:
                 operation_id=operation_id,
                 plot_index=plot_index,
             )
-        except FieldPlotNotFoundError:
-            return CommandResult(False, "FIELD_PLOT_NOT_FOUND", "当前没有可维护的灵田。", context.request_id, operation_id)
-        except FieldPlotSlotError:
-            return CommandResult(False, "INVALID_FIELD_SLOT", "这块田垄不在当前居所范围内。", context.request_id, operation_id)
-        except FieldPlotNotReadyError:
-            return CommandResult(False, "PLOT_MAINTENANCE_MISSED", "当前不在灵田维护阶段。", context.request_id, operation_id)
-        except FieldPlotWitheredError:
-            return CommandResult(False, "PLOT_WITHERED", "灵田作物已经枯萎。", context.request_id, operation_id)
-        except ResourceInsufficientError:
-            return CommandResult(False, "RESOURCE_INSUFFICIENT", "精力不足，无法维护灵田。", context.request_id, operation_id)
-        except PlayerNotFoundError:
-            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
-        except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "此事已有安排，请重新起意。", context.request_id, operation_id)
-        except Exception:
-            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+        except Exception as exc:
+            return self._field_error(context, operation_id, exc, "灵田维护")
+        narrative = record.cultivation["event"]["maintenance_text"] + "\n\n" if record.cultivation else ""
         return CommandResult(
             True,
             "FIELD_PLOT_MAINTAINED",
-            f"## 灵田维护完成\n\n第 {record.plot_index} 垄已完成 1 次维护，还需 {max(0, record.required_maintenance - record.maintenance_count)} 次。",
+            f"灵田维护完成\n\n{narrative}第 {record.plot_index} 垄已完成 1 次维护，还需 {max(0, record.required_maintenance - record.maintenance_count)} 次。",
             context.request_id,
             operation_id,
             data={"plot_id": record.plot_id, "plot_index": record.plot_index, "status": record.status, "maintenance_count": record.maintenance_count, "required_maintenance": record.required_maintenance, "idempotent_replay": record.already_completed},
@@ -601,7 +651,8 @@ class LivelihoodApplication:
     async def harvest(self, context: CommandContext) -> CommandResult:
         valid, plot_index = self._resolve_plot_index(context.command_args)
         if not valid:
-            return CommandResult(False, "INVALID_FIELD_SLOT", "可发送 `灵田收获` 或 `灵田收获 2` 指定田垄。", context.request_id)
+            return CommandResult(False, "INVALID_FIELD_SLOT", "可发送 `灵田收获` 或 `灵田收获 2` 指定田垄。", context.request_id,
+                                 data={"reason": "田垄号应为正整数", "subject": " ".join(context.command_args)})
         operation_id = self._operation_id(context, "livelihood.harvest")
         try:
             record = await self.repository.harvest_plot(
@@ -610,35 +661,25 @@ class LivelihoodApplication:
                 operation_id=operation_id,
                 plot_index=plot_index,
             )
-        except FieldPlotNotFoundError:
-            return CommandResult(False, "FIELD_PLOT_NOT_FOUND", "当前没有可收获的灵田。", context.request_id, operation_id)
-        except FieldPlotSlotError:
-            return CommandResult(False, "INVALID_FIELD_SLOT", "这块田垄不在当前居所范围内。", context.request_id, operation_id)
-        except FieldPlotAlreadyHarvestedError:
-            return CommandResult(False, "FIELD_PLOT_ALREADY_HARVESTED", "这块灵田已经收获过了。", context.request_id, operation_id)
-        except FieldPlotNotReadyError:
-            return CommandResult(False, "PLOT_NOT_READY", "作物尚未成熟，请稍后再来。", context.request_id, operation_id)
-        except FieldPlotWitheredError:
-            return CommandResult(False, "PLOT_WITHERED", "灵田作物已经枯萎，无法收获。", context.request_id, operation_id)
-        except PlayerNotFoundError:
-            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
-        except OperationConflictError:
-            return CommandResult(False, "OPERATION_CONFLICT", "此事已有安排，请重新起意。", context.request_id, operation_id)
-        except Exception:
-            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+        except Exception as exc:
+            return self._field_error(context, operation_id, exc, "灵田收获")
         items = "、".join(f"{record.harvest_labels[key]} ×{value}" for key, value in record.harvest.items()) or "无"
+        maintained = record.maintenance_count >= record.required_maintenance
+        narrative = (record.cultivation["event"]["complete_text" if maintained else "fallback_text"] + "\n\n") if record.cultivation else ""
+        uses = "\n用途：" + "、".join(command_link(use["name"], use["command"]) for use in record.cultivation["uses"]) if record.cultivation else ""
         return CommandResult(
             True,
             "FIELD_PLOT_HARVESTED",
-            f"## 灵田收获完成\n\n- **田垄**：第 {record.plot_index} 垄\n- **收获**：{items}\n- **地方名望**：+{record.local_reputation_delta}\n- **状态**：已收获",
+            f"灵田收获完成\n\n{narrative}第 {record.plot_index} 垄 · {'照料充分' if maintained else '照料不足'}\n收获：{items}\n地方名望：+{record.local_reputation_delta}{uses}",
             context.request_id,
             operation_id,
-            data={"plot_id": record.plot_id, "plot_index": record.plot_index, "status": record.status, "harvest": record.harvest, "local_reputation_delta": record.local_reputation_delta, "idempotent_replay": record.already_completed},
+            data={"plot_id": record.plot_id, "plot_index": record.plot_index, "status": record.status, "harvest": record.harvest, "maintained": maintained, "cultivation": record.cultivation, "local_reputation_delta": record.local_reputation_delta, "idempotent_replay": record.already_completed},
         )
 
     async def get_plot_profile(self, context: CommandContext) -> CommandResult:
         if context.command_args:
-            return CommandResult(False, "INVALID_FIELD_PLOT_COMMAND", "查看灵田无需附加参数。", context.request_id)
+            return CommandResult(False, "INVALID_FIELD_PLOT_COMMAND", "查看灵田无需附加参数。", context.request_id,
+                                 data={"reason": "查看灵田不接受参数", "subject": " ".join(context.command_args)})
         try:
             primary = await self.repository.get_field_plot(
                 platform=context.adapter,
@@ -648,17 +689,14 @@ class LivelihoodApplication:
                 platform=context.adapter,
                 platform_user_id=context.user_id,
             )
-        except FieldPlotNotFoundError:
-            return CommandResult(False, "FIELD_PLOT_NOT_FOUND", "当前还没有灵田记录。", context.request_id)
-        except PlayerNotFoundError:
-            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id)
-        except Exception:
-            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, retryable=True)
+        except Exception as exc:
+            return self._field_error(context, "", exc, "我的灵田")
         state_labels = {"growing": "生长中", "harvestable": "待收获", "harvested": "已收获", "withered": "已枯萎"}
         by_slot = {record.plot_index: record for record in records}
         slots = sorted(set(by_slot) | set(range(1, plot_count + 1)))
-        lines = ["## 我的灵田", ""]
+        lines = ["我的灵田", ""]
         payload = []
+        actions = []
         for slot in slots:
             record = by_slot.get(slot)
             if record is None:
@@ -672,6 +710,15 @@ class LivelihoodApplication:
                 f"预计成熟 {record.harvest_at or '无'}"
             )
             lines.append(line)
+            if record.cultivation:
+                lines.append(f"{record.cultivation['plan_name']} · {record.cultivation['event']['name']}\n{record.cultivation['event']['start_text']}")
+            lines.append(f"收割截止：{record.wither_at}")
+            if record.status == "growing" and record.maintenance_count < record.required_maintenance and len(actions) < 2:
+                actions.append(CommandAction(f"照料第{slot}垄", f"灵田维护 {slot}", enter=True))
+            elif record.status == "harvestable" and len(actions) < 2:
+                actions.append(CommandAction(f"收获第{slot}垄", f"灵田收获 {slot}", enter=True))
+            elif record.status in {"harvested", "withered"}:
+                lines.append(command_link("重新筹划", f"灵田预览 {record.crop_key}"))
             payload.append(
                 {
                     "plot_index": slot,
@@ -681,6 +728,8 @@ class LivelihoodApplication:
                     "harvest_at": record.harvest_at,
                     "maintenance_count": record.maintenance_count,
                     "required_maintenance": record.required_maintenance,
+                    "wither_at": record.wither_at,
+                    "cultivation": record.cultivation,
                 }
             )
         return CommandResult(
@@ -698,6 +747,7 @@ class LivelihoodApplication:
                 "required_maintenance": primary.required_maintenance,
                 "plots": payload,
             },
+            actions=tuple(actions),
         )
 
     async def list_commissions(self, context: CommandContext) -> CommandResult:

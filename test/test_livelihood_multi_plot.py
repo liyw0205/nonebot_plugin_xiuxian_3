@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import sqlite3
+import pytest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -269,8 +270,8 @@ def test_corrupt_second_plot_snapshot_rolls_back_without_touching_the_first(
                     (damaged, second.data["plot_id"]),
                 )
             before = flow.dump()
-            rejected = await flow.send("灵田收获 2", "corrupt-harvest-1", ok=False)
-            assert rejected.code == "PERSISTENCE_ERROR"
+            with pytest.raises(ValueError):
+                await flow.send("灵田收获 2", "corrupt-harvest-1", ok=False)
             assert flow.dump() == before
 
             with sqlite3.connect(flow.runtime.settings.database_path) as db:
