@@ -120,6 +120,8 @@ def validate_content_references(bundle: ContentBundle) -> dict[str, int]:
     materials = validate_material_content(bundle)
     sources = validate_source_content(bundle)
     crop_definitions(bundle)
+    from .specials.dispatch_rules import dispatch_definitions
+    dispatch_definitions(bundle)
     return {
         **world,
         "exploration_modes": modes,

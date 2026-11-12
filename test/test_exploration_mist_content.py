@@ -13,6 +13,7 @@ from combat_fixtures import BALANCED_QUALIFICATION
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
+from nonebot_plugin_xiuxian_3.xiuxian.rewards.rules import RewardContentError
 from nonebot_plugin_xiuxian_3.xiuxian.exploration.rules import battle_roll_bp
 from nonebot_plugin_xiuxian_3.xiuxian.specials.codex_projection import record_material_discoveries
 
@@ -273,8 +274,8 @@ def test_mist_grotto_rejects_invalid_pool_without_charging_or_session(
             user = f"mist-invalid-{adapter}"
             await _prepare_player(runtime, adapter, user)
             before = _state(runtime)
-            rejected = await _send(runtime, adapter, user, "invalid-start", "开始探索 雾隐洞天探索")
-            assert rejected.code == "PERSISTENCE_ERROR"
+            with pytest.raises(RewardContentError, match="item.missing"):
+                await _send(runtime, adapter, user, "invalid-start", "开始探索 雾隐洞天探索")
             assert _state(runtime) == before
         finally:
             await runtime.close()

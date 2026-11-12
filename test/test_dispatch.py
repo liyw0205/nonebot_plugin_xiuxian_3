@@ -359,6 +359,11 @@ def test_dispatch_rule_tables_are_closed_and_partial_outputs_round_down() -> Non
         "dispatch.soul.abyss_manifest": 10000,
         "dispatch.void.garden_tending": 10000,
         "dispatch.void.route_courier": 10000,
+        "dispatch.seeker.clinic_run": 10000,
+        "dispatch.cultivator.herb_convoy": 10000,
+        "dispatch.herb_spring_works": 10000,
+        "dispatch.ironwood_bridge_works": 10000,
+        "dispatch.basalt_watermark_works": 10000,
     }
     from nonebot_plugin_xiuxian_3.xiuxian.specials.dispatch_rules import reward_for
 

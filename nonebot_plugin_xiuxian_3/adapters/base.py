@@ -521,6 +521,7 @@ def register_core_commands(router: CommandRouter, application: XiuxianApplicatio
     router.register("领取挂机", application.claim_idle)
     router.register("取消挂机", application.cancel_idle)
     router.register("派遣预览", application.preview_dispatch, aliases=("查看派遣",))
+    router.register("派遣状态", application.status_dispatch, aliases=("我的派遣",))
     router.register("接受派遣", application.accept_dispatch, aliases=("开始派遣",))
     router.register("结算派遣", application.settle_dispatch)
     router.register("取消派遣", application.cancel_dispatch)

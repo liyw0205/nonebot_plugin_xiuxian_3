@@ -12,6 +12,7 @@ from combat_fixtures import BALANCED_QUALIFICATION, equip_damage_weapon
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
+from nonebot_plugin_xiuxian_3.xiuxian.rewards.rules import RewardContentError
 from nonebot_plugin_xiuxian_3.xiuxian.content import ContentBundle
 from nonebot_plugin_xiuxian_3.xiuxian.rewards.rules import reward_pool_map
 
@@ -221,10 +222,10 @@ def test_beast_hunt_rejects_invalid_pool_without_cost_or_session(
             user = f"beast-invalid-{adapter}"
             await _prepare_player(runtime, adapter, user)
             before = _state(runtime)
-            rejected = await _send(
-                runtime, adapter, user, "invalid-beast-hunt", "开始探索 万兽山狩猎"
-            )
-            assert rejected.code == "PERSISTENCE_ERROR", (rejected.code, rejected.message)
+            with pytest.raises(RewardContentError, match="item.missing"):
+                await _send(
+                    runtime, adapter, user, "invalid-beast-hunt", "开始探索 万兽山狩猎"
+                )
             assert _state(runtime) == before
         finally:
             await runtime.close()

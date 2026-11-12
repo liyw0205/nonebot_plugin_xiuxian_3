@@ -12,6 +12,7 @@ from combat_fixtures import BALANCED_QUALIFICATION, equip_damage_weapon
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
+from nonebot_plugin_xiuxian_3.xiuxian.rewards.rules import RewardContentError
 from nonebot_plugin_xiuxian_3.xiuxian.content import ContentBundle
 from nonebot_plugin_xiuxian_3.xiuxian.exploration.rules import settlement_result
 from nonebot_plugin_xiuxian_3.xiuxian.rewards.rules import reward_pool_uses_item_weight_bonus
@@ -230,10 +231,11 @@ def test_demon_abyss_rejects_invalid_pool_without_cost_or_session(
             user = f"demon-invalid-{adapter}"
             await _prepare_player(runtime, adapter, user)
             before = _state(runtime)
-            rejected = await _send(
-                runtime, adapter, user, "invalid-demon-abyss", "开始探索 魔界堕落遗迹探索"
-            )
-            assert rejected.code == "PERSISTENCE_ERROR"
+            error_subject = "item.missing" if "outcomes" in invalid_changes else "item_weight_bonus"
+            with pytest.raises(RewardContentError, match=error_subject):
+                await _send(
+                    runtime, adapter, user, "invalid-demon-abyss", "开始探索 魔界堕落遗迹探索"
+                )
             assert _state(runtime) == before
         finally:
             await runtime.close()

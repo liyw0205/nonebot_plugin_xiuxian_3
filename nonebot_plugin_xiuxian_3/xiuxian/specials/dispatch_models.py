@@ -18,6 +18,7 @@ class DispatchPreviewRecord:
     costs: dict[str, int]
     ready: bool
     missing: tuple[str, ...] = ()
+    planning: dict | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,6 +34,8 @@ class DispatchAssignmentRecord:
     cancel_until: str
     costs: dict[str, int] = field(default_factory=dict)
     already_completed: bool = False
+    label: str = ""
+    planning: dict | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,6 +48,8 @@ class DispatchSettlementRecord:
     reward: dict[str, int]
     refunded: dict[str, int] = field(default_factory=dict)
     already_completed: bool = False
+    label: str = ""
+    planning: dict | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,6 +60,15 @@ class DispatchCancelRecord:
     status: str
     refunded: dict[str, int]
     already_completed: bool = False
+    planning: dict | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class DispatchStatusRecord:
+    assignment: DispatchAssignmentRecord
+    remaining_seconds: int
+    cancel_seconds: int
+    result: dict = field(default_factory=dict)
 
 
 __all__ = [
@@ -62,4 +76,5 @@ __all__ = [
     "DispatchCancelRecord",
     "DispatchPreviewRecord",
     "DispatchSettlementRecord",
+    "DispatchStatusRecord",
 ]

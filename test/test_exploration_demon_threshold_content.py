@@ -12,6 +12,7 @@ from combat_fixtures import BALANCED_QUALIFICATION
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
+from nonebot_plugin_xiuxian_3.xiuxian.rewards.rules import RewardContentError
 from nonebot_plugin_xiuxian_3.xiuxian.rewards.rules import reward_pool_map
 
 
@@ -232,14 +233,14 @@ def test_demon_threshold_rejects_bad_reward_reference_atomically(
             user = f"demon-threshold-invalid-{adapter}"
             await _prepare_player(runtime, adapter, user)
             before = _state(runtime)
-            rejected = await _send(
-                runtime,
-                adapter,
-                user,
-                "invalid-demon-threshold",
-                "开始探索 深渊门备材",
-            )
-            assert rejected.code == "PERSISTENCE_ERROR"
+            with pytest.raises(RewardContentError, match="item.missing"):
+                await _send(
+                    runtime,
+                    adapter,
+                    user,
+                    "invalid-demon-threshold",
+                    "开始探索 深渊门备材",
+                )
             assert _state(runtime) == before
         finally:
             await runtime.close()

@@ -313,6 +313,28 @@ def test_cultivation_seed_upgrade_preserves_custom_and_repeats(host: Path, custo
 
 
 SECRET_REALM_FILE = Path("冒险/秘境专用.json")
+
+
+@pytest.mark.parametrize("custom", [False, True])
+def test_fieldwork_seeds_upgrade_from_v0134_and_preserve_custom(host: Path, custom: bool) -> None:
+    files = ("生活/生活.json", "战斗/敌人.json", "战斗/遭遇池.json")
+    manifest = json.loads((ROOT / "scripts/seed_migrations.json").read_text())
+    originals = {}
+    for relative in files:
+        original = subprocess.check_output(["git", "show", f"v0.1.34:data/{relative}"], cwd=ROOT)
+        assert hashlib.sha256(original).hexdigest() in manifest[relative]["old_sha256"]
+        originals[relative] = original + (b"\n" if custom else b"")
+        (host / "data" / relative).write_bytes(originals[relative])
+    result = deploy(host)
+    assert result.returncode == 0, result.stdout + result.stderr
+    backup = next((host / ".xiuxian3/backups").glob("deploy-*"))
+    for relative in files:
+        assert (host / "data" / relative).read_bytes() == (originals[relative] if custom else (ROOT / "data" / relative).read_bytes())
+        if not custom:
+            assert (backup / "data" / relative).read_bytes() == originals[relative]
+    repeated = deploy(host)
+    assert repeated.returncode == 0 and "种子更新 0 个" in repeated.stdout, repeated.stdout + repeated.stderr
+    preserved(host)
 COMMON_SECRET_REALM_FILE = Path("冒险/秘境.json")
 
 
