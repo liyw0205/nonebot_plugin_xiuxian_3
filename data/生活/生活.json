@@ -9,6 +9,21 @@
       "requirements": {"stage": "mortal", "location_key": "xuantian.herb_vale"},
       "reward_pool_key": "reward_pool.idle.herb_vale_gather",
       "fallback_reward_pool_key": "reward_pool.idle.herb_vale_gather.fallback", "durability_cost_bp": 0,
+      "wilderness_event": {
+        "scene": "坡脚传来咳声，姜婆发现背药的学徒困在雨棚下；坡顶一丛灵叶也正到采期。药篓有限，你要先帮谁？",
+        "choices": [
+          {"key": "shelter", "name": "扶徒归棚", "cost": {"stamina": 1, "energy": 0}, "reward_pool_key": "reward_pool.idle.event.herb_shelter",
+           "start_text": "你让出半只药篓，扶学徒沿缓坡回雨棚。姜婆留在棚口分拣药叶，托你把干草送回药铺。",
+           "complete_text": "学徒喝下热水，终于能说清药叶的来处。你收下止血草，姜婆替你在镇中药铺记下一份人情；这次没有赶上坡顶灵叶，却保住了学徒和整篓干药。",
+           "expired_text": "你迟迟没来收篓，姜婆已先送学徒回镇。干药大半分给病人，只替你留下原定的一束止血草。",
+           "recipe_keys": ["recipe.pill.healing_low"]},
+          {"key": "ridge", "name": "辨叶上坡", "cost": {"stamina": 0, "energy": 2}, "reward_pool_key": "reward_pool.idle.event.herb_ridge",
+           "start_text": "姜婆安排学徒留棚歇息，你独自上坡，按她教的叶脉逐株辨药，只剪成熟的叶尖。",
+           "complete_text": "你将辨出的灵叶单独包好。姜婆验过叶脉，提醒你灵叶宜用来凝神，不要混进止血药；学徒已自行回镇，你没有分到送药的人情。",
+           "expired_text": "山露浸透了尚未收回的灵叶，姜婆不肯将失去药性的叶子交给你，只留下原定的干止血草。",
+           "recipe_keys": ["recipe.pill.focus_low"]}
+        ]
+      },
       "gathering_journal": {
         "start_text": "姜婆把空药篓递来，领你绕开新芽，沿百草坡背阴处逐株辨认止血草。她嘱咐只取成叶，根须还要留给来年。",
         "complete_text": "日影移过坡顶，你将药草分束晾好。姜婆拈起一片叶子点头：认得药性，也得记得留根。药篓与这句叮嘱一同带回。",
@@ -24,6 +39,21 @@
       "requirements": {"stage": "cultivator", "realm": {"key": "qi_sensing", "min_layer": 1}, "location_key": "xuantian.ironwood_grove"},
       "reward_pool_key": "reward_pool.idle.ironwood_gather",
       "fallback_reward_pool_key": "reward_pool.idle.ironwood_gather.fallback", "durability_cost_bp": 0,
+      "wilderness_event": {
+        "scene": "风折的铁木横在旧窑口，樵匠石伯请你决定：顺纹取柄材，还是翻开树根寻露出的铁石。两处都要费工，不能兼顾。",
+        "choices": [
+          {"key": "grain", "name": "顺纹取材", "cost": {"stamina": 0, "energy": 1}, "reward_pool_key": "reward_pool.idle.event.wood_grain",
+           "start_text": "你听石伯敲木辨音，将有暗裂的枝段留作窑柴，沿完整木纹慢慢剥出柄材。",
+           "complete_text": "石伯把平直木料捆成一束：做木纹剑也好，做矿镐柄也好，先认清纹理。你多留住了木料，树根下的铁石却只来得及拾一块。",
+           "expired_text": "雾水钻进未收拢的木缝，细选的柄材已经胀裂。石伯只交回原定的一段干木，没有把坏料算作收成。",
+           "recipe_keys": ["recipe.weapon.wood_sword", "recipe.tool.mining_pickaxe"]},
+          {"key": "roots", "name": "翻根寻铁", "cost": {"stamina": 2, "energy": 0}, "reward_pool_key": "reward_pool.idle.event.wood_roots",
+           "start_text": "你与石伯用枯枝垫稳断木，扒开根部碎土，将铁石一块块搬到林口。",
+           "complete_text": "根下的铁石终于装满小袋，断木只保住了一段。石伯说这袋矿料适合锻镐，若急着做剑，下次还得专门挑木。",
+           "expired_text": "迟来的山雨又把铁石埋进树根，石伯收工前仅替你保住一段干木；这趟力气没有换成额外矿料。",
+           "recipe_keys": ["recipe.tool.mining_pickaxe"]}
+        ]
+      },
       "gathering_journal": {
         "start_text": "老樵匠在林口敲了敲一截枯枝，听出木心仍实。他带你拾取风折的铁木，再沿树根翻找混在碎土中的铁石。",
         "complete_text": "你把木料按纹理捆齐，将铁石装进小袋。老樵匠说，顺纹做柄才不易折，山中拾来的材料也能做一把可靠的矿镐。",
@@ -39,6 +69,21 @@
       "requirements": {"stage": "cultivator", "realm": {"key": "qi_gathering", "min_layer": 1}, "location_key": "xuantian.basalt_pass"},
       "reward_pool_key": "reward_pool.idle.basalt_sifting",
       "fallback_reward_pool_key": "reward_pool.idle.basalt_sifting.fallback", "durability_cost_bp": 0,
+      "wilderness_event": {
+        "scene": "岩径起了侧风，石匠阿砚发现筛底有细亮阵砂，石缝却露出一线铁色。他把两只筛盘推来，等你定下今天的工序。",
+        "choices": [
+          {"key": "fine", "name": "复筛细砂", "cost": {"stamina": 0, "energy": 2}, "reward_pool_key": "reward_pool.idle.event.sand_fine",
+           "start_text": "你在背风面架起双筛，按阿砚的手势逐层去掉松脆黑屑，宁可少搬石料也不混入杂砂。",
+           "complete_text": "阿砚用指腹抹开细砂，灵纹没有中断。这批阵砂可以交给阵师做基础聚灵阵，铁石却只留下一块；精筛的工夫都落在砂里。",
+           "expired_text": "封袋之前你没能回来，风吹散了细筛所得。阿砚从粗筛底收起原定的一包阵砂，额外工夫只剩一身尘土。",
+           "recipe_keys": ["recipe.array.gathering_basic"]},
+          {"key": "vein", "name": "循缝拾铁", "cost": {"stamina": 2, "energy": 0}, "reward_pool_key": "reward_pool.idle.event.sand_vein",
+           "start_text": "你顺着石缝搬出松动铁石，阿砚守在下方挡住滚石，剩下的砂只做一遍粗筛。",
+           "complete_text": "铁石比预想沉实，阵砂却只够装一小包。阿砚让你把矿料留给锻镐，别把混着黑屑的粗砂一并交给阵师。",
+           "expired_text": "你错过搬料的时辰，阿砚为清出山径已将铁石移交工棚，只替你保住原定的那包阵砂。",
+           "recipe_keys": ["recipe.tool.mining_pickaxe"]}
+        ]
+      },
       "gathering_journal": {
         "start_text": "石匠把筛盘架在背风处，教你从黑石碎屑里挑出能承灵纹的砂粒。岩径风硬，得先压稳筛脚再动手。",
         "complete_text": "筛过的阵砂在盘底微微发亮，旁边另有一袋铁石。石匠笑说，阵法要稳，起头这捧砂就不能掺进松脆的碎石。",
