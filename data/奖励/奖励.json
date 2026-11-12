@@ -1,6 +1,24 @@
 {
   "kind": "reward",
   "records": [
+    {"key": "reward_pool.idle.event.herb_shelter", "name": "扶徒归棚所得", "desc": "送学徒归棚，药材与镇中人情二者兼得，但不采坡顶灵叶。", "status": "active", "pool_type": "weighted", "outcomes": [
+      {"weight": 3, "rewards": {"item.herb.blood_grass": 2, "local.xuantian.new_town": 1, "codex.story.herb_vale_gather": 1}},
+      {"weight": 1, "rewards": {"item.herb.blood_grass": 3, "local.xuantian.new_town": 1, "codex.story.herb_vale_gather": 1}}]},
+    {"key": "reward_pool.idle.event.herb_ridge", "name": "辨叶上坡所得", "desc": "耗费精力辨叶，专供凝神炼制，不得送药人情。", "status": "active", "pool_type": "weighted", "outcomes": [
+      {"weight": 3, "rewards": {"item.herb.blood_grass": 1, "item.herb.spirit_leaf": 1, "codex.story.herb_vale_gather": 1}},
+      {"weight": 1, "rewards": {"item.herb.blood_grass": 1, "item.herb.spirit_leaf": 2, "codex.story.herb_vale_gather": 1}}]},
+    {"key": "reward_pool.idle.event.wood_grain", "name": "顺纹取材所得", "desc": "木料优先，矿料只保留少量。", "status": "active", "pool_type": "weighted", "outcomes": [
+      {"weight": 3, "rewards": {"item.mat.wood": 3, "item.ore.ironstone": 1, "codex.story.ironwood_gather": 1}},
+      {"weight": 1, "rewards": {"item.mat.wood": 4, "item.ore.ironstone": 1, "codex.story.ironwood_gather": 1}}]},
+    {"key": "reward_pool.idle.event.wood_roots", "name": "翻根寻铁所得", "desc": "矿料优先，木料只保留一段。", "status": "active", "pool_type": "weighted", "outcomes": [
+      {"weight": 3, "rewards": {"item.mat.wood": 1, "item.ore.ironstone": 3, "codex.story.ironwood_gather": 1}},
+      {"weight": 1, "rewards": {"item.mat.wood": 1, "item.ore.ironstone": 4, "codex.story.ironwood_gather": 1}}]},
+    {"key": "reward_pool.idle.event.sand_fine", "name": "复筛细砂所得", "desc": "精筛阵砂，少取铁石。", "status": "active", "pool_type": "weighted", "outcomes": [
+      {"weight": 3, "rewards": {"item.mat.array_sand": 3, "item.ore.ironstone": 1, "codex.story.basalt_sifting": 1}},
+      {"weight": 1, "rewards": {"item.mat.array_sand": 4, "item.ore.ironstone": 1, "codex.story.basalt_sifting": 1}}]},
+    {"key": "reward_pool.idle.event.sand_vein", "name": "循缝拾铁所得", "desc": "拾取矿料，只留粗筛阵砂。", "status": "active", "pool_type": "weighted", "outcomes": [
+      {"weight": 3, "rewards": {"item.mat.array_sand": 1, "item.ore.ironstone": 3, "codex.story.basalt_sifting": 1}},
+      {"weight": 1, "rewards": {"item.mat.array_sand": 1, "item.ore.ironstone": 4, "codex.story.basalt_sifting": 1}}]},
     {
       "key": "reward_pool.idle.herb_vale_gather", "name": "百草坡采药所得", "desc": "留根采叶后的日常药材与采药行记。",
       "status": "active", "pool_type": "weighted", "outcomes": [

@@ -23,6 +23,7 @@ from ..persistence.errors import (
 from .idle_models import IdleAssignmentRecord, IdleRoutePreviewRecord
 from .idle_repository import IdleRepositoryMixin
 from .idle_rules import idle_reward_label
+from .idle_rules import reward_ranges
 from ..utils.text import command_link
 
 
@@ -65,7 +66,7 @@ class IdleApplication:
                 return CommandResult(
                     False, code, message, context.request_id, operation_id or None,
                     retryable=error_type is RepositoryBusyError,
-                    data={"reason": str(exc), "subject": context.command_args[0] if context.command_args else "本人闲居安排"},
+                    data={"reason": str(exc), "subject": " ".join(context.command_args) or "本人闲居安排"},
                 )
         logger.error(
             "idle command failed command=%s adapter=%s request=%s operation=%s args=%r",
@@ -169,7 +170,20 @@ class IdleApplication:
                     lines.extend(["", journal["start_text"], f"材料去向：{self._uses_text(journal)}"])
                 if record.ready:
                     suffix = " <灵兽编号>" if conditions.get("required_companion_kind") else ""
-                    actions = (CommandAction("安排此项闲居", f"开始挂机 {record.label}{suffix}", enter=True),)
+                    label = "按原安排开始" if conditions.get("wilderness_event") else "安排此项闲居"
+                    actions = (CommandAction(label, f"开始挂机 {record.label}{suffix}", enter=True),)
+                event = conditions.get("wilderness_event", {})
+                if event:
+                    lines.extend(["", event["scene"], "选择其一开始安排；旧命令省略选择仍按原路线。额外投入逾时不返还。"])
+                    for choice in event["choices"]:
+                        cost = choice["cost"]
+                        lines.extend([
+                            f"{choice['name']}：额外体力 {cost['stamina']}、精力 {cost['energy']}",
+                            f"完整所得：{self._ranges_text(reward_ranges(choice['reward_pool_key'], self.repository.content))}",
+                            choice["journal"]["start_text"],
+                            f"材料去向：{self._uses_text(choice['journal'])}",
+                            command_link("选择" + choice["name"], f"开始挂机 {record.label} {choice['name']}"),
+                        ])
         lines.extend(["", command_link("当前安排", "挂机状态")])
         return CommandResult(True, "IDLE_PREVIEW", "\n".join(lines), context.request_id, data=data, actions=actions)
 
@@ -218,7 +232,7 @@ class IdleApplication:
 
     async def start(self, context: CommandContext) -> CommandResult:
         if not 1 <= len(context.command_args) <= 2:
-            return CommandResult(False, "INVALID_IDLE_COMMAND", "请写明路线名称，可附上工具或作坊槽位。", context.request_id)
+            return CommandResult(False, "INVALID_IDLE_COMMAND", "请写明路线名称，可附上事件选择、工具或作坊槽位。", context.request_id, data={"reason": "路线参数数量应为一至两个", "subject": " ".join(context.command_args) or "本人闲居安排"})
         operation_id = self._operation_id(context, "specials.assign_idle")
         try:
             record = await self.repository.start_idle(

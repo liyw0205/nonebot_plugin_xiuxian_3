@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from ..content import ContentBundle, ContentError, bundled_content
-from ..persistence.errors import IdleRouteNotFoundError
+from ..persistence.errors import IdleRouteNotFoundError, IdleRequirementError
 from ..rewards.rules import (
     RewardContentError,
     local_reputation_maximum,
@@ -49,6 +49,7 @@ class IdleRouteDefinition:
     required_companion_kind: str | None = None
     companion_progress: dict[str, int] = field(default_factory=dict)
     patrol_journal: dict[str, str] = field(default_factory=dict)
+    wilderness_event: dict[str, Any] = field(default_factory=dict)
 
 
 _STAGE_ORDER = {
@@ -93,6 +94,23 @@ def resolve_route(value: str | None, content: ContentBundle | None = None) -> Id
         return selectors[(value or "").strip()]
     except KeyError as exc:
         raise IdleRouteNotFoundError(f"unsupported idle route: {value}") from exc
+
+
+def select_wilderness_choice(definition: IdleRouteDefinition, selector: str | None) -> IdleRouteDefinition:
+    if not selector or not definition.wilderness_event:
+        return definition
+    for choice in definition.wilderness_event["choices"]:
+        if selector in (choice["key"], choice["name"]):
+            return replace(
+                definition, pool_key=choice["reward_pool_key"],
+                stamina_cost=definition.stamina_cost + choice["cost"]["stamina"],
+                energy_cost=definition.energy_cost + choice["cost"]["energy"],
+                gathering_journal={
+                    **choice["journal"],
+                    "start_text": f"{definition.wilderness_event['scene']}\n抉择：{choice['name']}\n{choice['journal']['start_text']}",
+                },
+            )
+    raise IdleRequirementError(f"{definition.label}没有选择「{selector}」，可选：" + "、".join(c["name"] for c in definition.wilderness_event["choices"]))
 
 
 def reward_for(
@@ -333,6 +351,9 @@ def _parse_route(row: dict[str, Any], bundle: ContentBundle) -> IdleRouteDefinit
     journal = _parse_gathering_journal(row.get("gathering_journal"), bundle, key, pool_key, fallback_pool_key)
     if journal and required_location is None:
         raise ContentError(f"idle route {key} gathering_journal requires a location")
+    event = _parse_wilderness_event(row.get("wilderness_event"), bundle, key, fallback_pool_key)
+    if event and (not journal or tool_keys or companion_kind or facility_kind):
+        raise ContentError(f"idle route {key} wilderness_event requires an unencumbered gathering route")
     return IdleRouteDefinition(
         key=key,
         label=name.strip(),
@@ -361,7 +382,41 @@ def _parse_route(row: dict[str, Any], bundle: ContentBundle) -> IdleRouteDefinit
         required_companion_kind=companion_kind,
         companion_progress=progress,
         patrol_journal=patrol_journal,
+        wilderness_event=event,
     )
+
+
+def _parse_wilderness_event(value: Any, bundle: ContentBundle, key: str, fallback_pool: str) -> dict[str, Any]:
+    if value is None:
+        return {}
+    if not isinstance(value, dict) or set(value) != {"scene", "choices"}:
+        raise ContentError(f"idle route {key} wilderness_event requires scene and choices")
+    scene = _required_string(value["scene"], key, "wilderness_event.scene").strip()
+    choices = value["choices"]
+    if not scene or not isinstance(choices, list) or len(choices) < 2:
+        raise ContentError(f"idle route {key} wilderness_event needs a scene and multiple choices")
+    parsed = []
+    selectors: set[str] = set()
+    fields = {"key", "name", "cost", "reward_pool_key", "start_text", "complete_text", "expired_text", "recipe_keys"}
+    for choice in choices:
+        if not isinstance(choice, dict) or set(choice) != fields:
+            raise ContentError(f"idle route {key} wilderness_event choice has invalid fields")
+        names = [_required_string(choice[f], key, f"wilderness_event.{f}").strip() for f in ("key", "name")]
+        if any(not n or any(c.isspace() for c in n) or n in selectors for n in names):
+            raise ContentError(f"idle route {key} wilderness_event choice selectors are invalid or duplicated")
+        selectors.update(names)
+        cost = choice["cost"]
+        if not isinstance(cost, dict) or set(cost) != {"stamina", "energy"}:
+            raise ContentError(f"idle route {key} wilderness_event cost requires stamina and energy")
+        cost = {f: _non_negative_integer(v, key, f"wilderness_event.cost.{f}") for f, v in cost.items()}
+        pool = _required_string(choice["reward_pool_key"], key, "wilderness_event.reward_pool_key")
+        _validate_pool(pool, bundle, key, fallback=False)
+        journal = _parse_gathering_journal(
+            {f: choice[f] for f in ("start_text", "complete_text", "expired_text", "recipe_keys")},
+            bundle, key, pool, fallback_pool,
+        )
+        parsed.append({"key": names[0], "name": names[1], "cost": cost, "reward_pool_key": pool, "journal": journal})
+    return {"scene": scene, "choices": parsed}
 
 
 def _parse_patrol_journal(value: Any, route_key: str, companion_kind: str | None) -> dict[str, str]:

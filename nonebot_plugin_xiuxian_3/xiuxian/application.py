@@ -481,6 +481,8 @@ class XiuxianApplication:
             f"{command_link('挂机状态', '挂机状态')}查看当前安排与领取窗口；"
             f"完整领取后可用{command_link('采集行记', '采集行记')}回看人物见闻与材料去向。"
         )
+        if any(route.wilderness_event for route in idle_route_order(bundle)):
+            lines.append("百草坡、铁木林与玄武岩径可在路线详情选择处理山野事件：额外投入换取不同材料或人情，逾时只留保底；省略选择保持原安排。")
         return "\n".join(lines)
 
     def _exploration_mode_lines(self) -> str:
