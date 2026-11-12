@@ -587,6 +587,11 @@ class PublicProjectDefinition:
     service_sources: tuple["ProjectServiceSource", ...] = ()
     codex_entry_key: str | None = None
     codex_entry_label: str | None = None
+    cycle: str = "weekly"
+    stages: tuple[dict[str, Any], ...] = ()
+    sources: tuple[dict[str, str], ...] = ()
+    effect_value: int | None = None
+    effect_duration_seconds: int = 604800
 
 
 @dataclass(frozen=True, slots=True)
@@ -619,6 +624,42 @@ def _positive_mapping(row: dict[str, Any], field: str, bundle: ContentBundle, ke
             raise ContentError(f"public project {key} references unknown item {raw_key}")
         result[raw_key] = raw_amount
     return result
+
+
+def validate_project_stages(stages: Any, requirements: dict[str, int]) -> None:
+    """Validate cumulative phase targets for content and persisted snapshots."""
+    if not isinstance(stages, (list, tuple)) or not 2 <= len(stages) <= 8:
+        raise ContentError("project stages require two to eight phases")
+    previous: dict[str, int] = {}
+    previous_service = 0
+    selectors: set[str] = set()
+    for stage in stages:
+        if not isinstance(stage, dict) or set(stage) != {
+            "key", "name", "scene", "complete_text", "requirements", "service_points"
+        }:
+            raise ContentError("project stage fields are invalid")
+        for field in ("key", "name", "scene", "complete_text"):
+            if not isinstance(stage[field], str) or not stage[field].strip():
+                raise ContentError(f"project stage {field} is invalid")
+        if stage["key"] in selectors or stage["name"] in selectors:
+            raise ContentError("project stages have duplicate selectors")
+        selectors.update((stage["key"], stage["name"]))
+        targets, service = stage["requirements"], stage["service_points"]
+        if not isinstance(targets, dict) or not targets or any(
+            key not in requirements or isinstance(value, bool) or not isinstance(value, int)
+            or not 0 < value <= requirements[key]
+            for key, value in targets.items()
+        ):
+            raise ContentError("project stage material targets are invalid")
+        if any(targets.get(key, 0) < value for key, value in previous.items()):
+            raise ContentError("project stage targets cannot decrease")
+        if isinstance(service, bool) or not isinstance(service, int) or service <= previous_service:
+            raise ContentError("project stage labour targets must increase")
+        if targets == previous:
+            raise ContentError("project stage material targets must increase")
+        previous, previous_service = targets, service
+    if previous != requirements:
+        raise ContentError("project final stage must cover all requirements")
 
 
 def public_project_definitions(content: ContentBundle | None = None) -> dict[str, PublicProjectDefinition]:
@@ -745,6 +786,56 @@ def public_project_definitions(content: ContentBundle | None = None) -> dict[str
             )
             for resource in requirements
         }
+        cycle = row.get("cycle", "weekly")
+        if cycle not in {"weekly", "persistent"}:
+            raise ContentError(f"public project {key} has invalid cycle")
+        stages = row.get("stages", [])
+        sources = row.get("sources", [])
+        effect_value = row.get("effect_value")
+        duration = row.get("effect_duration_seconds", 604800)
+        if isinstance(duration, bool) or not isinstance(duration, int) or not 1 <= duration <= 2592000:
+            raise ContentError(f"public project {key} has invalid effect duration")
+        if effect_value is not None and (
+            isinstance(effect_value, bool) or not isinstance(effect_value, int)
+            or effect_value <= 0
+            or effect_key not in {"town_commission.stock_bonus", "town_commission.herb_reward_bonus", "route.delay_weight_reduction"}
+            or effect_value > (10000 if effect_key == "route.delay_weight_reduction" else 100)
+        ):
+            raise ContentError(f"public project {key} has invalid effect value")
+        if cycle == "persistent":
+            validate_project_stages(stages, requirements)
+            if effect_value is None or len(service_sources) != 1 or any(
+                source.operation_names != ("livelihood.settle_route",) for source in service_sources
+            ) or service_sources[0].service_key != "service.transport" or service_sources[0].contribution_points > 30:
+                raise ContentError(f"public project {key} requires an effect and transport labour")
+            if any(stage["service_points"] % service_sources[0].contribution_points for stage in stages):
+                raise ContentError(f"public project {key} labour targets must match source points")
+            if not isinstance(sources, list) or len(sources) != len(requirements):
+                raise ContentError(f"public project {key} requires a source for each material")
+            seen: set[str] = set()
+            normalized_sources = []
+            from ..rewards.rules import reward_pool_outcomes
+
+            for source in sources:
+                if not isinstance(source, dict) or set(source) != {"item_key", "exploration_key"}:
+                    raise ContentError(f"public project {key} has invalid material source")
+                item, exploration = source["item_key"], source["exploration_key"]
+                if not isinstance(item, str) or item not in requirements or item in seen or not isinstance(exploration, str):
+                    raise ContentError(f"public project {key} has invalid material source")
+                mode = bundle.get("exploration_mode", exploration, include_locked=False)
+                if mode is None or not any(
+                    reward.get(item, 0) > 0
+                    for _, reward in reward_pool_outcomes(mode["reward_pool_key"], bundle)
+                ):
+                    raise ContentError(f"public project {key} source does not produce {item}")
+                seen.add(item)
+                normalized_sources.append({
+                    **source, "item_label": resource_labels[item], "source_label": mode["name"],
+                    "location_label": bundle.label("location", mode["location_key"]),
+                })
+            sources = normalized_sources
+        elif stages or sources:
+            raise ContentError(f"public project {key} stages require persistent cycle")
         selector_values = {key, label.strip(), *(alias.strip() for alias in aliases)}
         if selectors & selector_values or key in result:
             raise ContentError(f"public project {key} has duplicate key or alias")
@@ -771,6 +862,11 @@ def public_project_definitions(content: ContentBundle | None = None) -> dict[str
             service_sources=tuple(service_sources),
             codex_entry_key=codex_entry_key,
             codex_entry_label=codex_entry_label,
+            cycle=cycle,
+            stages=tuple(stages),
+            sources=tuple(sources),
+            effect_value=effect_value,
+            effect_duration_seconds=duration,
         )
     if not result:
         raise ContentError("no active public project content records")

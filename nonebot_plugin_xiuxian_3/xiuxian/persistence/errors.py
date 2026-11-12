@@ -1028,6 +1028,15 @@ class ProjectContributionRequirementError(RuntimeError):
     """The selected resource cannot contribute to this public project."""
 
 
+class ProjectPhaseRequirementError(ProjectContributionRequirementError):
+    """The current construction phase cannot accept this contribution."""
+
+    def __init__(self, reason: str, subject: str):
+        self.reason = reason
+        self.subject = subject
+        super().__init__(reason)
+
+
 class ProjectSourceAlreadyUsedError(RuntimeError):
     """The same settled service operation has already contributed."""
 

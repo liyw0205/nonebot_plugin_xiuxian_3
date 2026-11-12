@@ -129,6 +129,8 @@ _HELP_PAGES = {
         "备下药材、木石或阵砂后，可在山野现场承接勘务，选择踏勘或整治："
         f"{command_link('药泉', '派遣预览 百草坡药泉勘务')}、{command_link('桥基', '派遣预览 铁木林桥基勘务')}、"
         f"{command_link('水标', '派遣预览 玄武岩径水标勘务')}；{command_link('派遣状态', '派遣状态')}记录离线安排。\n\n"
+        f"山野物资也可投入{command_link('长期共建', '工程预览')}，"
+        f"{command_link('我的工程', '我的工程')}保留分期进境和已完成运输劳作，跨周不另起工程。\n\n"
         f"想深入秘境，可先{command_link('秘境预览', '秘境预览')}，"
         f"再用{command_link('进入秘境', '进入秘境')}填写秘境名。"
         f"{command_link('主线道途', '主线道途')}与{command_link('引路簿', '引路簿')}会记录你的见闻与嘉奖。\n\n"
@@ -187,6 +189,8 @@ _HELP_PAGES = {
         f"开始后六十秒内还能{command_link('取消挂机', '取消挂机')}。\n\n"
         f"{command_link('公共项目', '公共项目')}可查看本周建设；完成运输后，用"
         f"{command_link('贡献公共项目 项目名 运输', '贡献公共项目')}填入项目名，贡献本人尚未记过的运输。"
+        f"\n\n{command_link('工程预览', '工程预览')}列出铁木便桥、药材晾棚与岩径路标的分期物资和劳作。"
+        f"{command_link('我的工程', '我的工程')}查看跨周进境、本人出力与嘉赏；完工成效只影响委托和短途运输。"
         "领域避难所个人贡献满十点后，可安排十小时的避难所看守；完整领取才完成灯火长守后记。\n\n"
         f"护祖终关后，{command_link('领域前线主线', '领域前线主线')}中的“重巡万兽山”可开启祖灵栖地后记。"
         f"完成妖界引导并备妥 80 点妖界声望、500 灵石后，"
@@ -1877,6 +1881,12 @@ class XiuxianApplication:
 
     async def list_projects(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.project.list_projects(context), require_write=False)
+
+    async def preview_construction(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.project.preview_construction(context), require_write=False)
+
+    async def construction_status(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.project.construction_status(context), require_write=False)
 
     async def contribute_project(self, context: CommandContext) -> CommandResult:
         return await self._invoke(

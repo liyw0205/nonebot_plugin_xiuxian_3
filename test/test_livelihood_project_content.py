@@ -16,7 +16,7 @@ from nonebot_plugin_xiuxian_3.xiuxian.livelihood.rules import public_project_def
 
 def _copy_content(tmp_path: Path) -> Path:
     target = tmp_path / "content"
-    shutil.copytree(Path(__file__).parents[1] / "data", target)
+    shutil.copytree(Path(__file__).parents[1] / "data", target, ignore=shutil.ignore_patterns("*.sqlite3*", "*.db*"))
     return target
 
 

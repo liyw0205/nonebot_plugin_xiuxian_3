@@ -357,6 +357,8 @@ def validate(target: Path) -> None:
             mainline.VOID_ARCHIVE_STORY_KEY,
         ):
             mainline.mainline_definitions(story_key=story)
+        livelihood = importlib.import_module(f"{expected_module}.xiuxian.livelihood.rules")
+        livelihood.public_project_definitions()
     print(
         f"NoneBot 已加载 {expected_module} "
         f"module_file={module_file} matchers={len(plugin.matcher)} handlers={handlers}"
