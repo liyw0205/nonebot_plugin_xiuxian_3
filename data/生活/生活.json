@@ -677,8 +677,8 @@
       "record_type": "crop",
       "status": "active",
       "cultivation": {
-        "seed_source": {"kind": "exploration", "key": "exploration.spring_gather", "command": "探索 灵泉采集"},
-        "recipe_keys": ["recipe.pill.qi_guard", "recipe.pill.qi_gathering"], "commission_keys": [],
+        "seed_source": {"kind": "exploration", "key": "explore.spring_gather", "command": "开始探索 灵泉采集"},
+        "recipe_keys": ["recipe.pill.qi_guard", "recipe.pill.focus_low"], "commission_keys": [],
         "plans": [
           {
             "key": "intensive", "name": "精耕", "desc": "顺灵脉修剪，六小时成熟、照料三次；用较多精力换灵叶与阵砂。",
