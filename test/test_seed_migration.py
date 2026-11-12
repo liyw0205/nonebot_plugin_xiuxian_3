@@ -317,11 +317,15 @@ SECRET_REALM_FILE = Path("冒险/秘境专用.json")
 
 @pytest.mark.parametrize("custom", [False, True])
 def test_fieldwork_seeds_upgrade_from_v0134_and_preserve_custom(host: Path, custom: bool) -> None:
-    files = ("生活/生活.json", "战斗/敌人.json", "战斗/遭遇池.json")
+    files = {
+        "生活/生活.json": "fieldwork_v0134_livelihood.json",
+        "战斗/敌人.json": "fieldwork_v0134_enemies.json",
+        "战斗/遭遇池.json": "fieldwork_v0134_encounters.json",
+    }
     manifest = json.loads((ROOT / "scripts/seed_migrations.json").read_text())
     originals = {}
-    for relative in files:
-        original = subprocess.check_output(["git", "show", f"v0.1.34:data/{relative}"], cwd=ROOT)
+    for relative, fixture in files.items():
+        original = (ROOT / "test/fixtures/official_seeds" / fixture).read_bytes()
         assert hashlib.sha256(original).hexdigest() in manifest[relative]["old_sha256"]
         originals[relative] = original + (b"\n" if custom else b"")
         (host / "data" / relative).write_bytes(originals[relative])
@@ -335,6 +339,8 @@ def test_fieldwork_seeds_upgrade_from_v0134_and_preserve_custom(host: Path, cust
     repeated = deploy(host)
     assert repeated.returncode == 0 and "种子更新 0 个" in repeated.stdout, repeated.stdout + repeated.stderr
     preserved(host)
+
+
 COMMON_SECRET_REALM_FILE = Path("冒险/秘境.json")
 
 

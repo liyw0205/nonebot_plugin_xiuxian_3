@@ -1,0 +1,1220 @@
+{
+  "kind": "enemy",
+  "records": [
+    {
+      "name": "训练傀儡",
+      "desc": "演武场中用于磨炼基本功的木铁傀儡，招式简单，却不会轻易停手。",
+      "location_key": "xuantian.new_town",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "qi_sensing",
+          "min_layer": 1
+        }
+      ],
+      "stats": {
+        "hp": 80,
+        "attack": 8,
+        "initiative": 8,
+        "agility": 8
+      },
+      "skills": [
+        "enemy_skill.dummy_tap"
+      ],
+      "behavior": {
+        "can_critical": false,
+        "can_escape": false
+      },
+      "reward_refs": [],
+      "combat_profile": {
+        "random_pool_key": "battle.enemy.training_dummy",
+        "preview_max_rounds": 20,
+        "reward": {}
+      },
+      "key": "enemy.training_dummy",
+      "status": "active"
+    },
+    {
+      "name": "木鼠",
+      "desc": "常在近郊草丛间出没的小兽，行动灵巧，受惊时会迅速反扑。",
+      "location_key": "xuantian.outskirts",
+      "requirements": [
+        {
+          "type": "stage_min",
+          "stage": "mortal"
+        }
+      ],
+      "stats": {
+        "hp": 45,
+        "attack": 8,
+        "initiative": 10,
+        "agility": 8
+      },
+      "skills": [
+        "enemy_skill.scratch"
+      ],
+      "reward_refs": [
+        "reward.battle.wood_rat"
+      ],
+      "codex_entry_key": "codex.creature.wood_rat",
+      "combat_profile": {
+        "random_pool_key": "battle.enemy.wood_rat",
+        "reward": {},
+        "party_profile": {
+          "party_type": "standard_pve",
+          "reward": {"cultivation": 30, "spirit_stones": 10}
+        }
+      },
+      "key": "enemy.wood_rat",
+      "status": "active"
+    },
+    {
+      "name": "铁鬃野猪",
+      "desc": "鬃毛坚硬、冲势凶猛的野猪，常在山道间横冲直撞。",
+      "location_key": "xuantian.outskirts",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "qi_sensing",
+          "min_layer": 3
+        }
+      ],
+      "stats": {
+        "hp": 100,
+        "attack": 15,
+        "initiative": 7,
+        "agility": 8
+      },
+      "skills": [
+        "enemy_skill.charge"
+      ],
+      "reward_refs": [
+        "reward.battle.iron_boar"
+      ],
+      "combat_profile": {
+        "random_pool_key": "battle.enemy.iron_boar"
+      },
+      "codex_entry_key": "codex.creature.iron_boar",
+      "key": "enemy.iron_boar",
+      "status": "active"
+    },
+    {
+      "name": "劫修学徒",
+      "desc": "在近郊拦路掠夺的年轻劫修，刀法粗疏，却已懂得以灵力伤人。",
+      "location_key": "xuantian.cloud_city",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "qi_gathering",
+          "min_layer": 3
+        }
+      ],
+      "stats": {
+        "hp": 180,
+        "attack": 26,
+        "initiative": 12,
+        "agility": 10
+      },
+      "skills": [
+        "enemy_skill.blade_wave"
+      ],
+      "reward_refs": [
+        "reward.battle.bandit_apprentice"
+      ],
+      "combat_profile": {
+        "random_pool_key": "battle.enemy.bandit_apprentice",
+        "reward": {},
+        "drop_pool_key": "reward_pool.enemy.early"
+      },
+      "key": "enemy.bandit_apprentice",
+      "status": "active"
+    },
+    {
+      "name": "雾隐守卫",
+      "desc": "守在洞天深处的古老卫士，借浓雾护体，步步逼近闯入者。",
+      "location_key": "cave.mist_grotto",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "qi_gathering",
+          "min_layer": 4
+        }
+      ],
+      "stats": {
+        "hp": 320,
+        "attack": 42,
+        "initiative": 10,
+        "agility": 14
+      },
+      "skills": [
+        "enemy_skill.mist_shield"
+      ],
+      "reward_refs": [
+        "reward.battle.mist_guardian"
+      ],
+      "codex_entry_key": "codex.creature.mist_guardian",
+      "combat_profile": {
+        "random_pool_key": "battle.enemy.mist_guardian",
+        "reward": {},
+        "party_profile": {
+          "party_type": "standard_pve",
+          "reward": {"cultivation": 30, "spirit_stones": 10}
+        }
+      },
+      "key": "enemy.mist_guardian",
+      "status": "active"
+    },
+    {
+      "name": "雾隐精英",
+      "desc": "盘踞在雾隐洞天深处的强敌，借浓雾掩护身形，以凌厉攻势逼退来者。",
+      "location_key": "cave.mist_grotto_2",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "golden_core",
+          "min_layer": 1
+        }
+      ],
+      "stats": {
+        "hp": 1800,
+        "attack": 190,
+        "initiative": 15,
+        "agility": 18
+      },
+      "skills": [
+        "enemy_skill.mist_exposed"
+      ],
+      "reward_refs": [],
+      "combat_profile": {
+        "random_pool_key": "battle.enemy.mist_elite",
+        "preview_max_rounds": 20,
+        "reward": {}
+      },
+      "key": "enemy.mist_elite",
+      "status": "active"
+    },
+    {
+      "name": "灵泉水灵",
+      "desc": "灵泉凝聚而成的精怪，身形轻盈，招式如泉涌不息。",
+      "location_key": "xuantian.spirit_field",
+      "requirements": [{"type": "realm", "realm_key": "qi_sensing", "min_layer": 3}],
+      "stats": {"hp": 110, "attack": 18, "initiative": 11, "agility": 10},
+      "skills": ["enemy_skill.scratch"],
+      "reward_refs": [],
+      "combat_profile": {"random_pool_key": "battle.enemy.spring_wisp", "reward": {}},
+      "key": "enemy.spring_wisp",
+      "status": "active"
+    },
+    {
+      "name": "云舟守灵",
+      "desc": "守护云舟航路的灵卫，周身浮动云纹，出手沉稳有力。",
+      "location_key": "xuantian.floating_boat",
+      "requirements": [{"type": "realm", "realm_key": "golden_core", "min_layer": 1}],
+      "stats": {"hp": 900, "attack": 120, "initiative": 16, "agility": 16},
+      "skills": ["enemy_skill.cloud_armor"],
+      "reward_refs": [],
+      "combat_profile": {"random_pool_key": "battle.enemy.cloud_boat_guardian", "reward": {}},
+      "key": "enemy.cloud_boat_guardian",
+      "status": "active"
+    },
+    {
+      "name": "云铁矿兽",
+      "desc": "栖居矿脉深处，以铁砂护体；战斗结算确认踪迹后，矿区异兽记录方可点亮。",
+      "location_key": "xuantian.cloud_mine",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "foundation",
+          "min_layer": 1
+        }
+      ],
+      "stats": {
+        "hp": 700,
+        "attack": 85,
+        "initiative": 14,
+        "agility": 14
+      },
+      "skills": [
+        "enemy_skill.cloud_armor"
+      ],
+      "reward_refs": [],
+      "combat_profile": {
+        "random_pool_key": "battle.enemy.cloud_beast"
+      },
+      "codex_entry_key": "codex.creature.cloud_beast",
+      "key": "enemy.cloud_beast",
+      "status": "active"
+    },
+    {
+      "name": "万兽山守山兽",
+      "desc": "镇守万兽山山径的强大妖兽，咆哮声能令群兽闻风而动。",
+      "location_key": "beast.ten_thousand_hills",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "nascent_soul",
+          "min_layer": 1
+        }
+      ],
+      "stats": {
+        "hp": 7500,
+        "attack": 480,
+        "initiative": 22,
+        "agility": 24
+      },
+      "skills": [
+        "skill.beast.guardian_roar"
+      ],
+      "reward_refs": [],
+      "combat_profile": {
+        "random_pool_key": "battle.enemy.beast_guardian"
+      },
+      "key": "enemy.beast_guardian",
+      "status": "active"
+    },
+    {
+      "name": "雾塔试炼影",
+      "desc": "雾隐试炼塔低层凝成的试炼影，招式朴拙，却能稳稳守住关口。",
+      "location_key": "tower.mist_trial",
+      "requirements": [{"type": "realm", "realm_key": "qi_sensing", "min_layer": 1}],
+      "stats": {"hp": 80, "attack": 8, "initiative": 8, "agility": 8},
+      "skills": ["enemy_skill.dummy_tap"],
+      "reward_refs": [],
+      "combat_profile": {"random_pool_key": "battle.enemy.mist_trial.sensing", "reward": {}},
+      "key": "enemy.mist_trial.sensing",
+      "status": "active"
+    },
+    {
+      "name": "雾塔层间守将",
+      "desc": "镇守低层关口的雾塔守将，身形凝实，出手比试炼影更为凌厉。",
+      "location_key": "tower.mist_trial",
+      "requirements": [{"type": "realm", "realm_key": "qi_sensing", "min_layer": 1}],
+      "stats": {"hp": 150, "attack": 14, "initiative": 10, "agility": 10},
+      "skills": ["enemy_skill.dummy_tap"],
+      "reward_refs": [],
+      "combat_profile": {"random_pool_key": "battle.enemy.mist_trial.sensing_boss", "reward": {}},
+      "key": "enemy.mist_trial.sensing_boss",
+      "status": "active"
+    },
+    {
+      "name": "聚气层试炼影",
+      "desc": "聚气层中游荡的试炼影，借雾势蓄力，攻势连绵不绝。",
+      "location_key": "tower.mist_trial",
+      "requirements": [{"type": "realm", "realm_key": "qi_gathering", "min_layer": 4}],
+      "stats": {"hp": 320, "attack": 42, "initiative": 12, "agility": 14},
+      "skills": ["enemy_skill.scratch"],
+      "reward_refs": [],
+      "combat_profile": {"random_pool_key": "battle.enemy.mist_trial.gathering", "reward": {}},
+      "key": "enemy.mist_trial.gathering",
+      "status": "active"
+    },
+    {
+      "name": "聚气层守将",
+      "desc": "盘踞聚气层关口的守将，刀势沉重，逼得来者不敢分神。",
+      "location_key": "tower.mist_trial",
+      "requirements": [{"type": "realm", "realm_key": "qi_gathering", "min_layer": 4}],
+      "stats": {"hp": 480, "attack": 58, "initiative": 14, "agility": 16},
+      "skills": ["enemy_skill.scratch"],
+      "reward_refs": [],
+      "combat_profile": {"random_pool_key": "battle.enemy.mist_trial.gathering_boss", "reward": {}},
+      "key": "enemy.mist_trial.gathering_boss",
+      "status": "active"
+    },
+    {
+      "name": "筑基层试炼影",
+      "desc": "筑基层雾影已通晓灵力运转，步步压制闯塔之人。",
+      "location_key": "tower.mist_trial",
+      "requirements": [{"type": "realm", "realm_key": "foundation", "min_layer": 4}],
+      "stats": {"hp": 700, "attack": 85, "initiative": 15, "agility": 18},
+      "skills": ["enemy_skill.scratch"],
+      "reward_refs": [],
+      "combat_profile": {"random_pool_key": "battle.enemy.mist_trial.foundation", "reward": {}},
+      "key": "enemy.mist_trial.foundation",
+      "status": "active"
+    },
+    {
+      "name": "筑基层守将",
+      "desc": "筑基层的镇关守将，灵力厚重，守势如山。",
+      "location_key": "tower.mist_trial",
+      "requirements": [{"type": "realm", "realm_key": "foundation", "min_layer": 4}],
+      "stats": {"hp": 1000, "attack": 120, "initiative": 18, "agility": 20},
+      "skills": ["enemy_skill.scratch"],
+      "reward_refs": [],
+      "combat_profile": {"random_pool_key": "battle.enemy.mist_trial.foundation_boss", "reward": {}},
+      "key": "enemy.mist_trial.foundation_boss",
+      "status": "active"
+    },
+    {
+      "name": "金丹层试炼影",
+      "desc": "金丹层的雾影已显出锋芒，雾气随其一念聚散。",
+      "location_key": "tower.mist_trial",
+      "requirements": [{"type": "realm", "realm_key": "golden_core", "min_layer": 3}],
+      "stats": {"hp": 2400, "attack": 250, "initiative": 20, "agility": 22},
+      "skills": ["enemy_skill.mist_exposed"],
+      "reward_refs": [],
+      "combat_profile": {"random_pool_key": "battle.enemy.mist_trial.golden_core", "reward": {}},
+      "key": "enemy.mist_trial.golden_core",
+      "status": "active"
+    },
+    {
+      "name": "金丹层守将",
+      "desc": "镇守试炼塔高层的金丹守将，雾隐之间杀机四伏。",
+      "location_key": "tower.mist_trial",
+      "requirements": [{"type": "realm", "realm_key": "golden_core", "min_layer": 3}],
+      "stats": {"hp": 3600, "attack": 330, "initiative": 25, "agility": 28},
+      "skills": ["enemy_skill.mist_exposed"],
+      "reward_refs": [],
+      "combat_profile": {"random_pool_key": "battle.enemy.mist_trial.golden_core_boss", "reward": {}},
+      "key": "enemy.mist_trial.golden_core_boss",
+      "status": "active"
+    },
+    {
+      "name": "虚空塔斥候",
+      "desc": "游走在塔中低层的虚空斥候，最先察觉闯塔者的行踪。",
+      "location_key": "tower.void_spire",
+      "requirements": [{"type": "stage_min", "stage": "mortal"}],
+      "stats": {"hp": 120, "attack": 2, "initiative": 6, "agility": 6},
+      "skills": ["enemy_skill.scratch"],
+      "reward_refs": [],
+      "key": "enemy.void_spire.scout",
+      "status": "active"
+    },
+    {
+      "name": "虚空塔哨卫",
+      "desc": "守在通道要处的虚空哨卫，不会放任来者轻易深入。",
+      "location_key": "tower.void_spire",
+      "requirements": [{"type": "stage_min", "stage": "mortal"}],
+      "stats": {"hp": 140, "attack": 3, "initiative": 6, "agility": 6},
+      "skills": ["enemy_skill.scratch"],
+      "reward_refs": [],
+      "key": "enemy.void_spire.sentinel",
+      "status": "active"
+    },
+    {
+      "name": "虚空塔观测者",
+      "desc": "静候塔中异动的观测者，目光始终追随着闯塔之人。",
+      "location_key": "tower.void_spire",
+      "requirements": [{"type": "stage_min", "stage": "mortal"}],
+      "stats": {"hp": 160, "attack": 3, "initiative": 6, "agility": 6},
+      "skills": ["enemy_skill.scratch"],
+      "reward_refs": [],
+      "key": "enemy.void_spire.watcher",
+      "status": "active"
+    },
+    {
+      "name": "虚空塔战将",
+      "desc": "历经多场守塔之战的战将，出手沉稳，擅长封住去路。",
+      "location_key": "tower.void_spire",
+      "requirements": [{"type": "stage_min", "stage": "mortal"}],
+      "stats": {"hp": 180, "attack": 4, "initiative": 6, "agility": 6},
+      "skills": ["enemy_skill.scratch"],
+      "reward_refs": [],
+      "key": "enemy.void_spire.warlord",
+      "status": "active"
+    },
+    {
+      "name": "风暴路线守关者",
+      "desc": "守在风暴路线尽头的强敌，周身虚空乱流呼啸不止。",
+      "location_key": "tower.void_spire",
+      "requirements": [{"type": "stage_min", "stage": "mortal"}],
+      "stats": {"hp": 220, "attack": 5, "initiative": 6, "agility": 6},
+      "skills": ["enemy_skill.scratch"],
+      "reward_refs": [],
+      "key": "enemy.void_spire.route_storm_boss",
+      "status": "active"
+    },
+    {
+      "name": "回响路线守关者",
+      "desc": "镇守回响路线的强敌，能将塔中的余音化作压迫人心的回声。",
+      "location_key": "tower.void_spire",
+      "requirements": [{"type": "stage_min", "stage": "mortal"}],
+      "stats": {"hp": 240, "attack": 5, "initiative": 6, "agility": 6},
+      "skills": ["enemy_skill.scratch"],
+      "reward_refs": [],
+      "key": "enemy.void_spire.route_echo_boss",
+      "status": "active"
+    },
+    {
+      "name": "虚空碑铭记录者",
+      "desc": "看守古老碑铭的记录者，默默记下每一位来客的足迹。",
+      "location_key": "tower.void_spire",
+      "requirements": [{"type": "stage_min", "stage": "mortal"}],
+      "stats": {"hp": 260, "attack": 6, "initiative": 7, "agility": 7},
+      "skills": ["enemy_skill.scratch"],
+      "reward_refs": [],
+      "key": "enemy.void_spire.scribe",
+      "status": "active"
+    },
+    {
+      "name": "虚空碑铭守卫",
+      "desc": "守护碑铭不受侵扰的卫士，绝不容许旁人轻慢古老誓言。",
+      "location_key": "tower.void_spire",
+      "requirements": [{"type": "stage_min", "stage": "mortal"}],
+      "stats": {"hp": 300, "attack": 6, "initiative": 7, "agility": 7},
+      "skills": ["enemy_skill.scratch"],
+      "reward_refs": [],
+      "key": "enemy.void_spire.keeper",
+      "status": "active"
+    },
+    {
+      "name": "碑铭路线守关者",
+      "desc": "立于碑铭路线尽头的强敌，守着通往更深层的最后一道关口。",
+      "location_key": "tower.void_spire",
+      "requirements": [{"type": "stage_min", "stage": "mortal"}],
+      "stats": {"hp": 340, "attack": 7, "initiative": 8, "agility": 8},
+      "skills": ["enemy_skill.scratch"],
+      "reward_refs": [],
+      "key": "enemy.void_spire.route_inscription_boss",
+      "status": "active"
+    },
+    {
+      "name": "虚空见证巡守",
+      "desc": "巡行于虚空塔中的见证者，记录攀塔者的每一次抉择。",
+      "location_key": "tower.void_spire",
+      "requirements": [{"type": "stage_min", "stage": "mortal"}],
+      "stats": {"hp": 380, "attack": 7, "initiative": 8, "agility": 8},
+      "skills": ["enemy_skill.scratch"],
+      "reward_refs": [],
+      "key": "enemy.void_spire.echo_warden",
+      "status": "active"
+    },
+    {
+      "name": "道源见证守卫",
+      "desc": "守护道源遗迹的卫士，只会向真正走过此路的人让开。",
+      "location_key": "tower.void_spire",
+      "requirements": [{"type": "stage_min", "stage": "mortal"}],
+      "stats": {"hp": 420, "attack": 8, "initiative": 8, "agility": 8},
+      "skills": ["enemy_skill.scratch"],
+      "reward_refs": [],
+      "key": "enemy.void_spire.origin_guard",
+      "status": "active"
+    },
+    {
+      "name": "见证路线守关者",
+      "desc": "镇守见证路线终点的强敌，考验来者是否配得上继续前行。",
+      "location_key": "tower.void_spire",
+      "requirements": [{"type": "stage_min", "stage": "mortal"}],
+      "stats": {"hp": 500, "attack": 9, "initiative": 9, "agility": 9},
+      "skills": ["enemy_skill.scratch"],
+      "reward_refs": [],
+      "key": "enemy.void_spire.route_witness_boss",
+      "status": "active"
+    },
+    {
+      "name": "领域守望者",
+      "desc": "镇守领域前线的古老身影，只有稳住自身气机，方能在它的攻势下寻得破绽。",
+      "location_key": "xuantian.domain_front",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "soul_transformation",
+          "min_layer": 1
+        }
+      ],
+      "stats": {
+        "hp": 3600,
+        "attack": 330,
+        "initiative": 25,
+        "agility": 28
+      },
+      "skills": ["enemy_skill.scratch"],
+      "behavior": {
+        "can_critical": false,
+        "can_escape": false
+      },
+      "reward_refs": [],
+      "combat_profile": {
+        "random_pool_key": "battle.enemy.domain_front_guardian",
+        "reward": {}
+      },
+      "key": "enemy.domain_front_guardian",
+      "status": "active"
+    },
+    {
+      "name": "三劫天尊",
+      "desc": "天劫幻境中的至强身影，依次引动雷劫、心劫与道劫。",
+      "location_key": "tribulation.sky_terrace",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "tribulation",
+          "min_layer": 3
+        }
+      ],
+      "stats": {
+        "hp": 150000,
+        "attack": 5500,
+        "initiative": 1600,
+        "agility": 650
+      },
+      "skills": [
+        "skill.tribulation.thunder",
+        "skill.tribulation.heart",
+        "skill.tribulation.dao"
+      ],
+      "phases": [
+        {
+          "key": "thunder",
+          "min_hp_bp": 6667,
+          "attack": 5500,
+          "skill_key": "skill.tribulation.thunder",
+          "enemy_hit_bonus_bp": 0,
+          "player_damage_bp": 10000
+        },
+        {
+          "key": "heart",
+          "min_hp_bp": 3334,
+          "attack": 8000,
+          "skill_key": "skill.tribulation.heart",
+          "enemy_hit_bonus_bp": 200,
+          "player_damage_bp": 9500
+        },
+        {
+          "key": "dao",
+          "min_hp_bp": 0,
+          "attack": 12000,
+          "skill_key": "skill.tribulation.dao",
+          "enemy_hit_bonus_bp": 400,
+          "player_damage_bp": 9000
+        }
+      ],
+      "behavior": {
+        "can_critical": false,
+        "can_escape": false,
+        "automatic_phase_selection": true
+      },
+      "reward_refs": [],
+      "combat_profile": {
+        "random_pool_key": "battle.enemy.tribulation_heaven"
+      },
+      "key": "enemy.tribulation_heaven",
+      "status": "active"
+    },
+    {
+      "name": "铁木獾",
+      "desc": "常在铁木林翻找树根的小兽，身形灵活，受惊时会迅速反击。",
+      "location_key": "xuantian.ironwood_grove",
+      "requirements": [{"type": "realm", "realm_key": "qi_sensing", "min_layer": 2}],
+      "stats": {"hp": 68, "attack": 11, "initiative": 13, "agility": 14},
+      "skills": ["enemy_skill.scratch"],
+      "behavior": {"can_critical": true, "can_escape": true},
+      "reward_refs": [],
+      "combat_profile": {"random_pool_key": "battle.enemy.ironwood_weasel", "reward": {"spirit_stones": 4}, "drop_pool_key": "reward_pool.enemy.early"},
+      "key": "enemy.ironwood_weasel",
+      "status": "active"
+    },
+    {
+      "name": "玄石掘兽",
+      "desc": "潜伏在玄武岩层中的厚甲掘兽，动作迟缓但冲撞沉重。",
+      "location_key": "xuantian.basalt_pass",
+      "requirements": [{"type": "realm", "realm_key": "qi_gathering", "min_layer": 2}],
+      "stats": {"hp": 150, "attack": 18, "initiative": 7, "agility": 8},
+      "skills": ["enemy_skill.charge"],
+      "behavior": {"can_critical": false, "can_escape": false},
+      "reward_refs": [],
+      "combat_profile": {"random_pool_key": "battle.enemy.basalt_mole", "reward": {"spirit_stones": 8}, "drop_pool_key": "reward_pool.enemy.early"},
+      "key": "enemy.basalt_mole",
+      "status": "active"
+    },
+    {
+      "name": "守径阵偶",
+      "desc": "由旧阵纹驱动的石偶，会以规律重击驱散擅闯者。",
+      "location_key": "xuantian.basalt_pass",
+      "requirements": [{"type": "realm", "realm_key": "qi_gathering", "min_layer": 4}],
+      "stats": {"hp": 190, "attack": 22, "initiative": 6, "agility": 4},
+      "skills": ["enemy_skill.blade_wave"],
+      "behavior": {"can_critical": false, "can_escape": false},
+      "reward_refs": [],
+      "combat_profile": {"random_pool_key": "battle.enemy.array_golem", "reward": {"spirit_stones": 10}, "drop_pool_key": "reward_pool.enemy.early"},
+      "key": "enemy.array_golem",
+      "status": "active"
+    },
+    {
+      "name": "雾栖灵蜃",
+      "desc": "洞天薄雾中凝成的灵蜃，避战时化雾，受击后吐出寒息。",
+      "location_key": "cave.mist_grotto",
+      "requirements": [{"type": "realm", "realm_key": "qi_gathering", "min_layer": 4}],
+      "stats": {"hp": 245, "attack": 28, "initiative": 17, "agility": 21},
+      "skills": ["enemy_skill.mist_shield"],
+      "behavior": {"can_critical": true, "can_escape": true},
+      "reward_refs": [],
+      "combat_profile": {"random_pool_key": "battle.enemy.mist_wisp", "reward": {"spirit_stones": 14}, "drop_pool_key": "reward_pool.enemy.mist"},
+      "key": "enemy.mist_wisp",
+      "status": "active"
+    },
+    {
+      "name": "洞天巡游客",
+      "desc": "守在洞天二层岔路间的精锐妖修，熟悉禁制与近身突袭。",
+      "location_key": "cave.mist_grotto_2",
+      "requirements": [{"type": "realm", "realm_key": "golden_core", "min_layer": 1}],
+      "stats": {"hp": 560, "attack": 52, "initiative": 24, "agility": 21},
+      "skills": ["enemy_skill.charge"],
+      "behavior": {"can_critical": true, "can_escape": false},
+      "reward_refs": [],
+      "combat_profile": {"random_pool_key": "battle.enemy.cave_depth_stalker", "reward": {"spirit_stones": 32}, "drop_pool_key": "reward_pool.enemy.mist"},
+      "key": "enemy.cave_depth_stalker",
+      "status": "active"
+    },
+    {
+      "name": "雲礦殘魂",
+      "desc": "礦難後徘徊在云铁脉间的残魂，能以矿尘凝成锋刃。",
+      "location_key": "xuantian.cloud_mine",
+      "requirements": [{"type": "realm", "realm_key": "foundation", "min_layer": 1}],
+      "stats": {"hp": 310, "attack": 30, "initiative": 18, "agility": 13},
+      "skills": ["enemy_skill.blade_wave"],
+      "behavior": {"can_critical": true, "can_escape": false},
+      "reward_refs": [],
+      "combat_profile": {"random_pool_key": "battle.enemy.cloud_miner_ghost", "reward": {"spirit_stones": 18}, "drop_pool_key": "reward_pool.enemy.cloud_mine"},
+      "key": "enemy.cloud_miner_ghost",
+      "status": "active"
+    },
+    {
+      "name": "遗迹巡行者",
+      "desc": "守着堕落遗迹残门的巡行者，常以小队步法逼迫来者退让。",
+      "location_key": "demon.fallen_ruins",
+      "requirements": [{"type": "realm", "realm_key": "nascent_soul", "min_layer": 1}],
+      "stats": {"hp": 540, "attack": 46, "initiative": 23, "agility": 20},
+      "skills": ["enemy_skill.blade_wave"],
+      "behavior": {"can_critical": true, "can_escape": false},
+      "reward_refs": [],
+      "combat_profile": {"random_pool_key": "battle.enemy.demon_ruins_scout", "reward": {"spirit_stones": 28}, "drop_pool_key": "reward_pool.enemy.three_realms"},
+      "key": "enemy.demon_ruins_scout",
+      "status": "active"
+    },
+    {
+      "name": "遗迹缚魂卫",
+      "desc": "以旧契约维系的遗迹守卫，防御稳固，擅长以魔息反制。",
+      "location_key": "demon.fallen_ruins",
+      "requirements": [{"type": "realm", "realm_key": "nascent_soul", "min_layer": 3}],
+      "stats": {"hp": 680, "attack": 54, "initiative": 18, "agility": 14},
+      "skills": ["enemy_skill.mist_shield"],
+      "behavior": {"can_critical": false, "can_escape": false},
+      "reward_refs": [],
+      "combat_profile": {"random_pool_key": "battle.enemy.demon_ruins_warden", "reward": {"spirit_stones": 34}, "drop_pool_key": "reward_pool.enemy.three_realms"},
+      "key": "enemy.demon_ruins_warden",
+      "status": "active"
+    },
+    {
+      "name": "山脊潜猎兽",
+      "desc": "在万兽山外围追踪落单猎物的妖兽，善于突然近身。",
+      "location_key": "beast.ten_thousand_hills",
+      "requirements": [{"type": "realm", "realm_key": "nascent_soul", "min_layer": 1}],
+      "stats": {"hp": 520, "attack": 44, "initiative": 26, "agility": 28},
+      "skills": ["enemy_skill.charge"],
+      "behavior": {"can_critical": true, "can_escape": true},
+      "reward_refs": [],
+      "combat_profile": {"random_pool_key": "battle.enemy.beast_stalker", "reward": {"spirit_stones": 25}, "drop_pool_key": "reward_pool.enemy.three_realms"},
+      "key": "enemy.beast_stalker",
+      "status": "active"
+    },
+    {
+      "name": "祖灵湖影",
+      "desc": "由湖畔灵气凝聚的守望灵影，攻守随水势起伏。",
+      "location_key": "beast.ancestral_lake",
+      "requirements": [{"type": "realm", "realm_key": "soul_transformation", "min_layer": 1}],
+      "stats": {"hp": 930, "attack": 74, "initiative": 20, "agility": 18},
+      "skills": ["enemy_skill.mist_shield"],
+      "behavior": {"can_critical": false, "can_escape": false},
+      "reward_refs": [],
+      "combat_profile": {"random_pool_key": "battle.enemy.ancestral_spirit", "reward": {"spirit_stones": 55}, "drop_pool_key": "reward_pool.enemy.three_realms"},
+      "key": "enemy.ancestral_spirit",
+      "status": "active"
+    },
+    {
+      "name": "湖岸镇守者",
+      "desc": "祖灵湖岸边的古老镇守者，步伐沉稳，能以水幕抵挡攻势。",
+      "location_key": "beast.ancestral_lake",
+      "requirements": [{"type": "realm", "realm_key": "soul_transformation", "min_layer": 5}],
+      "stats": {"hp": 1120, "attack": 86, "initiative": 18, "agility": 16},
+      "skills": ["enemy_skill.mist_shield"],
+      "behavior": {"can_critical": false, "can_escape": false},
+      "reward_refs": [],
+      "combat_profile": {"random_pool_key": "battle.enemy.lake_warden", "reward": {"spirit_stones": 70}, "drop_pool_key": "reward_pool.enemy.three_realms"},
+      "key": "enemy.lake_warden",
+      "status": "active"
+    },
+    {
+      "name": "界隙守望者",
+      "desc": "巡守裂隙边缘的三界修士，熟悉不同道途的交替攻势。",
+      "location_key": "cave.boundary_realm",
+      "requirements": [{"type": "realm", "realm_key": "nascent_soul", "min_layer": 1}],
+      "stats": {"hp": 760, "attack": 63, "initiative": 22, "agility": 18},
+      "skills": ["enemy_skill.blade_wave"],
+      "behavior": {"can_critical": true, "can_escape": false},
+      "reward_refs": [],
+      "combat_profile": {"random_pool_key": "battle.enemy.boundary_watcher", "reward": {"spirit_stones": 38}, "drop_pool_key": "reward_pool.enemy.three_realms"},
+      "key": "enemy.boundary_watcher",
+      "status": "active"
+    },
+    {
+      "name": "三界巡界使",
+      "desc": "奉三界盟约巡查边境的使者，擅长封住对手惯用的进路。",
+      "location_key": "cave.boundary_realm",
+      "requirements": [{"type": "realm", "realm_key": "soul_transformation", "min_layer": 1}],
+      "stats": {"hp": 1050, "attack": 82, "initiative": 21, "agility": 20},
+      "skills": ["enemy_skill.mist_shield"],
+      "behavior": {"can_critical": false, "can_escape": false},
+      "reward_refs": [],
+      "combat_profile": {"random_pool_key": "battle.enemy.cross_realm_sentinel", "reward": {"spirit_stones": 52}, "drop_pool_key": "reward_pool.enemy.three_realms"},
+      "key": "enemy.cross_realm_sentinel",
+      "status": "active"
+    },
+    {
+      "name": "虚空航路回声",
+      "desc": "航道规则留下的回声会模仿过往修士的攻势，强度随虚力波动。",
+      "location_key": "void.first_route",
+      "requirements": [{"type": "realm", "realm_key": "void_refining", "min_layer": 1}],
+      "stats": {"hp": 1600, "attack": 120, "initiative": 25, "agility": 24},
+      "skills": ["enemy_skill.blade_wave"],
+      "behavior": {"can_critical": true, "can_escape": false},
+      "reward_refs": [],
+      "combat_profile": {"random_pool_key": "battle.enemy.void_route_echo", "reward": {"spirit_stones": 90}, "drop_pool_key": "reward_pool.enemy.void"},
+      "key": "enemy.void_route_echo",
+      "status": "active"
+    },
+    {
+      "name": "档案守录者",
+      "desc": "守护档案遗迹残卷的古修残影，会以规则印记压制闯入者。",
+      "location_key": "void.archive_ruins",
+      "requirements": [{"type": "realm", "realm_key": "void_refining", "min_layer": 3}],
+      "stats": {"hp": 1900, "attack": 135, "initiative": 22, "agility": 18},
+      "skills": ["enemy_skill.mist_shield"],
+      "behavior": {"can_critical": false, "can_escape": false},
+      "reward_refs": [],
+      "combat_profile": {"random_pool_key": "battle.enemy.archive_keeper", "reward": {"spirit_stones": 110}, "drop_pool_key": "reward_pool.enemy.void"},
+      "key": "enemy.archive_keeper",
+      "status": "active"
+    },
+    {
+      "name": "遗迹断律卫",
+      "desc": "由虚空遗迹旧律维持的守卫，攻击沉重但行动规律可辨。",
+      "location_key": "void.archive_ruins",
+      "requirements": [{"type": "realm", "realm_key": "void_refining", "min_layer": 1}],
+      "stats": {"hp": 1720, "attack": 128, "initiative": 20, "agility": 16},
+      "skills": ["enemy_skill.blade_wave"],
+      "behavior": {"can_critical": true, "can_escape": false},
+      "reward_refs": [],
+      "combat_profile": {"random_pool_key": "battle.enemy.void_ruins_sentinel", "reward": {"spirit_stones": 100}, "drop_pool_key": "reward_pool.enemy.void"},
+      "key": "enemy.void_ruins_sentinel",
+      "status": "active"
+    },
+    {
+      "name": "道源门镇关人",
+      "desc": "镇守道源门的试炼者，只以通过者能否稳住道心来判定结果。",
+      "location_key": "dao.origin_gate",
+      "requirements": [{"type": "realm", "realm_key": "dao_union", "min_layer": 6}],
+      "stats": {"hp": 6500, "attack": 420, "initiative": 80, "agility": 55},
+      "skills": ["skill.tribulation.dao"],
+      "behavior": {"can_critical": false, "can_escape": false},
+      "reward_refs": [],
+      "combat_profile": {"random_pool_key": "battle.enemy.dao_gatekeeper", "reward": {"spirit_stones": 250}, "drop_pool_key": "reward_pool.enemy.dao_origin"},
+      "key": "enemy.dao_gatekeeper",
+      "status": "active"
+    },
+    {
+      "name": "时园时光残影",
+      "desc": "时序福地里旧日游人的残影，行动带着迟缓而固执的节拍。",
+      "location_key": "cave.time_garden",
+      "requirements": [{"type": "realm", "realm_key": "void_refining", "min_layer": 1}],
+      "stats": {"hp": 1600, "attack": 120, "initiative": 25, "agility": 24},
+      "skills": ["enemy_skill.blade_wave"],
+      "behavior": {"can_critical": true, "can_escape": false},
+      "reward_refs": [],
+      "combat_profile": {"random_pool_key": "battle.enemy.time_garden_echo", "reward": {"spirit_stones": 95}, "drop_pool_key": "reward_pool.enemy.void"},
+      "key": "enemy.time_garden_echo",
+      "status": "active"
+    },
+    {
+      "name": "时园守园人",
+      "desc": "守护时序福地花畦的沉默守园人，不容来客惊扰此地光阴。",
+      "location_key": "cave.time_garden",
+      "requirements": [{"type": "realm", "realm_key": "void_refining", "min_layer": 1}],
+      "stats": {"hp": 1720, "attack": 128, "initiative": 20, "agility": 16},
+      "skills": ["enemy_skill.blade_wave"],
+      "behavior": {"can_critical": true, "can_escape": false},
+      "reward_refs": [],
+      "combat_profile": {"random_pool_key": "battle.enemy.time_garden_keeper", "reward": {"spirit_stones": 105}, "drop_pool_key": "reward_pool.enemy.void"},
+      "key": "enemy.time_garden_keeper",
+      "status": "active"
+    },
+    {
+      "key": "enemy.ancient_domain_warden",
+      "name": "洞天守禁灵卫",
+      "desc": "由洞天禁制凝聚的守卫，见生人踏入便以领域压制逼迫退让。",
+      "location_key": "cave.ancient_domain",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "soul_transformation",
+          "min_layer": 1
+        }
+      ],
+      "stats": {
+        "hp": 1680,
+        "attack": 122,
+        "initiative": 26,
+        "agility": 19
+      },
+      "skills": [
+        "enemy_skill.domain_suppress"
+      ],
+      "behavior": {
+        "can_critical": true,
+        "can_escape": false
+      },
+      "reward_refs": [],
+      "combat_profile": {
+        "random_pool_key": "battle.enemy.ancient_domain_warden",
+        "reward": {
+          "spirit_stones": 96
+        },
+        "drop_pool_key": "reward_pool.enemy.void"
+      },
+      "status": "active"
+    },
+    {
+      "key": "enemy.ancient_domain_echo",
+      "name": "洞天残影",
+      "desc": "旧日洞天修士留下的残影，只余下反复演练的防守本能。",
+      "location_key": "cave.ancient_domain",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "soul_transformation",
+          "min_layer": 1
+        }
+      ],
+      "stats": {
+        "hp": 1420,
+        "attack": 108,
+        "initiative": 21,
+        "agility": 24
+      },
+      "skills": [
+        "enemy_skill.boundary_wall"
+      ],
+      "behavior": {
+        "can_critical": false,
+        "can_escape": false
+      },
+      "reward_refs": [],
+      "combat_profile": {
+        "random_pool_key": "battle.enemy.ancient_domain_echo",
+        "reward": {
+          "spirit_stones": 84
+        },
+        "drop_pool_key": "reward_pool.enemy.void"
+      },
+      "status": "active"
+    },
+    {
+      "key": "enemy.abyss_depth_stalker",
+      "name": "深渊潜行者",
+      "desc": "伏在深层魔气里的猎手，惯以突进撕开来者的护体灵光。",
+      "location_key": "demon.abyss_depths",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "soul_transformation",
+          "min_layer": 1
+        }
+      ],
+      "stats": {
+        "hp": 1750,
+        "attack": 132,
+        "initiative": 29,
+        "agility": 22
+      },
+      "skills": [
+        "enemy_skill.charge"
+      ],
+      "behavior": {
+        "can_critical": true,
+        "can_escape": false
+      },
+      "reward_refs": [],
+      "combat_profile": {
+        "random_pool_key": "battle.enemy.abyss_depth_stalker",
+        "reward": {
+          "spirit_stones": 104
+        },
+        "drop_pool_key": "reward_pool.enemy.three_realms"
+      },
+      "status": "active"
+    },
+    {
+      "key": "enemy.abyss_pollution_wraith",
+      "name": "魔气怨影",
+      "desc": "被深层魔气浸透后散不去的怨念，靠近时以魔息侵蚀心神。",
+      "location_key": "demon.abyss_depths",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "soul_transformation",
+          "min_layer": 1
+        }
+      ],
+      "stats": {
+        "hp": 1520,
+        "attack": 116,
+        "initiative": 23,
+        "agility": 18
+      },
+      "skills": [
+        "skill.demonic.abyss_communion"
+      ],
+      "behavior": {
+        "can_critical": false,
+        "can_escape": false
+      },
+      "reward_refs": [],
+      "combat_profile": {
+        "random_pool_key": "battle.enemy.abyss_pollution_wraith",
+        "reward": {
+          "spirit_stones": 88
+        },
+        "drop_pool_key": "reward_pool.enemy.three_realms"
+      },
+      "status": "active"
+    },
+    {
+      "name": "守榜人·初阶",
+      "desc": "终局天榜第一重守榜人，出手试探修士根基是否稳固。",
+      "location_key": "location.final_arena",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "tribulation",
+          "min_layer": 6
+        }
+      ],
+      "stats": {
+        "hp": 8000,
+        "attack": 450,
+        "initiative": 30,
+        "agility": 30
+      },
+      "skills": [
+        "enemy_skill.domain_suppress"
+      ],
+      "behavior": {
+        "can_critical": false,
+        "can_escape": false
+      },
+      "reward_refs": [],
+      "combat_profile": {
+        "random_pool_key": "battle.enemy.final_arena_guardian_1",
+        "reward": {}
+      },
+      "key": "enemy.final_arena_guardian_1",
+      "status": "active"
+    },
+    {
+      "name": "守榜人·中阶",
+      "desc": "终局天榜第二重守榜人，已把渡劫所悟融入守势。",
+      "location_key": "location.final_arena",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "tribulation",
+          "min_layer": 6
+        }
+      ],
+      "stats": {
+        "hp": 11000,
+        "attack": 620,
+        "initiative": 34,
+        "agility": 34
+      },
+      "skills": [
+        "enemy_skill.archive_rule_rewrite"
+      ],
+      "behavior": {
+        "can_critical": false,
+        "can_escape": false
+      },
+      "reward_refs": [],
+      "combat_profile": {
+        "random_pool_key": "battle.enemy.final_arena_guardian_2",
+        "reward": {}
+      },
+      "key": "enemy.final_arena_guardian_2",
+      "status": "active"
+    },
+    {
+      "name": "守榜人·上阶",
+      "desc": "终局天榜第三重守榜人，执掌终榜，只让真正的破关者留名。",
+      "location_key": "location.final_arena",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "tribulation",
+          "min_layer": 6
+        }
+      ],
+      "stats": {
+        "hp": 15000,
+        "attack": 820,
+        "initiative": 38,
+        "agility": 38
+      },
+      "skills": [
+        "enemy_skill.time_fort_strike"
+      ],
+      "behavior": {
+        "can_critical": false,
+        "can_escape": false
+      },
+      "reward_refs": [],
+      "combat_profile": {
+        "random_pool_key": "battle.enemy.final_arena_guardian_3",
+        "reward": {}
+      },
+      "key": "enemy.final_arena_guardian_3",
+      "status": "active"
+    },
+    {
+      "name": "集市契约守卫",
+      "desc": "守着魔渊集市旧契约的守卫，收取契文时出手狠辣。",
+      "location_key": "demon.abyss_market",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "nascent_soul",
+          "min_layer": 1
+        }
+      ],
+      "stats": {
+        "hp": 560,
+        "attack": 48,
+        "initiative": 22,
+        "agility": 20
+      },
+      "skills": [
+        "enemy_skill.blade_wave"
+      ],
+      "behavior": {
+        "can_critical": true,
+        "can_escape": false
+      },
+      "reward_refs": [],
+      "combat_profile": {
+        "random_pool_key": "battle.enemy.abyss_market_warden",
+        "reward": {
+          "spirit_stones": 30
+        },
+        "drop_pool_key": "reward_pool.enemy.three_realms"
+      },
+      "key": "enemy.abyss_market_warden",
+      "status": "active"
+    },
+    {
+      "name": "货栈私贩",
+      "desc": "在三界货栈夹带私货的贩子，被撞破货单时拔刀相向。",
+      "location_key": "beast.three_realms_trade_port",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "nascent_soul",
+          "min_layer": 1
+        }
+      ],
+      "stats": {
+        "hp": 540,
+        "attack": 46,
+        "initiative": 23,
+        "agility": 20
+      },
+      "skills": [
+        "enemy_skill.blade_wave"
+      ],
+      "behavior": {
+        "can_critical": true,
+        "can_escape": false
+      },
+      "reward_refs": [],
+      "combat_profile": {
+        "random_pool_key": "battle.enemy.trade_port_smuggler",
+        "reward": {
+          "spirit_stones": 28
+        },
+        "drop_pool_key": "reward_pool.enemy.three_realms"
+      },
+      "key": "enemy.trade_port_smuggler",
+      "status": "active"
+    },
+    {
+      "name": "试阵傀儡",
+      "desc": "阵堂中校验阵纹的木铁傀儡，阵纹失序时便会自行运转，撞见弟子就挥臂驱赶。",
+      "location_key": "xuantian.array_hall",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "qi_gathering",
+          "min_layer": 1
+        }
+      ],
+      "stats": {
+        "hp": 200,
+        "attack": 24,
+        "initiative": 11,
+        "agility": 9
+      },
+      "skills": [
+        "enemy_skill.charge"
+      ],
+      "behavior": {
+        "can_critical": false,
+        "can_escape": false
+      },
+      "reward_refs": [],
+      "combat_profile": {
+        "random_pool_key": "battle.enemy.array_hall_sentry",
+        "reward": {
+          "spirit_stones": 14
+        },
+        "drop_pool_key": "reward_pool.enemy.array_hall"
+      },
+      "codex_entry_key": "codex.creature.array_hall_sentry",
+      "key": "enemy.array_hall_sentry",
+      "status": "active"
+    },
+    {
+      "name": "魔界先锋军士",
+      "desc": "越界试探的魔界先锋，甲胄上还留着战线烟尘，出手狠厉而不留余地。",
+      "location_key": "xuantian.war_front",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "nascent_soul",
+          "min_layer": 1
+        }
+      ],
+      "stats": {
+        "hp": 560,
+        "attack": 48,
+        "initiative": 23,
+        "agility": 21
+      },
+      "skills": [
+        "enemy_skill.blade_wave"
+      ],
+      "behavior": {
+        "can_critical": true,
+        "can_escape": false
+      },
+      "reward_refs": [],
+      "combat_profile": {
+        "random_pool_key": "battle.enemy.war_front_vanguard",
+        "reward": {
+          "spirit_stones": 32
+        },
+        "drop_pool_key": "reward_pool.enemy.war_front"
+      },
+      "codex_entry_key": "codex.creature.war_front_vanguard",
+      "key": "enemy.war_front_vanguard",
+      "status": "active"
+    }
+  ],
+  "schema": "xiuxian.content"
+}
