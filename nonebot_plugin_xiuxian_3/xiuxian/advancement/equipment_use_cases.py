@@ -155,14 +155,15 @@ class EquipmentApplication:
             lines.append("身边还没有可用的法器、防具或饰品。")
         else:
             for equipment in record.equipment:
-                state = "已穿戴" if equipment.equipped else "收纳中"
-                lines.append(
-                    f"- **{equipment.label}**（{self._slot_label(equipment.slot)}）：{state}，耐久 {equipment.durability_bp / 100:.0f}%"
-                    + " · " + command_link("卸下" if equipment.equipped else "穿戴",
+                state = "已损坏" if equipment.status == "broken" else ("已穿戴" if equipment.equipped else "收纳中")
+                line = f"- **{equipment.label}**（{self._slot_label(equipment.slot)}）：{state}，耐久 {equipment.durability_bp / 100:.0f}%"
+                if equipment.status == "active":
+                    line += " · " + command_link("卸下" if equipment.equipped else "穿戴",
                         f"{'卸下法器' if equipment.equipped else '穿戴法器'} {equipment.instance_id}")
-                    + (" · " + command_link("祭炼", f"强化法器 {equipment.instance_id}") if equipment.temper_level < equipment.max_temper_level else "")
-                    + " · " + command_link("重铸", f"重铸法器 {equipment.instance_id}")
-                )
+                    if equipment.temper_level < equipment.max_temper_level:
+                        line += " · " + command_link("祭炼", f"强化法器 {equipment.instance_id}")
+                    line += " · " + command_link("重铸", f"重铸法器 {equipment.instance_id}")
+                lines.append(line)
         return CommandResult(
             True,
             "EQUIPMENT_LISTED",
