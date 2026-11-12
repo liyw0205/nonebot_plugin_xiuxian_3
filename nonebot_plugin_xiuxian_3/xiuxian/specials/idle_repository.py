@@ -41,6 +41,7 @@ from .idle_rules import (
     reward_local_reputation_maximums,
     reward_ranges,
     resolve_route,
+    select_wilderness_choice,
 )
 from ..companions.interaction_content import companion_interaction_definition
 from ..companions.rules import companion_definition, level_after_experience
@@ -263,6 +264,7 @@ class IdleRepositoryMixin:
                 "required_companion_kind": definition.required_companion_kind,
                 "companion_progress": dict(definition.companion_progress),
                 "patrol_journal": dict(definition.patrol_journal),
+                "wilderness_event": definition.wilderness_event,
             },
         )
 
@@ -310,6 +312,11 @@ class IdleRepositoryMixin:
             if replay is not None:
                 return self._assignment_from_payload(replay, replay=True)
             definition = resolve_route(route_key, self.content)
+            choice_selector = None
+            if definition.wilderness_event and tool_or_facility:
+                choice_selector = tool_or_facility
+                definition = select_wilderness_choice(definition, tool_or_facility)
+                tool_or_facility = None
             player = self._require_player(connection, platform, platform_user_id)
             self._idle_validate(connection, player, definition, tool_or_facility, now)
             companion = self._idle_select_companion(connection, player, definition, tool_or_facility)
@@ -381,6 +388,7 @@ class IdleRepositoryMixin:
                 "companion_label": companion_snapshot["companion_label"] if companion_snapshot else None,
                 "companion": companion_snapshot,
                 "patrol_journal": definition.patrol_journal,
+                "wilderness_choice": choice_selector,
             }
             spend_player_state(
                 connection,
