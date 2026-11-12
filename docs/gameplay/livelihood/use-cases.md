@@ -4,6 +4,7 @@
 
 - `livelihood.lease_residence` / `livelihood.renew_residence` / `livelihood.rest`
 - `livelihood.plant` / `livelihood.maintain_plot` / `livelihood.harvest`
+- `灵田预览 [作物]` / `灵田播种 <作物> [田垄] [精耕|缓养]`：原播种入口增量方案，不另建会话域。
 - `livelihood.list_commissions` / `livelihood.accept_commission` / `livelihood.deliver_commission`
 - `livelihood.publish_service` / `livelihood.accept_service` / `livelihood.settle_service`
 - `livelihood.preview_route` / `livelihood.start_route` / `livelihood.settle_route`
@@ -15,6 +16,11 @@
 `RESIDENCE_REQUIRED`、`RESIDENCE_RENT_DUE`、`PLOT_NOT_READY`、`PLOT_MAINTENANCE_MISSED`、`COMMISSION_STOCK_EXHAUSTED`、`COMMISSION_ALREADY_ACCEPTED`、`SERVICE_REPUTATION_INSUFFICIENT`、`SERVICE_ESCROW_CONFLICT`、`ROUTE_QUOTA_EXHAUSTED`、`ROUTE_CARGO_LOCKED`、`LOCAL_REPUTATION_INSUFFICIENT`、`PROJECT_CONTRIBUTION_LIMIT`、`PROJECT_RESOURCE_INVALID`、`PROJECT_SOURCE_INVALID`、`PROJECT_SOURCE_ALREADY_USED`、`PROJECT_ALREADY_COMPLETE`、`PROJECT_NOT_READY`、`LIVELIHOOD_CONTENT_CLOSED`。
 
 ## 验收
+
+新增灵田筹划需证明公开引导/探索种源、止血草精耕换稻种、双垄种植与生产/委托实际消费；
+充分与不足照料分别领取冻结奖项，六方案九事件都被解释器消费。预览零写；旧默认和旧快照
+不追加方案。关闭/改名/重启/同请求回放不重抽；播种/维护/收获故障完整回滚、可原请求重试；
+枯萎边界与再播、具体拒绝 reason/subject、大数资产精度和 QQ 原生事件/Markdown 短合同须通过。
 
 1. 凡人可在不拥有修为/境界层数的情况下租居所、接城镇委托、种植和运输。
 2. 种植、运输和服务订单不直接增加 `realm_cultivation` 或 `total_cultivation`。

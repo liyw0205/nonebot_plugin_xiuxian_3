@@ -292,6 +292,7 @@ def register_core_commands(router: CommandRouter, application: XiuxianApplicatio
     router.register("取回居所", application.withdraw_residence_storage, aliases=("取回物资箱", "取回存放"))
     router.register("我的物资箱", application.get_residence_storage, aliases=("物资箱",))
     router.register("灵田播种", application.plant_field, aliases=("播种",))
+    router.register("灵田预览", application.preview_field, aliases=("灵田筹划",))
     router.register("灵田维护", application.maintain_field, aliases=("维护灵田",))
     router.register("灵田收获", application.harvest_field, aliases=("收获灵田",))
     router.register("我的灵田", application.get_field_profile, aliases=("灵田状态",))

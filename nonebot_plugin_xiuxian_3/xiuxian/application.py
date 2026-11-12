@@ -165,7 +165,9 @@ _HELP_PAGES = {
         "**生活**\n\n"
         f"制作前先用{command_link('生产预览', '生产预览')}填写配方名，核对材料与花费；"
         f"备妥后{command_link('开始生产', '开始生产')}填写同一配方，到时{command_link('领取生产', '领取生产')}。\n\n"
-        f"{command_link('我的灵田', '我的灵田')}可查看田间生长，成熟后{command_link('灵田收获', '灵田收获')}。"
+        f"{command_link('灵田预览', '灵田预览')}列出种源、居所、精耕/缓养投入与收成，"
+        f"{command_link('灵田播种 作物 方案', '灵田播种')}可填写作物与照料方案。"
+        f"{command_link('我的灵田', '我的灵田')}查看节候和收割窗口，成熟后{command_link('灵田收获', '灵田收获')}。"
         f"居所内可{command_link('休整', '休整')}恢复体力与精力，结束后{command_link('结算休整', '结算休整')}。"
         f"物资可{command_link('存入居所', '存入居所')}、{command_link('取回居所', '取回居所')}，"
         f"用{command_link('我的物资箱', '我的物资箱')}查看格数与存量。\n\n"
@@ -1827,6 +1829,9 @@ class XiuxianApplication:
             lambda: self.livelihood.plant(context),
             write_message="当前事件不允许播种灵田。",
         )
+
+    async def preview_field(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.livelihood.preview_field(context), require_write=False)
 
     async def maintain_field(self, context: CommandContext) -> CommandResult:
         return await self._invoke(

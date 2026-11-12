@@ -37,6 +37,8 @@ class FieldPlotRecord:
     local_reputation_delta: int = 0
     plot_index: int = 1
     already_completed: bool = False
+    wither_at: str = ""
+    cultivation: dict = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)

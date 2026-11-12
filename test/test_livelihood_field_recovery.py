@@ -13,6 +13,7 @@ from test_adapter_simulation import _onebot_group_event, _qq_group_event
 from nonebot_plugin_xiuxian_3.adapters.onebot import normalize_event
 from nonebot_plugin_xiuxian_3.adapters.qq import normalize_event as normalize_qq_event
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
+from nonebot_plugin_xiuxian_3.xiuxian.persistence.errors import OperationResultMalformedError
 
 ADAPTERS = ("qq.official", "onebot.v11")
 START = datetime(2026, 9, 22, tzinfo=UTC)
@@ -149,8 +150,8 @@ def test_cross_lease_corrupt_selected_snapshot_rolls_back_and_can_retry(
                 _corrupt_snapshot(raw, damage),
             )
             before = _state(runtime)
-            rejected = await _send(runtime, adapter, "retry-corrupt", command)
-            assert rejected.code == "PERSISTENCE_ERROR", rejected
+            with pytest.raises((ValueError, TypeError)):
+                await _send(runtime, adapter, "retry-corrupt", command)
             assert _state(runtime) == before
 
             _replace_json(runtime, "field_plots", "plot_id", plot_id, "snapshot_json", raw)
@@ -192,8 +193,8 @@ def test_field_operation_json_is_strict_and_replay_precedes_plot_selection(
             broken = "{" if damage == "malformed" else '{"plot_id":"another-plot",' + raw[1:]
             _replace_json(runtime, "operations", "operation_id", operation, "result_json", broken)
             before = _state(runtime)
-            rejected = await _send(runtime, adapter, operation, command)
-            assert rejected.code == "PERSISTENCE_ERROR", rejected
+            with pytest.raises(OperationResultMalformedError, match="operation result is malformed"):
+                await _send(runtime, adapter, operation, command)
             assert _state(runtime) == before
 
             _replace_json(runtime, "operations", "operation_id", operation, "result_json", raw)
@@ -235,8 +236,8 @@ def test_cross_lease_harvest_failure_rolls_back_rewards_codex_and_ledger(
                 )
             before = _state(runtime)
             player_before = _player(runtime)
-            failed = await _send(runtime, adapter, "harvest-retry", "灵田收获")
-            assert failed.code == "PERSISTENCE_ERROR", failed
+            with pytest.raises(sqlite3.IntegrityError, match="injected field harvest failure"):
+                await _send(runtime, adapter, "harvest-retry", "灵田收获")
             assert _state(runtime) == before
             with sqlite3.connect(runtime.settings.database_path) as connection:
                 connection.execute("DROP TRIGGER fail_field_harvest")
@@ -353,8 +354,8 @@ def test_corrupt_unselected_active_plot_prevents_partial_cross_lease_harvest(
             raw = _json_column(runtime, "field_plots", "plot_id", new_id, "snapshot_json")
             _replace_json(runtime, "field_plots", "plot_id", new_id, "snapshot_json", "{")
             before = _state(runtime)
-            rejected = await _send(runtime, adapter, "unselected-retry", "灵田收获")
-            assert rejected.code == "PERSISTENCE_ERROR", rejected
+            with pytest.raises(ValueError):
+                await _send(runtime, adapter, "unselected-retry", "灵田收获")
             assert _state(runtime) == before
             _replace_json(runtime, "field_plots", "plot_id", new_id, "snapshot_json", raw)
             retried = await _send(runtime, adapter, "unselected-retry", "灵田收获")
@@ -450,8 +451,8 @@ def test_replant_after_withering_rolls_back_cleanup_when_ledger_fails(
                 )
             before = _state(runtime)
             player_before = _player(runtime)
-            failed = await _send(runtime, adapter, "plant-after-wither", "灵田播种 止血草")
-            assert failed.code == "PERSISTENCE_ERROR", failed
+            with pytest.raises(sqlite3.IntegrityError, match="injected field replant failure"):
+                await _send(runtime, adapter, "plant-after-wither", "灵田播种 止血草")
             assert _state(runtime) == before
             with sqlite3.connect(runtime.settings.database_path) as connection:
                 connection.execute("DROP TRIGGER fail_field_replant")

@@ -83,6 +83,7 @@ def validate_exploration_content(bundle: ContentBundle) -> int:
     """Validate active modes and their non-empty reward/encounter pools."""
 
     from .exploration.rules import _definitions
+    from .livelihood.rules import crop_definitions
     from .rewards.rules import reward_pool_outcomes
 
     definitions = _definitions(bundle)
@@ -118,6 +119,7 @@ def validate_content_references(bundle: ContentBundle) -> dict[str, int]:
     recipes = len(recipe_definitions(bundle))
     materials = validate_material_content(bundle)
     sources = validate_source_content(bundle)
+    crop_definitions(bundle)
     return {
         **world,
         "exploration_modes": modes,
