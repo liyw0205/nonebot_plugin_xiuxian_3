@@ -26,6 +26,7 @@ from .adventures.mainline import (
     SEEKER_ECHOES_STORY_KEY,
     LIVELIHOOD_ECHOES_STORY_KEY,
     BEAST_HABITAT_ECHOES_STORY_KEY,
+    COMPANION_OLD_TRAIL_STORY_KEY,
     DAO_SETTLEMENT_STORY_KEY,
     DOMAIN_FRONTIER_STORY_KEY,
     VOID_ARCHIVE_STORY_KEY,
@@ -213,6 +214,11 @@ _HELP_PAGES = {
         "图鉴回响两页记录完成后，寻道期可按既有门槛使用观兽与塔外守望：先"
         f"{command_link('挂机预览 观兽', '挂机预览 观兽')}和{command_link('挂机预览 塔外守望', '挂机预览 塔外守望')}确认门槛，"
         "两条路线都要在主线开始后完整领取，逾时保底不替代主线交班。\n\n"
+        "完成玄天主线初入近郊后，可继续灵兽旧兽道手记：在近郊开始"
+        f"{command_link('灵兽旧兽道回响主线', '灵兽旧兽道回响主线')}，先按提示新结缘木鼠，"
+        f"再{command_link('挂机预览 灵兽栖地巡护', '挂机预览 灵兽栖地巡护')}并完整领取四小时巡护；"
+        f"最后用巡护所得粗糙灵米{command_link('喂养灵兽 灵兽编号', '喂养灵兽')}。"
+        "旧结缘、取消、逾时保底或本关开始前的喂养都不推进；巡护状态和故事进度在重启后保留。\n\n"
         "筑基四层后可接云铁守望回响：先"
         f"{command_link('云铁守望回响主线', '云铁守望回响主线')}查看关卡，"
         f"再{command_link('开始云铁守望回响主线 矿口听风', '开始云铁守望回响主线 矿口听风')}沿公开山道抵达云铁矿区；"
@@ -350,6 +356,13 @@ class XiuxianApplication:
             title="妖界栖地回响主线",
             start_command="开始妖界栖地回响主线",
             claim_command="领取妖界栖地回响主线奖励",
+        )
+        self.companion_old_trail_mainline = AdventuresMainlineApplication(
+            repository,
+            story_key=COMPANION_OLD_TRAIL_STORY_KEY,
+            title="灵兽旧兽道回响主线",
+            start_command="开始灵兽旧兽道回响主线",
+            claim_command="领取灵兽旧兽道回响主线奖励",
         )
         self.dao_echoes = DaoEchoesApplication(repository)
         self.three_realms = ThreeRealmsApplication(repository)
@@ -1672,6 +1685,27 @@ class XiuxianApplication:
             context,
             lambda: self.beast_habitat_echoes_mainline.claim_reward(context),
             write_message="此刻无缘收取妖界栖地回响主线所得。",
+        )
+
+    async def get_companion_old_trail_mainline_status(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.companion_old_trail_mainline.get_status(context),
+            require_write=False,
+        )
+
+    async def start_companion_old_trail_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.companion_old_trail_mainline.start_stage(context),
+            write_message="此刻无缘踏入灵兽旧兽道回响主线。",
+        )
+
+    async def claim_companion_old_trail_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.companion_old_trail_mainline.claim_reward(context),
+            write_message="此刻无缘收取灵兽旧兽道回响主线所得。",
         )
 
     async def preview_final_arena(self, context: CommandContext) -> CommandResult:

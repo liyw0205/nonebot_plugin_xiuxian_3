@@ -4255,6 +4255,85 @@
       "reputation_key": "local.beast.three_realms_trade_port",
       "first_clear_reward": {"spirit_stones": 55, "local_reputation": 6, "service_reputation": 2},
       "repeat_reward": {"spirit_stones": 8}
+    },
+    {
+      "key": "companion_old_trail.1",
+      "story_key": "story.mainline.companion_old_trail",
+      "chapter": 1,
+      "stage": 1,
+      "name": "近郊结缘",
+      "desc": "沿着近郊旧兽道，与一只真正结缘的木鼠重新认路。",
+      "body": "初入玄天时，你在近郊石阶旁见过一排浅浅的爪印。如今再沿旧路回来，才发现它们并非慌乱逃窜，而是绕开了被雨水冲松的石缝。木鼠从草根下探出头，嗅了嗅你掌心的气息。旧兽道不收猎获，只认同行的约定：在本关开始后，用公开的结缘方式迎它入队；先前已经结缘的木鼠、旁人记录或行囊中的兽粮都不能代替这次相遇。",
+      "objectives": [
+        {"key": "bond_wood_rat", "type": "companion_bond", "label": "本关开始后真实结缘一只木鼠", "companion_key": "beast.wood_rat"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "近郊", "description": "回到玄天近郊的旧兽道。"},
+        {"command": "结缘灵兽", "argument": "木鼠", "description": "本关开始后结缘木鼠；旧结缘记录不算本次同行。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.companion_old_trail:companion_old_trail.1"]},
+      "next_stage_key": "companion_old_trail.2",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "只认本关开始后本人成功结缘的木鼠；旧记录、其他灵兽或失败请求不推进。满足近郊来源后重新结缘即可领取，不扣主线奖励。"},
+      "status": "open",
+      "aliases": ["近郊结缘"],
+      "prerequisites": ["story.mainline.xuantian:chapter.1.stage.1"],
+      "lane": "companion_old_trail",
+      "lane_name": "灵兽旧兽道",
+      "first_clear_reward": {"codex.story.companion_old_trail.1": 1, "spirit_stones": 10},
+      "repeat_reward": {"spirit_stones": 3}
+    },
+    {
+      "key": "companion_old_trail.2",
+      "story_key": "story.mainline.companion_old_trail",
+      "chapter": 1,
+      "stage": 2,
+      "name": "四时巡护",
+      "desc": "带木鼠完整巡护近郊栖地，把它找回的灵米与灵叶带回。",
+      "body": "木鼠认得旧兽道上的每一处转弯，却还不懂怎样把发现带回家。你们沿浅坡绕过石涧，木鼠在落叶下找到了粗糙灵米，也替受惊的小兽引回草窝。把这次路程交给四小时的灵兽栖地巡护：必须在本关开始后安排，并在完整领取窗口内收回结果；取消会退回安排成本，逾时只留保底灵叶，都不算完整巡护。每日名额用尽时，按巡护原有日限等待后再走，不会消耗主线奖励。",
+      "objectives": [
+        {"key": "claim_companion_patrol", "type": "idle_claim", "label": "本关开始后完整领取一次灵兽栖地巡护", "route_key": "idle.beast_habitat_patrol"}
+      ],
+      "actions": [
+        {"command": "挂机预览", "argument": "灵兽栖地巡护", "description": "查看近郊地点、灵兽准入、体力成本、四小时时长与每日名额。"},
+        {"command": "开始挂机", "argument": "灵兽栖地巡护 <灵兽编号>", "description": "安排已结缘的灵兽巡护，等待完整窗口后领取。"},
+        {"command": "领取挂机", "argument": "", "description": "完整领取巡护所得；逾时保底或取消后按原日限重试。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.companion_old_trail:companion_old_trail.2"]},
+      "next_stage_key": "companion_old_trail.3",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "只认本关开始后的完整领取；仍在运行、取消、逾时保底、旧安排或其他路线均不推进。先处理当前安排，再按路线地点、灵兽状态和日限重新开始。"},
+      "status": "open",
+      "aliases": ["四时巡护"],
+      "prerequisites": ["companion_old_trail.1"],
+      "lane": "companion_old_trail",
+      "lane_name": "灵兽旧兽道",
+      "first_clear_reward": {"codex.story.companion_old_trail.2": 1, "service_reputation": 1, "spirit_stones": 15},
+      "repeat_reward": {"spirit_stones": 5}
+    },
+    {
+      "key": "companion_old_trail.3",
+      "story_key": "story.mainline.companion_old_trail",
+      "chapter": 1,
+      "stage": 3,
+      "name": "灵米喂伴",
+      "desc": "把巡护带回的粗糙灵米喂给木鼠，完成旧兽道的同行约定。",
+      "body": "巡护归来，木鼠把一粒粗糙灵米推到你脚边。它不懂这粒米值多少灵石，只知道你曾在近郊的风雨里替它挡过一次落枝。旧兽道最后一页不是把粮食收进仓库，而是在本关开始后亲手喂给木鼠一份由巡护奖池提供的粗糙灵米。没有可用灵米、木鼠仍在途中或喂养失败时，故事会保留进行中；补足真实来源与同伴状态后再喂即可。成功后，木鼠会记住这段路，你们也能继续把山野见闻写进自己的图鉴。",
+      "objectives": [
+        {"key": "feed_patrol_rice", "type": "companion_feed", "label": "本关开始后用巡护来源的粗糙灵米喂养木鼠", "route_key": "idle.beast_habitat_patrol", "companion_key": "beast.wood_rat", "item_key": "item.food.coarse_spirit_rice"}
+      ],
+      "actions": [
+        {"command": "灵兽状态", "argument": "", "description": "查看木鼠状态与灵兽编号。"},
+        {"command": "喂养灵兽", "argument": "<灵兽编号>", "description": "用背包中的粗糙灵米喂养木鼠；必须在本关开始后成功结算。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.companion_old_trail:companion_old_trail.3"]},
+      "next_stage_key": null,
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "只认本关开始后本人成功完成的木鼠喂养 operation；旧喂养、其他灵兽、缺少灵米、同伴途中或失败回滚均不推进，不发放主线奖励。"},
+      "status": "open",
+      "aliases": ["灵米喂伴"],
+      "prerequisites": ["companion_old_trail.2"],
+      "lane": "companion_old_trail",
+      "lane_name": "灵兽旧兽道",
+      "first_clear_reward": {"codex.story.companion_old_trail.3": 1, "service_reputation": 2, "spirit_stones": 25},
+      "repeat_reward": {"spirit_stones": 8}
     }
   ]
 }

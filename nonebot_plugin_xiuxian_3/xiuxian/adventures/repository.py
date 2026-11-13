@@ -1514,6 +1514,13 @@ class AdventuresRepositoryMixin:
             for item in intro.get("flags", [])
             if str(item) != "story.mainline.void_archive.time_fort"
         }
+        events.update(
+            str(row["event_key"])
+            for row in connection.execute(
+                "SELECT event_key FROM activity_events WHERE player_id = ?",
+                (player["id"],),
+            ).fetchall()
+        )
         if str(player["stage"]) != STAGE_NEW_USER:
             events.add("player.start_seeking")
         if connection.execute(
@@ -1800,6 +1807,10 @@ class AdventuresRepositoryMixin:
             )
             snapshot = {
                 "started_at": now_text,
+                "baseline_operation_rowid": int(connection.execute(
+                    "SELECT COALESCE(MAX(rowid), 0) FROM operations WHERE player_id=?",
+                    (row["id"],),
+                ).fetchone()[0]),
                 "baseline_idle_assignment_id": int(connection.execute(
                     "SELECT COALESCE(MAX(id), 0) FROM idle_assignments WHERE player_id=?",
                     (row["id"],),
@@ -2088,6 +2099,13 @@ class AdventuresRepositoryMixin:
             idle_baseline = snapshot.get("baseline_idle_assignment_id", 0)
             if isinstance(idle_baseline, bool) or not isinstance(idle_baseline, int) or idle_baseline < 0:
                 raise ValueError("mainline idle baseline is invalid")
+            operation_baseline = snapshot.get("baseline_operation_rowid", 0)
+            if (
+                isinstance(operation_baseline, bool)
+                or not isinstance(operation_baseline, int)
+                or operation_baseline < 0
+            ):
+                raise ValueError("mainline operation baseline is invalid")
         except (TypeError, json.JSONDecodeError, ValueError) as exc:
             raise ValueError("mainline run snapshot is invalid") from exc
 
@@ -2185,6 +2203,33 @@ class AdventuresRepositoryMixin:
                     "AND status='claimed' AND starts_at>=? AND id>? LIMIT 1",
                     (player_id, objective["route_key"], started_at, idle_baseline),
                 ).fetchone()
+            elif kind in {"companion_bond", "companion_feed"}:
+                operation_name = "companion.bond" if kind == "companion_bond" else "companion.feed"
+                rows = connection.execute(
+                    "SELECT result_json FROM operations WHERE player_id=? AND operation_name=? "
+                    "AND rowid>? ORDER BY rowid",
+                    (player_id, operation_name, operation_baseline),
+                ).fetchall()
+                found = None
+                for operation in rows:
+                    try:
+                        payload = json.loads(operation["result_json"] or "{}")
+                    except (TypeError, json.JSONDecodeError):
+                        continue
+                    companion = payload.get("companion") if isinstance(payload, dict) else None
+                    if (
+                        not isinstance(companion, dict)
+                        or companion.get("companion_key") != objective.get("companion_key")
+                    ):
+                        continue
+                    if kind == "companion_bond":
+                        found = operation
+                        break
+                    spent = payload.get("spent")
+                    amount = spent.get(objective.get("item_key")) if isinstance(spent, dict) else None
+                    if isinstance(amount, int) and not isinstance(amount, bool) and amount > 0:
+                        found = operation
+                        break
             elif kind == "dispatch_success":
                 found = connection.execute(
                     """
@@ -2304,6 +2349,21 @@ class AdventuresRepositoryMixin:
                         set(objective) == {"key", "type", "label", "route_key"}
                         and isinstance(objective["route_key"], str)
                         and bool(objective["route_key"].strip())
+                    )
+                if objective["type"] == "companion_bond":
+                    return (
+                        set(objective) == {"key", "type", "label", "companion_key"}
+                        and isinstance(objective["companion_key"], str)
+                        and bool(objective["companion_key"].strip())
+                    )
+                if objective["type"] == "companion_feed":
+                    return (
+                        set(objective)
+                        == {"key", "type", "label", "route_key", "companion_key", "item_key"}
+                        and all(
+                            isinstance(objective.get(field), str) and objective[field].strip()
+                            for field in ("route_key", "companion_key", "item_key")
+                        )
                     )
                 if objective["type"] == "dispatch_success":
                     return (
