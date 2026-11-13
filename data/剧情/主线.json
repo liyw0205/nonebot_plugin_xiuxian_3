@@ -4167,6 +4167,94 @@
       "first_clear_reward": {"spirit_stones": 32, "local_reputation": 3},
       "repeat_reward": {"spirit_stones": 7},
       "reputation_key": "local.xuantian.new_town"
+    },
+    {
+      "key": "beast_habitat_echoes.1",
+      "story_key": "story.mainline.beast_habitat_echoes",
+      "chapter": 1,
+      "stage": 1,
+      "name": "贸易口登记",
+      "desc": "从万兽山结算行程抵达三界贸易口，核验栖地夜值的公开名册。",
+      "body": "万兽山的巡线已经重新接上，栖地的夜值却不能只凭山口老人一句口头允诺。你把新画的迁徙线收进袖中，从山道南下三界贸易口，等行程真正结算后把名册交给值守的妖族使者。贸易口只认公开路线、真实抵达与足够的妖界声望；旧行程、未结算的船票和旁人代办都不会留下这次回响。登记完成，夜值的门才会为你打开。",
+      "objectives": [
+        {"key": "reach_habitat_trade_port", "type": "travel_arrival", "label": "结算行程抵达三界贸易口", "destination_key": "beast.three_realms_trade_port"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "三界贸易口", "description": "从万兽山沿公开山路南下，等待行程结束后结算抵达贸易口。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.beast_habitat_echoes:beast_habitat_echoes.1"]},
+      "next_stage_key": "beast_habitat_echoes.2",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "尚未结算抵达三界贸易口时关卡保持进行中且不发奖励；补足体力与妖界声望后，从万兽山沿公开山路重新启程。旧行程、未结算行程和他人抵达记录都不能替代本关。"},
+      "status": "open",
+      "aliases": ["贸易口登记"],
+      "lane": "habitat_echoes",
+      "lane_name": "妖界栖地回响",
+      "prerequisites": ["access.beast_ten_thousand_hills"],
+      "required_realm": "nascent_soul",
+      "required_layer": 10,
+      "reputation_key": "local.beast.three_realms_trade_port",
+      "first_clear_reward": {"spirit_stones": 30, "local_reputation": 3},
+      "repeat_reward": {"spirit_stones": 5}
+    },
+    {
+      "key": "beast_habitat_echoes.2",
+      "story_key": "story.mainline.beast_habitat_echoes",
+      "chapter": 1,
+      "stage": 2,
+      "name": "夜巡取证",
+      "desc": "回到万兽山完成一次真实狩猎，从结算奖池取得兽血作为夜值凭证。",
+      "body": "贸易口的值守使者没有收下空白名册。他要你带回一份来自山里的实证：不是仓库里早已存着的兽血，而是本关开始后亲自从万兽山狩猎结算所得的一份新血样。你重新沿开放山路北上，在夜色压低之前完成一次公开狩猎；遭遇战败、没有抽到兽血或只停在探索途中，都只留下未完成的记录，不会扣走主线奖励。带着真正从山里取回的血样，栖地管事才会把夜值班次写入你的名字。",
+      "objectives": [
+        {"key": "gather_habitat_blood", "type": "exploration_reward", "label": "在万兽山狩猎结算中取得一份兽血", "mode_key": "explore.beast_hunt", "location_key": "beast.ten_thousand_hills", "item_key": "item.beast_blood", "quantity": 1}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "万兽山入口", "description": "从三界贸易口沿已开放山路返回万兽山入口，并结算抵达。"},
+        {"command": "开始探索", "argument": "万兽山狩猎", "description": "在万兽山按公开探索规则完成狩猎，结算奖池取得兽血后再领取本关。"},
+        {"command": "申请贸易许可", "argument": "妖界", "description": "完成妖界引导且具备八十点妖界声望、五百灵石后，申请七日妖界贸易许可，为下一关夜值准备准入。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.beast_habitat_echoes:beast_habitat_echoes.2"]},
+      "next_stage_key": "beast_habitat_echoes.3",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "只统计本关开始后本人在万兽山已结算并实际取得的兽血；旧库存、其他地点、未结算探索、战败或未抽中都不推进。按探索原日限恢复后可重新狩猎，许可申请失败也不扣灵石。"},
+      "status": "open",
+      "aliases": ["夜巡取证"],
+      "lane": "habitat_echoes",
+      "lane_name": "妖界栖地回响",
+      "prerequisites": ["beast_habitat_echoes.1"],
+      "required_realm": "nascent_soul",
+      "required_layer": 10,
+      "reputation_key": "local.beast.three_realms_trade_port",
+      "first_clear_reward": {"spirit_stones": 45, "local_reputation": 4, "service_reputation": 1},
+      "repeat_reward": {"spirit_stones": 7}
+    },
+    {
+      "key": "beast_habitat_echoes.3",
+      "story_key": "story.mainline.beast_habitat_echoes",
+      "chapter": 1,
+      "stage": 3,
+      "name": "妖界栖地夜值",
+      "desc": "以真实贸易许可安排八小时栖地看守，完整交班并留下妖界名望。",
+      "body": "血样通过验收后，栖地管事把一枚夜值木牌递给你。木牌不能绕过贸易许可，也不能把一次逾时保底说成完整交班：你必须用本人刚取得或仍有效的妖界贸易许可，在公开入口预览并安排妖界栖地看守，等满八小时后于完整窗口内领取。取消、逾时保底、许可过期、跨重启仍未结算的安排都保留原闲居状态而不完成主线；恢复许可与日限后重新安排即可。夜值所得的灵米、灵叶和贸易口名望会沿现有闲居事务落账，再由这份完整交班闭合栖地回响。",
+      "objectives": [
+        {"key": "claim_habitat_night_watch", "type": "idle_claim", "label": "本关开始后完整领取一次妖界栖地夜值", "route_key": "idle.beast_habitat_watch"}
+      ],
+      "actions": [
+        {"command": "挂机预览", "argument": "妖界栖地", "description": "确认本人持有有效妖界贸易许可、八小时完整窗口和每日一次名额。"},
+        {"command": "开始挂机", "argument": "妖界栖地", "description": "本关开始后安排妖界栖地夜值，八小时后在完整领取窗口内交班。"},
+        {"command": "领取挂机", "argument": "", "description": "完整窗口结束后领取灵米、灵叶与名望；逾时保底先处理后按日限重试。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.beast_habitat_echoes:beast_habitat_echoes.3"]},
+      "next_stage_key": null,
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "只认本关开始后的本人妖界栖地新安排与完整领取；取消、提前、逾时保底、许可过期、旧安排和他人领取均不发主线奖励。按闲居原合同恢复许可与日限后重新安排，失败回滚会保留 running 状态并可用新请求重试。"},
+      "status": "open",
+      "aliases": ["妖界栖地夜值"],
+      "lane": "habitat_echoes",
+      "lane_name": "妖界栖地回响",
+      "prerequisites": ["beast_habitat_echoes.2"],
+      "required_realm": "nascent_soul",
+      "required_layer": 10,
+      "reputation_key": "local.beast.three_realms_trade_port",
+      "first_clear_reward": {"spirit_stones": 55, "local_reputation": 6, "service_reputation": 2},
+      "repeat_reward": {"spirit_stones": 8}
     }
   ]
 }
