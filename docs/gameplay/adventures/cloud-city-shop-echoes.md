@@ -12,12 +12,15 @@
    `xuantian.cloud_city`。
 2. `cloud_city_echoes.2`：本关开始后身在云城，完成 `explore.cloud_city_patrol` 并结算一场
    真实遭遇战胜利；未结算、战败或仅取得普通探索所得均不满足。
-3. `cloud_city_echoes.3`：本关开始后按既有名望门槛新建 `idle.cloud_city_shop`，在完整窗口领取；
+3. `cloud_city_echoes.3`：本关开始后必须身在 `xuantian.cloud_city`，且有至少 200 点
+   `local.xuantian.cloud_city` 名望，才能新建 `idle.cloud_city_shop` 并在完整窗口领取；
    逾时保底、取消、旧安排、他人记录和日限不足均不满足。
 
-云城地方名望继续由既有派遣、项目和巡夜奖励等公开来源积累，不能用测试注入物品或降低 200
-点门槛。玩家通过“云城店铺回响主线”、对应的开始/领取命令、`开始探索 云城巡夜`、
-`开始挂机 云城店铺` 和分类帮助完成路径；QQ/OneBot 只负责投递，共用同一 application。
+缺少店铺名望时，金丹一层玩家可在云城接受 `dispatch.golden_core.vein_survey`；派遣成功结算
+增加 5 点云城名望，部分完成结算增加 2 点，失败不增加。玩家通过“云城店铺回响主线”、
+对应的开始/领取命令、`开始探索 云城巡夜`、`接受派遣 云铁矿区勘测` 和
+`开始挂机 云城店铺` 完成路径；帮助会列出真实的名望来源及地点条件。QQ/OneBot 只负责投递，
+共用同一 application 与 repository。
 
 ## 事务与快照
 

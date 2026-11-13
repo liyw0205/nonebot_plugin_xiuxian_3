@@ -20,6 +20,8 @@ ROUTES = {
     "idle.beast_habitat_watch": (None, 0, "permit.beast_trade", {}, 28800, 1),
 }
 
+ROUTE_LOCATIONS = {"idle.cloud_city_shop": "xuantian.cloud_city"}
+
 
 class Clock:
     def __init__(self, value: datetime) -> None:
@@ -48,6 +50,7 @@ def test_mid_routes_load_with_expected_gates_and_pools() -> None:
         assert definition.required_layer == layer
         assert definition.required_permit == permit
         assert dict(definition.required_local_reputation) == reputation
+        assert definition.required_location == ROUTE_LOCATIONS.get(key)
         assert definition.duration_seconds == duration
         assert definition.daily_limit == daily
         full = reward_for(definition, "mid:seed", fallback=False)
@@ -70,7 +73,8 @@ def test_mid_route_preview_enforces_realm_reputation_and_permits() -> None:
             with sqlite3.connect(runtime.settings.database_path) as connection:
                 connection.execute(
                     "UPDATE players SET stage='cultivator', realm_key='foundation', "
-                    "realm_layer=3 WHERE platform=? AND platform_user_id=?",
+                    "realm_layer=3, energy=100, energy_max=100, stamina=100, stamina_max=100 "
+                    "WHERE platform=? AND platform_user_id=?",
                     (adapter, user),
                 )
                 player_id = connection.execute(
@@ -90,7 +94,7 @@ def test_mid_route_preview_enforces_realm_reputation_and_permits() -> None:
             assert blocked.code == "IDLE_PREVIEW", blocked.message
             mine = row(blocked, "idle.cloud_mine_watch")
             assert mine["ready"] is False
-            assert "境界不足" in mine["missing"]
+            assert any("境界不足" in value for value in mine["missing"])
             assert mine["requirements"]["required_realm"] == "foundation"
             assert mine["requirements"]["required_layer"] == 4
 
@@ -113,6 +117,14 @@ def test_mid_route_preview_enforces_realm_reputation_and_permits() -> None:
                         json.dumps({"local.xuantian.cloud_city": 200}, sort_keys=True),
                         clock.value.isoformat(),
                     ),
+                )
+            shop = row(await preview("云城店铺", "shop-location-blocked"), "idle.cloud_city_shop")
+            assert shop["ready"] is False
+            assert any("所在地点不符" in value for value in shop["missing"])
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                connection.execute(
+                    "UPDATE players SET location_key='xuantian.cloud_city' WHERE id=?",
+                    (player_id,),
                 )
             assert row(await preview("云城店铺", "shop-allowed"), "idle.cloud_city_shop")["ready"] is True
 
