@@ -65,9 +65,9 @@ M6 首采集与 QQ 配置以及分类帮助/悬赏蓝字已完成。用户新授
 
 ## 4. 唯一工作队列
 
-### 当前阶段：建设结算收据与回放校验（2026-11-13）
+### 最新交付：建设结算收据与回放校验（2026-11-13）
 
-续作基线 develop/origin `b8bd176`，批量生产已在 v0.1.38 发布，不重做。当前 WIP 收紧持久
+续作基线 develop/origin `b8bd176`，批量生产已在 v0.1.38 发布，不重做。本阶段收紧持久
 建设结算 operation 回放：校验冻结项目快照、奖励键/正整数、资格与奖励联动、地方名望差值，
 损坏回执在写入前拒绝并支持修复后原 operation 幂等重放；项目选择器兼容当前周/持久行、中文
 别名、旧 weekly 快照与重启，生活/探索帮助补充个人满十点后的 `结算公共项目 项目名` 入口。
@@ -77,9 +77,20 @@ M6 首采集与 QQ 配置以及分类帮助/悬赏蓝字已完成。用户新授
 按条件跳过。安装文档/种子迁移定向组 `67 passed`。额外执行发现版本无关测试将根包和两个
 宿主配置都强制要求动态版本，与 v0.1.38 根包静态版本及既有宿主固定元数据冲突；已校正为
 检查包版本与 CHANGELOG 同步及宿主 build metadata 合法，runtime 规则/存档隔离断言保留；
-`test_runtime_versionless.py` `3 passed`。当前准备 package `0.1.39` 版本提交，尚未合 main/发布。
-QQ SDK 缺失不安装、不做真机验收。
-小提交仅留 develop，版本提交及其 CI 通过后才普通合 main、发布并验包。
+`test_runtime_versionless.py` `3 passed`。QQ SDK 缺失不安装、不做真机验收。
+
+正式交付已完成：版本 develop `e164023326e5d3b5bb609a8ab98958dc8d1385ae` CI
+`43349433650`、main 普通合并 `0be9a71074e342accab18f9ffe4e13b1dacead58` CI
+`43350589596`、正式 `v0.1.39` tag/release CI `43351732226` 全绿。完整 Release 包
+`project.tar.gz` 为 3,286,670 bytes，1,288 份发布文件、83 份 data、44 条种子迁移和
+176 条旧来源全部通过原字节与 Git provenance 校验，无辅助或额外文件。SHA-256
+`ef2e5b3ce44ca821de67e44fa097ac2c5b2cc4b1f77648ce7391647fa80a6d19`
+与 GitHub asset digest 一致。已普通同步回 develop `109444d15af521622345b9372830e2576a948503`，
+业务树与正式 tag 一致；本 checkpoint 只补录验收记录，不再次合 main 或发布。
+同步精确 SHA CI `43353519147` 的 Python 3.11/3.12 quality、install-smoke、编译及 shell
+检查全绿，release 按分支条件跳过；本 checkpoint 文档链接/文案合同 `2 passed`、diff 检查通过。
+连接恢复后未启动子代理或重复审查，全部 `.codex-*`、`docs/goals/**` 保留且不 stage；
+未部署、操作真实玩家库或账号、发送 QQ、安装依赖或修改其它项目。
 
 ### 已交付阶段：常规个人批量生产（2026-11-13）
 
