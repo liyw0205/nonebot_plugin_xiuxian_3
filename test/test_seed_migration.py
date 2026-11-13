@@ -1272,3 +1272,44 @@ def test_custom_place_codex_seed_is_preserved(host: Path) -> None:
     assert "种子更新 0 个" in result.stdout
     assert codex_path.read_bytes() == custom
     preserved(host)
+
+
+def test_companion_old_trail_seeds_upgrade_together_and_preserve_custom(host: Path) -> None:
+    mainline = (ROOT / "data" / MAINLINE).read_text(encoding="utf-8")
+    marker = mainline.index('    {\n      "key": "companion_old_trail.1"')
+    old_mainline = (mainline[:marker].rstrip()[:-1] + "\n  ]\n}\n").encode("utf-8")
+    assert hashlib.sha256(old_mainline).hexdigest() == "ad6aae6f0a4037c52c17ea17e902188bcca190676d455bca6a49fa178c4ed473"
+    codex_file = Path("图鉴/条目.json")
+    codex = (ROOT / "data" / codex_file).read_text(encoding="utf-8")
+    old_codex, count = re.subn(
+        r'    \{\n      "key": "codex\.story\.companion_old_trail\.[123]",.*?\n    \},\n',
+        "", codex, flags=re.S,
+    )
+    assert count == 3
+    old_codex_blob = old_codex.encode("utf-8")
+    assert hashlib.sha256(old_codex_blob).hexdigest() == "898a3030272173423d2c55371beaf5a46fa73483fe06538aaf2c5723fcf1389f"
+    old_blobs = {MAINLINE: old_mainline, codex_file: old_codex_blob}
+    for relative, blob in old_blobs.items():
+        (host / "data" / relative).write_bytes(blob)
+    upgraded = deploy(host)
+    assert upgraded.returncode == 0, upgraded.stdout + upgraded.stderr
+    assert "种子更新 2 个" in upgraded.stdout
+    backup = next((host / ".xiuxian3/backups").glob("deploy-*"))
+    for relative, blob in old_blobs.items():
+        assert (host / "data" / relative).read_bytes() == (ROOT / "data" / relative).read_bytes()
+        assert (backup / "data" / relative).read_bytes() == blob
+    preserved(host)
+    repeated = deploy(host)
+    assert repeated.returncode == 0, repeated.stdout + repeated.stderr
+    assert "种子更新 0 个" in repeated.stdout
+    for relative in old_blobs:
+        document = json.loads((ROOT / "data" / relative).read_text(encoding="utf-8"))
+        document["records"][0]["desc"] = "自定义旧兽道内容"
+        custom = (json.dumps(document, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+        (host / "data" / relative).write_bytes(custom)
+        old_blobs[relative] = custom
+    custom_deploy = deploy(host)
+    assert custom_deploy.returncode == 0, custom_deploy.stdout + custom_deploy.stderr
+    assert "种子更新 0 个" in custom_deploy.stdout
+    assert all((host / "data" / relative).read_bytes() == blob for relative, blob in old_blobs.items())
+    preserved(host)
