@@ -51,7 +51,7 @@ operation 回放语义均沿用现行消费者，无新代码路径。
 - 6 条新悬赏的目标类型、来源键、境界门槛、奖池、名望与开放状态；
 - 每个带键目标都经 `resolve_dispatch` / 敌人或物品记录解析，无来源键目标确认为 null；
 - 两个奖池各有至少 2 条互异且非空结果，且每条引用该池的悬赏都能用确定性种子抽出实发奖励；
-- 发布清单钉值 `bounties` 从 45 更新为 51。
+- 发布清单中的悬赏集合与内容文件保持一致。
 
 回归：`test_bounty_batch.py`、`test_adventures_bounty_settlement.py`、
 `test_m9_content_integrity.py`、`test_rewards.py`、`test_documentation.py`。

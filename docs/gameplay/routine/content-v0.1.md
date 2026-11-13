@@ -1,6 +1,6 @@
 # v0.1 道历与运营循环内容基线
 
-本文件遵守[版本内容开发合同](../../content-development-contract.md)与[道历与运营循环域](README.md)。`content_version=content-0.1`，`rule_version=routine-0.1.0`。本文件是版本内容快照；当前实现状态以[当前开发状态](../../current-status.md)为准。
+本文件遵守[版本内容开发合同](../../content-development-contract.md)与[道历与运营循环域](README.md)。`content_version=content-0.1`，`rule_version=routine-0.1.0`。本文件是版本内容快照；当前实现状态以[当前可用能力](../../availability.md)为准。
 
 ## 1. 道历问安、补录道历与灵木聚财
 

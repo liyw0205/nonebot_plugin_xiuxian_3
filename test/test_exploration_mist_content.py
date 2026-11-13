@@ -340,6 +340,11 @@ def test_mist_grotto_real_encounters_settle_frozen_rewards_by_battle_result(
         data_dir = _copy_data(tmp_path)
         _set_pool(data_dir, FROZEN_REWARDS)
         _set_guardian_stats(data_dir, outcome=outcome)
+        _update_record(
+            data_dir / "战斗" / "遭遇池.json",
+            "encounter.cave.mist_grotto",
+            candidates=[{"enemy_key": "enemy.mist_guardian", "weight": 1}],
+        )
         runtime = create_runtime(data_dir=data_dir, adapters=ADAPTERS)
         try:
             for adapter in ADAPTERS:

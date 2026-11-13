@@ -83,7 +83,6 @@ def validate_exploration_content(bundle: ContentBundle) -> int:
     """Validate active modes and their non-empty reward/encounter pools."""
 
     from .exploration.rules import _definitions
-    from .livelihood.rules import crop_definitions
     from .rewards.rules import reward_pool_outcomes
 
     definitions = _definitions(bundle)
@@ -106,6 +105,7 @@ def validate_content_references(bundle: ContentBundle) -> dict[str, int]:
     _validate_manifest_files(bundle)
     from .adventures.rules import bounty_definitions
     from .combat_content import validate_combat_content
+    from .livelihood.rules import crop_definitions
     from .material_content import validate_material_content
     from .production.rules import recipe_definitions
     from .world_content import validate_world_content

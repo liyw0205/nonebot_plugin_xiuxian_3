@@ -1,8 +1,7 @@
 # v0.9 功业内容基线：计数型功业与道统十役
 
-`docs/gameplay/routine/content-v0.8.md` 之前，功业只有「某事件发生过一次」这一种达成口径：
-`_honor_source_operation` 找到该 `source_event` 的第一条记录即视为完成。因此
-「累计完成十次道统服务」这类按次数累积的功业无法表达。
+功业支持单次事件达成与按操作次数累计两种口径。未设置 `required_count` 时要求一条匹配的
+`source_event`；累计目标还须以 `count_event_key` 限定实际操作类型，避免把不同任务混计。
 
 ## 新增口径
 
@@ -27,7 +26,7 @@
 `success`——失败的派单不算服务。达到次数后返回**最近一次**事件的 `source_operation_id`
 作为称号来源，保证 `activity_events`/称号授予的 provenance 指向真实操作。
 
-## 本次内容
+## 道统服务功业
 
 | 键 | 值 |
 |:--|:--|

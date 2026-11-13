@@ -2,7 +2,7 @@
 
 ## 范围
 
-本阶段只消费已有公开的云城移动、云城巡夜探索和云城店铺闲居，不开放锁定地点、改变
+剧情只使用已有公开的云城移动、云城巡夜探索和云城店铺闲居，不开放锁定地点、改变
 境界/名望门槛或调整探索成本、日限与奖池。云城要求金丹一层；巡夜使用 8 体力、每日 4 次
 和真实遭遇战；店铺要求 `local.xuantian.cloud_city >= 200`，持续 8 小时且每日一次。
 
@@ -12,12 +12,30 @@
    `xuantian.cloud_city`。
 2. `cloud_city_echoes.2`：本关开始后身在云城，完成 `explore.cloud_city_patrol` 并结算一场
    真实遭遇战胜利；未结算、战败或仅取得普通探索所得均不满足。
-3. `cloud_city_echoes.3`：本关开始后按既有名望门槛新建 `idle.cloud_city_shop`，在完整窗口领取；
+3. `cloud_city_echoes.3`：本关开始后必须身在 `xuantian.cloud_city`，且有至少 200 点
+   `local.xuantian.cloud_city` 名望，才能新建 `idle.cloud_city_shop` 并在完整窗口领取；
    逾时保底、取消、旧安排、他人记录和日限不足均不满足。
 
-云城地方名望继续由既有派遣、项目和巡夜奖励等公开来源积累，不能用测试注入物品或降低 200
-点门槛。玩家通过“云城店铺回响主线”、对应的开始/领取命令、`开始探索 云城巡夜`、
-`开始挂机 云城店铺` 和分类帮助完成路径；QQ/OneBot 只负责投递，共用同一 application。
+缺少店铺名望时，金丹一层玩家可在云城接受 `dispatch.golden_core.vein_survey`；派遣成功结算
+增加 5 点云城名望，部分完成结算增加 2 点，失败不增加。玩家通过“云城店铺回响主线”、
+对应的开始/领取命令、`开始探索 云城巡夜`、`接受派遣 云铁矿区勘测` 和
+`开始挂机 云城店铺` 完成路径；帮助会列出真实的名望来源及地点条件。QQ/OneBot 只负责投递，
+共用同一 application 与 repository。
+
+完整开始、目标与领奖命令见[玩家使用指南](../../usage.md#云城店铺回响)。巡夜未遇敌或战败可按原日限重试；
+主线与闲居进度分别用 `云城店铺回响主线`、`挂机状态` 查看，离线和重启后继续原记录。
+
+## 数据与消费者
+
+| 内容或记录 | 实际用途 |
+|:--|:--|
+| [主线种子](../../../data/剧情/主线.json)中的 `cloud_city_echoes.1`–`.3` | application 的专属查看、开始和领奖入口读取正文、目标、动作与奖励，开始时生成关卡快照 |
+| [生活种子](../../../data/生活/生活.json)中的 `idle.cloud_city_shop` | `IdleRepositoryMixin` 的预览和新建校验所在地、200 点地方名望及次数，安排后冻结地点与所得 |
+| `dispatch.golden_core.vein_survey` | `DispatchRepositoryMixin` 在派遣结算事务中写入实际云城名望，接受派遣时不提前计入 |
+| `travel_sessions`、`exploration_sessions`、`idle_assignments` | `AdventuresRepositoryMixin._mainline_missing_objectives` 按本人、开始时间和指定地点/模式/路线核验三关目标 |
+
+官方种子升级按[发布与种子迁移](../../release-distribution.md)核验旧/新指纹与 Git 来源，未知或自定义 JSON 保留；
+地点条件作用于新安排，已开始的闲居继续使用原快照结算。
 
 ## 事务与快照
 

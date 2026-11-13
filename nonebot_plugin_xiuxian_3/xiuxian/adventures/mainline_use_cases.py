@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ...contracts import CommandContext, CommandResult
+from ...contracts import CommandAction, CommandContext, CommandResult
 from ..repository import (
     MainlineAlreadyRunningError,
     MainlineContentClosedError,
@@ -21,6 +21,7 @@ from .mainline import (
 )
 from ..routine.rules import honor_title
 from ..specials.codex_rules import label_for_entry
+from ..utils.text import command_link
 
 
 STATUS_LABELS = {
@@ -122,6 +123,13 @@ class AdventuresMainlineApplication:
             return None
         return resolve_mainline(args[0], story_key=self.story_key, content=self.repository.content)
 
+    @staticmethod
+    def _action_link(item: dict[str, str]) -> str:
+        label = f"{item['command']}{' ' + item['argument'] if item['argument'] else ''}"
+        # An unfilled companion reference must remain a prefill, never a sent ID.
+        command = label.split("<", 1)[0].rstrip()
+        return command_link(label, command)
+
     async def get_status(self, context: CommandContext) -> CommandResult:
         if context.command_args:
             return CommandResult(False, "INVALID_MAINLINE_COMMAND", f"查看{self.title}无需附加参数。", context.request_id)
@@ -149,7 +157,11 @@ class AdventuresMainlineApplication:
         for item in record.stages:
             lines.append(f"- **第 {item.chapter} 章·{item.stage}关 {item.label}**：{STATUS_LABELS.get(item.status, item.status)}")
             if item.status == "available":
-                lines.append(f"  `{self.start_command} {item.label}`")
+                command = f"{self.start_command} {item.label}"
+                lines.append(f"  {command_link(command, command)}")
+            elif item.status in {"running", "cleared", "reward_pending"}:
+                command = f"{self.claim_command} {item.label}"
+                lines.append(f"  {command_link(command, command)}")
             stages.append(
                 {
                     "chapter": item.chapter,
@@ -164,7 +176,7 @@ class AdventuresMainlineApplication:
         lines.extend(
             [
                 "",
-                f"> 可发送 `{self.start_command} 序号` 开始当前关卡，完成后发送 `{self.claim_command} 序号`。",
+                f"> 可发送 {command_link(f'{self.start_command} 序号', self.start_command)} 开始当前关卡，完成后发送 {command_link(f'{self.claim_command} 序号', self.claim_command)}。",
                 "> 前置未成时只会静候于主线，不会耗损灵力与灵石。",
             ]
         )
@@ -215,11 +227,10 @@ class AdventuresMainlineApplication:
                 f"- **状态**：进行中\n"
                 f"- **剧情**：{record.body or record.description}\n"
                 + ("\n" + "\n".join(
-                    f"- **行动**：`{item['command']}"
-                    f"{' ' + item['argument'] if item['argument'] else ''}` · {item['description']}"
+                    f"- **行动**：{self._action_link(item)} · {item['description']}"
                     for item in record.actions
                 ) if record.actions else "")
-                + f"\n\n> 完成目标后发送 `{self.claim_command} {record.stage_key}` 领取所得。"
+                + f"\n\n> 完成目标后发送 {command_link(f'{self.claim_command} {record.stage_key}', f'{self.claim_command} {record.stage_key}')} 领取所得。"
             ),
             context.request_id,
             operation_id,
@@ -242,7 +253,7 @@ class AdventuresMainlineApplication:
         except MainlineContentClosedError:
             return CommandResult(False, "CONTENT_CLOSED", "这段天路尚未显现，暂不结算所得。", context.request_id, operation_id)
         except MainlineNotStartedError:
-            return CommandResult(False, "MAINLINE_NOT_STARTED", "请先发送 `开始主线 序号`，再领取当前关卡奖励。", context.request_id, operation_id)
+            return CommandResult(False, "MAINLINE_NOT_STARTED", f"请先发送 `{self.start_command} 序号`，再领取当前关卡奖励。", context.request_id, operation_id)
         except MainlineObjectivesIncompleteError as exc:
             missing = "、".join(exc.missing)
             return CommandResult(
@@ -270,12 +281,21 @@ class AdventuresMainlineApplication:
                 f"## {self.title}结算完成 · {record.label}\n\n"
                 f"**{self._display_name(record.player)}**完成了第 **{record.stage}** 关，获得 **{reward_kind}**。\n\n"
                 f"- **获得**：{self._reward_text(record.reward)}\n\n"
-                + (f"> 下一关：`{self.start_command} {record.next_stage_key}`。\n\n" if record.next_stage_key else "")
+                + ("> 继续前行，可查看下一关的要求。\n\n" if record.next_stage_key else "")
                 + f"> 首通所得只取一次；若再入此关，请重新发送 `{self.start_command} 序号`。"
             ),
             context.request_id,
             operation_id,
             data={"stage_key": record.stage_key, "chapter": record.chapter, "stage": record.stage, "reward": record.reward, "first_clear": record.first_clear, "next_stage_key": record.next_stage_key, "idempotent_replay": record.already_completed},
+            actions=(
+                (CommandAction(
+                    label="开始下一关",
+                    command=f"{self.start_command} {record.next_stage_key}",
+                    enter=True,
+                ),)
+                if record.next_stage_key
+                else ()
+            ),
         )
 
 

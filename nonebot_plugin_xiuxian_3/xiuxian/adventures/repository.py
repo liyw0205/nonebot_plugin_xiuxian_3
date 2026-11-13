@@ -1514,6 +1514,15 @@ class AdventuresRepositoryMixin:
             for item in intro.get("flags", [])
             if str(item) != "story.mainline.void_archive.time_fort"
         }
+        # Cross-story progress comes from first clears, not projected event flags.
+        events.update(
+            f"{row['story_key']}:{row['stage_key']}"
+            for row in connection.execute(
+                "SELECT story_key, stage_key FROM mainline_runs "
+                "WHERE player_id = ? AND first_clear_claimed = 1",
+                (player["id"],),
+            ).fetchall()
+        )
         if str(player["stage"]) != STAGE_NEW_USER:
             events.add("player.start_seeking")
         if connection.execute(
@@ -1800,8 +1809,16 @@ class AdventuresRepositoryMixin:
             )
             snapshot = {
                 "started_at": now_text,
+                "baseline_operation_rowid": int(connection.execute(
+                    "SELECT COALESCE(MAX(rowid), 0) FROM operations WHERE player_id=?",
+                    (row["id"],),
+                ).fetchone()[0]),
                 "baseline_idle_assignment_id": int(connection.execute(
                     "SELECT COALESCE(MAX(id), 0) FROM idle_assignments WHERE player_id=?",
+                    (row["id"],),
+                ).fetchone()[0]),
+                "baseline_production_order_id": int(connection.execute(
+                    "SELECT COALESCE(MAX(id), 0) FROM production_orders WHERE player_id=?",
                     (row["id"],),
                 ).fetchone()[0]),
                 "stage": str(row["stage"]),
@@ -1984,6 +2001,18 @@ class AdventuresRepositoryMixin:
                 "SELECT * FROM mainline_runs WHERE player_id = ? AND story_key = ? AND stage_key = ?",
                 (row["id"], story_key, definition.key),
             ).fetchone()
+            if run is not None and str(run["status"]) == "claimed":
+                claimed = connection.execute(
+                    "SELECT operation_name, player_id, request_hash, result_json "
+                    "FROM operations WHERE operation_id = ?",
+                    (run["claim_operation_id"],),
+                ).fetchone()
+                if (
+                    claimed is None or claimed["operation_name"] != operation_name
+                    or claimed["player_id"] != row["id"] or claimed["request_hash"] != request_hash
+                ):
+                    raise ValueError("mainline claimed operation is invalid")
+                return self._mainline_claim_from_payload(json.loads(claimed["result_json"]), replay=True)
             if run is None or str(run["status"]) != "running":
                 raise MainlineNotStartedError("mainline stage has not been started")
             frozen = self._mainline_definition_from_snapshot(run, definition)
@@ -2088,8 +2117,39 @@ class AdventuresRepositoryMixin:
             idle_baseline = snapshot.get("baseline_idle_assignment_id", 0)
             if isinstance(idle_baseline, bool) or not isinstance(idle_baseline, int) or idle_baseline < 0:
                 raise ValueError("mainline idle baseline is invalid")
+            operation_baseline = snapshot.get("baseline_operation_rowid", 0)
+            if (
+                isinstance(operation_baseline, bool)
+                or not isinstance(operation_baseline, int)
+                or operation_baseline < 0
+            ):
+                raise ValueError("mainline operation baseline is invalid")
+            needs_production = any(
+                isinstance(item, dict) and item.get("type") in {"production_complete", "item_use"}
+                for item in objectives
+            )
+            production_baseline = snapshot.get("baseline_production_order_id", None if needs_production else 0)
+            if type(production_baseline) is not int or production_baseline < 0:
+                raise ValueError("mainline production baseline is invalid")
         except (TypeError, json.JSONDecodeError, ValueError) as exc:
             raise ValueError("mainline run snapshot is invalid") from exc
+
+        def completed_production(objective: dict) -> int | None:
+            item_path = '$.outputs.' + json.dumps(objective["item_key"])
+            completed = connection.execute(
+                "SELECT o.rowid FROM production_orders p JOIN operations o "
+                "ON o.player_id=p.player_id AND json_extract(o.result_json, '$.order_id')=p.order_id "
+                "WHERE p.player_id=? AND p.recipe_key=? AND p.id>? AND p.starts_at>=? "
+                "AND p.status='completed' AND o.operation_name IN ('production.complete','production.recover') "
+                "AND o.rowid>? AND json_type(o.result_json, '$.success')='true' "
+                "AND json_type(o.result_json, ?)='integer' "
+                "AND json_extract(o.result_json, ?)>=1 ORDER BY o.rowid LIMIT 1",
+                (
+                    player_id, objective["recipe_key"], production_baseline, started_at,
+                    operation_baseline, item_path, item_path,
+                ),
+            ).fetchone()
+            return int(completed[0]) if completed is not None else None
 
         missing: list[str] = []
         for objective in objectives:
@@ -2185,6 +2245,60 @@ class AdventuresRepositoryMixin:
                     "AND status='claimed' AND starts_at>=? AND id>? LIMIT 1",
                     (player_id, objective["route_key"], started_at, idle_baseline),
                 ).fetchone()
+            elif kind in {"companion_bond", "companion_feed"}:
+                operation_name = "companion.bond" if kind == "companion_bond" else "companion.feed"
+                alternative = "companion.company" if objective.get("allow_company") is True else operation_name
+                rows = connection.execute(
+                    "SELECT result_json FROM operations WHERE player_id=? AND operation_name IN (?, ?) "
+                    "AND rowid>? ORDER BY rowid",
+                    (player_id, operation_name, alternative, operation_baseline),
+                ).fetchall()
+                found = None
+                for operation in rows:
+                    try:
+                        payload = json.loads(operation["result_json"] or "{}")
+                    except (TypeError, json.JSONDecodeError):
+                        continue
+                    companion = payload.get("companion") if isinstance(payload, dict) else None
+                    if (
+                        not isinstance(companion, dict)
+                        or companion.get("companion_key") not in (
+                            objective.get("companion_key"), *objective.get("alternate_companion_keys", [])
+                        )
+                    ):
+                        continue
+                    if kind == "companion_bond":
+                        found = operation
+                        break
+                    spent = payload.get("spent")
+                    amount = spent.get(objective.get("item_key")) if isinstance(spent, dict) else None
+                    if isinstance(amount, int) and not isinstance(amount, bool) and amount > 0:
+                        found = operation
+                        break
+            elif kind == "production_complete":
+                found = completed_production(objective)
+            elif kind == "item_use":
+                found = None
+                cooked_rowid = completed_production(objective)
+                if cooked_rowid is None:
+                    missing.append(str(objective["label"]))
+                    continue
+                for operation in connection.execute(
+                    "SELECT result_json FROM operations WHERE player_id=? "
+                    "AND operation_name='items.use' AND rowid>? ORDER BY rowid",
+                    (player_id, cooked_rowid),
+                ).fetchall():
+                    payload = decode_json_strict(operation["result_json"])
+                    effect = payload.get("effect") if isinstance(payload, dict) else None
+                    if (
+                        isinstance(effect, dict) and payload.get("item_key") == objective["item_key"]
+                        and type(payload.get("quantity")) is int and payload["quantity"] > 0
+                        and effect.get("type") == "restore_choice"
+                        and effect.get("resource") in objective["resources"]
+                        and type(effect.get("restored")) is int and effect["restored"] > 0
+                    ):
+                        found = operation
+                        break
             elif kind == "dispatch_success":
                 found = connection.execute(
                     """
@@ -2305,6 +2419,45 @@ class AdventuresRepositoryMixin:
                         and isinstance(objective["route_key"], str)
                         and bool(objective["route_key"].strip())
                     )
+                if objective["type"] == "companion_bond":
+                    return (
+                        valid_companion_alternatives(objective)
+                        and set(objective) - {"alternate_companion_keys"} in (
+                            {"key", "type", "label", "companion_key"},
+                            {"key", "type", "label", "companion_key", "allow_company"},
+                        )
+                        and ("allow_company" not in objective or objective["allow_company"] is True)
+                        and isinstance(objective["companion_key"], str)
+                        and bool(objective["companion_key"].strip())
+                    )
+                if objective["type"] == "companion_feed":
+                    return (
+                        valid_companion_alternatives(objective)
+                        and set(objective) - {"alternate_companion_keys"}
+                        == {"key", "type", "label", "route_key", "companion_key", "item_key"}
+                        and all(
+                            isinstance(objective.get(field), str) and objective[field].strip()
+                            for field in ("route_key", "companion_key", "item_key")
+                        )
+                    )
+                if objective["type"] in {"production_complete", "item_use"}:
+                    extra = "route_key" if objective["type"] == "production_complete" else "resources"
+                    if (
+                        set(objective) != {"key", "type", "label", "recipe_key", "item_key", extra}
+                        or not all(
+                            isinstance(objective.get(field), str) and objective[field].strip()
+                            for field in ("recipe_key", "item_key")
+                        )
+                    ):
+                        return False
+                    value = objective[extra]
+                    if extra == "route_key":
+                        return isinstance(value, str) and bool(value.strip())
+                    return (
+                        isinstance(value, list) and bool(value)
+                        and all(isinstance(item, str) and item.strip() for item in value)
+                        and len(set(value)) == len(value)
+                    )
                 if objective["type"] == "dispatch_success":
                     return (
                         set(objective) == {"key", "type", "label", "dispatch_key"}
@@ -2312,6 +2465,17 @@ class AdventuresRepositoryMixin:
                         and bool(objective["dispatch_key"].strip())
                     )
                 return False
+
+            def valid_companion_alternatives(objective: dict) -> bool:
+                if "alternate_companion_keys" not in objective:
+                    return True
+                values = objective["alternate_companion_keys"]
+                return (
+                    isinstance(values, list) and bool(values)
+                    and all(isinstance(item, str) and item.strip() for item in values)
+                    and len(set(values)) == len(values)
+                    and objective.get("companion_key") not in values
+                )
 
             def valid_action(action: object) -> bool:
                 return (

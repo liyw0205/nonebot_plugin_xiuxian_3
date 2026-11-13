@@ -170,7 +170,7 @@
       "reward_pool_key": "reward_pool.exploration.mist_grotto",
       "battle_chance_bp": 2500,
       "enemy_pool_key": "encounter.cave.mist_grotto",
-      "access_any": [{"type": "item", "item_key": "item.cave_pass_basic", "quantity": 1}],
+      "access_any": [],
       "status": "open"
     },
     {

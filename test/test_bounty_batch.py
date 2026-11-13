@@ -70,9 +70,8 @@ def test_bounty_board_shows_a_daily_batch_not_all_definitions() -> None:
             )
             keys = [offer.key for offer in offers]
             assert len(set(keys)) == 3, "batch entries must be unique"
-            # The board no longer renders the full definition set (34 bounties):
-            # a batch of 3 covers it, so the M9 audit line
-            # "当前展示全定义而非持久随机批次" is closed.
+            # Rendering remains bounded to the selected offers, not every
+            # bounty definition.
             rendered = await runtime.dispatch(
                 _context(user, "board-message"), "悬赏榜"
             )

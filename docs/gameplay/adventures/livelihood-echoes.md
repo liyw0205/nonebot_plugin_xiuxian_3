@@ -2,7 +2,7 @@
 
 ## 范围与来源
 
-本阶段只消费凡人阶段已经开放的三条闲居路线：`idle.town_errand`、`idle.herb_watch` 和
+剧情只使用凡人时期已经开放的三条闲居路线：`idle.town_errand`、`idle.herb_watch` 和
 `idle.workshop_care`。它们原有的地点、居所、工具、设施、时长、成本、每日限额以及完整/逾时
 奖池保持不变；不开放 locked 内容，也不改变经济规则。
 

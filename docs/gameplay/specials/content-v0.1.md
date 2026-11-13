@@ -1,6 +1,6 @@
 # v0.1 特色玩法内容基线：玄天六类玩法起点
 
-本文件遵守 [版本内容开发合同](../../content-development-contract.md) 与 [特色玩法域](README.md) 的六类合同。`content_version=content-0.1`，`rule_version=specials-0.1.0`。所有结算必须保存路线/任务/楼层/快照/故事节点、随机池、版本和 `operation_id`。本文件定义发布内容合同；当前运行时实现与缺口见[当前开发状态](../../current-status.md)。
+本文件遵守 [版本内容开发合同](../../content-development-contract.md) 与 [特色玩法域](README.md) 的六类合同。`content_version=content-0.1`，`rule_version=specials-0.1.0`。所有结算必须保存路线/任务/楼层/快照/故事节点、随机池、版本和 `operation_id`。本文件定义发布内容合同；当前运行时实现与缺口见[当前可用能力](../../availability.md)。
 
 ## 1. 挂机收益
 

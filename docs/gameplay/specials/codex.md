@@ -68,32 +68,31 @@
 
 验收：同一来源重放不双建条目且不补写历史漏记；伪造前端条目拒绝；隐藏内容不泄漏；集合奖励唯一且不含战斗/修为收益；保持引用闭合的内容调整不改历史首见；机缘结算故障不留下扣费、所得或图鉴；管理员修复只追加审计说明。
 
-## 里程碑扩展（v0.8）
+## 里程碑内容
 
-`data/图鉴/里程碑.json` 由 6 条扩到 12 条，新增 6 条复用既有图鉴条目、只用既有地方名望奖励：
+`data/图鉴/里程碑.json` 可将既有见闻组成集合目标，并只使用已支持的地方名望、服务信誉、线索或展示解锁奖励。现有集合目标包括：
 `codex.challenge.trials_3`、`codex.story.threads_3`、`codex.route.three_roads`、
 `codex.service.town_three`、`codex.place.xuantian_five`、`codex.challenge.domain_3`。
-条目字段仍为 `key`/`name`/`desc`/`entry_keys`/`reward`/`unlocks`/`status`，`entry_keys` 是显式清单；
-`图鉴` 按文件顺序展示 12 条，`领取图鉴里程碑 <序号>` 的未完成/领取/回放/唯一约束语义不变。
-既有 6 条顺序与数值不变，新条目追加在末尾。
+每条记录使用 `key`/`name`/`desc`/`entry_keys`/`reward`/`unlocks`/`status`；`entry_keys` 是显式清单。
+`图鉴` 按内容顺序展示，`领取图鉴里程碑 <序号|键>` 会校验集齐条件并为每名角色唯一结算。
 
-## 商路里程碑（v0.10）
+## 商路里程碑
 
-`data/图鉴/里程碑.json` 由 15 条扩到 16 条，追加 `codex.place.markets_two`（双市通商）：
+`data/图鉴/里程碑.json` 定义 `codex.place.markets_two`（双市通商）：
 
 - `entry_keys`：`codex.place.demon_market`（魔渊集市）与 `codex.place.trade_port`（三界贸易口）
-  两处跨域贸易端点的既有 `place` 类条目，本版不新增条目、物品或解锁；
-- `reward`：`local.demon.abyss_market` 名望 +6（上限 1000），`unlocks` 留空；
-- 语义不变：`我的图鉴` 按文件顺序展示 16 条，`领取图鉴里程碑 <序号|键>` 的未完成拒绝、
-  领取一次、同 operation 回放同一所得、重复领取拒绝与名望上限只记实际增量均沿用既有实现。
+  两处跨域贸易端点的 `place` 类条目；
+- `reward`：`local.demon.abyss_market` 名望 +6（上限 1000），`unlocks` 留空。
+- `我的图鉴` 按内容顺序展示；未集齐时拒绝领取，成功后每名角色仅可领取一次。同 operation
+  重放返回冻结所得，名望上限只记录实际增加量。
 
-该组只把两处已开放但此前无任何集合目标的贸易端点串成一赏，让「行遍双市」有真实可领取的
-名望回报。聚焦证据见 `test/test_trade_market_milestone.py`；计数与固定顺序回归见
-`test_codex_milestone_content.py` 与 `test_codex_milestone_v09.py`。
+该里程碑把两处贸易端点串为一项可领取的见闻目标，奖励仍只增加地方名望。
+`test/test_trade_market_milestone.py` 覆盖实际领取；`test/test_codex_milestone_content.py`
+与 `test/test_codex_milestone_v09.py` 校验内容集合和顺序。
 
-## 蜕变双录与阵堂/战线见闻（v0.11）
+## 蜕变双录与阵堂/战线见闻
 
-`data/图鉴/里程碑.json` 由 16 条扩到 17 条，追加 `codex.creature.evolutions_two`（蜕变双录）：
+`data/图鉴/里程碑.json` 定义 `codex.creature.evolutions_two`（蜕变双录）：
 
 - `entry_keys`：`codex.creature.jade_rat`（玉背鼠）与 `codex.creature.cloud_elk`（云角鹿），
   即两条既有蜕变线（`beast.evolution.iron_rat_2`、`mount.evolution.bamboo_deer_1`）产物新登记的
@@ -102,7 +101,7 @@
   `codex_entry_key`，`companions/repository.evolve_companion` 在成功的同一事务内投影该条目，
   因此条目由真实玩法点亮，不是只有 JSON。
 
-`data/图鉴/条目.json` 另新增 `codex.escort.array_hall_drill` 与 `codex.escort.war_front_patrol`
+`data/图鉴/条目.json` 还登记 `codex.escort.array_hall_drill` 与 `codex.escort.war_front_patrol`
 （`challenge` 类，由探索结算按 `codex.escort.*` 既有投影点亮）与 `codex.material.ward_plate`
 （`material` 类，由首次获得投影点亮）。领取语义、未完成拒绝、一次领取、同 operation 回放与名望
 上限只记实际增量全部沿用既有实现。

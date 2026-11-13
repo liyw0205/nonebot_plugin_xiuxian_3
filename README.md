@@ -1,177 +1,97 @@
 # NoneBot 修仙 3
 
-`nonebot_plugin_xiuxian_3` 是面向 NoneBot 2 的文字修仙游戏插件。玩家从凡人开始，选择道途，修炼突破，探索地点，完成采集、悬赏和战斗，再把所得材料用于生产、经济、装备与灵兽成长。角色进度保存在 SQLite，玩法内容位于宿主的 `data/` JSON 目录。
+`nonebot_plugin_xiuxian_3` 是面向 NoneBot 2 的文字修仙游戏插件。正式版本为 `v0.1.40`。玩家从青石镇起步，完成引导、选择道途、修炼突破，并通过移动、探索、剧情、挂机、悬赏、生产与社交逐步深入三界。角色进度保存在 SQLite，游戏内容由宿主 `data/` 下的 JSON 提供。
 
-插件可接入 OneBot V11 和 QQ 官方机器人。两种适配器共用角色、任务和玩法服务；QQ 的 Markdown、蓝字和键盘是否呈现取决于账号能力与平台权限，未满足时保留可读文本。
+QQ 官方机器人与 OneBot V11 共用游戏服务。QQ 的 Markdown、蓝字与键盘按账号能力和平台权限呈现；OneBot 使用等价文本命令。发送 `修仙帮助` 可查看启程、修炼、探索、悬赏、生活和社交分类。
 
 ## 玩法
 
-- **启程与修炼**：创建角色、寻仙问道、道号、道途、功法、修为、境界和突破。
-- **世界与探索**：移动、采集、挖矿、历练、秘境、主线见闻和图鉴。
-- **悬赏与战斗**：悬赏榜、目标进度、自动 PvE、队伍战斗和终局挑战。
-- **生产与经济**：炼丹、炼器、布阵、灵田、设施、摆摊、求购和订单。
-- **灵兽与装备**：灵兽、灵骑、喂养、运输、行囊、鞍具、装备和耐久。
-- **任务与社交**：引路任务、日常、活动、宗门、师徒、道侣、队伍和切磋。
+- **启程与成长**：创建角色、选择道途、修炼突破、功法和装备。
+- **世界与剧情**：移动、采集、探索、自动战斗、秘境、主线和图鉴。
+- **挂机与生产**：闲居路线、派遣、炼丹炼器、灵田、居所、委托和运输。
+- **交易与社交**：摆摊、求购、拍卖、灵兽、宗门、师徒、道侣和队伍。
 
-## 开始游戏
+## 快速开始
 
-命令前缀由宿主的 `COMMAND_START` 决定，下面示例省略前缀；QQ群聊通常还需要 @机器人。
-
-```text
-开始修仙
-修仙帮助
-修仙帮助 启程
-我的状态
-```
-
-帮助总览按启程、修炼、探索、悬赏、生活、社交六类组织。QQ 可在有权限时点击蓝字，OneBot 会收到等价纯文本。
-
-## 安装
-
-安装器会创建 `$HOME/xiu3` 宿主和 `$HOME/myenv` 虚拟环境，安装 NoneBot CLI、QQ、OneBot V11 适配器及 FastAPI、HTTPX、websockets、AIOHTTP 驱动。Release 管理安装从 latest Release 获取程序文件；更新时保留宿主已有的 `.env`、数据库和 JSON 文件。
+Linux/Termux 可直接安装正式 Release，无需预先下载源码。要求 Python 3.11 或更高版本；安装完成后编辑 `.env` 并启动宿主：
 
 ### Linux 一键 Release 安装
 
-只需先准备 curl；Debian/Ubuntu 可执行 `sudo apt install curl`。Release 一键安装不需要先 clone 仓库。
-
 ```bash
-curl -fsSL https://raw.githubusercontent.com/liyw0205/nonebot_plugin_xiuxian_3/main/scripts/onekey.sh \
+curl -fsSL https://raw.githubusercontent.com/liyw0205/nonebot_plugin_xiuxian_3/v0.1.40/scripts/onekey.sh \
   | bash -s -- install --source-mode release --mirror accelerated
+${EDITOR:-vi} "$HOME/xiu3/.env"
+xiu3 start
 ```
-
-安装完成后编辑 `$HOME/xiu3/.env`，再执行 `xiu3 start`。无法写入公共命令目录时，使用 `$HOME/xiu3/xiu3`。
 
 ### Termux 一键 Release 安装
 
 ```bash
 pkg update -y
 pkg install -y curl
-curl -fsSL https://raw.githubusercontent.com/liyw0205/nonebot_plugin_xiuxian_3/main/scripts/onekey.sh \
+curl -fsSL https://raw.githubusercontent.com/liyw0205/nonebot_plugin_xiuxian_3/v0.1.40/scripts/onekey.sh \
   | bash -s -- install --source-mode release --mirror accelerated
 termux-wake-lock
 ```
 
-安装器会补齐 Python、Git、curl 和 clang。不要混用 Termux 与 `proot-distro` 的 Python/虚拟环境；在容器内重新执行安装器。
+Termux 安装器会使用 `pkg` 准备 Python、Git 和构建工具。不要混用 Termux 与 `proot-distro`
+的 Python/虚拟环境；在容器内单独执行安装流程。
+
+Release 一键安装不需要先 clone 仓库。安装器默认使用 `$HOME/xiu3` 宿主及 `$HOME/myenv` 虚拟环境，
+可通过 `--target` 和 `--venv` 指定独立路径。
 
 ### 手动获取脚本或源码安装
 
-以下 clone 仅用于手动获取脚本或显式进行源码安装，不是上面的 Release 一键安装前置。源码模式适合本地开发；`xiu3 update` 仅支持 Release 管理安装。
-
 ```bash
-git clone --branch main --single-branch \
+git clone --branch v0.1.40 --single-branch \
   https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git xiuxian3-src
 cd xiuxian3-src
 bash scripts/onekey.sh install --source-mode source --mirror direct
 ```
 
-### Windows（手动获取脚本）
+源码模式从指定目录安装；`xiu3 update` 只支持 Release 管理安装。更新前停止并备份宿主，
+升级保留 `.env`、SQLite 和自定义 JSON，官方种子仅在指纹匹配后迁移。
 
-Windows 示例先 clone `main` 获取 PowerShell 安装脚本；没有 Git 时在 PowerShell 执行 `winget install --id Git.Git --exact`，然后重开终端。
+### 配置与启动
 
-```powershell
-git clone --branch main --single-branch https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git xiuxian3-src
-Set-Location xiuxian3-src
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\onekey_windows.ps1 install -SourceMode release -Mirror direct
-```
-
-### Docker（手动获取部署文件）
-
-Docker Compose 文件需要从 `main` 获取；以下 clone 是为了取得这些部署文件。
-
-```bash
-git clone --branch main --single-branch \
-  https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git xiuxian3-src
-cd xiuxian3-src
-cp -n docker/env.example docker/.env
-# 编辑 docker/.env 后执行
-docker compose up -d --build
-docker compose logs -f xiuxian3
-```
-
-Docker 将 `./data` 挂载为内容和 SQLite 目录，将 `./runtime` 挂载为额外运行状态目录；凭据只写入 `docker/.env`。
-
-### 已有 NoneBot 宿主
-
-适合已经有 NoneBot 项目的用户。先获取 main 中的安装脚本，再由 Release 补齐宿主依赖；脚本不会覆盖已有 `bot.py`、`pyproject.toml`、`.env` 或 `data/*.json`。
-
-```bash
-git clone --branch main --single-branch \
-  https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git xiuxian3-src
-cd xiuxian3-src
-bash scripts/onekey.sh install --source-mode release --mirror direct \
-  --target /path/to/nonebot-host \
-  --source /path/to/xiuxian3-release-cache \
-  --venv /path/to/venv
-```
-
-宿主需要能够使用 `nb run`，并允许安装 QQ/OneBot 适配器和驱动。首次从源码安装或本地开发时，显式指定源码目录：
-
-```bash
-bash scripts/onekey.sh install --source-mode source --mirror direct \
-  --target /path/to/nonebot-host --source "$PWD" --venv /path/to/venv
-```
-
-## 配置
-
-宿主 `.env` 的最小示例：
-
-```dotenv
-ENVIRONMENT=prod
-DRIVER=~fastapi+~httpx+~websockets+~aiohttp
-HOST=0.0.0.0
-PORT=8080
-LOG_LEVEL=INFO
-COMMAND_START=["/"]
-SUPERUSERS=[]
-QQ_BOTS=[]
-# XIUXIAN3_DATA_DIR=./data
-```
-
-### QQ 官方机器人
-
-在 `QQ_BOTS` 填写 QQ 开放平台提供的 AppID、Token、Secret 和事件意图。群消息至少启用 `c2c_group_at_messages`，并按开放平台权限开通需要的事件。
-
-```dotenv
-QQ_BOTS='[{"id":"APP_ID","token":"APP_TOKEN","secret":"APP_SECRET","use_websocket":true,"intent":{"c2c_group_at_messages":true,"direct_message":true}}]'
-```
-
-`xiu3 login`（Windows 为 `& .\xiu3.ps1 login`）是 QQ 官方 bot 绑定辅助，调用 QQ 官方绑定接口并更新 `.env`；它不是 OneBot/NapCat 扫码登录，也不替代手填 `QQ_BOTS` 凭据。QQ Markdown、蓝字和键盘仍需要对应的平台能力与权限，真实呈现以账号和设备为准。
-
-### OneBot V11 / NapCat
-
-OneBot/NapCat 在自己的客户端完成登录和扫码，NoneBot 提供反向 WebSocket：
+宿主 `.env` 的 `COMMAND_START` 控制命令前缀。只用 OneBot 时保持 `QQ_BOTS=[]`，
+在 OneBot/NapCat 客户端完成账号登录，并配置反向 WebSocket：
 
 ```text
 ws://服务器地址:8080/onebot/v11/ws
 ```
 
-`ONEBOT_V11_ACCESS_TOKEN` 仅在启用反向 WebSocket 鉴权时配置；不启用鉴权时省略该变量。启用后，宿主 `.env` 与 OneBot/NapCat 客户端的访问令牌必须一致。
+同一个 Docker 网络中的 OneBot 可使用 `ws://xiuxian3:8080/onebot/v11/ws`。
+`ONEBOT_V11_ACCESS_TOKEN` 仅在启用反向 WebSocket 鉴权时填写，且须与客户端一致。
 
-Docker Compose 同一网络内使用 `ws://xiuxian3:8080/onebot/v11/ws`。只使用 OneBot 时保持 `QQ_BOTS=[]`，不要把 OneBot 登录信息写进 `QQ_BOTS`。
+使用 QQ 官方机器人时，在 `QQ_BOTS` 填入开放平台的 AppID、Token、Secret 和事件权限；
+群消息需要 `c2c_group_at_messages`。凭据保存在宿主 `.env`。
+`xiu3 login` 提供可选的官方 bot 绑定辅助，QQ Markdown 和键盘仍须具备对应平台权限。
 
-## 控制命令
-
-Linux/Termux 使用 `xiu3`，Windows 使用宿主目录中的 `xiu3.ps1`：
-
-```text
+```bash
 xiu3 start
 xiu3 status
-xiu3 pause
-xiu3 resume
-xiu3 restart
-xiu3 stop
 xiu3 logs --lines 100
-xiu3 update
-xiu3 login
-xiu3 uninstall --yes
 ```
 
-`uninstall --yes` 会删除宿主目录及其中的 SQLite 数据，不会删除共享虚拟环境；执行前先备份。
-安装与更新也可使用 `install`、`update`，并通过 `--target`、`--source`、`--source-mode`、`--mirror`、`--venv` 指定宿主、源码来源、下载方式和虚拟环境。
+其他系统、已有 NoneBot 宿主、配置、备份和更新步骤见[安装指南](docs/installation.md)。
+
+## 玩家起步
+
+```text
+开始修仙
+寻仙问道
+完成引导 阅读
+前往 近郊
+我的状态
+修仙帮助 启程
+```
+
+后续按状态完成采集和生产教学，再选择道途。移动、探索、挂机和主线都在对应的状态卡或分类帮助中提供下一步入口。
 
 ## 更新、备份与排错
 
-以下流程适用于 Release 管理安装。先停止宿主，再备份；`xiu3 update` 从 latest Release 下载 `project.tar.gz` 并更新程序文件，保留宿主配置、SQLite、`data/`、`runtime/` 和 venv；完成后重新启动：
+Release 管理安装从 latest Release 获取 `project.tar.gz`。先停止并备份宿主，再更新和启动：
 
 ```bash
 xiu3 stop
@@ -180,27 +100,45 @@ xiu3 update
 xiu3 start
 ```
 
-源码模式仅用于首次源码安装或本地开发；`xiu3 update` 只支持 Release 管理安装，需要可用的 Release 源码目录来获取归档。不要在宿主运行时复制数据库。
+## 其他安装方式
 
-查看状态和正常宿主日志：
+Windows PowerShell、Docker Compose 和已有 NoneBot 宿主也可使用正式版本。Windows 与 Docker 示例需先取得发布脚本和部署文件：
 
 ```bash
-xiu3 status
-tail -n 80 "$HOME/xiu3/.xiuxian3/nb.log"
+git clone --branch v0.1.40 --single-branch \
+  https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git xiuxian3-src
 ```
 
-`.xiuxian3/nb.pid` 保存 PID，`.xiuxian3/nb.log` 保存 `nb run` 日志；`runtime/` 仅用于 Docker 额外挂载。端口冲突时修改宿主 `.env` 的 `PORT` 后重启。QQ 无消息先检查 `QQ_BOTS` 和事件权限，OneBot 无消息先检查反向 WebSocket 地址、令牌、防火墙和客户端连接日志。
+Windows 在 PowerShell 中运行：
 
-## 文档与数据
+```powershell
+Set-Location xiuxian3-src
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\onekey_windows.ps1 install -SourceMode release -Mirror direct
+```
 
-- [玩家使用指南](https://github.com/liyw0205/nonebot_plugin_xiuxian_3/blob/main/docs/usage.md)
-- [安装与配置](https://github.com/liyw0205/nonebot_plugin_xiuxian_3/blob/main/docs/installation.md)
-- [运行与安全](https://github.com/liyw0205/nonebot_plugin_xiuxian_3/blob/main/docs/operations.md)
-- [适配器说明](https://github.com/liyw0205/nonebot_plugin_xiuxian_3/blob/main/docs/extensions/adapters/README.md)
-- [QQ 能力配置](https://github.com/liyw0205/nonebot_plugin_xiuxian_3/blob/main/docs/operations.md#1-配置层级)
+Docker Compose 在 Linux 主机或服务器中运行：
 
-`data/` 保存 JSON 内容定义和 SQLite 数据；普通宿主的运行 PID/日志位于 `.xiuxian3/`，Docker 另外挂载 `runtime/`。请勿把 token、Secret、数据库或备份提交到 Git。
+```bash
+cd xiuxian3-src
+cp -n docker/env.example docker/.env
+docker compose up -d --build
+docker compose logs -f xiuxian3
+```
 
-## 许可证
+Compose 将 `./data` 用作内容与 SQLite 目录，`./runtime` 保存额外运行状态；QQ 凭据只填入 `docker/.env`。
+已有宿主的 Release 接入、安装参数和 Windows 控制命令见[安装指南](docs/installation.md)。
 
-本项目采用 [MIT License](https://github.com/liyw0205/nonebot_plugin_xiuxian_3/blob/main/LICENSE)。
+源码模式用指定源码重新安装。启动失败时先用 `xiu3 status` 和 `xiu3 logs --lines 100` 查看原因；
+连接、端口、权限和恢复步骤见[安装指南排错](docs/installation.md#排错)。
+
+Linux/Termux 管理命令为 `xiu3 start|stop|restart|status|logs|update|login`。
+卸载会删除宿主目录和其中的 SQLite，执行前先备份。
+
+## 文档
+
+- [当前可用能力](docs/availability.md)
+- [玩家使用指南](docs/usage.md)
+- [安装、配置与更新](docs/installation.md)
+- [文档索引](docs/index.md)
+- [运行与安全](docs/operations.md)
+- [MIT 许可证](LICENSE)

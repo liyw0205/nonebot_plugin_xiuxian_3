@@ -25,6 +25,9 @@ from .adventures.mainline import (
     CLOUD_CITY_ECHOES_STORY_KEY,
     SEEKER_ECHOES_STORY_KEY,
     LIVELIHOOD_ECHOES_STORY_KEY,
+    BEAST_HABITAT_ECHOES_STORY_KEY,
+    COMPANION_OLD_TRAIL_STORY_KEY,
+    SPRING_SUPPER_STORY_KEY,
     DAO_SETTLEMENT_STORY_KEY,
     DOMAIN_FRONTIER_STORY_KEY,
     VOID_ARCHIVE_STORY_KEY,
@@ -212,6 +215,16 @@ _HELP_PAGES = {
         "图鉴回响两页记录完成后，寻道期可按既有门槛使用观兽与塔外守望：先"
         f"{command_link('挂机预览 观兽', '挂机预览 观兽')}和{command_link('挂机预览 塔外守望', '挂机预览 塔外守望')}确认门槛，"
         "两条路线都要在主线开始后完整领取，逾时保底不替代主线交班。\n\n"
+        "完成玄天主线初入近郊后，可继续灵兽旧兽道手记：在近郊开始"
+        f"{command_link('灵兽旧兽道回响主线', '灵兽旧兽道回响主线')}，先按提示新结缘木鼠或与已有木鼠相伴，"
+        f"再{command_link('挂机预览 灵兽栖地巡护', '挂机预览 灵兽栖地巡护')}并完整领取四小时巡护；"
+        f"最后用巡护所得粗糙灵米{command_link('喂养灵兽 灵兽编号', '喂养灵兽')}。"
+        "旧结缘、取消、逾时保底或本关开始前的喂养都不推进；巡护状态和故事进度在重启后保留。\n\n"
+        "感气二层后，可接"
+        f"{command_link('泉边炊烟主线', '泉边炊烟主线')}：沿公开山路到灵泉谷，"
+        f"先{command_link('挂机预览 灵泉谷拾穗', '挂机预览 灵泉谷拾穗')}并完整收获四小时稻畦，"
+        f"再由烹饪辅修{command_link('生产预览 灵米饭', '生产预览 灵米饭')}，新开锅、收饭后选择补回体力或精力。"
+        "旧安排和旧锅不算本关劳作；取消、逾时拾穗或没有实际补回气力时可按关卡提示重续。\n\n"
         "筑基四层后可接云铁守望回响：先"
         f"{command_link('云铁守望回响主线', '云铁守望回响主线')}查看关卡，"
         f"再{command_link('开始云铁守望回响主线 矿口听风', '开始云铁守望回响主线 矿口听风')}沿公开山道抵达云铁矿区；"
@@ -219,7 +232,9 @@ _HELP_PAGES = {
         "金丹一层后可接云城店铺回响：先"
         f"{command_link('云城店铺回响主线', '云城店铺回响主线')}查看关卡，"
         f"再{command_link('开始云城店铺回响主线 云城听更', '开始云城店铺回响主线 云城听更')}沿公开路线抵达云城；"
-        "随后按关卡提示完成云城巡夜真实胜场，并在云城地方名望达到 200 后完整领取店铺闲居。逾时保底不替代主线交班。\n\n"
+        f"随后按关卡提示完成云城巡夜真实胜场；名望不足时可用{command_link('派遣预览 云铁矿区勘测', '派遣预览 云铁矿区勘测')}查看公开来源，"
+        f"再{command_link('接受派遣 云铁矿区勘测', '接受派遣 云铁矿区勘测')}，成功五点或部分完成两点都在派遣结算后入账。"
+        f"身在云城且名望达到 200 后，再{command_link('挂机预览 云城店铺', '挂机预览 云城店铺')}并完整领取八小时店铺闲居；逾时保底不替代主线交班。\n\n"
         "寻道期回到青石镇后可接闲居回响：先"
         f"{command_link('寻道闲居回响主线', '寻道闲居回响主线')}查看关卡，"
         f"再{command_link('挂机预览 镇中问询', '挂机预览 镇中问询')}确认青石镇名望十点与三小时窗口，"
@@ -233,6 +248,13 @@ _HELP_PAGES = {
         f"第三关用{command_link('挂机预览 作坊值守', '挂机预览 作坊值守')}确认基础炉具或铁锤之一，或本人可用的炼器台。"
         "器修入道可取得铁锤，辅修炼丹或炼器可取得对应工具；"
         "逾时保底不替代剧情交班。\n\n"
+        "妖界栖地回响承接万兽山的真实行路：用"
+        f"{command_link('妖界栖地回响主线', '妖界栖地回响主线')}查看三段，"
+        f"先{command_link('开始妖界栖地回响主线 贸易口登记', '开始妖界栖地回响主线 贸易口登记')}并从万兽山结算抵达三界贸易口；"
+        "随后回到万兽山，按主线提示完成真实狩猎并结算取得兽血。"
+        f"完成妖界引导、持有至少 80 点妖界声望和 500 灵石后，{command_link('申请贸易许可 妖界', '申请贸易许可 妖界')}取得七日许可；"
+        f"再{command_link('挂机预览 妖界栖地', '挂机预览 妖界栖地')}、{command_link('开始挂机 妖界栖地', '开始挂机 妖界栖地')}，八小时完整领取才记入夜值回响。"
+        "提前、取消、逾时保底、战败或重启中的未结算记录都不会推进；按原路线恢复后可重试。\n\n"
         f"{command_link('每日修行', '每日修行')}记下日常安排，"
         f"{command_link('道历问安', '道历问安')}领取当日问安所得。\n\n"
         f"{command_link('灵兽状态', '灵兽状态')}可查看同行灵兽与灵骑；"
@@ -333,6 +355,27 @@ class XiuxianApplication:
             title="青石镇常驻生计回响主线",
             start_command="开始青石镇常驻生计回响主线",
             claim_command="领取青石镇常驻生计回响主线奖励",
+        )
+        self.beast_habitat_echoes_mainline = AdventuresMainlineApplication(
+            repository,
+            story_key=BEAST_HABITAT_ECHOES_STORY_KEY,
+            title="妖界栖地回响主线",
+            start_command="开始妖界栖地回响主线",
+            claim_command="领取妖界栖地回响主线奖励",
+        )
+        self.companion_old_trail_mainline = AdventuresMainlineApplication(
+            repository,
+            story_key=COMPANION_OLD_TRAIL_STORY_KEY,
+            title="灵兽旧兽道回响主线",
+            start_command="开始灵兽旧兽道回响主线",
+            claim_command="领取灵兽旧兽道回响主线奖励",
+        )
+        self.spring_supper_mainline = AdventuresMainlineApplication(
+            repository,
+            story_key=SPRING_SUPPER_STORY_KEY,
+            title="泉边炊烟主线",
+            start_command="开始泉边炊烟主线",
+            claim_command="领取泉边炊烟主线奖励",
         )
         self.dao_echoes = DaoEchoesApplication(repository)
         self.three_realms = ThreeRealmsApplication(repository)
@@ -1634,6 +1677,63 @@ class XiuxianApplication:
             context,
             lambda: self.livelihood_echoes_mainline.claim_reward(context),
             write_message="此刻无缘收取青石镇常驻生计回响主线所得。",
+        )
+
+    async def get_beast_habitat_echoes_mainline_status(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.beast_habitat_echoes_mainline.get_status(context),
+            require_write=False,
+        )
+
+    async def start_beast_habitat_echoes_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.beast_habitat_echoes_mainline.start_stage(context),
+            write_message="此刻无缘踏入妖界栖地回响主线。",
+        )
+
+    async def claim_beast_habitat_echoes_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.beast_habitat_echoes_mainline.claim_reward(context),
+            write_message="此刻无缘收取妖界栖地回响主线所得。",
+        )
+
+    async def get_companion_old_trail_mainline_status(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.companion_old_trail_mainline.get_status(context),
+            require_write=False,
+        )
+
+    async def start_companion_old_trail_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.companion_old_trail_mainline.start_stage(context),
+            write_message="此刻无缘踏入灵兽旧兽道回响主线。",
+        )
+
+    async def claim_companion_old_trail_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.companion_old_trail_mainline.claim_reward(context),
+            write_message="此刻无缘收取灵兽旧兽道回响主线所得。",
+        )
+
+    async def get_spring_supper_mainline_status(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.spring_supper_mainline.get_status(context), require_write=False)
+
+    async def start_spring_supper_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context, lambda: self.spring_supper_mainline.start_stage(context),
+            write_message="此刻无法开始泉边炊烟。",
+        )
+
+    async def claim_spring_supper_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context, lambda: self.spring_supper_mainline.claim_reward(context),
+            write_message="此刻无法领取泉边炊烟所得。",
         )
 
     async def preview_final_arena(self, context: CommandContext) -> CommandResult:

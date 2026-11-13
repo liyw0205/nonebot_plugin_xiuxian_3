@@ -1960,6 +1960,27 @@
       "status": "active"
     },
     {
+      "key": "codex.story.companion_old_trail.1",
+      "name": "旧兽道·初识木鼠",
+      "desc": "与木鼠结缘或陪它重认旧路，记下同行的约定；蜕变后的它仍认得你的气息。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.companion_old_trail.2",
+      "name": "旧兽道·四时巡护",
+      "desc": "完整领取灵兽栖地巡护后，记录木鼠带回的近郊收获。",
+      "category": "story",
+      "status": "active"
+    },
+    {
+      "key": "codex.story.companion_old_trail.3",
+      "name": "旧兽道·灵米喂伴",
+      "desc": "巡护归来，把粗糙灵米喂给木鼠或蜕变后的同伴，完成同行约定。",
+      "category": "story",
+      "status": "active"
+    },
+    {
       "key": "codex.escort.array_hall_drill",
       "name": "阵堂校阵记",
       "desc": "在阵堂校验阵纹、击退失序试阵傀儡后，阵堂见闻收入图鉴。",

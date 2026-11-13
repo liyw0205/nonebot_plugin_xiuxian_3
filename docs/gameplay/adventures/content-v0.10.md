@@ -66,8 +66,7 @@
 `test/test_trade_endpoint_realms.py` 覆盖：
 
 - 两条记录按通用秘境合同逐字段核对（键前缀、`record_type`、地点、境界门、体力、无凭证、
-  节点顺序、敌人、首/重奖励、周限、过期、名望键与奖励一致），别名解析，`secret_realm_definitions`
-  计数 7→9；
+  节点顺序、敌人、首/重奖励、周限、过期、名望键与奖励一致），别名解析；
 - 发现性：两个地点 `actions` 含对应秘境键且 `codex_entry_key` 未变，两名敌人的 `location_key`/
   `combat_profile`/`stats.agility` 可解析；
 - 预览在 `qq.official` 与 `onebot.v11` 两端列出两条记录及其节点/体力/周限/首奖励；
@@ -77,9 +76,7 @@
 - 三界货栈完整通关经真实战斗结算，`battle_sessions` 恰一行且敌人来自该秘境；
 - 战斗失败（无武器）结算 `reward == {}` 且不发首通；超时结算 `outcome=expired` 且退还体力 20。
 
-回归：`test_secret_realm_intro.py`（预览集合按数据更新）、`test_secret_realm_expansion.py`
-（通用秘境计数 7→9）、`test_combat_content.py`（敌人/档案/遭遇计数）、`test_m9_content_integrity.py`
-（`combat_enemies` 64→66）。发布清单钉值随本切片更新。
+相关回归覆盖通用秘境预览、敌人档案、遭遇引用和内容完整性。
 
 种子迁移：`冒险/秘境.json`、`战斗/敌人.json`、`地图/地点.json` 三份官方种子在
 `scripts/seed_migrations.json` 中登记本版 `new_sha256`/`new_commit`，并把上一版 `new_sha256` 追加为

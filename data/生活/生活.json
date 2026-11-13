@@ -1405,6 +1405,7 @@
       "daily_limit": 1,
       "requirements": {
         "stage": "cultivator",
+        "location_key": "xuantian.cloud_city",
         "local_reputation": {
           "local.xuantian.cloud_city": 200
         }

@@ -1,6 +1,6 @@
 # 核心：冒险、主线与战斗记录域
 
-本域把已有的悬赏、秘境与战斗日志正规化，并新增主线关卡。它复用探索/战斗域的快照与结算，不复制第二套战斗引擎。
+本域负责悬赏、秘境、遗府、主线关卡与斗法留影，复用探索/战斗域的会话、快照和奖励结算。
 
 当前全部开放境界的悬赏目标、公开来源、通路与有限资源边界见[悬赏可达性矩阵](bounty-reachability.md)。
 
@@ -12,8 +12,9 @@
 再向魔渊净化工程提交本人本关开始后的新贡献。
 
 青石镇常驻生活可推进[常驻生计回响](livelihood-echoes.md)：镇中行旅、灵圃看护与作坊值守。
+金丹一层可推进[云城店铺回响](cloud-city-shop-echoes.md)：抵达云城、巡夜胜场、积累地方名望后完整领取店铺闲居；具体命令见[玩家使用指南](../../usage.md#云城店铺回响)。
 
-当前开放草药补给、生产订单、v0.2 云铁矿区/洞天精英悬赏、v0.3 魔界救援与妖界栖地悬赏、v0.1 两个秘境、v0.2 雾隐洞天二层与云舟秘境、v0.3 `instance.secret_realm.boundary_rift` 界隙裂隙秘境、`instance.secret_realm.demon_abyss` 魔界深渊秘境、v0.4 `instance.secret_realm.ancient_domain` 远古洞天和 `instance.secret_realm.ancestral_hall` 祖灵殿、v0.5 `instance.secret_realm.void_ruins` 虚空遗迹与 `instance.secret_realm.time_fort` 时序堡垒、v0.6 `instance.secret_realm.dao_origin` 道源秘境、`instance.secret_realm.heaven_echo` 天劫回音，v0.7 `instance.secret_realm.ironwood_trial` 铁木试炼、`instance.secret_realm.time_garden_echo` 时序残响与 `instance.secret_realm.ancestral_vein` 祖灵支脉，以及 `instance.legacy.demon_reliquary` 和 `instance.legacy.demon_abyss_echo` 两条线索驱动遗府。v0.10 `instance.secret_realm.abyss_market_run` 魔渊契约集市与 `instance.secret_realm.trade_port_convoy` 三界货栈把两个已开放却无活动的贸易端点接上通用秘境。虚空遗迹使用独立仓储、专用 2–5 人队伍、十节点路线、两场自动战、托管锚和系统补偿；专项 QQ 官方/OneBot V11 双方向与重启恢复测试见 `test/test_void_ruins_secret_realm_v05.py`。祖灵殿专项见 `test/test_ancestral_hall_secret_realm_v04.py`，时序堡垒专项见 `test/test_time_fort_secret_realm_v05.py`，道源秘境专项见 `test/test_dao_origin_secret_realm_v06.py`。遗府使用遗府专属仓储和稳定键隔离，现无已登记且规则闭合的后续副本待办。斗法记录分享和尚未定义合同的后续内容仍保持锁定；世界/社交域以其他稳定键独立开放的副本不代表相应秘境合同已开放；具名遭遇和天劫试炼的战斗会话由战斗域统一管理，状态总表见[当前开发状态](../../current-status.md)。
+本域的玩家入口包含悬赏榜、秘境预览/进入/结算、主线查看/开始/领奖以及已开放的斗法留影。各入口按地点、境界、物品、许可、队伍和轮次验证准入；可用范围以[当前可用能力](../../availability.md)为准，内容键、奖励和专属规则见对应快照与状态机。
 
 当前运行时已开放 v0.1 的 `bounty.herb_supply`、`bounty.craft_order`，v0.2 的 `bounty.cloud_mine`，感气阶段的
 `bounty.spell_trial`、`bounty.body_trial`，以及 v0.3 的 `bounty.demon_relief`、`bounty.beast_habitat`：悬赏榜为只读查询，
@@ -51,23 +52,23 @@ SQLite 角色记录保持隔离。
 队伍先在 `cave.boundary_realm` 使用 `创建界隙裂隙秘境队伍` 建立 2–5 人专用队伍并完成确认；随后队长依次使用
 `进入秘境 界隙裂隙`、`选择秘境节点 <节点>`，破碎岔路需追加 `内|外`，遭遇战/终局奖励使用 `结算界隙裂隙秘境`。
 规则、首通/重复奖励、成本补偿与节点顺序以[v0.3 冒险内容合同](content-v0.3.md#instancesecret_realmboundary_rift-合同)为准。
-QQ 官方与 OneBot V11 双方向混合队伍验收见 `test/test_boundary_rift_secret_realm_v03.py`。
+队伍成员可使用 QQ 官方或 OneBot V11 入口；队伍、节点和结算状态由同一服务端记录推进。
 
 虚空遗迹秘境使用独立 `void_ruins_runs` / `void_ruins_members`，不复用通用 `secret_realm_runs` 或战斗奖励。队伍在 `void.archive_ruins` 创建并确认后，队长使用 `进入秘境 虚空遗迹`，再按十节点顺序选择；两场服务端自动战由任一队员使用 `结算秘境` 续跑。入场快照冻结不稳定风险、战斗属性和版本；战败/过期保留体力和周额度但返还锚，明确系统故障才补偿体力并释放额度。规则和稳定键以[v0.5 冒险内容合同](content-v0.5.md#instancesecret_realmvoid_ruins-合同)为准。
 
 时序堡垒秘境使用专属 `TimeFortRepositoryMixin` 与 `time_fort_runs` / `time_fort_members`，不复用通用秘境会话或虚空遗迹奖励。全员需炼虚 L1、位于 `void.archive_ruins` 并持有 `access.void.time_fort`；队长支付 40 体力，每位成员每 UTC 周尝试一次。六节点路线在 `time_keeper` 进行一场自动队伍战，时间风暴按冻结快照每三回合伤害全体存活队员；首通逐成员发阵砂并写入独立主线旗标。失败/过期保留成本和额度，明确系统故障补偿才退款并释放额度。命令及失败边界按[v0.5 时序堡垒合同](content-v0.5.md)执行。
 
-魔界深渊秘境使用专用 `DemonAbyssRepositoryMixin` 事务，不把路线、风险、首通奖励和恢复逻辑塞入通用秘境仓储。命令为 `进入秘境 魔界深渊`、`选择秘境节点 深渊门|污染渗流|残响守卫|深渊之心` 和 `结算秘境`；要求筑基 L1、魔界深渊门地点、门禁旗标与魔界声望 200，每 UTC 周一次、入场扣 20 体力，运行 60 分钟。节点顺序、自动战、污染风险、失败/过期成本、首通/重复奖励及系统中止补偿按[v0.3 冒险内容合同](content-v0.3.md#instancesecret_realmdemon_abyss-合同)执行。战斗使用 `combat-0.3.2`，适配器覆盖 QQ 官方、OneBot V11 及 QQ→OneBot 重启续跑，详见 `test/test_demon_abyss_secret_realm_v03.py`。
+魔界深渊秘境使用专用 `DemonAbyssRepositoryMixin` 事务，不把路线、风险、首通奖励和恢复逻辑塞入通用秘境仓储。命令为 `进入秘境 魔界深渊`、`选择秘境节点 深渊门|污染渗流|残响守卫|深渊之心` 和 `结算秘境`；要求筑基 L1、魔界深渊门地点、门禁旗标与魔界声望 200，每 UTC 周一次、入场扣 20 体力，运行 60 分钟。节点顺序、自动战、污染风险、失败/过期成本、首通/重复奖励及系统中止补偿按[v0.3 冒险内容合同](content-v0.3.md#instancesecret_realmdemon_abyss-合同)执行。战斗使用 `combat-0.3.2`，开始时冻结自动战规则并支持跨适配器恢复。
 
-祖灵殿秘境使用独立 `AncestralHallRepositoryMixin` 与 `ancestral_hall_runs` 表，不把领域事务挤入通用秘境仓储。命令为 `进入秘境 祖灵殿`、`选择秘境节点 祖灵门|誓言石阵|血脉回廊|祖灵守灵|始祖祭坛` 和 `结算秘境`；入口检查化神 L1、祖灵湖、妖界声望 3000、血脉稳定 5000 bp，单人消耗 25 体力，每 UTC 周尝试一次，60 分钟过期。首次完成只写 `story.ancestral_hall`，没有资产奖励；守灵自动战按 `combat-0.4.1` 持久化召影、自动清影和超时恢复。QQ 官方、OneBot V11 及两个身份切换方向、补偿、过期和重启续战见 `test/test_ancestral_hall_secret_realm_v04.py`。
+祖灵殿秘境使用独立 `AncestralHallRepositoryMixin` 与 `ancestral_hall_runs` 表，不把领域事务挤入通用秘境仓储。命令为 `进入秘境 祖灵殿`、`选择秘境节点 祖灵门|誓言石阵|血脉回廊|祖灵守灵|始祖祭坛` 和 `结算秘境`；入口检查化神 L1、祖灵湖、妖界声望 3000、血脉稳定 5000 bp，单人消耗 25 体力，每 UTC 周尝试一次，60 分钟过期。首次完成只写 `story.ancestral_hall`，没有资产奖励；守灵自动战按 `combat-0.4.1` 持久化召影、自动清影和超时恢复。
 
 道源秘境使用独立 `DaoOriginRepositoryMixin` 与 `dao_origin_runs` 表，不复用通用秘境仓储。角色须在 `dao.origin_gate` 达到合道 L1 并持有 `access.dao.origin`；固定八节点、60 体力、60 分钟和每角色一次。首通结算写入 `story.dao_origin` 与 `codex.dao.service_origin`，不修改任何终局资源；系统补偿才退款，普通过期保留成本和额度。命令为 `进入秘境 道源秘境`、`选择秘境节点 <当前节点>` 和 `结算秘境`。
 
-天劫回音使用独立 `HeavenEchoRepositoryMixin` 与 `heaven_echo_runs` 表。角色须渡劫 L1 且不在最终战中；固定三节点、无体力/票券/次数成本、60 分钟过期，完成后允许重复挑战。首通结算只写 `story.heaven_echo` 结局旁线旗标，不改天劫债、终局状态或飞升资源；系统中止只结束无资源运行。命令为 `进入秘境 天劫回音`、`选择秘境节点 <当前节点>` 和 `结算秘境`，专项 QQ 官方/OneBot V11、重启和身份切换验收见 `test/test_heaven_echo_secret_realm_v06.py`。
+天劫回音使用独立 `HeavenEchoRepositoryMixin` 与 `heaven_echo_runs` 表。角色须渡劫 L1 且不在最终战中；固定三节点、无体力/票券/次数成本、60 分钟过期，完成后允许重复挑战。首通结算只写 `story.heaven_echo` 结局旁线旗标，不改天劫债、终局状态或飞升资源；系统中止只结束无资源运行。命令为 `进入秘境 天劫回音`、`选择秘境节点 <当前节点>` 和 `结算秘境`。
 
-首条遗府 `instance.legacy.demon_reliquary` 使用独立 `LegacyManorRepositoryMixin` 与 `legacy_manor_runs` 表。角色须元婴 L1、位于 `demon.fallen_ruins`、持有 `access.demon.fallen_ruins` 和绑定 `item.clue.demon_contract`；线索不消耗。固定三节点、无资源成本，60 分钟过期；失败可重试，首通只写 `story.legacy.demon_reliquary` 并关闭后续新建。命令为 `进入遗府`、`遗府状态`、`选择遗府节点 <节点>` 和 `结算遗府`；状态查询用于跨适配器/重启恢复后查看当前节点。QQ/OneBot V11 双向身份切换、重启、过期、系统中止和资源隔离见 `test/test_legacy_manor_v06.py`。
+首条遗府 `instance.legacy.demon_reliquary` 使用独立 `LegacyManorRepositoryMixin` 与 `legacy_manor_runs` 表。角色须元婴 L1、位于 `demon.fallen_ruins`、持有 `access.demon.fallen_ruins` 和绑定 `item.clue.demon_contract`；线索不消耗。固定三节点、无资源成本，60 分钟过期；失败可重试，首通只写 `story.legacy.demon_reliquary` 并关闭后续新建。命令为 `进入遗府`、`遗府状态`、`选择遗府节点 <节点>` 和 `结算遗府`；状态查询用于跨适配器/重启恢复后查看当前节点。
 
-第二条 `instance.legacy.demon_abyss_echo` 在 `demon.abyss_gate` 使用既有深渊残响线索，筑基 L1 后可进入；固定三节点、60 分钟、无资源成本，首通只写故事旗标。它与契约遗府共享遗府专属会话表，但每条记录保存独立 `instance_key`；角色任一时间只能推进一处遗府。命令为 `进入残响遗府`、`残响遗府状态`、`选择残响遗府节点 <节点>` 和 `结算残响遗府`。QQ/OneBot V11 双适配器与跨适配器身份恢复见 `test/test_demon_abyss_echo_legacy_v06.py`。
+第二条 `instance.legacy.demon_abyss_echo` 在 `demon.abyss_gate` 使用既有深渊残响线索，筑基 L1 后可进入；固定三节点、60 分钟、无资源成本，首通只写故事旗标。它与契约遗府共享遗府专属会话表，但每条记录保存独立 `instance_key`；角色任一时间只能推进一处遗府。命令为 `进入残响遗府`、`残响遗府状态`、`选择残响遗府节点 <节点>` 和 `结算残响遗府`。
 
 v0.2 秘境合同：`instance.secret_realm.mist_depth_2` 要求金丹 L1、`cave.mist_grotto_2` 和 `item.cave_pass_advanced`，
 路线为 `resource -> encounter -> choice -> encounter -> choice`，首通创建 `item.weapon.cloud_sword` 装备实例；
@@ -80,6 +81,12 @@ v0.2 秘境合同：`instance.secret_realm.mist_depth_2` 要求金丹 L1、`cave
 奖励、地点/图鉴事件、称号和声誉在同一事务中提交，重复 operation 只回放结果，
 重新挑战只发重复奖励。地方名望通过共享角色状态事务封顶，领奖记录与回复只保留实际所得。
 关卡定义、前置、境界门槛、别名和奖励均从内容包读取。
+
+首章雾中守门要求筑基 L1：筑基突破的公开结算发放一张 `item.cave_pass_basic`，从灵泉谷前往
+雾隐洞天一层时消耗；抵达后，`explore.mist_grotto` 仍按模式声明的聚气 L4 与当前位置准入，
+不重复要求第二张凭证。城镇委托关只以前一主线关卡为开始前置；开始后须通过常驻委托入口
+交付 `town_commission.herb_supply`，目标消费者按交付时间不早于主线开始时间核验，不能用开始前的
+历史交付代替本次目标。
 
 领域前线主线已接入守界、净渊、护祖三线，每线六关：`领域前线主线` 查看状态，
 `开始领域前线主线 <关卡名>` 开始，`领取领域前线主线奖励 <关卡名>` 结算。关卡前置只认
@@ -179,8 +186,7 @@ v0.6 `story.mainline.dao_echoes` 已开放玩家流程：炼虚 L10 后可查询
 - 重复：三选一权重池（空手 / 木材×2 / 铁石×1），第二次通关起不再发首通奖励；
 - 超时 3600 秒退还体力，战斗失败不退体力且无首通奖励。
 
-专项测试 `test/test_secret_realm_ironwood.py` 覆盖预览、地点/境界/体力/配额四类拒绝、
-完整通关、节点重放返回同一战斗、重复结算幂等、重复奖池、战斗失败与超时退款。
+新建时校验预览、地点/境界/体力/配额；运行后节点推进与重复结算幂等，战斗失败和超时按上述资源合同处理。
 
 ## 时序残响与祖灵支脉（v0.7）
 
@@ -197,11 +203,9 @@ v0.6 `story.mainline.dao_echoes` 已开放玩家流程：炼虚 L10 后可查询
   抽兽血×1 或空手。它只读取境界与地点，不要求祖灵殿的妖界声望 3000 或血脉稳定 5000 bp，
   也不写 `story.ancestral_hall`。
 
-预览层新增只读资格判断（地点、境界、体力、凭证、周期次数、进行中的秘境/长时行动），
-不创建运行、不扣资源；失败保留体力与周次数，过期返还门票与锁定体力，两条记录无门票，
-因此过期只返还体力。专项测试 `test/test_secret_realm_expansion.py` 覆盖内容合同与坏引用拒绝、
-预览可进入标记/单入口按钮/OneBot 降级、探索帮助列表、首通/周限/重复池/过期退款、
-祖灵支脉重启续跑与结算幂等。
+预览层执行只读资格判断（地点、境界、体力、凭证、周期次数、进行中的秘境/长时行动），
+不创建运行、不扣资源；失败保留体力与周次数，过期返还门票与锁定体力。两条记录没有门票，
+因此过期只返还体力；帮助列表和适配器呈现不改变准入与结算结果。
 
 ## 道统起源服务悬赏（v0.7）
 
@@ -241,12 +245,11 @@ v0.6 `story.mainline.dao_echoes` 已开放玩家流程：炼虚 L10 后可查询
   `consume_target: true`。
 
 两条均无 `path_keys` 限制，沿用既有境界/层数与交付结算事务，未新增物品或奖池；目标物确由对应秘境
-的真实奖池产出。聚焦证据见 `test/test_trade_endpoint_bounties.py`；计数回归见
-`test_bounty_variety_content.py` 与 `test_m9_content_integrity.py`。
+的真实奖池产出。
 
 ## 贸易口秘境（v0.10）
 
-两个此前已开放但**没有任何活动**的贸易端点各补上一条通用秘境，数据提交随本切片推送：
+魔渊集市与三界货栈分别提供一条通用秘境；两者沿用地点准入、队伍、战斗快照和统一领奖事务：
 
 - `instance.secret_realm.abyss_market_run`（魔渊契约集市，别名 `魔渊集市秘境`）：地点
   `demon.abyss_market`、元婴 L1、体力 20、周限 2、无凭证，路线 资源→遭遇→选择，敌人

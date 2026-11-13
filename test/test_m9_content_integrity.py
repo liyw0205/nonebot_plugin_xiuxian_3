@@ -37,15 +37,13 @@ def _edit(root: Path, relative: str, key: str, **changes: object) -> None:
 
 def test_m9_content_references_are_closed() -> None:
     summary = validate_content_references(ContentBundle.load(DATA))
-    # Inventory pins track the shipped seeds; they move only when a content
-    # slice adds records (this file is not run by CI, so it must be kept in
-    # sync by the slice that grows the inventory).
+    # These counts pin the shipped content inventory.
     assert summary["locations"] == 34
     assert summary["exploration_modes"] == 27
     assert summary["bounties"] == 54
     assert summary["recipes"] == 37
-    assert summary["sources"] == 17
-    assert summary["combat_enemies"] == 68
+    assert summary["sources"] == 18
+    assert summary["combat_enemies"] == 69
 
 
 def test_exploration_rejects_missing_reward_pool(tmp_path: Path) -> None:

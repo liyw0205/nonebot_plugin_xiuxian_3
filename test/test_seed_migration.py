@@ -20,6 +20,49 @@ def old_official_mainline() -> bytes:
     # Reverse only the guard.5-protect.6, void_archive.recorder.1-return.8 and
     # lane.<lane>.chapter.01-10 content deltas; pin the patrol blob.
     text = (ROOT / "data" / MAINLINE).read_text(encoding="utf-8")
+
+    def replace_record_field(key: str, pattern: str, replacement: str) -> None:
+        nonlocal text
+        start = text.index(f'      "key": "{key}"')
+        end = text.index("\n    },", start)
+        flags = re.M | (re.S if ".*?" in pattern else 0)
+        section, count = re.subn(pattern, replacement, text[start:end], count=1, flags=flags)
+        assert count == 1, (key, pattern)
+        text = text[:start] + section + text[end:]
+
+    replace_record_field("chapter.1.stage.3", r'^      "required_realm":.*$', '      "required_realm": "qi_sensing",')
+    replace_record_field("chapter.1.stage.3", r'^      "required_layer":.*$', '      "required_layer": 3,')
+    replace_record_field(
+        "chapter.1.stage.3",
+        r'^      "actions": \[\n.*?^      \],',
+        '      "actions": [\n'
+        '        {"command": "前往", "argument": "雾隐洞天一层", "description": "达到气府境四层并持有雾隐洞天一层凭证后启程。"},\n'
+        '        {"command": "开始探索", "argument": "雾隐洞天探索", "description": "完成自动遭遇战并结算探索，战胜守卫或雾灵才算守门成功。"}\n'
+        '      ],',
+    )
+    replace_record_field(
+        "chapter.2.stage.1",
+        r'^      "body":.*$',
+        '      "body": "雾隐线索带你回到青石镇，药铺掌柜正守着一批迟迟未到的止血草。镇里的商路不靠一句承诺运转：先把委托接进自己的委托簿，再从公开采集或已有库存备齐三株止血草，最后在订单仍有效时交付。掌柜会把这次交货记入镇务账册，商路因此向你开放；材料不足或订单过期不会吞掉物品，补齐后仍可接当天的其他委托重试。",',
+    )
+    replace_record_field(
+        "chapter.2.stage.1",
+        r'^      "actions": \[\n.*?^      \],',
+        '      "actions": [\n'
+        '        {"command": "查看委托", "argument": "城镇委托", "description": "先查看当日公开订单，再接取止血草供应。"},\n'
+        '        {"command": "交付委托", "argument": "止血草供应", "description": "接取订单后交付三株止血草，结算事务会同时写入名望与信誉。"}\n'
+        '      ],',
+    )
+    replace_record_field(
+        "chapter.2.stage.1",
+        r'^        "message":.*$',
+        '        "message": "委托材料不足或订单过期时保留主线进行中，不发放商路奖励；接取并交付新的公开订单后可再次结算。"',
+    )
+    replace_record_field(
+        "chapter.2.stage.1",
+        r'^      "prerequisites":.*$',
+        '      "prerequisites": ["chapter.1.stage.3", "livelihood.town_commission.delivered"],',
+    )
     for key in (
         "domain_frontier.guard.5",
         "domain_frontier.guard.6",
@@ -296,7 +339,7 @@ def test_cultivation_seed_upgrade_preserves_custom_and_repeats(host: Path, custo
     old = (ROOT / "test/fixtures/official_seeds/livelihood_pre_reachability.json").read_bytes()
     rule = json.loads((ROOT / "scripts/seed_migrations.json").read_text())[relative.as_posix()]
     assert hashlib.sha256(old).hexdigest() in rule["old_sha256"]
-    original = old + b"\n" if custom else old
+    original = (ROOT / "data" / relative).read_bytes() + b"\n" if custom else old
     path = host / "data" / relative
     path.write_bytes(original)
     result = deploy(host)
@@ -313,22 +356,8 @@ def test_cultivation_seed_upgrade_preserves_custom_and_repeats(host: Path, custo
 
 
 def pre_construction_livelihood() -> bytes:
-    text = (ROOT / "data/生活/生活.json").read_text(encoding="utf-8")
-    decoder = json.JSONDecoder()
-    position = text.index("[", text.index('"records"')) + 1
-    records = []
-    while True:
-        while text[position].isspace() or text[position] == ",":
-            position += 1
-        if text[position] == "]":
-            break
-        start = position
-        row, position = decoder.raw_decode(text, position)
-        records.append((row["key"], start))
-    keys = [key for key, _ in records]
-    start = keys.index("project.ironwood_bridge")
-    assert keys[start:start+3] == ["project.ironwood_bridge", "project.herb_drying_house", "project.basalt_waymarker"]
-    blob = (text[:records[start][1]] + text[records[start+3][1]:]).encode("utf-8")
+    # Exact bytes from 208a16bc47e1d90cd0dd8e712f77efd76519f3f8:data/生活/生活.json.
+    blob = (ROOT / "test/fixtures/official_seeds/construction_v0136_livelihood.json").read_bytes()
     assert hashlib.sha256(blob).hexdigest() == "1eaef8b80ac72c1fc351e734f6aba2ff25adb880ed5351e1130c9e129c9644eb"
     return blob
 
@@ -1017,6 +1046,9 @@ PLACE_CODEX_ADDED = frozenset(
         "codex.material.demon_abyss_echo",
         "codex.material.beast_bloodline",
         "codex.material.mist_cave_route",
+        "codex.story.companion_old_trail.1",
+        "codex.story.companion_old_trail.2",
+        "codex.story.companion_old_trail.3",
     }
 )
 
@@ -1057,8 +1089,8 @@ def test_bounty_source_seeds_upgrade_together_with_backup_and_idempotency(host: 
 
 def test_unknown_bounty_source_seeds_are_preserved(host: Path) -> None:
     custom = {
-        relative: (SEED_FIXTURES / fixture).read_bytes() + b"\n"
-        for relative, fixture in BOUNTY_SOURCE_SEEDS.items()
+        relative: (ROOT / "data" / relative).read_bytes() + b"\n"
+        for relative in BOUNTY_SOURCE_SEEDS
     }
     for relative, blob in custom.items():
         (host / "data" / relative).write_bytes(blob)
@@ -1067,6 +1099,22 @@ def test_unknown_bounty_source_seeds_are_preserved(host: Path) -> None:
     assert "种子更新 0 个" in result.stdout
     for relative, blob in custom.items():
         assert (host / "data" / relative).read_bytes() == blob
+    preserved(host)
+
+
+def test_unknown_livelihood_missing_story_source_fails_and_rolls_back(host: Path) -> None:
+    path = host / "data/生活/生活.json"
+    custom = (SEED_FIXTURES / "livelihood_pre_reachability.json").read_bytes() + b"\n"
+    path.write_bytes(custom)
+    previous_source = (host / "src/plugins/nonebot_plugin_xiuxian_3/__init__.py").read_bytes()
+    previous_toml = (host / "pyproject.toml").read_bytes()
+    result = deploy(host)
+    assert result.returncode != 0
+    assert "claim_companion_patrol references unknown idle route" in result.stdout + result.stderr
+    assert "已回退" in result.stderr
+    assert path.read_bytes() == custom
+    assert (host / "src/plugins/nonebot_plugin_xiuxian_3/__init__.py").read_bytes() == previous_source
+    assert (host / "pyproject.toml").read_bytes() == previous_toml
     preserved(host)
 
 
@@ -1156,8 +1204,7 @@ def old_official_common_secret_realms() -> bytes:
     ],
 )
 def test_goal_a_i_seed_reverse_helpers_match_registered_old_blobs(reverse) -> None:
-    # Every seed file the A-I goals changed must be upgradeable from the blob
-    # that preceded the change; the helper asserts the digest itself.
+    # Each registered legacy fixture must match its pre-migration blob digest.
     assert reverse()
 
 
@@ -1243,4 +1290,75 @@ def test_custom_place_codex_seed_is_preserved(host: Path) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
     assert "种子更新 0 个" in result.stdout
     assert codex_path.read_bytes() == custom
+    preserved(host)
+
+
+def test_companion_old_trail_seeds_upgrade_together_and_preserve_custom(host: Path) -> None:
+    mainline = (ROOT / "data" / MAINLINE).read_text(encoding="utf-8")
+    marker = mainline.index('    {\n      "key": "companion_old_trail.1"')
+    old_mainline = (mainline[:marker].rstrip()[:-1] + "\n  ]\n}\n").encode("utf-8")
+    assert hashlib.sha256(old_mainline).hexdigest() == "ad6aae6f0a4037c52c17ea17e902188bcca190676d455bca6a49fa178c4ed473"
+    codex_file = Path("图鉴/条目.json")
+    codex = (ROOT / "data" / codex_file).read_text(encoding="utf-8")
+    old_codex, count = re.subn(
+        r'    \{\n      "key": "codex\.story\.companion_old_trail\.[123]",.*?\n    \},\n',
+        "", codex, flags=re.S,
+    )
+    assert count == 3
+    old_codex_blob = old_codex.encode("utf-8")
+    assert hashlib.sha256(old_codex_blob).hexdigest() == "898a3030272173423d2c55371beaf5a46fa73483fe06538aaf2c5723fcf1389f"
+    old_blobs = {MAINLINE: old_mainline, codex_file: old_codex_blob}
+    for relative, blob in old_blobs.items():
+        (host / "data" / relative).write_bytes(blob)
+    upgraded = deploy(host)
+    assert upgraded.returncode == 0, upgraded.stdout + upgraded.stderr
+    assert "种子更新 2 个" in upgraded.stdout
+    backup = next((host / ".xiuxian3/backups").glob("deploy-*"))
+    for relative, blob in old_blobs.items():
+        assert (host / "data" / relative).read_bytes() == (ROOT / "data" / relative).read_bytes()
+        assert (backup / "data" / relative).read_bytes() == blob
+    preserved(host)
+    repeated = deploy(host)
+    assert repeated.returncode == 0, repeated.stdout + repeated.stderr
+    assert "种子更新 0 个" in repeated.stdout
+    for relative in old_blobs:
+        document = json.loads((ROOT / "data" / relative).read_text(encoding="utf-8"))
+        document["records"][0]["desc"] = "自定义旧兽道内容"
+        custom = (json.dumps(document, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+        (host / "data" / relative).write_bytes(custom)
+        old_blobs[relative] = custom
+    custom_deploy = deploy(host)
+    assert custom_deploy.returncode == 0, custom_deploy.stdout + custom_deploy.stderr
+    assert "种子更新 0 个" in custom_deploy.stdout
+    assert all((host / "data" / relative).read_bytes() == blob for relative, blob in old_blobs.items())
+    preserved(host)
+
+
+def test_spring_supper_mainline_seed_upgrade_backup_repeat_and_custom_preservation(host: Path) -> None:
+    text = (ROOT / "data" / MAINLINE).read_text(encoding="utf-8")
+    marker = text.index('    {\n      "key": "spring_supper.1"')
+    old = (text[:marker].rstrip()[:-1] + "\n  ]\n}\n").encode("utf-8")
+    assert hashlib.sha256(old).hexdigest() == "0ebe7d841042d1688778d1a19d7b640e5edaa621ecc9778989ae015cd1260fb8"
+    _registered_old_blob(MAINLINE, old)
+    path = host / "data" / MAINLINE
+    path.write_bytes(old)
+    result = deploy(host)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "种子更新 1 个" in result.stdout
+    assert path.read_bytes() == (ROOT / "data" / MAINLINE).read_bytes()
+    backup = next((host / ".xiuxian3/backups").glob("deploy-*"))
+    assert (backup / "data" / MAINLINE).read_bytes() == old
+    preserved(host)
+    repeated = deploy(host)
+    assert repeated.returncode == 0, repeated.stdout + repeated.stderr
+    assert "种子更新 0 个" in repeated.stdout
+    document = json.loads(text)
+    stage = next(row for row in document["records"] if row["key"] == "spring_supper.1")
+    stage["body"] += "阿禾把自家稻畦的水口另作了标记。"
+    custom = (json.dumps(document, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+    path.write_bytes(custom)
+    custom_deploy = deploy(host)
+    assert custom_deploy.returncode == 0, custom_deploy.stdout + custom_deploy.stderr
+    assert "种子更新 0 个" in custom_deploy.stdout
+    assert path.read_bytes() == custom
     preserved(host)

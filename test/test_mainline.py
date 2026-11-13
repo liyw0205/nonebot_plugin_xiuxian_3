@@ -100,7 +100,7 @@ def test_mainline_stage_prerequisites_and_reward_assets() -> None:
 
             with runtime.repository._connect() as connection:
                 connection.execute(
-                    "UPDATE players SET realm_layer = 3 WHERE platform_user_id = ?",
+                    "UPDATE players SET realm_key='foundation', realm_layer=1 WHERE platform_user_id = ?",
                     ("mainline-user",),
                 )
             stage3 = await runtime.dispatch(_context("stage3-start"), "开始主线 3")
@@ -143,29 +143,29 @@ def test_mainline_town_commission_unlocks_chapter_two_and_settles_once() -> None
             assert (await runtime.dispatch(_context("stage2-start"), "开始主线 2")).ok
             mark_mainline_snapshot_legacy(runtime, "web", "mainline-user", "chapter.1.stage.2")
             assert (await runtime.dispatch(_context("stage2-claim"), "领取主线奖励 2")).ok
+            with runtime.repository._connect() as connection:
+                connection.execute(
+                    "UPDATE players SET realm_key='foundation', realm_layer=1 WHERE platform_user_id=?",
+                    ("mainline-user",),
+                )
             assert (await runtime.dispatch(_context("stage3-start"), "开始主线 3")).ok
             mark_mainline_snapshot_legacy(runtime, "web", "mainline-user", "chapter.1.stage.3")
             assert (await runtime.dispatch(_context("stage3-claim"), "领取主线奖励 3")).ok
 
-            locked = await runtime.dispatch(_context("before-commission"), "开始主线 城镇委托")
-            assert locked.code == "MAINLINE_REQUIREMENT_MISSING"
-            listed = await runtime.dispatch(_context("commission-list"), "城镇委托")
-            assert listed.code == "COMMISSION_LIST"
-            accepted = await runtime.dispatch(
-                _context("commission-accept"), "接取委托 止血草供应"
-            )
-            assert accepted.code == "COMMISSION_ACCEPTED"
-            delivered = await runtime.dispatch(
-                _context("commission-deliver"), "交付委托 止血草供应"
-            )
-            assert delivered.code == "COMMISSION_DELIVERED"
             started = await runtime.dispatch(_context("stage4-start"), "开始主线 城镇委托")
             assert started.code == "MAINLINE_STARTED"
-            now[0] += timedelta(days=1)
+            early = await runtime.dispatch(
+                _context("stage4-early-claim"), "领取主线奖励 城镇委托"
+            )
+            assert early.code == "MAINLINE_OBJECTIVES_INCOMPLETE"
+            assert (await runtime.dispatch(_context("commission-list"), "城镇委托")).code == "COMMISSION_LIST"
+            assert (await runtime.dispatch(
+                _context("commission-accept"), "接取委托 止血草供应"
+            )).code == "COMMISSION_ACCEPTED"
             grant_blood_grass(runtime, "web", "mainline-user")
-            assert (await runtime.dispatch(_context("commission-list-next"), "城镇委托")).code == "COMMISSION_LIST"
-            assert (await runtime.dispatch(_context("commission-accept-next"), "接取委托 止血草供应")).code == "COMMISSION_ACCEPTED"
-            assert (await runtime.dispatch(_context("commission-deliver-next"), "交付委托 止血草供应")).code == "COMMISSION_DELIVERED"
+            assert (await runtime.dispatch(
+                _context("commission-deliver"), "交付委托 止血草供应"
+            )).code == "COMMISSION_DELIVERED"
             claimed = await runtime.dispatch(_context("stage4-claim"), "领取主线奖励 城镇委托")
             assert claimed.code == "MAINLINE_REWARD_CLAIMED"
             assert claimed.data["first_clear"] is True
@@ -185,12 +185,12 @@ def test_mainline_town_commission_unlocks_chapter_two_and_settles_once() -> None
                     "SELECT COUNT(*) AS count FROM town_commission_claims WHERE player_id = (SELECT id FROM players WHERE platform_user_id = ?) AND status = 'delivered'",
                     ("mainline-user",),
                 ).fetchone()
-                assert int(delivered_evidence["count"]) == 2
+                assert int(delivered_evidence["count"]) == 1
                 reputation = connection.execute(
                     "SELECT service_reputation FROM player_reputations WHERE player_id = (SELECT id FROM players WHERE platform_user_id = ?)",
                     ("mainline-user",),
                 ).fetchone()
-                assert int(reputation["service_reputation"]) == 7
+                assert int(reputation["service_reputation"]) == 6
             await runtime.close()
 
     asyncio.run(run())
@@ -334,19 +334,22 @@ def test_mainline_town_commission_runs_through_qq_and_onebot_adapters() -> None:
                 assert (await dispatch("stage2-start", "开始主线 2")).ok
                 mark_mainline_snapshot_legacy(runtime, adapter, user, "chapter.1.stage.2")
                 assert (await dispatch("stage2-claim", "领取主线奖励 2")).ok
+                with runtime.repository._connect() as connection:
+                    connection.execute(
+                        "UPDATE players SET realm_key='foundation', realm_layer=1 WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    )
                 assert (await dispatch("stage3-start", "开始主线 3")).ok
                 mark_mainline_snapshot_legacy(runtime, adapter, user, "chapter.1.stage.3")
                 assert (await dispatch("stage3-claim", "领取主线奖励 3")).ok
-                assert (await dispatch("list", "城镇委托")).code == "COMMISSION_LIST"
-                assert (await dispatch("accept", "接取委托 止血草供应")).code == "COMMISSION_ACCEPTED"
-                assert (await dispatch("deliver", "交付委托 止血草供应")).code == "COMMISSION_DELIVERED"
                 claimed = await dispatch("stage4-start", "开始主线 城镇委托")
                 assert claimed.code == "MAINLINE_STARTED"
-                now[0] += timedelta(days=1)
+                early = await dispatch("stage4-early-claim", "领取主线奖励 城镇委托")
+                assert early.code == "MAINLINE_OBJECTIVES_INCOMPLETE"
+                assert (await dispatch("list", "城镇委托")).code == "COMMISSION_LIST"
+                assert (await dispatch("accept", "接取委托 止血草供应")).code == "COMMISSION_ACCEPTED"
                 grant_blood_grass(runtime, adapter, user)
-                assert (await dispatch("list-next", "城镇委托")).code == "COMMISSION_LIST"
-                assert (await dispatch("accept-next", "接取委托 止血草供应")).code == "COMMISSION_ACCEPTED"
-                assert (await dispatch("deliver-next", "交付委托 止血草供应")).code == "COMMISSION_DELIVERED"
+                assert (await dispatch("deliver", "交付委托 止血草供应")).code == "COMMISSION_DELIVERED"
                 reward = await dispatch("stage4-claim", "领取主线奖励 城镇委托")
                 assert reward.code == "MAINLINE_REWARD_CLAIMED"
                 assert reward.data["reward"]["service_reputation"] == 5
