@@ -119,10 +119,12 @@ outcome_texts；第一方案必须与原任务默认规则相同，省略选择�
 闲居只认本关开始后新安排且已完整领取的指定路线，`expired/cancelled/running` 不计入。
 目标、奖励与重试提示仍在开始时冻结，旧快照不追补新目标；目标不足保持原关卡且不写领奖 operation。
 
-灵兽旧兽道后记支持 `companion_bond`（`companion_key`）与
+灵兽旧兽道后记支持 `companion_bond`（`companion_key`，可选 `allow_company: true`）与
 `companion_feed`（`route_key`、`companion_key`、`item_key`）。灵兽键须引用开放灵兽；喂养目标还须证明
 开放闲居路线的完整奖池实际产出该物品、路线准入的灵兽种类相符，且该灵兽的 `feed_item_key` 正是目标物品。
-运行时只读取本关开始后本人对应的 `companion.bond` 或 `companion.feed` operation；以开始时冻结的 operation
+两类目标可声明非空、无重复的 `alternate_companion_keys`，旧兽道允许木鼠的铁背鼠、玉背鼠形态；每个候选均须通过相同的开放、种类和喂养物品校验，并冻结在快照中。
+运行时只读取本关开始后本人对应的 `companion.bond` 或 `companion.feed` operation；声明 `allow_company` 时也接受真实的
+`companion.company`，供结缘满额的已有同伴选择，保留相伴体力、日限和亲和规则。以开始时冻结的 operation
 rowid 水位排除旧记录和同秒重放，喂养还须匹配灵兽键与实际消耗。完整巡护仍由此前关卡的 `idle_claim` 证明；
 取消、逾时保底、其他路线、错误灵兽、缺少物品或失败事务均不能补足目标。
 

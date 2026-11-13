@@ -19,6 +19,7 @@ from ..repository import (
 )
 from ..content import bundled_content
 from .models import CompanionStatusRecord
+from ..utils.text import command_link
 
 
 class CompanionApplication:
@@ -73,10 +74,16 @@ class CompanionApplication:
             kind = "灵骑" if companion.kind == "mount" else "灵兽"
             lines.append(
                 f"- **{companion.name}**（{kind}）\n"
+                f"  - 编号：`{companion.instance_id}`\n"
                 f"  - 等级 {companion.level}；经验 {companion.experience}\n"
                 f"  - 状态：{self._status(companion.status)}；{state}；耐力 {companion.stamina}\n"
                 f"  - 血脉：{self._evolution_text(companion.evolution_stage)}；灵窍 {companion.skill_slots}"
             )
+            if companion.kind == "beast":
+                lines.append(
+                    "  - " + command_link("喂养", f"喂养灵兽 {companion.instance_id}")
+                    + " · " + command_link("相伴", f"灵兽相伴 {companion.instance_id}")
+                )
             for gear in companion.gear:
                 gear_key = str(gear.get("gear_key", ""))
                 lines.append(f"  - 灵具：{self._label(gear_key)}，耐久 {gear.get('durability_bp', 0)} bp")

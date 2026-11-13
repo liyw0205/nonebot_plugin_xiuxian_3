@@ -319,6 +319,15 @@ def _story_objectives(
         if objective_key in seen:
             raise ContentError(f"mainline {key} has duplicate objective {objective_key}")
         seen.add(str(objective_key))
+        if kind in {"companion_bond", "companion_feed"} and "alternate_companion_keys" in objective:
+            alternatives = objective["alternate_companion_keys"]
+            if (
+                not isinstance(alternatives, list) or not alternatives
+                or any(not isinstance(item, str) or not item.strip() for item in alternatives)
+                or len(set(alternatives)) != len(alternatives)
+                or objective.get("companion_key") in alternatives
+            ):
+                raise ContentError(f"mainline {key} objective {objective_key} has invalid companion alternatives")
         if kind == "travel_arrival":
             if set(objective) != {"key", "type", "label", "destination_key"}:
                 raise ContentError(f"mainline {key} objective {objective_key} has an invalid travel shape")
@@ -482,21 +491,32 @@ def _story_objectives(
                 "key": str(objective_key), "type": kind, "label": label.strip(), "route_key": route_key,
             }
         elif kind == "companion_bond":
-            if set(objective) != {"key", "type", "label", "companion_key"}:
+            if set(objective) - {"alternate_companion_keys"} not in (
+                {"key", "type", "label", "companion_key"},
+                {"key", "type", "label", "companion_key", "allow_company"},
+            ) or ("allow_company" in objective and objective["allow_company"] is not True):
                 raise ContentError(f"mainline {key} objective {objective_key} has an invalid companion bond shape")
             companion_key = objective.get("companion_key")
             if not isinstance(companion_key, str) or not companion_key.strip():
                 raise ContentError(f"mainline {key} objective {objective_key} requires companion_key")
             if bundle is not None:
-                companion = bundle.get("companion", companion_key, include_locked=False)
-                if companion is None or companion.get("kind") != "beast":
-                    raise ContentError(f"mainline {key} objective {objective_key} references an inactive beast")
+                for candidate in (companion_key, *objective.get("alternate_companion_keys", [])):
+                    companion = bundle.get("companion", candidate, include_locked=False)
+                    if companion is None or companion.get("kind") != "beast":
+                        raise ContentError(f"mainline {key} objective {objective_key} references an inactive beast")
+                if objective.get("allow_company") is True:
+                    from ..companions.interaction_content import companion_interaction_definition
+
+                    if companion_interaction_definition("interaction.companion.company", bundle).closed:
+                        raise ContentError(f"mainline {key} objective {objective_key} references a closed interaction")
             normalized = {
                 "key": str(objective_key), "type": kind, "label": label.strip(),
                 "companion_key": companion_key,
             }
+            if objective.get("allow_company") is True:
+                normalized["allow_company"] = True
         elif kind == "companion_feed":
-            if set(objective) != {
+            if set(objective) - {"alternate_companion_keys"} != {
                 "key", "type", "label", "route_key", "companion_key", "item_key",
             }:
                 raise ContentError(f"mainline {key} objective {objective_key} has an invalid companion feed shape")
@@ -507,14 +527,15 @@ def _story_objectives(
                 raise ContentError(f"mainline {key} objective {objective_key} requires route, companion and item keys")
             if bundle is not None:
                 route = bundle.get("livelihood", route_key, include_locked=False)
-                companion = bundle.get("companion", companion_key, include_locked=False)
                 if route is None or route.get("record_type") != "idle_route":
                     raise ContentError(f"mainline {key} objective {objective_key} references an unknown idle source")
-                if companion is None or companion.get("kind") != "beast" or companion.get("feed_item_key") != item_key:
-                    raise ContentError(f"mainline {key} objective {objective_key} item is not consumed by its companion")
                 requirements = route.get("requirements")
-                if not isinstance(requirements, dict) or requirements.get("companion_kind") != companion.get("kind"):
-                    raise ContentError(f"mainline {key} objective {objective_key} route requires another companion kind")
+                for candidate in (companion_key, *objective.get("alternate_companion_keys", [])):
+                    companion = bundle.get("companion", candidate, include_locked=False)
+                    if companion is None or companion.get("kind") != "beast" or companion.get("feed_item_key") != item_key:
+                        raise ContentError(f"mainline {key} objective {objective_key} item is not consumed by its companion")
+                    if not isinstance(requirements, dict) or requirements.get("companion_kind") != companion.get("kind"):
+                        raise ContentError(f"mainline {key} objective {objective_key} route requires another companion kind")
                 try:
                     pool = bundle.require("reward", str(route.get("reward_pool_key", "")), include_locked=False)
                     bundle.require("item", item_key, include_locked=False)
@@ -560,6 +581,8 @@ def _story_objectives(
             }
         else:
             raise ContentError(f"mainline {key} objective {objective_key} has unsupported type {kind}")
+        if kind in {"companion_bond", "companion_feed"} and "alternate_companion_keys" in objective:
+            normalized["alternate_companion_keys"] = list(objective["alternate_companion_keys"])
         objectives.append(normalized)
     return tuple(objectives)
 

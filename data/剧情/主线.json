@@ -4263,17 +4263,19 @@
       "stage": 1,
       "name": "近郊结缘",
       "desc": "沿着近郊旧兽道，与一只真正结缘的木鼠重新认路。",
-      "body": "初入玄天时，你在近郊石阶旁见过一排浅浅的爪印。如今再沿旧路回来，才发现它们并非慌乱逃窜，而是绕开了被雨水冲松的石缝。木鼠从草根下探出头，嗅了嗅你掌心的气息。旧兽道不收猎获，只认同行的约定：在本关开始后，用公开的结缘方式迎它入队；先前已经结缘的木鼠、旁人记录或行囊中的兽粮都不能代替这次相遇。",
+      "body": "初入玄天时，你在近郊石阶旁见过一排浅浅的爪印。如今再沿旧路回来，才发现它们并非慌乱逃窜，而是绕开了被雨水冲松的石缝。木鼠从草根下探出头，嗅了嗅你掌心的气息。旧兽道不收猎获，只认同行的约定：在本关开始后，用公开的结缘方式迎它入队；若已有木鼠，也可陪它静处，重新熟悉彼此的气息。相伴会消耗体力并受每日次数限制，名额用尽可次日再来。旧结缘或旧相伴记录、旁人记录与行囊中的兽粮都不能代替这次相遇。",
       "objectives": [
-        {"key": "bond_wood_rat", "type": "companion_bond", "label": "本关开始后真实结缘一只木鼠", "companion_key": "beast.wood_rat"}
+        {"key": "bond_wood_rat", "type": "companion_bond", "label": "本关开始后结缘木鼠或与木鼠及其蜕变形态相伴", "companion_key": "beast.wood_rat", "allow_company": true, "alternate_companion_keys": ["beast.iron_rat", "beast.jade_rat"]}
       ],
       "actions": [
         {"command": "前往", "argument": "近郊", "description": "回到玄天近郊的旧兽道。"},
-        {"command": "结缘灵兽", "argument": "木鼠", "description": "本关开始后结缘木鼠；旧结缘记录不算本次同行。"}
+        {"command": "结缘灵兽", "argument": "木鼠", "description": "本关开始后结缘木鼠；旧结缘记录不算本次同行。"},
+        {"command": "灵兽状态", "argument": "", "description": "已有木鼠或结缘满额时，查看编号与相伴入口。"},
+        {"command": "灵兽相伴", "argument": "<灵兽编号>", "description": "另一种约定：与已有木鼠、铁背鼠或玉背鼠相伴，消耗体力并增进亲和。"}
       ],
       "state_changes": {"activity_events": ["story.mainline.companion_old_trail:companion_old_trail.1"]},
       "next_stage_key": "companion_old_trail.2",
-      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "只认本关开始后本人成功结缘的木鼠；旧记录、其他灵兽或失败请求不推进。满足近郊来源后重新结缘即可领取，不扣主线奖励。"},
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "只认本关开始后本人成功结缘木鼠或与木鼠相伴的记录；旧记录、其他灵兽或失败请求不推进。结缘满额时可改为相伴；相伴名额用尽则次日重试，不扣主线奖励。"},
       "status": "open",
       "aliases": ["近郊结缘"],
       "prerequisites": ["story.mainline.xuantian:chapter.1.stage.1"],
@@ -4316,17 +4318,17 @@
       "stage": 3,
       "name": "灵米喂伴",
       "desc": "把巡护带回的粗糙灵米喂给木鼠，完成旧兽道的同行约定。",
-      "body": "巡护归来，木鼠把一粒粗糙灵米推到你脚边。它不懂这粒米值多少灵石，只知道你曾在近郊的风雨里替它挡过一次落枝。旧兽道最后一页不是把粮食收进仓库，而是在本关开始后亲手喂给木鼠一份由巡护奖池提供的粗糙灵米。没有可用灵米、木鼠仍在途中或喂养失败时，故事会保留进行中；补足真实来源与同伴状态后再喂即可。成功后，木鼠会记住这段路，你们也能继续把山野见闻写进自己的图鉴。",
+      "body": "巡护归来，木鼠把一粒粗糙灵米推到你脚边。它不懂这粒米值多少灵石，只知道你曾在近郊的风雨里替它挡过一次落枝。旧兽道最后一页不是把粮食收进仓库，而是在本关开始后亲手喂给同伴一份粗糙灵米。即使木鼠已蜕变为铁背鼠或玉背鼠，它也认得这份熟悉的粮食。没有可用灵米、同伴仍在途中或喂养未成时，这一页会留待重续；可再完整巡护一趟取得灵米，等同伴归来再喂。成功后，它会记住这段路，你们也能继续把山野见闻写进自己的图鉴。",
       "objectives": [
-        {"key": "feed_patrol_rice", "type": "companion_feed", "label": "本关开始后用巡护来源的粗糙灵米喂养木鼠", "route_key": "idle.beast_habitat_patrol", "companion_key": "beast.wood_rat", "item_key": "item.food.coarse_spirit_rice"}
+        {"key": "feed_patrol_rice", "type": "companion_feed", "label": "本关开始后用粗糙灵米喂养木鼠或其蜕变形态", "route_key": "idle.beast_habitat_patrol", "companion_key": "beast.wood_rat", "item_key": "item.food.coarse_spirit_rice", "alternate_companion_keys": ["beast.iron_rat", "beast.jade_rat"]}
       ],
       "actions": [
         {"command": "灵兽状态", "argument": "", "description": "查看木鼠状态与灵兽编号。"},
-        {"command": "喂养灵兽", "argument": "<灵兽编号>", "description": "用背包中的粗糙灵米喂养木鼠；必须在本关开始后成功结算。"}
+        {"command": "喂养灵兽", "argument": "<灵兽编号>", "description": "用粗糙灵米喂养木鼠、铁背鼠或玉背鼠；必须在本关开始后成功结算。"}
       ],
       "state_changes": {"activity_events": ["story.mainline.companion_old_trail:companion_old_trail.3"]},
       "next_stage_key": null,
-      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "只认本关开始后本人成功完成的木鼠喂养 operation；旧喂养、其他灵兽、缺少灵米、同伴途中或失败回滚均不推进，不发放主线奖励。"},
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "请在本关开始后成功喂养木鼠、铁背鼠或玉背鼠。旧喂养、其他灵兽、缺少灵米或同伴尚在途中都不能完成约定；灵米不足可再完整巡护一趟补给，喂养未成时不会领取奖励。"},
       "status": "open",
       "aliases": ["灵米喂伴"],
       "prerequisites": ["companion_old_trail.2"],

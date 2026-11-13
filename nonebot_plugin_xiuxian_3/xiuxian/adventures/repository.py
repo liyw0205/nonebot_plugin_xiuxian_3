@@ -1514,10 +1514,12 @@ class AdventuresRepositoryMixin:
             for item in intro.get("flags", [])
             if str(item) != "story.mainline.void_archive.time_fort"
         }
+        # Cross-story progress comes from first clears, not projected event flags.
         events.update(
-            str(row["event_key"])
+            f"{row['story_key']}:{row['stage_key']}"
             for row in connection.execute(
-                "SELECT event_key FROM activity_events WHERE player_id = ?",
+                "SELECT story_key, stage_key FROM mainline_runs "
+                "WHERE player_id = ? AND first_clear_claimed = 1",
                 (player["id"],),
             ).fetchall()
         )
@@ -1995,6 +1997,18 @@ class AdventuresRepositoryMixin:
                 "SELECT * FROM mainline_runs WHERE player_id = ? AND story_key = ? AND stage_key = ?",
                 (row["id"], story_key, definition.key),
             ).fetchone()
+            if run is not None and str(run["status"]) == "claimed":
+                claimed = connection.execute(
+                    "SELECT operation_name, player_id, request_hash, result_json "
+                    "FROM operations WHERE operation_id = ?",
+                    (run["claim_operation_id"],),
+                ).fetchone()
+                if (
+                    claimed is None or claimed["operation_name"] != operation_name
+                    or claimed["player_id"] != row["id"] or claimed["request_hash"] != request_hash
+                ):
+                    raise ValueError("mainline claimed operation is invalid")
+                return self._mainline_claim_from_payload(json.loads(claimed["result_json"]), replay=True)
             if run is None or str(run["status"]) != "running":
                 raise MainlineNotStartedError("mainline stage has not been started")
             frozen = self._mainline_definition_from_snapshot(run, definition)
@@ -2205,10 +2219,11 @@ class AdventuresRepositoryMixin:
                 ).fetchone()
             elif kind in {"companion_bond", "companion_feed"}:
                 operation_name = "companion.bond" if kind == "companion_bond" else "companion.feed"
+                alternative = "companion.company" if objective.get("allow_company") is True else operation_name
                 rows = connection.execute(
-                    "SELECT result_json FROM operations WHERE player_id=? AND operation_name=? "
+                    "SELECT result_json FROM operations WHERE player_id=? AND operation_name IN (?, ?) "
                     "AND rowid>? ORDER BY rowid",
-                    (player_id, operation_name, operation_baseline),
+                    (player_id, operation_name, alternative, operation_baseline),
                 ).fetchall()
                 found = None
                 for operation in rows:
@@ -2219,7 +2234,9 @@ class AdventuresRepositoryMixin:
                     companion = payload.get("companion") if isinstance(payload, dict) else None
                     if (
                         not isinstance(companion, dict)
-                        or companion.get("companion_key") != objective.get("companion_key")
+                        or companion.get("companion_key") not in (
+                            objective.get("companion_key"), *objective.get("alternate_companion_keys", [])
+                        )
                     ):
                         continue
                     if kind == "companion_bond":
@@ -2352,13 +2369,19 @@ class AdventuresRepositoryMixin:
                     )
                 if objective["type"] == "companion_bond":
                     return (
-                        set(objective) == {"key", "type", "label", "companion_key"}
+                        valid_companion_alternatives(objective)
+                        and set(objective) - {"alternate_companion_keys"} in (
+                            {"key", "type", "label", "companion_key"},
+                            {"key", "type", "label", "companion_key", "allow_company"},
+                        )
+                        and ("allow_company" not in objective or objective["allow_company"] is True)
                         and isinstance(objective["companion_key"], str)
                         and bool(objective["companion_key"].strip())
                     )
                 if objective["type"] == "companion_feed":
                     return (
-                        set(objective)
+                        valid_companion_alternatives(objective)
+                        and set(objective) - {"alternate_companion_keys"}
                         == {"key", "type", "label", "route_key", "companion_key", "item_key"}
                         and all(
                             isinstance(objective.get(field), str) and objective[field].strip()
@@ -2372,6 +2395,17 @@ class AdventuresRepositoryMixin:
                         and bool(objective["dispatch_key"].strip())
                     )
                 return False
+
+            def valid_companion_alternatives(objective: dict) -> bool:
+                if "alternate_companion_keys" not in objective:
+                    return True
+                values = objective["alternate_companion_keys"]
+                return (
+                    isinstance(values, list) and bool(values)
+                    and all(isinstance(item, str) and item.strip() for item in values)
+                    and len(set(values)) == len(values)
+                    and objective.get("companion_key") not in values
+                )
 
             def valid_action(action: object) -> bool:
                 return (

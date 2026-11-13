@@ -1962,7 +1962,7 @@
     {
       "key": "codex.story.companion_old_trail.1",
       "name": "旧兽道·初识木鼠",
-      "desc": "完成本关开始后的真实结缘，记下与木鼠相识的旧兽道。",
+      "desc": "与木鼠结缘或陪它重认旧路，记下同行的约定；蜕变后的它仍认得你的气息。",
       "category": "story",
       "status": "active"
     },
@@ -1976,7 +1976,7 @@
     {
       "key": "codex.story.companion_old_trail.3",
       "name": "旧兽道·灵米喂伴",
-      "desc": "用真实巡护来源的粗糙灵米喂养木鼠，完成同行约定。",
+      "desc": "巡护归来，把粗糙灵米喂给木鼠或蜕变后的同伴，完成同行约定。",
       "category": "story",
       "status": "active"
     },
