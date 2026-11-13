@@ -356,22 +356,8 @@ def test_cultivation_seed_upgrade_preserves_custom_and_repeats(host: Path, custo
 
 
 def pre_construction_livelihood() -> bytes:
-    text = (ROOT / "data/生活/生活.json").read_text(encoding="utf-8")
-    decoder = json.JSONDecoder()
-    position = text.index("[", text.index('"records"')) + 1
-    records = []
-    while True:
-        while text[position].isspace() or text[position] == ",":
-            position += 1
-        if text[position] == "]":
-            break
-        start = position
-        row, position = decoder.raw_decode(text, position)
-        records.append((row["key"], start))
-    keys = [key for key, _ in records]
-    start = keys.index("project.ironwood_bridge")
-    assert keys[start:start+3] == ["project.ironwood_bridge", "project.herb_drying_house", "project.basalt_waymarker"]
-    blob = (text[:records[start][1]] + text[records[start+3][1]:]).encode("utf-8")
+    # Exact bytes from 208a16bc47e1d90cd0dd8e712f77efd76519f3f8:data/生活/生活.json.
+    blob = (ROOT / "test/fixtures/official_seeds/construction_v0136_livelihood.json").read_bytes()
     assert hashlib.sha256(blob).hexdigest() == "1eaef8b80ac72c1fc351e734f6aba2ff25adb880ed5351e1130c9e129c9644eb"
     return blob
 
