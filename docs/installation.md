@@ -1,8 +1,8 @@
 # 安装、配置与更新
 
-本文适用于正式版本 `v0.1.39`。Release 一键安装与更新获取正式发布资产；源码模式按显式指定的源码目录安装。
+本文适用于正式版本 `v0.1.40`。Release 一键安装与更新获取正式发布资产；源码模式按显式指定的源码目录安装。
 
-以下步骤使用 `v0.1.39` 的安装脚本。要求 Python 3.11+；宿主由 NoneBot 的 `nb run` 启动，插件不单独监听业务端口。
+以下步骤使用 `v0.1.40` 的安装脚本。要求 Python 3.11+；宿主由 NoneBot 的 `nb run` 启动，插件不单独监听业务端口。
 
 Linux/Termux 的 Release 一键安装可直接运行版本化 raw 脚本，不需要先 clone 仓库。
 
@@ -15,7 +15,7 @@ Linux/Termux 的 Release 一键安装可直接运行版本化 raw 脚本，不�
 先准备 curl（Debian/Ubuntu 可用 `sudo apt install curl`）。安装器会补齐 Git、Python 和所需构建工具。
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/liyw0205/nonebot_plugin_xiuxian_3/v0.1.39/scripts/onekey.sh \
+curl -fsSL https://raw.githubusercontent.com/liyw0205/nonebot_plugin_xiuxian_3/v0.1.40/scripts/onekey.sh \
   | bash -s -- install --source-mode release --mirror accelerated
 ```
 
@@ -24,7 +24,7 @@ curl -fsSL https://raw.githubusercontent.com/liyw0205/nonebot_plugin_xiuxian_3/v
 ```bash
 pkg update -y
 pkg install -y curl
-curl -fsSL https://raw.githubusercontent.com/liyw0205/nonebot_plugin_xiuxian_3/v0.1.39/scripts/onekey.sh \
+curl -fsSL https://raw.githubusercontent.com/liyw0205/nonebot_plugin_xiuxian_3/v0.1.40/scripts/onekey.sh \
   | bash -s -- install --source-mode release --mirror accelerated
 termux-wake-lock
 ```
@@ -33,7 +33,7 @@ termux-wake-lock
 
 ### Release 下载与参数
 
-版本化 Release 使用 `vMAJOR.MINOR.PATCH` tag，当前正式版本为 `v0.1.39`，归档资产名为 `project.tar.gz`。Release 安装和更新使用 GitHub 官方 `latest/download/project.tar.gz` 地址；源码安装可显式 checkout `v0.1.39`。
+版本化 Release 使用 `vMAJOR.MINOR.PATCH` tag，当前正式版本为 `v0.1.40`，归档资产名为 `project.tar.gz`。Release 安装和更新使用 GitHub 官方 `latest/download/project.tar.gz` 地址；源码安装可显式 checkout `v0.1.40`。
 
 常用参数：
 
@@ -51,10 +51,10 @@ termux-wake-lock
 
 ### Windows（手动获取脚本）
 
-Windows 示例通过 clone `v0.1.39` 获取 PowerShell 安装脚本；没有 Git 时在 PowerShell 执行 `winget install --id Git.Git --exact`，然后重开终端。
+Windows 示例通过 clone `v0.1.40` 获取 PowerShell 安装脚本；没有 Git 时在 PowerShell 执行 `winget install --id Git.Git --exact`，然后重开终端。
 
 ```powershell
-git clone --branch v0.1.39 --single-branch https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git xiuxian3-src
+git clone --branch v0.1.40 --single-branch https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git xiuxian3-src
 Set-Location xiuxian3-src
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\onekey_windows.ps1 install -SourceMode release -Mirror direct
 ```
@@ -63,10 +63,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\onekey_windows.ps1
 
 ### Docker（手动获取部署文件）
 
-先从 `v0.1.39` 获取仓库中的 `Dockerfile`、`docker-compose.yml` 和 `docker/env.example`；此处 clone 是为了取得部署文件：
+先从 `v0.1.40` 获取仓库中的 `Dockerfile`、`docker-compose.yml` 和 `docker/env.example`；此处 clone 是为了取得部署文件：
 
 ```bash
-git clone --branch v0.1.39 --single-branch \
+git clone --branch v0.1.40 --single-branch \
   https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git xiuxian3-src
 cd xiuxian3-src
 cp -n docker/env.example docker/.env
@@ -79,10 +79,10 @@ Compose 将宿主的 `./data` 挂载到容器 `/app/data`，将 `./runtime` 挂�
 
 ## 手动获取脚本或源码安装
 
-需要手动获取脚本或进行源码安装时，再 clone `v0.1.39`。这不是 Linux/Termux Release 一键安装的前置步骤。源码模式使用 checkout 中的源码，不会下载 Release：
+需要手动获取脚本或进行源码安装时，再 clone `v0.1.40`。这不是 Linux/Termux Release 一键安装的前置步骤。源码模式使用 checkout 中的源码，不会下载 Release：
 
 ```bash
-git clone --branch v0.1.39 --single-branch \
+git clone --branch v0.1.40 --single-branch \
   https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git xiuxian3-src
 cd xiuxian3-src
 bash scripts/onekey.sh install --source-mode source --mirror direct
@@ -102,7 +102,7 @@ bash scripts/onekey.sh install --source-mode release --mirror direct --target /p
 
 ### 不使用安装脚本
 
-已取得 `v0.1.39` 源码且安装了 Python 3.11+ 时，可在仓库根目录执行以下步骤。Linux/Termux 示例：
+已取得 `v0.1.40` 源码且安装了 Python 3.11+ 时，可在仓库根目录执行以下步骤。Linux/Termux 示例：
 
 ```bash
 XIUXIAN3_SRC="$PWD"
@@ -196,7 +196,7 @@ xiu3 start
 
 源码模式不支持 `xiu3 update`；该命令要求 Release 管理安装并从 latest Release 获取 `project.tar.gz`。
 
-正常宿主的 PID 和日志在 `.xiuxian3/nb.pid`、`.xiuxian3/nb.log`；`runtime/` 是 Docker 额外挂载的运行状态目录。QQ Markdown/键盘能力由 [`XIUXIAN3_QQ_CAPABILITIES`](https://github.com/liyw0205/nonebot_plugin_xiuxian_3/blob/v0.1.39/docs/operations.md#1-配置层级) 控制，未配置时沿用默认富消息能力；配置存在但未列出当前 AppID 时使用纯文本。
+正常宿主的 PID 和日志在 `.xiuxian3/nb.pid`、`.xiuxian3/nb.log`；`runtime/` 是 Docker 额外挂载的运行状态目录。QQ Markdown/键盘能力由 [`XIUXIAN3_QQ_CAPABILITIES`](https://github.com/liyw0205/nonebot_plugin_xiuxian_3/blob/v0.1.40/docs/operations.md#1-配置层级) 控制，未配置时沿用默认富消息能力；配置存在但未列出当前 AppID 时使用纯文本。
 
 ## 排错
 
@@ -212,6 +212,6 @@ tail -n 80 "$HOME/xiu3/.xiuxian3/nb.log"
 - 适配器/驱动缺失：Release 管理安装执行 `xiu3 update`；源码模式使用当前 checkout 重新运行安装流程。
 - QQ 无消息：检查 `QQ_BOTS`、开放平台事件权限和 QQ 适配器版本。
 - OneBot 无消息：检查 NapCat 的反向 WebSocket URL、端口、防火墙和连接日志。
-- Release 下载失败：先重试，再使用 `--mirror direct`；也可 checkout `v0.1.39` 并使用 `--source-mode source`。
+- Release 下载失败：先重试，再使用 `--mirror direct`；也可 checkout `v0.1.40` 并使用 `--source-mode source`。
 
 常用命令和玩法流程见 [玩家使用指南](usage.md)；发布资产规则见 [发布分发](release-distribution.md)。

@@ -2,7 +2,7 @@
 
 ## 玩家与安装
 
-- [当前可用能力](availability.md)：v0.1.39 的开放玩法与能力边界。
+- [当前可用能力](availability.md)：v0.1.40 的开放玩法与能力边界。
 - [安装、配置与更新](installation.md)：Linux、Termux、Windows、Docker 和已有 NoneBot 宿主。
 - [玩家使用指南](usage.md)：角色创建、修炼、探索、挂机、剧情与委托流程。
 - [运行与安全](operations.md)：配置优先级、备份、恢复、权限与运行安全。
