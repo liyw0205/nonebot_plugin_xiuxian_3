@@ -22,6 +22,21 @@
 `开始挂机 云城店铺` 完成路径；帮助会列出真实的名望来源及地点条件。QQ/OneBot 只负责投递，
 共用同一 application 与 repository。
 
+完整开始、目标与领奖命令见[玩家使用指南](../../usage.md#云城店铺回响)。巡夜未遇敌或战败可按原日限重试；
+主线与闲居进度分别用 `云城店铺回响主线`、`挂机状态` 查看，离线和重启后继续原记录。
+
+## 数据与消费者
+
+| 内容或记录 | 实际用途 |
+|:--|:--|
+| [主线种子](../../../data/剧情/主线.json)中的 `cloud_city_echoes.1`–`.3` | application 的专属查看、开始和领奖入口读取正文、目标、动作与奖励，开始时生成关卡快照 |
+| [生活种子](../../../data/生活/生活.json)中的 `idle.cloud_city_shop` | `IdleRepositoryMixin` 的预览和新建校验所在地、200 点地方名望及次数，安排后冻结地点与所得 |
+| `dispatch.golden_core.vein_survey` | `DispatchRepositoryMixin` 在派遣结算事务中写入实际云城名望，接受派遣时不提前计入 |
+| `travel_sessions`、`exploration_sessions`、`idle_assignments` | `AdventuresRepositoryMixin._mainline_missing_objectives` 按本人、开始时间和指定地点/模式/路线核验三关目标 |
+
+官方种子升级按[发布与种子迁移](../../release-distribution.md)核验旧/新指纹与 Git 来源，未知或自定义 JSON 保留；
+地点条件作用于新安排，已开始的闲居继续使用原快照结算。
+
 ## 事务与快照
 
 主线开始时冻结正文、目标、动作、奖励和开始时间。`travel_arrival` 只读取本人开始后的已抵达
