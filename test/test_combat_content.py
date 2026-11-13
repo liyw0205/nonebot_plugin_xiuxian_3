@@ -67,9 +67,8 @@ def _edit(root: Path, relative: str, key: str, **changes: object) -> None:
 def test_combat_content_closes_current_enemy_and_encounter_data() -> None:
     summary = validate_combat_content(ContentBundle.load(DATA))
 
-    # The exploration-mode file ships 20 encounter pools consumed by modes
-    # (16 from the M9 batch plus the two foundation pools, the two trade-endpoint
-    # realms' pools and the two inert-location modes added later).
+    # Two of the 22 declared pools belong to inert-location modes and are not
+    # consumed; the other 20 are connected to open exploration modes.
     expected_consumed_encounters = 20 if (DATA / "探索/模式.json").exists() else 0
     # The early basalt source adds one profile; specialized tower enemies retain
     # their existing dedicated content consumer.

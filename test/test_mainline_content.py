@@ -47,19 +47,24 @@ def test_xuantian_mainline_chapter_two_content_runs_on_both_adapters() -> None:
                     mark_mainline_snapshot_legacy(runtime, adapter, user, f"chapter.1.stage.{number}")
                     assert (await send(f"claim-{number}", f"领取主线奖励 {number}")).ok
                 grant_spirit_field_prerequisites(runtime, adapter, user, layer=3)
-                for number in (2, 3):
-                    assert (await send(f"start-{number}", f"开始主线 {number}")).ok
-                    mark_mainline_snapshot_legacy(runtime, adapter, user, f"chapter.1.stage.{number}")
-                    assert (await send(f"claim-{number}", f"领取主线奖励 {number}")).ok
+                assert (await send("start-2", "开始主线 2")).ok
+                mark_mainline_snapshot_legacy(runtime, adapter, user, "chapter.1.stage.2")
+                assert (await send("claim-2", "领取主线奖励 2")).ok
+                with runtime.repository._connect() as connection:
+                    connection.execute(
+                        "UPDATE players SET realm_key='foundation', realm_layer=1 WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    )
+                assert (await send("start-3", "开始主线 3")).ok
+                mark_mainline_snapshot_legacy(runtime, adapter, user, "chapter.1.stage.3")
+                assert (await send("claim-3", "领取主线奖励 3")).ok
+                assert (await send("town-start", "开始主线 城镇委托")).ok
+                early = await send("town-early-claim", "领取主线奖励 城镇委托")
+                assert early.code == "MAINLINE_OBJECTIVES_INCOMPLETE"
                 assert (await send("commission-list", "城镇委托")).code == "COMMISSION_LIST"
                 assert (await send("commission-accept", "接取委托 止血草供应")).code == "COMMISSION_ACCEPTED"
-                assert (await send("commission-deliver", "交付委托 止血草供应")).code == "COMMISSION_DELIVERED"
-                assert (await send("town-start", "开始主线 城镇委托")).ok
-                now[0] += timedelta(days=1)
                 grant_blood_grass(runtime, adapter, user)
-                assert (await send("commission-list-next", "城镇委托")).code == "COMMISSION_LIST"
-                assert (await send("commission-accept-next", "接取委托 止血草供应")).code == "COMMISSION_ACCEPTED"
-                assert (await send("commission-deliver-next", "交付委托 止血草供应")).code == "COMMISSION_DELIVERED"
+                assert (await send("commission-deliver", "交付委托 止血草供应")).code == "COMMISSION_DELIVERED"
                 assert (await send("town-claim", "领取主线奖励 城镇委托")).ok
 
                 with runtime.repository._connect() as connection:

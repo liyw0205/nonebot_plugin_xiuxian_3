@@ -20,6 +20,49 @@ def old_official_mainline() -> bytes:
     # Reverse only the guard.5-protect.6, void_archive.recorder.1-return.8 and
     # lane.<lane>.chapter.01-10 content deltas; pin the patrol blob.
     text = (ROOT / "data" / MAINLINE).read_text(encoding="utf-8")
+
+    def replace_record_field(key: str, pattern: str, replacement: str) -> None:
+        nonlocal text
+        start = text.index(f'      "key": "{key}"')
+        end = text.index("\n    },", start)
+        flags = re.M | (re.S if ".*?" in pattern else 0)
+        section, count = re.subn(pattern, replacement, text[start:end], count=1, flags=flags)
+        assert count == 1, (key, pattern)
+        text = text[:start] + section + text[end:]
+
+    replace_record_field("chapter.1.stage.3", r'^      "required_realm":.*$', '      "required_realm": "qi_sensing",')
+    replace_record_field("chapter.1.stage.3", r'^      "required_layer":.*$', '      "required_layer": 3,')
+    replace_record_field(
+        "chapter.1.stage.3",
+        r'^      "actions": \[\n.*?^      \],',
+        '      "actions": [\n'
+        '        {"command": "前往", "argument": "雾隐洞天一层", "description": "达到气府境四层并持有雾隐洞天一层凭证后启程。"},\n'
+        '        {"command": "开始探索", "argument": "雾隐洞天探索", "description": "完成自动遭遇战并结算探索，战胜守卫或雾灵才算守门成功。"}\n'
+        '      ],',
+    )
+    replace_record_field(
+        "chapter.2.stage.1",
+        r'^      "body":.*$',
+        '      "body": "雾隐线索带你回到青石镇，药铺掌柜正守着一批迟迟未到的止血草。镇里的商路不靠一句承诺运转：先把委托接进自己的委托簿，再从公开采集或已有库存备齐三株止血草，最后在订单仍有效时交付。掌柜会把这次交货记入镇务账册，商路因此向你开放；材料不足或订单过期不会吞掉物品，补齐后仍可接当天的其他委托重试。",',
+    )
+    replace_record_field(
+        "chapter.2.stage.1",
+        r'^      "actions": \[\n.*?^      \],',
+        '      "actions": [\n'
+        '        {"command": "查看委托", "argument": "城镇委托", "description": "先查看当日公开订单，再接取止血草供应。"},\n'
+        '        {"command": "交付委托", "argument": "止血草供应", "description": "接取订单后交付三株止血草，结算事务会同时写入名望与信誉。"}\n'
+        '      ],',
+    )
+    replace_record_field(
+        "chapter.2.stage.1",
+        r'^        "message":.*$',
+        '        "message": "委托材料不足或订单过期时保留主线进行中，不发放商路奖励；接取并交付新的公开订单后可再次结算。"',
+    )
+    replace_record_field(
+        "chapter.2.stage.1",
+        r'^      "prerequisites":.*$',
+        '      "prerequisites": ["chapter.1.stage.3", "livelihood.town_commission.delivered"],',
+    )
     for key in (
         "domain_frontier.guard.5",
         "domain_frontier.guard.6",
@@ -1156,8 +1199,7 @@ def old_official_common_secret_realms() -> bytes:
     ],
 )
 def test_goal_a_i_seed_reverse_helpers_match_registered_old_blobs(reverse) -> None:
-    # Every seed file the A-I goals changed must be upgradeable from the blob
-    # that preceded the change; the helper asserts the digest itself.
+    # Each registered legacy fixture must match its pre-migration blob digest.
     assert reverse()
 
 

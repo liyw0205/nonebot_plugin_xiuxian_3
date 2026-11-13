@@ -105,10 +105,11 @@
       "efa3428a72f07324ee8f7fd1cb8573877b2adc46948670b9a3c98f6f67f8d249": "379f0a28698c113153116eaea1952d86663ada2f:data/剧情/主线.json",
       "eb3d11231a364e63aa165cb2cd52f52608b1076e2fdaa5f62c0fc44cb8908b2b": "b6cf6673926a2ff78006e7f9f2e3cd25c4fd2191:data/剧情/主线.json",
       "602b75a266fe7533974ab3c7433e2f290190067571424454b09fba2ec915495b": "cb5d79e8a0e5606ba1842f0be527d8b9bfbd208a:data/剧情/主线.json",
-      "51180c08c9d3466bb5e25f5e64fe7d852cfbc66855cfa8d9a02e289a3d58caad": "0972d0c02f9ffc0305784fec8ec8ba0dd686db7f:data/剧情/主线.json"
+      "51180c08c9d3466bb5e25f5e64fe7d852cfbc66855cfa8d9a02e289a3d58caad": "0972d0c02f9ffc0305784fec8ec8ba0dd686db7f:data/剧情/主线.json",
+      "0ff4ccab126ac447c350a235f6f268c565538adf1a2e24e748a1ccca9453fbbd": "534e31945a78913754aa3f1828e523edeb5f21d1:data/剧情/主线.json"
     },
-    "new_sha256": "0ff4ccab126ac447c350a235f6f268c565538adf1a2e24e748a1ccca9453fbbd",
-    "new_commit": "534e31945a78913754aa3f1828e523edeb5f21d1:data/剧情/主线.json"
+    "new_sha256": "9e368d5b6a2d9a57dd639296d6a1d84c55316ea3a46367dd7c8de597ccc658d4",
+    "new_commit": "30854009f220ec8584e1045a103f7bd2ec6d4706:data/剧情/主线.json"
   },
   "内容清单.json": {
     "old_sha256": {
@@ -158,10 +159,11 @@
       "2f5c61d8adc3b09c4c9759ff68731deb350fa7370560fbb7c6ae521c560eb472": "c35c1b78adf9c46393de8c3db0dc3606a572751b:data/探索/模式.json",
       "42bb4af46071bbb391cd309c8b1403bec642c3f3e681fe63f2f50679ac8aa6ad": "2f05ee4de43d2c983d2b1b94a573e64d9cfff79a:data/探索/模式.json",
       "95a81877438ce59e1fefb4054b6eb19149e0354d6d362ce652e9f8db04f19669": "e280d3ae746d065c37b1d7a33512556837ffc43d:data/探索/模式.json",
-      "8f8e047263edb048abdc668b6e4d3f01b79eae1209c343326a9bb6f6e3b0caba": "721517927a382a0799638159cafbc40ba1504d68:data/探索/模式.json"
+      "8f8e047263edb048abdc668b6e4d3f01b79eae1209c343326a9bb6f6e3b0caba": "721517927a382a0799638159cafbc40ba1504d68:data/探索/模式.json",
+      "d4cebfbcab883232a20745cd9e0b603b35a408fca6356428fc8b62589eb990e4": "9861ee6edd57d69a996ef9b7f4035ed6581885e3:data/探索/模式.json"
     },
-    "new_sha256": "d4cebfbcab883232a20745cd9e0b603b35a408fca6356428fc8b62589eb990e4",
-    "new_commit": "9861ee6edd57d69a996ef9b7f4035ed6581885e3"
+    "new_sha256": "a61b136357635b4741430de164bd652605ffb6f8f5fbbb5a039ba6d81465830a",
+    "new_commit": "30854009f220ec8584e1045a103f7bd2ec6d4706:data/探索/模式.json"
   },
   "战斗/敌人.json": {
     "old_sha256": {

@@ -1,18 +1,9 @@
 """Content completeness contract.
 
-Three defects in the last month came from data that *looked* complete but was not
-closed end to end:
-
-* an exploration mode shipped `status=open` while no location listed it, so players
-  could not see the entrance;
-* a mainline `exploration_reward` objective pointed at an item its own reward pool
-  could no longer pay (`item is not attainable`), which surfaced only when another
-  stage pinned that pool;
-* three enemies declared `stats` in `data/战斗/敌人.json` without a `combat_profile`,
-  so `enemy_definition` silently used the Python table and content edits did nothing.
-
-Each invariant below is asserted over the whole bundle and reports *every* violation
-at once, so a future regression fails in CI with a file/key list instead of in play.
+Open exploration content must connect its location entrance, reward and encounter
+pools, executable enemy definitions, realm gates, and payable mainline objectives.
+Data-driven enemies require a combat profile so their declared stats are consumed.
+Each invariant reports all invalid references in the bundle with their content keys.
 """
 
 from __future__ import annotations

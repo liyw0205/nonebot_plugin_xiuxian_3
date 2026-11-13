@@ -341,8 +341,9 @@ def test_release_install_smoke_checks_plugin_source_loading() -> None:
 def test_user_install_guides_prefer_raw_release_and_label_manual_checkout() -> None:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     installation = (ROOT / "docs/installation.md").read_text(encoding="utf-8")
+    version = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
     raw_installer = (
-        "https://raw.githubusercontent.com/liyw0205/nonebot_plugin_xiuxian_3/main/scripts/onekey.sh"
+        f"https://raw.githubusercontent.com/liyw0205/nonebot_plugin_xiuxian_3/v{version}/scripts/onekey.sh"
     )
     for guide in (readme, installation):
         linux = guide.split("### Linux 一键 Release 安装\n", 1)[1].split("\n### ", 1)[0]
@@ -357,7 +358,7 @@ def test_user_install_guides_prefer_raw_release_and_label_manual_checkout() -> N
     readme_manual = readme.split("### 手动获取脚本或源码安装\n", 1)[1].split("\n### ", 1)[0]
     install_manual = installation.split("## 手动获取脚本或源码安装\n", 1)[1].split("\n## ", 1)[0]
     for section in (readme_manual, install_manual):
-        assert "git clone --branch main" in section
+        assert f"git clone --branch v{version}" in section
         assert "--source-mode source" in section
     assert "requirements.txt" in installation
     assert "--mirror accelerated" in installation
