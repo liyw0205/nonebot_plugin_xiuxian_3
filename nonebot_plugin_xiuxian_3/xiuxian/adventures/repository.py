@@ -1817,6 +1817,10 @@ class AdventuresRepositoryMixin:
                     "SELECT COALESCE(MAX(id), 0) FROM idle_assignments WHERE player_id=?",
                     (row["id"],),
                 ).fetchone()[0]),
+                "baseline_production_order_id": int(connection.execute(
+                    "SELECT COALESCE(MAX(id), 0) FROM production_orders WHERE player_id=?",
+                    (row["id"],),
+                ).fetchone()[0]),
                 "stage": str(row["stage"]),
                 "realm_key": str(row["realm_key"]),
                 "realm_layer": player_integer(row, "realm_layer"),
@@ -2120,8 +2124,32 @@ class AdventuresRepositoryMixin:
                 or operation_baseline < 0
             ):
                 raise ValueError("mainline operation baseline is invalid")
+            needs_production = any(
+                isinstance(item, dict) and item.get("type") in {"production_complete", "item_use"}
+                for item in objectives
+            )
+            production_baseline = snapshot.get("baseline_production_order_id", None if needs_production else 0)
+            if type(production_baseline) is not int or production_baseline < 0:
+                raise ValueError("mainline production baseline is invalid")
         except (TypeError, json.JSONDecodeError, ValueError) as exc:
             raise ValueError("mainline run snapshot is invalid") from exc
+
+        def completed_production(objective: dict) -> int | None:
+            item_path = '$.outputs.' + json.dumps(objective["item_key"])
+            completed = connection.execute(
+                "SELECT o.rowid FROM production_orders p JOIN operations o "
+                "ON o.player_id=p.player_id AND json_extract(o.result_json, '$.order_id')=p.order_id "
+                "WHERE p.player_id=? AND p.recipe_key=? AND p.id>? AND p.starts_at>=? "
+                "AND p.status='completed' AND o.operation_name IN ('production.complete','production.recover') "
+                "AND o.rowid>? AND json_type(o.result_json, '$.success')='true' "
+                "AND json_type(o.result_json, ?)='integer' "
+                "AND json_extract(o.result_json, ?)>=1 ORDER BY o.rowid LIMIT 1",
+                (
+                    player_id, objective["recipe_key"], production_baseline, started_at,
+                    operation_baseline, item_path, item_path,
+                ),
+            ).fetchone()
+            return int(completed[0]) if completed is not None else None
 
         missing: list[str] = []
         for objective in objectives:
@@ -2245,6 +2273,30 @@ class AdventuresRepositoryMixin:
                     spent = payload.get("spent")
                     amount = spent.get(objective.get("item_key")) if isinstance(spent, dict) else None
                     if isinstance(amount, int) and not isinstance(amount, bool) and amount > 0:
+                        found = operation
+                        break
+            elif kind == "production_complete":
+                found = completed_production(objective)
+            elif kind == "item_use":
+                found = None
+                cooked_rowid = completed_production(objective)
+                if cooked_rowid is None:
+                    missing.append(str(objective["label"]))
+                    continue
+                for operation in connection.execute(
+                    "SELECT result_json FROM operations WHERE player_id=? "
+                    "AND operation_name='items.use' AND rowid>? ORDER BY rowid",
+                    (player_id, cooked_rowid),
+                ).fetchall():
+                    payload = decode_json_strict(operation["result_json"])
+                    effect = payload.get("effect") if isinstance(payload, dict) else None
+                    if (
+                        isinstance(effect, dict) and payload.get("item_key") == objective["item_key"]
+                        and type(payload.get("quantity")) is int and payload["quantity"] > 0
+                        and effect.get("type") == "restore_choice"
+                        and effect.get("resource") in objective["resources"]
+                        and type(effect.get("restored")) is int and effect["restored"] > 0
+                    ):
                         found = operation
                         break
             elif kind == "dispatch_success":
@@ -2387,6 +2439,24 @@ class AdventuresRepositoryMixin:
                             isinstance(objective.get(field), str) and objective[field].strip()
                             for field in ("route_key", "companion_key", "item_key")
                         )
+                    )
+                if objective["type"] in {"production_complete", "item_use"}:
+                    extra = "route_key" if objective["type"] == "production_complete" else "resources"
+                    if (
+                        set(objective) != {"key", "type", "label", "recipe_key", "item_key", extra}
+                        or not all(
+                            isinstance(objective.get(field), str) and objective[field].strip()
+                            for field in ("recipe_key", "item_key")
+                        )
+                    ):
+                        return False
+                    value = objective[extra]
+                    if extra == "route_key":
+                        return isinstance(value, str) and bool(value.strip())
+                    return (
+                        isinstance(value, list) and bool(value)
+                        and all(isinstance(item, str) and item.strip() for item in value)
+                        and len(set(value)) == len(value)
                     )
                 if objective["type"] == "dispatch_success":
                     return (

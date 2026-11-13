@@ -20,6 +20,7 @@ SEEKER_ECHOES_STORY_KEY = "story.mainline.seeker_echoes"
 LIVELIHOOD_ECHOES_STORY_KEY = "story.mainline.livelihood_echoes"
 BEAST_HABITAT_ECHOES_STORY_KEY = "story.mainline.beast_habitat_echoes"
 COMPANION_OLD_TRAIL_STORY_KEY = "story.mainline.companion_old_trail"
+SPRING_SUPPER_STORY_KEY = "story.mainline.spring_supper"
 MAINLINE_TOWN_COMMISSION_DELIVERED = "livelihood.town_commission.delivered"
 
 MAINLINE_LOCKED = "locked"
@@ -223,6 +224,8 @@ _VERTICAL_SLICE_STAGES = frozenset(
         "companion_old_trail.1",
         "companion_old_trail.2",
         "companion_old_trail.3",
+        "spring_supper.1",
+        "spring_supper.2",
         "lane.builder.chapter.01",
         "lane.builder.chapter.02",
         "lane.builder.chapter.03",
@@ -555,6 +558,63 @@ def _story_objectives(
             normalized = {
                 "key": str(objective_key), "type": kind, "label": label.strip(),
                 "route_key": route_key, "companion_key": companion_key, "item_key": item_key,
+            }
+        elif kind in {"production_complete", "item_use"}:
+            extra = "route_key" if kind == "production_complete" else "resources"
+            if set(objective) != {"key", "type", "label", "recipe_key", "item_key", extra}:
+                raise ContentError(f"mainline {key} objective {objective_key} has an invalid {kind} shape")
+            recipe_key, item_key = objective.get("recipe_key"), objective.get("item_key")
+            if any(not isinstance(item, str) or not item.strip() for item in (recipe_key, item_key)):
+                raise ContentError(f"mainline {key} objective {objective_key} requires recipe and item keys")
+            if kind == "production_complete":
+                if not isinstance(objective[extra], str) or not objective[extra].strip():
+                    raise ContentError(f"mainline {key} objective {objective_key} requires route_key")
+            else:
+                resources = objective[extra]
+                if (
+                    not isinstance(resources, list) or not resources
+                    or any(not isinstance(item, str) or not item.strip() for item in resources)
+                    or len(set(resources)) != len(resources)
+                ):
+                    raise ContentError(f"mainline {key} objective {objective_key} has invalid resources")
+            if bundle is not None:
+                from ..production.rules import recipe_definition
+
+                try:
+                    recipe = recipe_definition(recipe_key, bundle)
+                except ValueError as exc:
+                    raise ContentError(f"mainline {key} objective {objective_key} references an inactive recipe") from exc
+                if recipe.outputs.get(item_key, 0) < 1:
+                    raise ContentError(f"mainline {key} objective {objective_key} recipe does not produce its item")
+                if kind == "production_complete":
+                    route = bundle.get("livelihood", objective[extra], include_locked=False)
+                    if route is None or route.get("record_type") != "idle_route":
+                        raise ContentError(f"mainline {key} objective {objective_key} references an unknown idle source")
+                    pool = bundle.get("reward", str(route.get("reward_pool_key", "")), include_locked=False)
+                    outcomes = pool.get("outcomes") if pool is not None else None
+                    if not isinstance(outcomes, list) or not outcomes or any(
+                        not isinstance(outcome, dict) or not isinstance(outcome.get("rewards"), dict)
+                        or any(
+                            type(outcome["rewards"].get(asset)) is not int
+                            or outcome["rewards"][asset] < quantity
+                            for asset, quantity in recipe.inputs.items()
+                        )
+                        for outcome in outcomes
+                    ):
+                        raise ContentError(f"mainline {key} objective {objective_key} ingredients are not guaranteed")
+                else:
+                    from ..items.rules import resolve_item
+
+                    try:
+                        food = resolve_item(item_key, bundle)
+                    except ValueError as exc:
+                        raise ContentError(f"mainline {key} objective {objective_key} references an unusable item") from exc
+                    if food.effect_type != "restore_choice" or not set(resources) <= set(food.resources):
+                        raise ContentError(f"mainline {key} objective {objective_key} item cannot restore its resources")
+            normalized = {
+                "key": str(objective_key), "type": kind, "label": label.strip(),
+                "recipe_key": recipe_key, "item_key": item_key,
+                extra: list(objective[extra]) if kind == "item_use" else objective[extra],
             }
         elif kind == "dispatch_success":
             if set(objective) != {"key", "type", "label", "dispatch_key"}:
@@ -1078,6 +1138,7 @@ __all__ = [
     "LIVELIHOOD_ECHOES_STORY_KEY",
     "BEAST_HABITAT_ECHOES_STORY_KEY",
     "COMPANION_OLD_TRAIL_STORY_KEY",
+    "SPRING_SUPPER_STORY_KEY",
     "MAINLINE_TOWN_COMMISSION_DELIVERED",
     "MainlineDefinition",
     "MainlineStageDefinition",

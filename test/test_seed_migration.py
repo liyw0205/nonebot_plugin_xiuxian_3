@@ -339,7 +339,7 @@ def test_cultivation_seed_upgrade_preserves_custom_and_repeats(host: Path, custo
     old = (ROOT / "test/fixtures/official_seeds/livelihood_pre_reachability.json").read_bytes()
     rule = json.loads((ROOT / "scripts/seed_migrations.json").read_text())[relative.as_posix()]
     assert hashlib.sha256(old).hexdigest() in rule["old_sha256"]
-    original = old + b"\n" if custom else old
+    original = (ROOT / "data" / relative).read_bytes() + b"\n" if custom else old
     path = host / "data" / relative
     path.write_bytes(original)
     result = deploy(host)
@@ -1046,6 +1046,9 @@ PLACE_CODEX_ADDED = frozenset(
         "codex.material.demon_abyss_echo",
         "codex.material.beast_bloodline",
         "codex.material.mist_cave_route",
+        "codex.story.companion_old_trail.1",
+        "codex.story.companion_old_trail.2",
+        "codex.story.companion_old_trail.3",
     }
 )
 
@@ -1086,8 +1089,8 @@ def test_bounty_source_seeds_upgrade_together_with_backup_and_idempotency(host: 
 
 def test_unknown_bounty_source_seeds_are_preserved(host: Path) -> None:
     custom = {
-        relative: (SEED_FIXTURES / fixture).read_bytes() + b"\n"
-        for relative, fixture in BOUNTY_SOURCE_SEEDS.items()
+        relative: (ROOT / "data" / relative).read_bytes() + b"\n"
+        for relative in BOUNTY_SOURCE_SEEDS
     }
     for relative, blob in custom.items():
         (host / "data" / relative).write_bytes(blob)
@@ -1096,6 +1099,22 @@ def test_unknown_bounty_source_seeds_are_preserved(host: Path) -> None:
     assert "种子更新 0 个" in result.stdout
     for relative, blob in custom.items():
         assert (host / "data" / relative).read_bytes() == blob
+    preserved(host)
+
+
+def test_unknown_livelihood_missing_story_source_fails_and_rolls_back(host: Path) -> None:
+    path = host / "data/生活/生活.json"
+    custom = (SEED_FIXTURES / "livelihood_pre_reachability.json").read_bytes() + b"\n"
+    path.write_bytes(custom)
+    previous_source = (host / "src/plugins/nonebot_plugin_xiuxian_3/__init__.py").read_bytes()
+    previous_toml = (host / "pyproject.toml").read_bytes()
+    result = deploy(host)
+    assert result.returncode != 0
+    assert "claim_companion_patrol references unknown idle route" in result.stdout + result.stderr
+    assert "已回退" in result.stderr
+    assert path.read_bytes() == custom
+    assert (host / "src/plugins/nonebot_plugin_xiuxian_3/__init__.py").read_bytes() == previous_source
+    assert (host / "pyproject.toml").read_bytes() == previous_toml
     preserved(host)
 
 

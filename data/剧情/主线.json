@@ -4336,6 +4336,69 @@
       "lane_name": "灵兽旧兽道",
       "first_clear_reward": {"codex.story.companion_old_trail.3": 1, "service_reputation": 2, "spirit_stones": 25},
       "repeat_reward": {"spirit_stones": 8}
+    },
+    {
+      "key": "spring_supper.1",
+      "story_key": "story.mainline.spring_supper",
+      "chapter": 1,
+      "stage": 1,
+      "name": "泉畦拾穗",
+      "desc": "循着泉声找到谷守阿禾，疏通旧稻畦，收回四小时照看的成熟散穗。",
+      "body": "灵泉谷的石桥下，阿禾正挽着裤脚清理水口。泉边的旧稻畦许久无人照应，成熟散穗垂进水里，再晚些就要泡坏。你答应留下四小时，一边疏水，一边把干燥的散穗拾进竹篮。先沿公开山路来到灵泉谷，再开始拾穗，等完整收获后把粮食带回。若提前离开，可以及时取消安排；错过收获窗口只剩阿禾留下的一份干米，不能交作这一畦的完整收成。她会把这次照看记入谷中行记，也盼你把辛苦得来的米煮成一顿热饭。",
+      "objectives": [
+        {"key": "glean_full", "type": "idle_claim", "label": "本关开始后完整领取一次灵泉谷拾穗", "route_key": "idle.spring_gleaning"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "灵泉谷", "description": "达到感气二层后沿青石镇的公开山路入谷。"},
+        {"command": "挂机预览", "argument": "灵泉谷拾穗", "description": "查看地点、体力精力成本及完整收获窗口。"},
+        {"command": "开始挂机", "argument": "灵泉谷拾穗", "description": "在本关开始后照看四小时稻畦；完整收成至少足够煮一份灵米饭。"},
+        {"command": "领取挂机", "argument": "", "description": "在完整窗口内收回灵米与谷中行记。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.spring_supper:spring_supper.1"]},
+      "next_stage_key": "spring_supper.2",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "旧拾穗、尚未收获、取消和逾时留下的干米都不能完成这一畦照看。先处理当前安排，再按地点与每日名额重新拾穗；主线进度保留。"},
+      "status": "open",
+      "aliases": ["泉畦拾穗"],
+      "prerequisites": ["player.start_seeking"],
+      "required_realm": "qi_sensing",
+      "required_layer": 2,
+      "lane": "spring_supper",
+      "lane_name": "泉边炊烟",
+      "first_clear_reward": {"spirit_stones": 8, "service_reputation": 1},
+      "repeat_reward": {"spirit_stones": 2}
+    },
+    {
+      "key": "spring_supper.2",
+      "story_key": "story.mainline.spring_supper",
+      "chapter": 1,
+      "stage": 2,
+      "name": "一饭暖途",
+      "desc": "把散穗脱成的灵米煮熟，亲自吃一碗，决定先恢复赶路的体力还是劳作的精力。",
+      "body": "竹篮中的散穗已经脱成粗糙灵米，阿禾却没有急着把它称成灵石。她添了半瓢泉水，把小锅推到你面前：路再远，也得先吃一顿热饭。这一餐需要烹饪辅修；尚未习得时，先查看辅修预览，再按原有条件选择烹饪。用两份粗糙灵米开始烹煮，守到饭熟并领取；随后亲自吃一碗，选择补回赶路的体力，或恢复劳作耗去的精力。两种选择都能续上旅程，只认实际补回的气力。旧饭食、只开火未收锅，或在饱足时勉强吃下，都不能替代这一餐。材料不足时可再照看稻畦，饭未煮成则按原有烹饪规则重试；谷守会把这份踏实的生活本领记在心里。",
+      "objectives": [
+        {"key": "cook_rice", "type": "production_complete", "label": "本关开始后新开锅并成功领取灵米饭", "route_key": "idle.spring_gleaning", "recipe_key": "recipe.food.spirit_rice", "item_key": "item.food.spirit_rice"},
+        {"key": "eat_rice", "type": "item_use", "label": "本关开始后吃灵米饭并实际恢复体力或精力", "recipe_key": "recipe.food.spirit_rice", "item_key": "item.food.spirit_rice", "resources": ["stamina", "energy"]}
+      ],
+      "actions": [
+        {"command": "辅修预览", "argument": "烹饪", "description": "已有烹饪辅修可直接开锅；其他辅修先查看切换条件，按原规则确认，不会自动改业。"},
+        {"command": "生产预览", "argument": "灵米饭", "description": "确认两份粗糙灵米、精力和烹饪时长。"},
+        {"command": "开始生产", "argument": "灵米饭", "description": "本关开始后新开一锅；旧锅后来才领取也不算本关烹煮。"},
+        {"command": "领取生产", "argument": "", "description": "饭熟后收锅；错过窗口可按生产状态的提示恢复。"},
+        {"command": "使用物品", "argument": "灵米饭 体力", "description": "选择补回体力，继续走山路。"},
+        {"command": "使用物品", "argument": "灵米饭 精力", "description": "或选择补回精力，再做一份劳作；只需选择其中一种。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.spring_supper:spring_supper.2"]},
+      "next_stage_key": null,
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "需要本关新开的锅成功出饭，并在本关吃饭实际恢复体力或精力。旧锅、旧用餐、未熟、烹饪失败、缺少材料或未补回气力都不能交卷；补足食材、等待饭熟后再试，已经完成的本关行动会保留。"},
+      "status": "open",
+      "aliases": ["一饭暖途"],
+      "prerequisites": ["spring_supper.1"],
+      "required_realm": "qi_sensing",
+      "required_layer": 2,
+      "lane": "spring_supper",
+      "lane_name": "泉边炊烟",
+      "first_clear_reward": {"spirit_stones": 20, "service_reputation": 2},
+      "repeat_reward": {"spirit_stones": 4}
     }
   ]
 }
