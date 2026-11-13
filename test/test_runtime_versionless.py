@@ -20,16 +20,20 @@ def test_runtime_does_not_select_rules_by_release_label() -> None:
     assert not (Path(__file__).parents[1] / "nonebot_plugin_xiuxian_3" / "xiuxian" / "versions.py").exists()
 
 
-def test_project_metadata_does_not_hardcode_a_release_version() -> None:
+def test_project_metadata_keeps_build_versions_out_of_runtime_rules() -> None:
     root = Path(__file__).parents[1]
-    for relative_path in (
-        "pyproject.toml",
-        "examples/nonebot/pyproject.toml",
-        "docker/pyproject.toml",
-    ):
+    project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))["project"]
+    version = project.get("version")
+    assert isinstance(version, str) and version
+    changelog = (root / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert f"## {version}" in changelog
+
+    for relative_path in ("examples/nonebot/pyproject.toml", "docker/pyproject.toml"):
         project = tomllib.loads((root / relative_path).read_text(encoding="utf-8"))["project"]
-        assert "version" not in project
-        assert project.get("dynamic") == ["version"]
+        assert isinstance(project.get("name"), str) and project["name"]
+        has_static_version = isinstance(project.get("version"), str) and bool(project["version"])
+        has_dynamic_version = "version" in project.get("dynamic", [])
+        assert has_static_version != has_dynamic_version
 
 
 def test_new_player_schema_has_no_release_marker(tmp_path: Path) -> None:

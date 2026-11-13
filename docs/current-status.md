@@ -65,7 +65,23 @@ M6 首采集与 QQ 配置以及分类帮助/悬赏蓝字已完成。用户新授
 
 ## 4. 唯一工作队列
 
-### 当前阶段：常规个人批量生产（2026-11-13）
+### 当前阶段：建设结算收据与回放校验（2026-11-13）
+
+续作基线 develop/origin `b8bd176`，批量生产已在 v0.1.38 发布，不重做。当前 WIP 收紧持久
+建设结算 operation 回放：校验冻结项目快照、奖励键/正整数、资格与奖励联动、地方名望差值，
+损坏回执在写入前拒绝并支持修复后原 operation 幂等重放；项目选择器兼容当前周/持久行、中文
+别名、旧 weekly 快照与重启，生活/探索帮助补充个人满十点后的 `结算公共项目 项目名` 入口。
+定向建设/帮助/旧项目测试 `53 passed`，编译与 diff 检查通过；业务提交
+`d66e5309f4a7334358616d9225deced59d318e61` 已推送 develop，精确 SHA CI `43344686359`
+的 Python 3.11/3.12 quality、install-smoke、编译与 shell 检查全绿，分支 push 的 release job
+按条件跳过。安装文档/种子迁移定向组 `67 passed`。额外执行发现版本无关测试将根包和两个
+宿主配置都强制要求动态版本，与 v0.1.38 根包静态版本及既有宿主固定元数据冲突；已校正为
+检查包版本与 CHANGELOG 同步及宿主 build metadata 合法，runtime 规则/存档隔离断言保留；
+`test_runtime_versionless.py` `3 passed`。当前准备 package `0.1.39` 版本提交，尚未合 main/发布。
+QQ SDK 缺失不安装、不做真机验收。
+小提交仅留 develop，版本提交及其 CI 通过后才普通合 main、发布并验包。
+
+### 已交付阶段：常规个人批量生产（2026-11-13）
 
 续作基线 develop `478dbcf` / 正式 `v0.1.37`，保留已有批量改动，不重做共建或重建旧 goal。
 常规配方支持 1-5 份聚合预览/开工与整批结算，份额日限、质量、投入产出及原请求冻结；
@@ -79,9 +95,14 @@ HEAD 隔离复现旧设施时长 12≠108，修正把 9000 时长倍率误作减
 legacy-message-final,facility-fixed,duration-documentation}.xml`；编译及 diff 检查通过。
 只在 develop 白名单提交；精确 SHA CI `43324976655` 已全绿（Python 3.11/3.12 quality、
 install-smoke、编译与 shell 检查），本地最终树生产/装备/完整性/合同/内容规则定向组合 `126 passed`，
-审查发现的损坏装备快捷链接已在 `478dbcf` 修复，装备与批量回归 `53 passed`。当前待普通合 main、
-递增正式版本 `0.1.38`、tag/release 与完整 Release 验包。
-未部署、操作生产/真实账号、发 QQ、安装依赖或改其它项目；全部辅助文件保留且不 stage。
+审查发现的损坏装备快捷链接已在 `478dbcf` 修复，装备与批量回归 `53 passed`；另 `test_production.py`
+`8 passed`。版本 `834a4f4` 精确 SHA CI `43326349367`、普通 main 合并
+`1d7b9277a1fedddd45db22443a894acd2173bd80` CI `43327486516`、tag/release CI `43328881013`
+均全绿。正式 `v0.1.38` 指向 main 合并提交；Release 包完整下载 `3,285,532` bytes，1288 tracked
+files、83 data、44 seed rules、176 old provenance 全部核验，无辅助文件/额外文件；本地 SHA-256
+`bbd952b130a12a54db5a581f7aa3622abcecd938640eee1596179745d54fa412` 与 GitHub asset digest 相同。
+已回 develop 留本 checkpoint；未部署、操作生产/真实账号、发 QQ、安装依赖或改其它项目；
+全部辅助文件保留且不 stage。
 
 ### 最新交付：山野共建长期工程（2026-11-13）
 

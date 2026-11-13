@@ -217,7 +217,10 @@ def test_construction_qq_help_blue_links_and_plain_text_without_optional_sdk(tmp
             for adapter in ("qq.official", "onebot.v11"):
                 for category in ("生活", "探索"):
                     help_result = await send(runtime, f"修仙帮助 {category}", adapter=adapter)
-                    assert "工程预览" in unquote(help_result.message) and "我的工程" in help_result.message
+                    rendered_help = unquote(help_result.message)
+                    assert "工程预览" in rendered_help and "我的工程" in rendered_help
+                    assert "满十点" in rendered_help
+                    assert "](command:结算公共项目 项目名)" in rendered_help
                     assert not help_result.actions
         finally:
             await runtime.close()
@@ -452,6 +455,90 @@ def test_malformed_construction_receipt_numbers_refuse_zero_write_then_repair(fi
             before = snapshot_state(runtime)
             assert (await send(runtime, command, "receipt-number")).data["idempotent_replay"]
             assert snapshot_state(runtime) == before
+        finally:
+            await runtime.close()
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize(
+    "damage",
+    [
+        "reputation_before_boolean",
+        "reputation_after_type",
+        "reputation_delta",
+        "unknown_reward",
+        "paired_unknown_reward",
+        "reward_boolean",
+        "json_object",
+        "json_array",
+        "missing_project",
+        "missing_reputation",
+        "eligibility_mismatch",
+        "cycle_downgrade",
+    ],
+)
+def test_malformed_construction_settlement_receipt_refuses_zero_write_then_repair(damage, tmp_path):
+    async def run():
+        clock = Clock()
+        runtime = create_runtime(data_dir=tmp_path, clock=clock)
+        try:
+            await unit_ready(runtime)
+            project_id = await compact_finish(runtime, clock)
+            command = f"结算公共项目 {project_id}"
+            claim = await send(runtime, command, "receipt-replay")
+            assert claim.ok and claim.data["rewarded"]
+            await runtime.close()
+            runtime = create_runtime(data_dir=tmp_path, clock=clock)
+            with runtime.repository._connect() as connection:
+                original = connection.execute(
+                    "SELECT result_json FROM operations WHERE operation_id='receipt-replay'"
+                ).fetchone()[0]
+                receipt = json.loads(original)
+                if damage == "json_object":
+                    broken_json = "{"
+                elif damage == "json_array":
+                    broken_json = "[]"
+                elif damage == "reputation_before_boolean":
+                    receipt["local_reputation_before"] = True
+                elif damage == "reputation_after_type":
+                    receipt["local_reputation_after"] = "0"
+                elif damage == "reputation_delta":
+                    receipt["local_reputation_delta"] = 1
+                elif damage == "missing_project":
+                    receipt.pop("project")
+                elif damage == "missing_reputation":
+                    receipt.pop("local_reputation_delta")
+                elif damage == "eligibility_mismatch":
+                    receipt["rewarded"] = False
+                elif damage == "cycle_downgrade":
+                    receipt["project"]["cycle"] = "weekly"
+                elif damage == "paired_unknown_reward":
+                    receipt["project"]["reward_labels"]["item.unknown"] = "未知物"
+                    receipt["reward"]["item.unknown"] = 1
+                elif damage == "reward_boolean":
+                    receipt["reward"]["spirit_stones"] = True
+                else:
+                    receipt["reward"]["item.unknown"] = 1
+                connection.execute(
+                    "UPDATE operations SET result_json=? WHERE operation_id='receipt-replay'",
+                    (broken_json if damage in {"json_object", "json_array"} else json.dumps(receipt),),
+                )
+            before = snapshot_state(runtime)
+            denied = await send(runtime, command, "receipt-replay")
+            if damage in {"json_object", "json_array"}:
+                assert denied.code == "OPERATION_CONFLICT"
+            else:
+                assert denied.code == "PERSISTENCE_ERROR" and denied.retryable
+            assert snapshot_state(runtime) == before
+            with runtime.repository._connect() as connection:
+                connection.execute(
+                    "UPDATE operations SET result_json=? WHERE operation_id='receipt-replay'",
+                    (original,),
+                )
+            before = snapshot_state(runtime)
+            replay = await send(runtime, command, "receipt-replay")
+            assert replay.ok and replay.data["idempotent_replay"]
+            assert replay.message == claim.message and snapshot_state(runtime) == before
         finally:
             await runtime.close()
     asyncio.run(run())
