@@ -1332,3 +1332,33 @@ def test_companion_old_trail_seeds_upgrade_together_and_preserve_custom(host: Pa
     assert "种子更新 0 个" in custom_deploy.stdout
     assert all((host / "data" / relative).read_bytes() == blob for relative, blob in old_blobs.items())
     preserved(host)
+
+
+def test_spring_supper_mainline_seed_upgrade_backup_repeat_and_custom_preservation(host: Path) -> None:
+    text = (ROOT / "data" / MAINLINE).read_text(encoding="utf-8")
+    marker = text.index('    {\n      "key": "spring_supper.1"')
+    old = (text[:marker].rstrip()[:-1] + "\n  ]\n}\n").encode("utf-8")
+    assert hashlib.sha256(old).hexdigest() == "0ebe7d841042d1688778d1a19d7b640e5edaa621ecc9778989ae015cd1260fb8"
+    _registered_old_blob(MAINLINE, old)
+    path = host / "data" / MAINLINE
+    path.write_bytes(old)
+    result = deploy(host)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "种子更新 1 个" in result.stdout
+    assert path.read_bytes() == (ROOT / "data" / MAINLINE).read_bytes()
+    backup = next((host / ".xiuxian3/backups").glob("deploy-*"))
+    assert (backup / "data" / MAINLINE).read_bytes() == old
+    preserved(host)
+    repeated = deploy(host)
+    assert repeated.returncode == 0, repeated.stdout + repeated.stderr
+    assert "种子更新 0 个" in repeated.stdout
+    document = json.loads(text)
+    stage = next(row for row in document["records"] if row["key"] == "spring_supper.1")
+    stage["body"] += "阿禾把自家稻畦的水口另作了标记。"
+    custom = (json.dumps(document, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+    path.write_bytes(custom)
+    custom_deploy = deploy(host)
+    assert custom_deploy.returncode == 0, custom_deploy.stdout + custom_deploy.stderr
+    assert "种子更新 0 个" in custom_deploy.stdout
+    assert path.read_bytes() == custom
+    preserved(host)
