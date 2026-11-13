@@ -561,12 +561,17 @@ class ProjectRepositoryMixin:
             connection.execute("BEGIN IMMEDIATE")
             existing = self._project_operation(connection, operation_id, operation_name, request_hash)
             if existing is not None:
-                return self._project_settlement_from_payload(existing, replay=True)
+                return self._project_settlement_from_payload(existing, connection=connection, replay=True)
             player = self._require_player(connection, platform, platform_user_id)
             if project_id:
                 project = connection.execute(
-                    "SELECT * FROM livelihood_projects WHERE project_id=? OR (project_key=? AND business_week='persistent') ORDER BY id DESC LIMIT 1",
-                    (project_id, project_id),
+                    """
+                    SELECT * FROM livelihood_projects
+                    WHERE project_id=? OR (project_key=? AND business_week IN (?, 'persistent'))
+                    ORDER BY CASE WHEN project_id=? THEN 0 WHEN business_week='persistent' THEN 1 ELSE 2 END, id DESC
+                    LIMIT 1
+                    """,
+                    (project_id, project_id, self._business_week(now), project_id),
                 ).fetchone()
             else:
                 project = connection.execute(
@@ -602,7 +607,7 @@ class ProjectRepositoryMixin:
                     int(award.get("local_reputation_after", 0)),
                 )
                 self._record_project_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
-                return self._project_settlement_from_payload(payload, replay=True)
+                return self._project_settlement_from_payload(payload, connection=connection, replay=True)
             contribution = connection.execute(
                 "SELECT COALESCE(SUM(contribution_points), 0) AS points FROM livelihood_project_contributions WHERE project_id = ? AND player_id = ?",
                 (project["project_id"], player["id"]),
@@ -653,7 +658,7 @@ class ProjectRepositoryMixin:
                 local_reputation_after,
             )
             self._record_project_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
-            return self._project_settlement_from_payload(payload)
+            return self._project_settlement_from_payload(payload, connection=connection)
 
     @staticmethod
     def _business_week(now: datetime) -> str:
@@ -1089,14 +1094,82 @@ class ProjectRepositoryMixin:
             "local_reputation_delta": local_reputation_after - local_reputation_before,
         }
 
-    def _project_settlement_from_payload(self, payload: dict[str, Any], *, replay: bool = False) -> ProjectSettlementRecord:
-        self._validate_construction_receipt(payload["project"])
-        if payload["project"].get("cycle") == "persistent" and (
-            not isinstance(payload.get("eligible"), bool) or not isinstance(payload.get("rewarded"), bool)
-            or not isinstance(payload.get("reward"), dict)
-            or any(isinstance(value, bool) or not isinstance(value, int) or value <= 0 for value in payload["reward"].values())
+    def _project_settlement_from_payload(
+        self,
+        payload: dict[str, Any],
+        *,
+        connection: Any,
+        replay: bool = False,
+    ) -> ProjectSettlementRecord:
+        project_payload = payload.get("project")
+        if not isinstance(project_payload, dict):
+            raise ValueError("construction settlement project receipt is invalid")
+        project_id = project_payload.get("project_id")
+        if not isinstance(project_id, str) or not project_id:
+            raise ValueError("construction settlement project id is invalid")
+        stored = connection.execute(
+            "SELECT * FROM livelihood_projects WHERE project_id = ?",
+            (project_id,),
+        ).fetchone()
+        stored_snapshot = self._project_snapshot(stored) if stored is not None else None
+        stored_persistent = stored_snapshot is not None and stored_snapshot.get("cycle", "weekly") == "persistent"
+        receipt_persistent = project_payload.get("cycle", "weekly") == "persistent"
+        if stored_persistent and (
+            project_payload.get("cycle") != "persistent"
+            or project_payload.get("project_key") != str(stored["project_key"])
+            or project_payload.get("business_week") != str(stored["business_week"])
+            or project_payload.get("requirements") != stored_snapshot["requirements"]
+            or project_payload.get("reward_labels") != stored_snapshot["reward_labels"]
         ):
-            raise ValueError("construction settlement receipt is invalid")
+            raise ValueError("construction settlement receipt differs from frozen project snapshot")
+        if receipt_persistent and not stored_persistent:
+            raise ValueError("construction settlement project is not persistent")
+        self._validate_construction_receipt(project_payload)
+        if receipt_persistent:
+            reward = payload.get("reward")
+            reward_labels = project_payload.get("reward_labels")
+            reputation_fields = tuple(
+                payload.get(key)
+                for key in (
+                    "local_reputation_before",
+                    "local_reputation_after",
+                    "local_reputation_delta",
+                )
+            )
+            eligible = payload.get("eligible")
+            rewarded = payload.get("rewarded")
+            if (
+                not isinstance(eligible, bool)
+                or not isinstance(rewarded, bool)
+                or rewarded != eligible
+                or not isinstance(reward, dict)
+                or not isinstance(reward_labels, dict)
+                or any(
+                    not isinstance(key, str)
+                    or not key
+                    or not isinstance(label, str)
+                    or not label
+                    for key, label in reward_labels.items()
+                )
+                or any(
+                    not isinstance(key, str)
+                    or key not in reward_labels
+                    or isinstance(value, bool)
+                    or not isinstance(value, int)
+                    or value <= 0
+                    for key, value in reward.items()
+                )
+                or any(
+                    isinstance(value, bool) or not isinstance(value, int) or value < 0
+                    for value in reputation_fields
+                )
+                or reputation_fields[1] - reputation_fields[0] != reputation_fields[2]
+                or (not eligible and (reward or any(reputation_fields)))
+                or reputation_fields[2] != sum(
+                    value for key, value in reward.items() if key.startswith("local.")
+                )
+            ):
+                raise ValueError("construction settlement receipt is invalid")
         return ProjectSettlementRecord(
             player=self._row_to_player(payload["player"]),
             project=PublicProjectView(**payload["project"]),

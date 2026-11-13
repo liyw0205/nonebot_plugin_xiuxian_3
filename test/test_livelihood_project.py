@@ -99,6 +99,63 @@ def test_public_project_completion_and_personal_reward_do_not_change_cultivation
     asyncio.run(run())
 
 
+def test_legacy_weekly_project_alias_settlement_survives_snapshot_compatibility_and_restart() -> None:
+    async def run() -> None:
+        clock = MutableClock(datetime(2026, 10, 12, tzinfo=timezone.utc))
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir, clock=clock)
+            context = _context("weekly-selector")
+            try:
+                await runtime.dispatch(context, "开始修仙")
+                await runtime.dispatch(context, "寻仙问道")
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    player_id = connection.execute(
+                        "SELECT id FROM players WHERE platform_user_id = ?", ("weekly-selector",)
+                    ).fetchone()[0]
+                    connection.execute(
+                        "UPDATE players SET inventory_json = ? WHERE id = ?",
+                        (json.dumps({"item.mat.wood": 100}), player_id),
+                    )
+                assert (await runtime.dispatch(
+                    replace(context, operation_id="weekly-alias-first"),
+                    "贡献公共项目 灵井 木材 30",
+                )).ok
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    row = connection.execute(
+                        "SELECT snapshot_json FROM livelihood_projects WHERE project_key='project.town_well'"
+                    ).fetchone()
+                    snapshot = json.loads(row[0])
+                    for field in ("cycle", "stages", "sources", "effect_value", "effect_duration_seconds", "daily_limit", "selectors"):
+                        snapshot.pop(field, None)
+                    connection.execute(
+                        "UPDATE livelihood_projects SET snapshot_json=? WHERE project_key='project.town_well'",
+                        (json.dumps(snapshot),),
+                    )
+                for index, amount in enumerate((30, 30, 10), 1):
+                    result = await runtime.dispatch(
+                        replace(context, operation_id=f"weekly-alias-{index}"),
+                        f"贡献公共项目 灵井 木材 {amount}",
+                    )
+                    assert result.ok, result.message
+                await runtime.close()
+                runtime = create_runtime(data_dir=data_dir, clock=clock)
+                settled = await runtime.dispatch(
+                    replace(context, operation_id="weekly-alias-settle"),
+                    "结算公共项目 灵井",
+                )
+                assert settled.ok and settled.data["rewarded"]
+                before = settled.message
+                replay = await runtime.dispatch(
+                    replace(context, operation_id="weekly-alias-settle"),
+                    "结算公共项目 project.town_well",
+                )
+                assert replay.ok and replay.data["idempotent_replay"] and replay.message == before
+            finally:
+                await runtime.close()
+
+    asyncio.run(run())
+
+
 def test_public_project_concurrent_same_operation_deducts_once() -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:
