@@ -53,4 +53,4 @@
 - 同一 operation 回放不重复发奖，重启后进度与领奖保持。
 
 回归：`test_bounty_batch.py`、`test_adventures_bounty_settlement.py`、
-`test_m9_content_integrity.py`（悬赏清单钉值 42→45）、`test_documentation.py`。
+`test_m9_content_integrity.py`、`test_documentation.py`。

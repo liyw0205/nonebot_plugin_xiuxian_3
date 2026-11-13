@@ -61,7 +61,7 @@ success_bp = clamp(base_bp + preparation_bp + foundation_bp + support_bp - risk_
 `恢复道基震荡`（可追加保护或提前恢复）。开始突破独立使用对应的
 `progression.breakthrough_*` operation，结算独立使用 `progression.settle_breakthrough`；
 两者均保存随机池、地点、道途、资质、境界和成本快照，不保存运行时版本标识。高境界突破、合道、
-渡劫和终局状态机已接入；玩家入口的当前开放边界以[当前开发状态](../../current-status.md)为准，
+渡劫和终局状态机已接入；玩家入口的当前开放边界以[当前可用能力](../../availability.md)为准，
 不得将本节低境界命令示例解释为元婴及以上关闭。
 筑基突破固定使用 5 分钟会话、7,500 bp 基础成功率、聚气修为 70% 失败保留和 6 小时虚弱；
 道基质量、功法、阵法辅修、筑基护脉丹和 +400 bp 失败保底均写入开始快照。

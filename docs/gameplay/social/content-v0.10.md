@@ -73,5 +73,4 @@
 - 重启后建造中记录保留并可完成；
 - 旧即时项目、operation 回放与既有据点行为不变。
 
-种子侧 `scripts/seed_migrations.json` 把旧 `7654a3c4…` 登记为 `old_sha256`，新 SHA 为
-`711dbb9c…`；`test/test_seed_migration.py` 的清单反向助手继续覆盖该文件。
+官方种子迁移须登记旧/新指纹及真实 Git 来源，升级保留未知与自定义数据。

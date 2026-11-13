@@ -12,4 +12,4 @@
 
 净化工程仍要求 `access.project.abyss_purification` 与魔界阵营声望 300，材料为血草和阵砂；驿所所得的 `local.demon.abyss_market` 是地方名望，不能代替阵营声望。工程每角色每日最多贡献 30 点，项目完成或当日额度不足时等待既有轮换/额度恢复，不扣资产。
 
-三关目标在开始时冻结。旧行程、旧闲居、逾时保底、他人记录、旧贡献、项目全服进度和存量背包都不能冒领；前置不足或目标未完成保持 `running`，不写主线领奖 operation。贡献、奖励、声望、剧情事件和 operation 继续使用共享事务，故障回滚后原请求可重试，重复请求只回放原结果。专项验收见 `test/test_domain_purification_epilogue.py`。
+三关目标在开始时冻结。旧行程、旧闲居、逾时保底、他人记录、旧贡献、项目全服进度和存量背包都不能冒领；前置不足或目标未完成保持 `running`，不写主线领奖 operation。贡献、奖励、声望、剧情事件和 operation 使用共享事务，故障回滚后原请求可重试，重复请求只回放原结果。专项验收见 `test/test_domain_purification_epilogue.py`。

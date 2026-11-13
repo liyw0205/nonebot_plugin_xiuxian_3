@@ -116,9 +116,9 @@ stage**；`_SUPPORTED_STAGES` 只到 `new_user`/`mortal`/`seeker`/`cultivator`�
 
 两条引导的可读正文写在 `desc` 上——`intro_use_cases._guide_body` 渲染的是 `desc`，
 JSON 里的 `content` 字段加载器并不消费，所以玩家看得见的数值必须落在 `desc`。
-`test/test_qi_gathering_guides.py` 逐项比对 `desc` 引用的修为阈值与
-`境界.json` 的 `qi_gathering.layer_thresholds`（180/380/620/900/1220/1580/1980/2420/2900）
-以及 `cross_realm_total_cultivation`（4260），防止文案与数据漂移。
+`desc` 引用的修为阈值须与 `境界.json` 的 `qi_gathering.layer_thresholds`
+（180/380/620/900/1220/1580/1980/2420/2900）以及 `cross_realm_total_cultivation`（4260）一致；
+`test/test_qi_gathering_guides.py` 校验文案与数据的对应关系。
 
 ## 6. 体系分支与入道：`player.enter_cultivation`
 

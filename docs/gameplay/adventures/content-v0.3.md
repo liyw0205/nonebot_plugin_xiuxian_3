@@ -16,7 +16,7 @@
 `bounty.demon_relief` 使用 `content-0.3` / `adventures-0.3.0`：角色须已通过魔界风险确认并持有
 `access.demon_abyss_gate`，不另加境界或地点门槛。进度以接取时 `item.food.coarse_spirit_rice` 数量为基线，
 只计接取后新增量；领取事务再核验并扣除 3 份，失败/过期不扣货、不发奖。奖励写入 `faction_reputation.demon`
-与灵石，重复 operation 回放原结果。当前实现与适配器验收见[冒险域](README.md)和[当前开发状态](../../current-status.md)。
+与灵石，重复 operation 回放原结果。当前可用入口见[当前可用能力](../../availability.md)。
 
 `bounty.beast_habitat` 使用 `content-0.3` / `adventures-0.3.0`：角色申请时须持有效 `permit.beast_trade`。
 进度按接取时间之后已结算的 `specials.dispatch.settled` 事件计算，只接受 `dispatch.beast_relocation`
@@ -37,7 +37,7 @@
 
 首次成功结算按角色独立唯一：发放 `faction_reputation.demon +20` 与绑定线索 `item.clue.demon_abyss_echo` ×1，并写入 `story.demon_abyss_echo`。之后成功结算固定发放 `item.demon_core` ×1，不再增加首通声望或线索。没有随机奖励池；奖励键、数量、准入快照、规则版本和首通资格在入场快照冻结，首通标记与奖励在成功结算事务内原子写入。首通唯一键为 `secret_realm.first_clear:instance.secret_realm.demon_abyss:<player_id>`；所有进入、节点和结算 operation 均由调用方稳定 operation ID 幂等重放。
 
-命令为 `进入秘境 魔界深渊`、`选择秘境节点 深渊门|污染渗流|残响守卫|深渊之心` 和 `结算秘境`。QQ 官方及 OneBot V11 验收覆盖两种适配器各自主流程、QQ→OneBot 混合适配器重启续跑、地点/境界/门禁/声望逐项拒绝且不扣费、跨秘境活动锁、路线跳步拒绝、两场服务端自动战、风险 roll 边界和重放、首通/重复奖励、周额度、战败/过期成本、过期战斗停止、system-aborted 补偿、污染锁和 operation 重放。当前运行时与验收见[冒险域](README.md)及[当前开发状态](../../current-status.md)，本切片状态为 `open`。
+命令为 `进入秘境 魔界深渊`、`选择秘境节点 深渊门|污染渗流|残响守卫|深渊之心` 和 `结算秘境`。节点顺序、风险判定、失败/过期处理、系统补偿和 operation 重放均由服务端按冻结快照执行；当前可用入口见[当前可用能力](../../availability.md)。
 
 ## `instance.secret_realm.boundary_rift` 合同
 

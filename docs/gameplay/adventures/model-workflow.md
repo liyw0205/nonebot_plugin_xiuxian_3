@@ -34,7 +34,7 @@ replay: recorded -> indexed -> private/shared -> archived
   `instance.secret_realm.ancestral_vein` 是 v0.7 的两条普通内容记录，复用本用例，不另建仓储。
 - `instance.secret_realm.boundary_rift` 使用独立队伍类型、运行记录、每周成员额度与结算事务；不得复用 `cave.boundary_realm` 战斗奖励。其固定路线、两场自动战、退款边界和恢复合同见[v0.3 冒险内容](content-v0.3.md#instancesecret_realmboundary_rift-合同)。
 - `instance.secret_realm.demon_abyss` 将专属事务放在冒险域仓储 mixin；与其他秘境共享活动锁表，但不可并行运行。冻结路线、风险和版本快照，过期遭遇不得继续自动战，系统中止补偿只能回滚本 run 已记录的资源变化；详细合同见[v0.3 冒险内容](content-v0.3.md#instancesecret_realmdemon_abyss-合同)。
-- `instance.secret_realm.time_fort` 使用独立队伍 run/成员表；入场冻结时序许可、战斗快照和时间风暴词缀，守时者自动战每三回合写入直接环境伤害动作。失败/过期不退成本，只有系统故障补偿才退款并释放周额度；详细合同见[v0.5 冒险内容](content-v0.5.md#instancesecret_realm-time_fort-合同)。
+- `instance.secret_realm.time_fort` 使用独立队伍 run/成员表；入场冻结时序许可、战斗快照和时间风暴词缀，守时者自动战每三回合写入直接环境伤害动作。失败/过期不退成本，只有系统故障补偿才退款并释放周额度；详细合同见[v0.5 冒险内容](content-v0.5.md#instancesecret_realmtime_fort-合同)。
 - 主线首次通关键为 `story_key:chapter:stage:player_id`；章节重试不能重复首通奖励。
 - 主线开始时冻结地方名望地点与地点上限；领奖通过共享角色状态事务结算并记录实际增量，重启与内容调整不改变已开始关卡的奖励。
 - 斗法留影永不提供写资产接口，分享链接只含签名、过期时间和脱敏战报。

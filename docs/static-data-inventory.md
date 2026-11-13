@@ -6,7 +6,7 @@
 ## 1. 建议的内容包文件
 
 运行时统一从 `data/内容清单.json` 读取文件清单，不保存内容或规则版本元数据；
-配置包的注册状态不决定玩家入口，入口和关闭语义仍由[当前开发状态](current-status.md)
+配置包的注册状态不决定玩家入口，入口和关闭语义仍由[当前可用能力](availability.md)
 裁决。每个领域文件只保留 `kind` 和 `records` 等业务结构；每条记录统一使用 `key`，
 引用仍使用带类型的 `item_key`、`realm_key` 等字段：
 
@@ -108,7 +108,7 @@ data/
 `item.manual.transcendence_tribulation`、`item.manual.ascension_inquiry`。每个开放境界有两
 部，配置修行准入和突破加成，并由突破预览/结算及分阶段悬赏消费。
 
-法器和防具各有 447 件，其中各有 15 件通用基准、432 件覆盖六大道途与九个开放境界（每个组合八件）；饰品 108 件，每个道途/境界组合各有两种选择。装备使用 `path_key` 标记构筑取向，并复用品质成长模板；其效果由装备合同和战斗快照结算。除上表和下方版本清单所列基准装备外，本轮新增：
+法器和防具覆盖通用基准及六大道途、九个开放境界的装备组合；饰品覆盖各道途/境界组合的多种选择。装备使用 `path_key` 标记构筑取向，并复用品质成长模板；其效果由装备合同和战斗快照结算。当前目录包括：
 
 | 类型 | 新增内容键 |
 |:--|:--|
@@ -116,11 +116,10 @@ data/
 | 防具 | 已有 15 件，以及 `data/装备/防具.json` 中按 `item.armor.<path>.<key>` 注册的 432 件道途/境界装备 |
 | 饰品 | `data/装备/饰品.json` 中按 `item.accessory.<path>.<key>` 注册；攻击、防御、续航、命中闪避、会心与恢复压制等方向各有差异 |
 
-新增装备均配置品质成长模板和战斗属性；悬赏奖池按品质抽取饰品，并按领取者的道途与境界筛选，领取时直接创建装备实例。
+装备均配置品质成长模板和战斗属性；悬赏奖池按品质抽取饰品，并按领取者的道途与境界筛选，领取时直接创建装备实例。
 
-另外，`foundation/advancement/content-v0.1.md` 使用
-`item.token.constitution_reset` 作为管理员测试用物品。它不应进入普通掉落池，
-但内容校验仍需要将它注册为 `admin_only`，或者在 manifest 中明确声明为测试键。
+另外，`foundation/advancement/content-v0.1.md` 中的 `item.token.constitution_reset` 仅供受权限控制的管理流程使用，
+不得进入普通掉落池；内容包应将它注册为 `admin_only`，或在 manifest 中明确标记为非玩家内容。
 
 ## 3. 后续版本物品键
 
@@ -183,8 +182,8 @@ data/
 | `技能/技能.json` | 基础攻击、六大道途在九境各自的稳定攻势与战术备选（108 条）、敌方技能及天劫阶段技能；技能名按招式意象命名，战斗消费器结算爆发、辅御、持续、削弱、蓄力、中毒、灼烧和反伤，高阶备选要求悬赏可得的传承残卷 | `gameplay/combat/content-v0.1.md`、`gameplay/combat/workflow.md` |
 | `事件/飞升日.json` | 飞升日展示口径：24 小时窗口、三榜键、新篇章入口，强制 `allow_assets: false` | `gameplay/events/content-v0.7.md` |
 | `灵兽/互动.json` | 灵兽相伴互动（基础亲和 3、御兽每点 +1、上限 100、体力 10、每日一次） | `gameplay/companions/content-v0.7.md` |
-| `功业/功业.json` | 功业定义（含本版新增计数型 `achievement.dao_service`：十次道统派单成功、授予 `title.dao_service`） | `gameplay/routine/content-v0.9.md` |
-| `任务/悬赏.json` | 悬赏定义（含本版新增 `bounty.dao_origin_service`：合道 L1、12 小时、三次公共服务、道统名望） | `gameplay/adventures/content-v0.7.md` |
+| `功业/功业.json` | 功业定义（含计数型 `achievement.dao_service`：十次道统派单成功、授予 `title.dao_service`） | `gameplay/routine/content-v0.9.md` |
+| `任务/悬赏.json` | 悬赏定义（含 `bounty.dao_origin_service`：合道 L1、12 小时、三次公共服务、道统名望） | `gameplay/adventures/content-v0.7.md` |
 | `经济/虚空物资寄售.json` | 虚空物资寄售：炼虚/功勋准入、6 小时挂单、800 bp 手续费、可寄售白名单（须可交易且非绑定） | `gameplay/economy/content-v0.8.md` |
 | `社交/道侣协作.json` | 道侣终局协作：终局未锁准入、助战胜利计数、双方各领世界功勋与普通材料，终局资产禁发 | `gameplay/social/content-v0.9.md` |
 | `社交/道统路线.json` | 道统议事准入（宗门等级/合道/三票/公共功勋 1000）、周期与锁定期，以及守界/飞升/留界三线的加成键与数值 | `gameplay/social/content-v0.8.md` |
@@ -228,11 +227,8 @@ data/
 4. `item.recipe.void_refinery` 是物品表中的配方实例，`recipe.void_refinery` 是配方
    定义；加载器按 `item_key`/`recipe_key` 分开校验，不能用前缀推断类型。
 
-## 6. 运行时落地顺序
+## 6. 内容加载与引用验证
 
-1. 先按[完整内容开发总表](content-development.md)裁决稳定键和首版开关。
-2. 按 v0.1 清单建立 JSON schema 和内容包，不提前启用 v0.2–v0.6 的可执行效果。
-3. 写引用闭合校验：配方输入/输出、奖励物品、敌人技能、地点准入、任务奖励必须
-   都能解析到注册表。
-4. 运行时通过 `ContentBundle` 读取 `data/内容清单.json` 和领域配置；玩家实例仍由
-   数据库保存。
+1. 按[完整内容开发总表](content-development.md)和[当前可用能力](availability.md)核对稳定键与入口边界。
+2. 由 `ContentBundle` 按 `data/内容清单.json` 读取领域配置；玩家实例与结算记录仍由数据库保存。
+3. 校验配方输入/输出、奖励物品、敌人技能、地点准入和任务奖励均能解析到注册表，拒绝缺失引用。

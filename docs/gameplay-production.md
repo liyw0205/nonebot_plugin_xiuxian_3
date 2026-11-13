@@ -1,6 +1,6 @@
 # 核心玩法：生产与生活
 
-> **兼容概览，非权威。** 开发时先读[开发文档总入口](development-guide.md)，再进入[生产域](gameplay/production/)；当前状态以[当前开发状态](current-status.md)为准。
+> **兼容概览，非权威。** 领域细节见[生产域](gameplay/production/)；当前状态以[当前可用能力](availability.md)为准。
 
 ## 1. 生产链
 
