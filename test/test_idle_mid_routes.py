@@ -18,9 +18,13 @@ ROUTES = {
     "idle.cloud_city_shop": (None, 0, None, {"local.xuantian.cloud_city": 200}, 28800, 1),
     "idle.demon_trade_post": (None, 0, "permit.demon_trade", {}, 28800, 1),
     "idle.beast_habitat_watch": (None, 0, "permit.beast_trade", {}, 28800, 1),
+    "idle.beast_hills_watch": ("nascent_soul", 10, None, {}, 36000, 1),
 }
 
-ROUTE_LOCATIONS = {"idle.cloud_city_shop": "xuantian.cloud_city"}
+ROUTE_LOCATIONS = {
+    "idle.cloud_city_shop": "xuantian.cloud_city",
+    "idle.beast_hills_watch": "beast.ten_thousand_hills",
+}
 
 
 class Clock:

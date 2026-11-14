@@ -32,7 +32,7 @@ def _stages() -> dict[str, object]:
 def test_the_mainline_continues_past_chapter_eight() -> None:
     stages = _stages()
     chapters = [key for key in stages if key.startswith("chapter.")]
-    assert len(chapters) == 40
+    assert len(chapters) == 41
     for key in CHAPTER_NINE:
         assert key in stages, key
         stage = stages[key]

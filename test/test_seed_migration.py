@@ -1305,6 +1305,14 @@ def _historical_mainline_prefix(text: str, marker: int) -> str:
         flags=re.S,
     )
     assert count == 1
+    prefix, count = re.subn(
+        r'    \{\n      "key": "chapter\.13\.stage\.4".*?\n    \},\n',
+        "",
+        prefix,
+        count=1,
+        flags=re.S,
+    )
+    assert count == 1
     prefix = prefix.replace(
         '{"command": "开始探索", "argument": "云城护送", "description": "在云城街巷开启护送探索，遭遇战由自动战斗结算。"}',
         '{"command": "探索", "argument": "云城护送", "description": "在云城街巷开启护送探索，遭遇战由自动战斗结算。"}',

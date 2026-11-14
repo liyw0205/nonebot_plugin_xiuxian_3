@@ -279,7 +279,9 @@ v0.6 `story.mainline.dao_echoes` 已开放玩家流程：炼虚 L10 后可查询
 `explore.demon_threshold` 的魔核，九关为元婴 L1–L9、`keep_running` 重试。
 完整说明见 [content-v0.12.md](content-v0.12.md)。
 
-元婴混元 L10 由 `chapter.13.stage.1`–`.3`（入山问脉、循血猎兽、守山定契）收束：入口 `beast.ten_thousand_hills`
-需妖界声望 200 或妖界引导的 `access.beast_ten_thousand_hills`，目标为抵达山口、`explore.beast_hunt`
-结算取得兽血、以及该模式的遭遇战胜利；末关 `next_stage_key` 为空，与化神 story 分开。
-完整说明见 [content-v0.13.md](content-v0.13.md)。
+元婴混元 L10 的主链由 `chapter.13.stage.1`–`.3`（入山问脉、循血猎兽、守山定契）收束：入口
+`beast.ten_thousand_hills` 需妖界声望 200 或妖界引导的 `access.beast_ten_thousand_hills`，目标为抵达山口、
+`explore.beast_hunt` 结算取得兽血、以及该模式的遭遇战胜利；`.3` 的 `next_stage_key` 仍为空。
+完成 `.3` 后可选接 `chapter.13.stage.4`「守契夜巡」：元婴 L10 在万兽山完整领取十小时
+`idle.beast_hills_watch`，再领取主线奖励；取消、逾时保底、旧安排和未结算行程不推进，仍与化神 story 分开。
+完整说明见 [content-v0.13.md](content-v0.13.md) 与 [content-v0.14.md](content-v0.14.md)。

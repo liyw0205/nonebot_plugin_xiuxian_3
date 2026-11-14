@@ -2153,6 +2153,34 @@
       "key": "idle.tower_watch",
       "record_type": "idle_route",
       "status": "active"
+    },
+    {
+      "name": "万兽山守契",
+      "desc": "在万兽山山口守护血脉契约，记录兽群回返与贸易口来信。",
+      "aliases": [
+        "守契夜巡",
+        "万兽山守契"
+      ],
+      "duration_seconds": 36000,
+      "cost": {
+        "stamina": 4,
+        "energy": 0
+      },
+      "daily_limit": 1,
+      "requirements": {
+        "stage": "cultivator",
+        "realm": {
+          "key": "nascent_soul",
+          "min_layer": 10
+        },
+        "location_key": "beast.ten_thousand_hills"
+      },
+      "reward_pool_key": "reward_pool.idle.beast_hills_watch",
+      "fallback_reward_pool_key": "reward_pool.idle.beast_hills_watch.fallback",
+      "durability_cost_bp": 0,
+      "key": "idle.beast_hills_watch",
+      "record_type": "idle_route",
+      "status": "active"
     }
   ],
   "schema": "xiuxian.content"
