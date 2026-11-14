@@ -1294,9 +1294,17 @@ def test_custom_place_codex_seed_is_preserved(host: Path) -> None:
 
 
 def _historical_mainline_prefix(text: str, marker: int) -> str:
-    """Rebuild the pre-slice blob without the later chapter-nine command fix."""
+    """Rebuild a pre-slice blob without later chapter-nine records or fixes."""
 
     prefix = text[:marker]
+    prefix, count = re.subn(
+        r'    \{\n      "key": "chapter\.9\.stage\.4".*?\n    \},\n',
+        "",
+        prefix,
+        count=1,
+        flags=re.S,
+    )
+    assert count == 1
     prefix = prefix.replace(
         '{"command": "开始探索", "argument": "云城护送", "description": "在云城街巷开启护送探索，遭遇战由自动战斗结算。"}',
         '{"command": "探索", "argument": "云城护送", "description": "在云城街巷开启护送探索，遭遇战由自动战斗结算。"}',

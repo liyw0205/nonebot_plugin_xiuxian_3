@@ -268,7 +268,9 @@ v0.6 `story.mainline.dao_echoes` 已开放玩家流程：炼虚 L10 后可查询
 
 主线在第八章之后不再终止：`chapter.9.stage.1`–`.3`（云城受讬、街巷护送、雾中旧账）把玄天卷接到云城
 与雾隐洞天的旧账上，分别要求抵达云城、在 `explore.cloud_city_escort` 取胜、在 `explore.mist_grotto`
-结算中取得灵叶。三关均为金丹 L1–L3、`keep_running` 重试、各带首通与重复奖励，最后一关收束链路。
+结算中取得灵叶。三关均为金丹 L1–L3、`keep_running` 重试、各带首通与重复奖励；完成后可选做
+`chapter.9.stage.4` 账房夜值：回到云城，按公开名望来源达到 200 后完整领取八小时
+`idle.cloud_city_shop`。它不改变旧三关到第十章的前置，逾时保底、取消和旧安排不推进。
 完整说明见 [content-v0.11.md](content-v0.11.md)。
 
 元婴整段此前没有主线：`chapter.10.stage.1`–`chapter.12.stage.3`（云城问舟、渡口候船、云舟北渡、

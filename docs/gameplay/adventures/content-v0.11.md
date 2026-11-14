@@ -3,7 +3,8 @@
 本文件遵守[版本内容开发合同](../../content-development-contract.md)。`content_version=content-0.11`。
 
 主线在 `chapter.8.stage.3` 之后原本直接终止（`next_stage_key` 为空），尽管该关正文只写完
-近郊一卷。本版补上第九章三关，把玄天卷接到云城与雾隐洞天的旧账上。
+近郊一卷。本版补上第九章三关，把玄天卷接到云城与雾隐洞天的旧账上；随后增加独立的
+`chapter.9.stage.4` 夜值尾声，不改变旧三关到第十章的主链。
 
 ## 第九章关卡
 
@@ -12,8 +13,10 @@
 | `chapter.9.stage.1` | 云城受讬 | 抵达 `xuantian.cloud_city` | 金丹 L1 |
 | `chapter.9.stage.2` | 街巷护送 | 在 `explore.cloud_city_escort` 赢得一场遭遇战 | 金丹 L2 |
 | `chapter.9.stage.3` | 雾中旧账 | 在 `explore.mist_grotto` 结算中取得灵叶×1 | 金丹 L3 |
+| `chapter.9.stage.4` | 账房夜值（可选尾声） | 本关开始后完整领取 `idle.cloud_city_shop` | 金丹 L3 |
 
-链路：`chapter.8.stage.3` → `chapter.9.stage.1` → `chapter.9.stage.2` → `chapter.9.stage.3`（终点）。
+主链：`chapter.8.stage.3` → `chapter.9.stage.1` → `chapter.9.stage.2` → `chapter.9.stage.3` → `chapter.10.stage.1`。
+可选尾声以 `chapter.9.stage.3` 为前置，使用真实云城店铺闲居；逾时保底、取消和旧安排不推进，旧存档无需补做。
 
 ## 数值与结算
 
@@ -22,6 +25,7 @@
 | 云城受讬 | 灵石 70、服务信誉 5 | 灵石 20 |
 | 街巷护送 | 灵石 80、灵叶 2、服务信誉 5 | 灵石 25 |
 | 雾中旧账 | 灵石 90、服务信誉 6 | 灵石 30 |
+| 账房夜值 | 灵石 100、服务信誉 7 | 灵石 35 |
 
 三关均为 `retry.on_incomplete=keep_running`、冷却 0：未达成目标时不扣首通奖励，也不增加尝试次数。
 每关写入自身 `activity_events`（`story.mainline.xuantian:chapter.9.stage.N`），由既有主线账册展示。

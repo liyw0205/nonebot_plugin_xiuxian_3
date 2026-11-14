@@ -17,7 +17,12 @@ from nonebot_plugin_xiuxian_3.runtime import create_runtime
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
 
-CHAPTER_NINE = ("chapter.9.stage.1", "chapter.9.stage.2", "chapter.9.stage.3")
+CHAPTER_NINE = (
+    "chapter.9.stage.1",
+    "chapter.9.stage.2",
+    "chapter.9.stage.3",
+    "chapter.9.stage.4",
+)
 
 
 def _stages() -> dict[str, object]:
@@ -27,7 +32,7 @@ def _stages() -> dict[str, object]:
 def test_the_mainline_continues_past_chapter_eight() -> None:
     stages = _stages()
     chapters = [key for key in stages if key.startswith("chapter.")]
-    assert len(chapters) == 39
+    assert len(chapters) == 40
     for key in CHAPTER_NINE:
         assert key in stages, key
         stage = stages[key]
@@ -44,6 +49,9 @@ def test_the_chain_runs_from_chapter_eight_into_chapter_ten() -> None:
     assert stages["chapter.9.stage.1"].next_stage_key == "chapter.9.stage.2"
     assert stages["chapter.9.stage.2"].next_stage_key == "chapter.9.stage.3"
     assert stages["chapter.9.stage.3"].next_stage_key == "chapter.10.stage.1"
+    assert stages["chapter.9.stage.4"].next_stage_key is None
+    assert tuple(stages["chapter.9.stage.4"].prerequisites) == ("chapter.9.stage.3",)
+    assert stages["chapter.9.stage.4"].lane == "chapter9_cloud_ledger"
     # Prerequisites follow the same order, so the chain is actually walkable.
     assert tuple(stages["chapter.9.stage.1"].prerequisites) == ("chapter.8.stage.3",)
     assert tuple(stages["chapter.9.stage.2"].prerequisites) == ("chapter.9.stage.1",)
@@ -83,6 +91,17 @@ def test_chapter_nine_objectives_reference_live_content() -> None:
         for item in (outcome.get("rewards") or {})
     }
     assert ledger["item_key"] in served, sorted(served)
+
+    night_watch = stages["chapter.9.stage.4"].objectives[0]
+    assert night_watch == {
+        "key": "claim_cloud_ledger_watch",
+        "type": "idle_claim",
+        "label": "本关开始后完整领取一次云城店铺",
+        "route_key": "idle.cloud_city_shop",
+    }
+    route = bundle.require("livelihood", night_watch["route_key"], include_locked=False)
+    assert route["duration_seconds"] == 8 * 60 * 60
+    assert route["requirements"]["location_key"] == "xuantian.cloud_city"
 
 
 def test_chapter_nine_stages_are_announced_in_the_journal() -> None:

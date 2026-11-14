@@ -138,6 +138,7 @@ _VERTICAL_SLICE_STAGES = frozenset(
         "chapter.8.stage.1",
         "chapter.8.stage.2",
         "chapter.8.stage.3",
+        "chapter.9.stage.4",
         "chapter.10.stage.1",
         "chapter.10.stage.2",
         "chapter.10.stage.3",

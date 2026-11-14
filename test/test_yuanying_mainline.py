@@ -60,7 +60,7 @@ def _stages_by_key() -> dict[str, object]:
 
 def test_the_yuanying_arc_is_a_complete_gated_chain() -> None:
     stages = _stages_by_key()
-    assert len(MAINLINE_STAGES) == 39
+    assert len(MAINLINE_STAGES) == 40
     assert stages["chapter.9.stage.3"].next_stage_key == "chapter.10.stage.1"
 
     previous = "chapter.9.stage.3"
