@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.43
+
+### Fixed
+
+- 修正公开 README、安装指南和能力导航中的版本化 Release 链接，使安装脚本、源码 checkout 与当前正式 tag 保持一致。
+
 ## 0.1.42
 
 ### Fixed
