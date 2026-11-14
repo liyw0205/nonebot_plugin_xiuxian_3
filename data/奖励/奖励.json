@@ -1882,6 +1882,30 @@
       "status": "active"
     },
     {
+      "name": "万兽山守契夜值所得",
+      "desc": "在万兽山完整守契所得的灵石、血脉线索与贸易口名望。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 1, "rewards": {"spirit_stones": 160, "item.clue.beast_bloodline": 1, "local.beast.three_realms_trade_port": 4}},
+        {"weight": 1, "rewards": {"spirit_stones": 175, "item.clue.beast_bloodline": 1, "local.beast.three_realms_trade_port": 4}},
+        {"weight": 1, "rewards": {"spirit_stones": 190, "item.clue.beast_bloodline": 1, "local.beast.three_realms_trade_port": 4}},
+        {"weight": 1, "rewards": {"spirit_stones": 205, "item.clue.beast_bloodline": 1, "local.beast.three_realms_trade_port": 4}},
+        {"weight": 1, "rewards": {"spirit_stones": 220, "item.clue.beast_bloodline": 1, "local.beast.three_realms_trade_port": 4}}
+      ],
+      "key": "reward_pool.idle.beast_hills_watch",
+      "status": "active"
+    },
+    {
+      "name": "万兽山守契夜值保底所得",
+      "desc": "逾时后仍可领取的少量灵石。",
+      "pool_type": "weighted",
+      "outcomes": [
+        {"weight": 1, "rewards": {"spirit_stones": 60}}
+      ],
+      "key": "reward_pool.idle.beast_hills_watch.fallback",
+      "status": "active"
+    },
+    {
       "name": "领域避难所看守所得",
       "desc": "看守领域避难所所得的灵石、建设券与前线名望。",
       "pool_type": "weighted",
