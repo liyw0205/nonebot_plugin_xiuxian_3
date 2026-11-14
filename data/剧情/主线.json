@@ -3380,8 +3380,6 @@
       },
       "status": "open",
       "aliases": ["守山定契"],
-      "lane": "chapter13_beast_main",
-      "lane_name": "万兽山主线",
       "prerequisites": ["chapter.13.stage.2"],
       "required_realm": "nascent_soul",
       "required_layer": 10,
