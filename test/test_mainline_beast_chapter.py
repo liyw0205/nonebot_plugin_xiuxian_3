@@ -123,7 +123,7 @@ def _stage_ready_player(
 
 def test_the_beast_chapter_is_a_gated_l10_chain() -> None:
     definitions = {item.key: item for item in mainline_definitions(None, story_key=MAINLINE_STORY_KEY)}
-    assert len(definitions) == 40
+    assert len(definitions) == 41
     assert definitions["chapter.12.stage.3"].next_stage_key == "chapter.13.stage.1"
 
     for previous, key in zip(BEAST_STAGES, BEAST_STAGES[1:]):

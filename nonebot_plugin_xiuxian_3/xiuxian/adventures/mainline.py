@@ -151,6 +151,7 @@ _VERTICAL_SLICE_STAGES = frozenset(
         "chapter.13.stage.1",
         "chapter.13.stage.2",
         "chapter.13.stage.3",
+        "chapter.13.stage.4",
         "domain_frontier.guard.1",
         "domain_frontier.guard.2",
         "domain_frontier.guard.3",
@@ -744,6 +745,10 @@ def mainline_definitions(
             and bundle.get("livelihood", "dispatch.ironwood_bridge_works", include_locked=True) is None
             and bundle.get("livelihood", "project.ironwood_bridge", include_locked=True) is None
         )
+        legacy_beast_watch_seed = (
+            key == "chapter.13.stage.4"
+            and bundle.get("livelihood", "idle.beast_hills_watch", include_locked=True) is None
+        )
         body = row.get("body", description)
         if not isinstance(body, str) or not body.strip():
             raise ContentError(f"mainline {key} body must be a non-empty string")
@@ -752,7 +757,7 @@ def mainline_definitions(
         objectives = _story_objectives(
             row.get("objectives"),
             key,
-            bundle if validate_sources and not legacy_ironwood_seed else None,
+            bundle if validate_sources and not (legacy_ironwood_seed or legacy_beast_watch_seed) else None,
             required=is_vertical_slice_stage,
         )
         actions = _story_actions(row.get("actions"), key, required=is_vertical_slice_stage)
@@ -791,7 +796,15 @@ def mainline_definitions(
                 if same_lane:
                     same_story = same_lane
             tail = max(same_story, key=lambda item: (item["chapter"], item["stage"]))
-            if (chapter, stage) != (tail.get("chapter"), tail.get("stage")):
+            optional_epilogue = any(
+                isinstance(item, dict)
+                and item.get("story_key") == record_story_key
+                and key in (item.get("prerequisites") or [])
+                and isinstance(item.get("lane"), str)
+                and bool(item["lane"].strip())
+                for item in rows
+            )
+            if (chapter, stage) != (tail.get("chapter"), tail.get("stage")) and not optional_epilogue:
                 raise ContentError(f"mainline {key} requires next_stage_key")
         retry = row.get("retry")
         if retry is None and not is_vertical_slice_stage:
@@ -832,7 +845,7 @@ def mainline_definitions(
         runtime_status = row.get("status", "locked")
         if runtime_status not in {"open", "active", "locked"}:
             raise ContentError(f"mainline {key} has unsupported status {runtime_status}")
-        if legacy_ironwood_seed:
+        if legacy_ironwood_seed or legacy_beast_watch_seed:
             runtime_status = "locked"
         reputation_key = row.get("reputation_key")
         if reputation_key is not None and (not isinstance(reputation_key, str) or not reputation_key.strip()):
