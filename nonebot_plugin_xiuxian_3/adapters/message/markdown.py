@@ -10,6 +10,26 @@ from ...contracts import CommandAction
 from .common import MessageSendResult, message_id_from_response, require_content
 
 
+_COMMAND_LINK_PATTERN = re.compile(r"\[([^\]\n]+)\]\(command:([^)]+)\)")
+
+
+def command_targets(markdown: str) -> tuple[str, ...]:
+    """Return decoded internal command targets already present in Markdown."""
+
+    return tuple(unquote(match.group(2)).strip() for match in _COMMAND_LINK_PATTERN.finditer(markdown))
+
+
+def _actions_without_inline_links(
+    markdown: str, actions: Collection[CommandAction]
+) -> tuple[CommandAction, ...]:
+    targets = {" ".join(command.split()) for command in command_targets(markdown)}
+    return tuple(
+        action
+        for action in actions
+        if " ".join(action.command.split()) not in targets
+    )
+
+
 async def send_markdown_message(
     bot: Any,
     event: Any,
@@ -22,13 +42,16 @@ async def send_markdown_message(
     **kwargs: Any,
 ) -> MessageSendResult:
     require_content(markdown, "markdown")
+    effective_actions = _actions_without_inline_links(markdown, actions)
     if _supports_markdown(bot, event, capabilities):
         body = markdown
-        keyboard_requested = bool(actions and "keyboard" in capabilities)
-        if actions and not keyboard_requested:
+        keyboard_requested = bool(effective_actions and "keyboard" in capabilities)
+        if effective_actions and not keyboard_requested:
             from ...xiuxian.utils.text import command_link
 
-            body += "\n\n" + " · ".join(command_link(action.label, action.command) for action in actions)
+            body += "\n\n" + " · ".join(
+                command_link(action.label, action.command) for action in effective_actions
+            )
         segment = qq_markdown_segment(body, command_prefix=command_prefix)
         if segment is not None:
             sent_format = "markdown"
@@ -37,12 +60,14 @@ async def send_markdown_message(
                 from .qq import qq_keyboard
 
                 try:
-                    segment += qq_keyboard((actions,), command_prefix=command_prefix)
+                    segment += qq_keyboard((effective_actions,), command_prefix=command_prefix)
                     sent_format = "markdown+keyboard"
                 except (ImportError, RuntimeError, TypeError, ValueError):
                     from ...xiuxian.utils.text import command_link
 
-                    body += "\n\n" + " · ".join(command_link(action.label, action.command) for action in actions)
+                    body += "\n\n" + " · ".join(
+                        command_link(action.label, action.command) for action in effective_actions
+                    )
                     segment = qq_markdown_segment(body, command_prefix=command_prefix)
                     degraded = True
             if segment is not None:
@@ -56,8 +81,8 @@ async def send_markdown_message(
                 )
 
     text = fallback_text if fallback_text is not None else markdown_to_text(markdown)
-    if actions:
-        text += "\n\n可发送：" + "；".join(action.command for action in actions)
+    if effective_actions:
+        text += "\n\n可发送：" + "；".join(action.command for action in effective_actions)
     require_content(text, "fallback_text")
     response = await bot.send(event=event, message=text, **kwargs)
     return MessageSendResult(
@@ -116,7 +141,7 @@ def qq_markdown_segment(markdown: str, *, command_prefix: str = "") -> Any | Non
 
 
 def _qq_command_links(markdown: str, *, command_prefix: str = "") -> str:
-    pattern = re.compile(r"\[([^\]\n]+)\]\(command:([^)]+)\)")
+    pattern = _COMMAND_LINK_PATTERN
     if not pattern.search(markdown):
         return markdown
     from .qq import qq_command_link

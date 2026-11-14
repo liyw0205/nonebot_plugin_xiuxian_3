@@ -10,6 +10,7 @@ from pathlib import Path
 
 from nonebot_plugin_xiuxian_3.xiuxian.adventures.mainline import MAINLINE_STAGES
 from nonebot_plugin_xiuxian_3.xiuxian.content import ContentBundle
+from nonebot_plugin_xiuxian_3.runtime import create_runtime
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
@@ -24,7 +25,7 @@ def _stages() -> dict[str, object]:
 def test_the_mainline_continues_past_chapter_eight() -> None:
     stages = _stages()
     chapters = [key for key in stages if key.startswith("chapter.")]
-    assert len(chapters) == 27
+    assert len(chapters) == 39
     for key in CHAPTER_NINE:
         assert key in stages, key
         stage = stages[key]
@@ -35,16 +36,17 @@ def test_the_mainline_continues_past_chapter_eight() -> None:
         assert stage.retry_message
 
 
-def test_the_chain_runs_from_chapter_eight_into_chapter_nine_and_stops() -> None:
+def test_the_chain_runs_from_chapter_eight_into_chapter_ten() -> None:
     stages = _stages()
     assert stages["chapter.8.stage.3"].next_stage_key == "chapter.9.stage.1"
     assert stages["chapter.9.stage.1"].next_stage_key == "chapter.9.stage.2"
     assert stages["chapter.9.stage.2"].next_stage_key == "chapter.9.stage.3"
-    assert stages["chapter.9.stage.3"].next_stage_key is None
+    assert stages["chapter.9.stage.3"].next_stage_key == "chapter.10.stage.1"
     # Prerequisites follow the same order, so the chain is actually walkable.
     assert tuple(stages["chapter.9.stage.1"].prerequisites) == ("chapter.8.stage.3",)
     assert tuple(stages["chapter.9.stage.2"].prerequisites) == ("chapter.9.stage.1",)
     assert tuple(stages["chapter.9.stage.3"].prerequisites) == ("chapter.9.stage.2",)
+    assert tuple(stages["chapter.10.stage.1"].prerequisites) == ("chapter.9.stage.3",)
 
 
 def test_chapter_nine_objectives_reference_live_content() -> None:
@@ -91,3 +93,13 @@ def test_chapter_nine_stages_are_announced_in_the_journal() -> None:
         assert stage.actions, key
         for action in stage.actions:
             assert action["command"] and action["argument"] and action["description"]
+
+
+def test_chapter_nine_actions_target_registered_runtime_commands() -> None:
+    """Story action links must remain executable by the shared router."""
+
+    runtime = create_runtime(data_dir=DATA)
+    registered = set(runtime.router.commands)
+    for key in CHAPTER_NINE:
+        for action in _stages()[key].actions:
+            assert action["command"].lower() in registered, (key, action["command"])

@@ -3,6 +3,7 @@
 from .message import (
     ForwardNode,
     MessageSendResult,
+    command_targets,
     markdown_to_text,
     message_id_from_response,
     send_markdown_message,
@@ -28,6 +29,7 @@ from .message.markdown import _supports_markdown, qq_markdown_segment as _qq_mar
 __all__ = [
     "ForwardNode",
     "MessageSendResult",
+    "command_targets",
     "markdown_to_text",
     "message_id_from_response",
     "send_markdown_message",

@@ -7,7 +7,7 @@ from urllib.parse import quote
 
 from ...contracts import CommandAction
 from .common import MessageSendResult, require_adapter, require_content, send_text_message, message_id_from_response
-from .markdown import markdown_to_text, qq_markdown_segment
+from .markdown import command_targets, markdown_to_text, qq_markdown_segment
 
 
 def _clean_command_parts(label: str, command: str) -> tuple[str, str]:
@@ -44,6 +44,17 @@ def _keyboard_fallback_text(
     if commands:
         text += "\n\n可发送：" + "；".join(commands)
     return text
+
+
+def _rows_without_inline_links(
+    markdown: str,
+    rows: tuple[tuple[tuple[str, str, bool], ...], ...],
+) -> tuple[tuple[tuple[str, str, bool], ...], ...]:
+    targets = {" ".join(command.split()) for command in command_targets(markdown)}
+    return tuple(
+        tuple(item for item in row if " ".join(item[1].split()) not in targets)
+        for row in rows
+    )
 
 
 async def send_qq_text_message(bot: Any, event: Any, text: str, **kwargs: Any) -> MessageSendResult:
@@ -179,7 +190,22 @@ async def send_qq_markdown_keyboard_message(
 
     require_content(markdown, "markdown")
     require_adapter(bot, event, "qq")
-    normalized_rows = _button_rows(rows)
+    normalized_rows = _rows_without_inline_links(markdown, _button_rows(rows))
+    if not any(normalized_rows):
+        result = await send_qq_markdown_message(
+            bot,
+            event,
+            markdown,
+            fallback_text=fallback_text,
+            **kwargs,
+        )
+        return MessageSendResult(
+            requested_format="markdown+keyboard",
+            sent_format=result.sent_format,
+            degraded=result.degraded,
+            response=result.response,
+            message_id=result.message_id,
+        )
     segment = qq_markdown_segment(markdown)
     if segment is None:
         text = _keyboard_fallback_text(markdown, normalized_rows, fallback_text=fallback_text)

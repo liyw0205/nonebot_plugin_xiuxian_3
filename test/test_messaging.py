@@ -213,6 +213,54 @@ def test_shared_markdown_sender_degrades_when_keyboard_capability_is_unavailable
     asyncio.run(run())
 
 
+def test_shared_sender_does_not_duplicate_inline_command_actions() -> None:
+    from nonebot_plugin_xiuxian_3.contracts import CommandAction
+    from nonebot_plugin_xiuxian_3.xiuxian.utils.text import command_link
+
+    async def run() -> None:
+        bot = FakeBot()
+        result = await send_markdown_message(
+            bot,
+            "event",
+            "**下一步**：" + command_link("查看", "我的状态"),
+            actions=(CommandAction("查看", "我的状态", enter=True),),
+        )
+        assert result.sent_format == "text"
+        assert result.degraded is True
+        assert bot.sent[0][1] == "下一步：查看（我的状态）"
+        assert "可发送" not in bot.sent[0][1]
+
+    asyncio.run(run())
+
+
+def test_qq_keyboard_does_not_duplicate_a_matching_blue_link(monkeypatch) -> None:
+    from nonebot_plugin_xiuxian_3.adapters.message import qq as qq_message
+    from nonebot_plugin_xiuxian_3.xiuxian.utils.text import command_link
+
+    monkeypatch.setattr(qq_message, "qq_markdown_segment", lambda markdown: markdown)
+
+    async def run() -> None:
+        class FakeQQBot(FakeBot):
+            __module__ = "nonebot.adapters.qq.bot"
+
+        class FakeQQEvent:
+            __module__ = "nonebot.adapters.qq.event"
+
+        bot = FakeQQBot()
+        result = await send_qq_markdown_keyboard_message(
+            bot,
+            FakeQQEvent(),
+            "下一步：" + command_link("查看", "我的状态"),
+            [[("查看", "我的状态")]],
+        )
+        assert result.sent_format == "markdown"
+        assert result.degraded is False
+        assert "keyboard" not in str(bot.sent[0][1])
+        assert str(bot.sent[0][1]).count("command:%E6%88%91%E7%9A%84%E7%8A%B6%E6%80%81") == 1
+
+    asyncio.run(run())
+
+
 def test_qq_fallback_does_not_swallow_delivery_failures(monkeypatch) -> None:
     from nonebot_plugin_xiuxian_3.adapters.message import qq as qq_message
 
