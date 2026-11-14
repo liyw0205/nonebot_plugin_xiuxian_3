@@ -1293,10 +1293,26 @@ def test_custom_place_codex_seed_is_preserved(host: Path) -> None:
     preserved(host)
 
 
+def _historical_mainline_prefix(text: str, marker: int) -> str:
+    """Rebuild the pre-slice blob without the later chapter-nine command fix."""
+
+    prefix = text[:marker]
+    prefix = prefix.replace(
+        '{"command": "开始探索", "argument": "云城护送", "description": "在云城街巷开启护送探索，遭遇战由自动战斗结算。"}',
+        '{"command": "探索", "argument": "云城护送", "description": "在云城街巷开启护送探索，遭遇战由自动战斗结算。"}',
+    )
+    return prefix.replace(
+        '{"command": "开始探索", "argument": "雾隐洞天", "description": "在洞天内开启探索，结算时按奖池取得灵叶。"}',
+        '{"command": "探索", "argument": "雾隐洞天", "description": "在洞天内开启探索，结算时按奖池取得灵叶。"}',
+    )
+
+
 def test_companion_old_trail_seeds_upgrade_together_and_preserve_custom(host: Path) -> None:
     mainline = (ROOT / "data" / MAINLINE).read_text(encoding="utf-8")
     marker = mainline.index('    {\n      "key": "companion_old_trail.1"')
-    old_mainline = (mainline[:marker].rstrip()[:-1] + "\n  ]\n}\n").encode("utf-8")
+    old_mainline = (
+        _historical_mainline_prefix(mainline, marker).rstrip()[:-1] + "\n  ]\n}\n"
+    ).encode("utf-8")
     assert hashlib.sha256(old_mainline).hexdigest() == "ad6aae6f0a4037c52c17ea17e902188bcca190676d455bca6a49fa178c4ed473"
     codex_file = Path("图鉴/条目.json")
     codex = (ROOT / "data" / codex_file).read_text(encoding="utf-8")
@@ -1337,7 +1353,9 @@ def test_companion_old_trail_seeds_upgrade_together_and_preserve_custom(host: Pa
 def test_spring_supper_mainline_seed_upgrade_backup_repeat_and_custom_preservation(host: Path) -> None:
     text = (ROOT / "data" / MAINLINE).read_text(encoding="utf-8")
     marker = text.index('    {\n      "key": "spring_supper.1"')
-    old = (text[:marker].rstrip()[:-1] + "\n  ]\n}\n").encode("utf-8")
+    old = (
+        _historical_mainline_prefix(text, marker).rstrip()[:-1] + "\n  ]\n}\n"
+    ).encode("utf-8")
     assert hashlib.sha256(old).hexdigest() == "0ebe7d841042d1688778d1a19d7b640e5edaa621ecc9778989ae015cd1260fb8"
     _registered_old_blob(MAINLINE, old)
     path = host / "data" / MAINLINE
@@ -1367,7 +1385,9 @@ def test_spring_supper_mainline_seed_upgrade_backup_repeat_and_custom_preservati
 def _pre_ironwood_mainline() -> bytes:
     text = (ROOT / "data" / MAINLINE).read_text(encoding="utf-8")
     marker = text.index('    {\n      "key": "ironwood_craft.1"')
-    old = (text[:marker].rstrip()[:-1] + "\n  ]\n}\n").encode("utf-8")
+    old = (
+        _historical_mainline_prefix(text, marker).rstrip()[:-1] + "\n  ]\n}\n"
+    ).encode("utf-8")
     assert hashlib.sha256(old).hexdigest() == "bb15ca2fd397b5afb12c591ade83268ece040763c343a613665ec9db774eba9a"
     return _registered_old_blob(MAINLINE, old)
 
