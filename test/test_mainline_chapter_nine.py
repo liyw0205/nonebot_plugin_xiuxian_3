@@ -6,8 +6,10 @@ after 24 stages. This module pins the chapter 9 slice and the chain that reaches
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 
+from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.xiuxian.adventures.mainline import MAINLINE_STAGES
 from nonebot_plugin_xiuxian_3.xiuxian.content import ContentBundle
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
@@ -103,3 +105,24 @@ def test_chapter_nine_actions_target_registered_runtime_commands() -> None:
     for key in CHAPTER_NINE:
         for action in _stages()[key].actions:
             assert action["command"].lower() in registered, (key, action["command"])
+
+
+def test_chapter_nine_action_links_reach_application_handlers() -> None:
+    """A public action must dispatch to its use case, not stop at routing."""
+
+    async def run() -> None:
+        runtime = create_runtime(data_dir=DATA, adapters=("onebot.v11",))
+        context = CommandContext(adapter="onebot.v11", user_id="chapter-nine-action-check")
+        try:
+            for key in CHAPTER_NINE:
+                for index, action in enumerate(_stages()[key].actions):
+                    result = await runtime.adapters.dispatch(
+                        "onebot.v11",
+                        context,
+                        f"{action['command']} {action['argument']}",
+                    )
+                    assert result.code != "COMMAND_NOT_FOUND", (key, index, result.message)
+        finally:
+            await runtime.close()
+
+    asyncio.run(run())
