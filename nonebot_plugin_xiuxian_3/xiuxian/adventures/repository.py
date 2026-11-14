@@ -1622,7 +1622,7 @@ class AdventuresRepositoryMixin:
         }
         completed_events = AdventuresRepositoryMixin._mainline_completed_events(connection, player, now=now)
         views: list[MainlineStageView] = []
-        for current_definition in mainline_definitions(content, story_key=story_key):
+        for current_definition in mainline_definitions(content, story_key=story_key, validate_sources=False):
             run = runs.get(current_definition.key)
             definition = (
                 AdventuresRepositoryMixin._mainline_definition_from_snapshot(run, current_definition)
@@ -1733,7 +1733,7 @@ class AdventuresRepositoryMixin:
         operation_id: str,
         story_key: str,
     ) -> MainlineStartRecord:
-        definition = mainline_definition(stage_key, story_key=story_key, content=self.content)
+        definition = mainline_definition(stage_key, story_key=story_key, content=self.content, validate_sources=False)
         operation_name = "mainline.start_stage"
         request_hash = self._request_hash(
             operation_name,
@@ -1760,6 +1760,8 @@ class AdventuresRepositoryMixin:
                 )
             if definition.runtime_status != "open":
                 raise MainlineContentClosedError("mainline stage is not open")
+            # Only new runs need current public sources; replay and recovery use frozen evidence.
+            definition = mainline_definition(stage_key, story_key=story_key, content=self.content)
             row = self._require_player(connection, platform, platform_user_id)
             status_record = self._mainline_status_from_connection(
                 connection,
@@ -1972,7 +1974,7 @@ class AdventuresRepositoryMixin:
         operation_id: str,
         story_key: str,
     ) -> MainlineClaimRecord:
-        definition = mainline_definition(stage_key, story_key=story_key, content=self.content)
+        definition = mainline_definition(stage_key, story_key=story_key, content=self.content, validate_sources=False)
         operation_name = "mainline.claim_first_clear"
         request_hash = self._request_hash(
             operation_name,
@@ -2227,9 +2229,10 @@ class AdventuresRepositoryMixin:
                 found = connection.execute(
                     "SELECT 1 FROM town_commission_claims AS claims "
                     "JOIN town_commissions AS commissions ON commissions.commission_id=claims.commission_id "
+                    "JOIN operations o ON o.operation_id=claims.deliver_operation_id AND o.player_id=claims.player_id "
                     "WHERE claims.player_id=? AND claims.status='delivered' "
-                    "AND commissions.commission_key=? AND claims.delivered_at>=? LIMIT 1",
-                    (player_id, objective.get("commission_key"), started_at),
+                    "AND commissions.commission_key=? AND claims.delivered_at>=? AND o.rowid>? LIMIT 1",
+                    (player_id, objective.get("commission_key"), started_at, operation_baseline),
                 ).fetchone()
             elif kind == "public_project_contribution":
                 progress = connection.execute(
@@ -2304,16 +2307,18 @@ class AdventuresRepositoryMixin:
                     """
                     SELECT 1
                     FROM activity_events e
-                    JOIN dispatch_assignments d ON d.settle_operation_id = e.source_operation_id
+                    JOIN dispatch_assignments d ON d.settle_operation_id = e.source_operation_id AND d.player_id=e.player_id
+                    JOIN operations accepted ON accepted.operation_id=d.operation_id AND accepted.player_id=d.player_id
                     WHERE e.player_id=?
                       AND e.event_key='specials.dispatch.settled'
-                      AND e.occurred_at>?
+                      AND e.occurred_at>=?
+                      AND d.accepted_at>=? AND accepted.rowid>?
                       AND d.dispatch_key=?
                       AND d.status='settled'
                       AND json_extract(e.payload_json, '$.outcome')='success'
                     LIMIT 1
                     """,
-                    (player_id, started_at, objective["dispatch_key"]),
+                    (player_id, started_at, started_at, operation_baseline, objective["dispatch_key"]),
                 ).fetchone()
             else:
                 raise ValueError("mainline snapshot objective type is invalid")

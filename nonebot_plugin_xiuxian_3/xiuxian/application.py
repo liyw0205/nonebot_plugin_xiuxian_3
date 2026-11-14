@@ -28,6 +28,7 @@ from .adventures.mainline import (
     BEAST_HABITAT_ECHOES_STORY_KEY,
     COMPANION_OLD_TRAIL_STORY_KEY,
     SPRING_SUPPER_STORY_KEY,
+    IRONWOOD_CRAFT_STORY_KEY,
     DAO_SETTLEMENT_STORY_KEY,
     DOMAIN_FRONTIER_STORY_KEY,
     VOID_ARCHIVE_STORY_KEY,
@@ -225,6 +226,11 @@ _HELP_PAGES = {
         f"先{command_link('挂机预览 灵泉谷拾穗', '挂机预览 灵泉谷拾穗')}并完整收获四小时稻畦，"
         f"再由烹饪辅修{command_link('生产预览 灵米饭', '生产预览 灵米饭')}，新开锅、收饭后选择补回体力或精力。"
         "旧安排和旧锅不算本关劳作；取消、逾时拾穗或没有实际补回气力时可按关卡提示重续。\n\n"
+        "感气一层后可接"
+        f"{command_link('铁木问工主线', '铁木问工主线')}：沿近郊山路到铁木林，完整领取六小时拾材，"
+        f"再{command_link('派遣预览 铁木林桥基勘务', '派遣预览 铁木林桥基勘务')}，选择踏勘或整治并成功交差，"
+        "最后回青石镇接取并交付工具修缮，先看当日公示期限。木石不足可再拾材，气力不足可恢复状态；"
+        "取消、逾时保底、旧派遣、部分交差或延误不推进，延误结算后按日限另接。\n\n"
         "筑基四层后可接云铁守望回响：先"
         f"{command_link('云铁守望回响主线', '云铁守望回响主线')}查看关卡，"
         f"再{command_link('开始云铁守望回响主线 矿口听风', '开始云铁守望回响主线 矿口听风')}沿公开山道抵达云铁矿区；"
@@ -376,6 +382,13 @@ class XiuxianApplication:
             title="泉边炊烟主线",
             start_command="开始泉边炊烟主线",
             claim_command="领取泉边炊烟主线奖励",
+        )
+        self.ironwood_craft_mainline = AdventuresMainlineApplication(
+            repository,
+            story_key=IRONWOOD_CRAFT_STORY_KEY,
+            title="铁木问工主线",
+            start_command="开始铁木问工主线",
+            claim_command="领取铁木问工主线奖励",
         )
         self.dao_echoes = DaoEchoesApplication(repository)
         self.three_realms = ThreeRealmsApplication(repository)
@@ -1734,6 +1747,21 @@ class XiuxianApplication:
         return await self._invoke(
             context, lambda: self.spring_supper_mainline.claim_reward(context),
             write_message="此刻无法领取泉边炊烟所得。",
+        )
+
+    async def get_ironwood_craft_mainline_status(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.ironwood_craft_mainline.get_status(context), require_write=False)
+
+    async def start_ironwood_craft_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context, lambda: self.ironwood_craft_mainline.start_stage(context),
+            write_message="此刻无法开始铁木问工。",
+        )
+
+    async def claim_ironwood_craft_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context, lambda: self.ironwood_craft_mainline.claim_reward(context),
+            write_message="此刻无法领取铁木问工所得。",
         )
 
     async def preview_final_arena(self, context: CommandContext) -> CommandResult:

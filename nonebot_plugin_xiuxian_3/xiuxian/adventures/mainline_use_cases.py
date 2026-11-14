@@ -121,7 +121,7 @@ class AdventuresMainlineApplication:
     def _stage_key(self, args: tuple[str, ...]) -> str | None:
         if len(args) != 1:
             return None
-        return resolve_mainline(args[0], story_key=self.story_key, content=self.repository.content)
+        return resolve_mainline(args[0], story_key=self.story_key, content=self.repository.content, validate_sources=False)
 
     @staticmethod
     def _action_link(item: dict[str, str]) -> str:
