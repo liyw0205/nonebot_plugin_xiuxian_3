@@ -22,6 +22,7 @@ BEAST_HABITAT_ECHOES_STORY_KEY = "story.mainline.beast_habitat_echoes"
 COMPANION_OLD_TRAIL_STORY_KEY = "story.mainline.companion_old_trail"
 SPRING_SUPPER_STORY_KEY = "story.mainline.spring_supper"
 IRONWOOD_CRAFT_STORY_KEY = "story.mainline.ironwood_craft"
+BASALT_WAYMARKER_STORY_KEY = "story.mainline.basalt_waymarker"
 MAINLINE_TOWN_COMMISSION_DELIVERED = "livelihood.town_commission.delivered"
 
 MAINLINE_LOCKED = "locked"
@@ -232,6 +233,9 @@ _VERTICAL_SLICE_STAGES = frozenset(
         "ironwood_craft.1",
         "ironwood_craft.2",
         "ironwood_craft.3",
+        "basalt_waymarker.1",
+        "basalt_waymarker.2",
+        "basalt_waymarker.3",
         "lane.builder.chapter.01",
         "lane.builder.chapter.02",
         "lane.builder.chapter.03",
@@ -749,6 +753,11 @@ def mainline_definitions(
             key == "chapter.13.stage.4"
             and bundle.get("livelihood", "idle.beast_hills_watch", include_locked=True) is None
         )
+        legacy_basalt_waymarker_seed = (
+            key.startswith("basalt_waymarker.")
+            and bundle.get("livelihood", "dispatch.basalt_watermark_works", include_locked=True) is None
+            and bundle.get("livelihood", "project.basalt_waymarker", include_locked=True) is None
+        )
         body = row.get("body", description)
         if not isinstance(body, str) or not body.strip():
             raise ContentError(f"mainline {key} body must be a non-empty string")
@@ -757,7 +766,9 @@ def mainline_definitions(
         objectives = _story_objectives(
             row.get("objectives"),
             key,
-            bundle if validate_sources and not (legacy_ironwood_seed or legacy_beast_watch_seed) else None,
+            bundle if validate_sources and not (
+                legacy_ironwood_seed or legacy_beast_watch_seed or legacy_basalt_waymarker_seed
+            ) else None,
             required=is_vertical_slice_stage,
         )
         actions = _story_actions(row.get("actions"), key, required=is_vertical_slice_stage)
@@ -845,7 +856,7 @@ def mainline_definitions(
         runtime_status = row.get("status", "locked")
         if runtime_status not in {"open", "active", "locked"}:
             raise ContentError(f"mainline {key} has unsupported status {runtime_status}")
-        if legacy_ironwood_seed or legacy_beast_watch_seed:
+        if legacy_ironwood_seed or legacy_beast_watch_seed or legacy_basalt_waymarker_seed:
             runtime_status = "locked"
         reputation_key = row.get("reputation_key")
         if reputation_key is not None and (not isinstance(reputation_key, str) or not reputation_key.strip()):
@@ -1179,6 +1190,7 @@ __all__ = [
     "COMPANION_OLD_TRAIL_STORY_KEY",
     "SPRING_SUPPER_STORY_KEY",
     "IRONWOOD_CRAFT_STORY_KEY",
+    "BASALT_WAYMARKER_STORY_KEY",
     "MAINLINE_TOWN_COMMISSION_DELIVERED",
     "MainlineDefinition",
     "MainlineStageDefinition",

@@ -29,6 +29,7 @@ from .adventures.mainline import (
     COMPANION_OLD_TRAIL_STORY_KEY,
     SPRING_SUPPER_STORY_KEY,
     IRONWOOD_CRAFT_STORY_KEY,
+    BASALT_WAYMARKER_STORY_KEY,
     DAO_SETTLEMENT_STORY_KEY,
     DOMAIN_FRONTIER_STORY_KEY,
     VOID_ARCHIVE_STORY_KEY,
@@ -169,6 +170,14 @@ _HELP_PAGES = {
         f"{command_link('青石镇常驻生计回响主线', '青石镇常驻生计回响主线')}查看三关，"
         f"再{command_link('开始青石镇常驻生计回响主线 镇中行旅', '开始青石镇常驻生计回响主线 镇中行旅')}在青石镇完整领取镇中行旅；"
         "后续按关卡准备有效居所，再持基础炉具或铁锤之一（也可使用本人可用炼器台），分别完整领取灵圃看护和作坊值守。"
+        "\n\n玄武岩径水标回响是聚气一层、寻仙后可接的开放山径三关：先"
+        f"{command_link('玄武岩径水标回响主线', '玄武岩径水标回响主线')}查看进度，"
+        f"再{command_link('开始玄武岩径水标回响主线 水标入径', '开始玄武岩径水标回响主线 水标入径')}并真实抵达玄武岩径；"
+        f"随后用{command_link('挂机预览 玄武岩径筛砂', '挂机预览 玄武岩径筛砂')}、"
+        f"{command_link('开始挂机 玄武岩径筛砂', '开始挂机 玄武岩径筛砂')}安排八小时，完整领取后再"
+        f"{command_link('派遣预览 玄武岩径水标勘务', '派遣预览 玄武岩径水标勘务')}选择踏勘或整治，"
+        "只以本关开始后的本人成功派遣回执交卷；取消、部分、失败、延误、逾时保底、旧记录或他人记录不推进，"
+        "重启后可用挂机状态、派遣状态继续。"
     ),
     "悬赏": (
         "**悬赏**\n\n"
@@ -239,6 +248,13 @@ _HELP_PAGES = {
         f"再{command_link('派遣预览 铁木林桥基勘务', '派遣预览 铁木林桥基勘务')}，选择踏勘或整治并成功交差，"
         "最后回青石镇接取并交付工具修缮，先看当日公示期限。木石不足可再拾材，气力不足可恢复状态；"
         "取消、逾时保底、旧派遣、部分交差或延误不推进，延误结算后按日限另接。\n\n"
+        "玄武岩径水标回响同样消费既有筛砂与水标勘务：完成寻仙、聚气一层后，"
+        f"先{command_link('玄武岩径水标回响主线', '玄武岩径水标回响主线')}查看三关；"
+        f"在玄武岩径用{command_link('挂机预览 玄武岩径筛砂', '挂机预览 玄武岩径筛砂')}确认八小时、每日一次和气力成本，"
+        f"再{command_link('开始挂机 玄武岩径筛砂', '开始挂机 玄武岩径筛砂')}并完整领取。"
+        f"随后{command_link('派遣预览 玄武岩径水标勘务', '派遣预览 玄武岩径水标勘务')}选择踏勘或整治，"
+        "只以本关开始后本人成功结算的水标回执交卷；取消、部分、失败、延误、逾时保底、旧记录和未结算安排不替代剧情。"
+        "离线或重启后可用挂机状态、派遣状态继续。\n\n"
         "筑基四层后可接云铁守望回响：先"
         f"{command_link('云铁守望回响主线', '云铁守望回响主线')}查看关卡，"
         f"再{command_link('开始云铁守望回响主线 矿口听风', '开始云铁守望回响主线 矿口听风')}沿公开山道抵达云铁矿区；"
@@ -273,6 +289,14 @@ _HELP_PAGES = {
         f"完成妖界引导、持有至少 80 点妖界声望和 500 灵石后，{command_link('申请贸易许可 妖界', '申请贸易许可 妖界')}取得七日许可；"
         f"再{command_link('挂机预览 妖界栖地', '挂机预览 妖界栖地')}、{command_link('开始挂机 妖界栖地', '开始挂机 妖界栖地')}，八小时完整领取才记入夜值回响。"
         "提前、取消、逾时保底、战败或重启中的未结算记录都不会推进；按原路线恢复后可重试。\n\n"
+        "玄武岩径水标回响是聚气一层、寻仙后可接的独立三关：先"
+        f"{command_link('玄武岩径水标回响主线', '玄武岩径水标回响主线')}查看进度，"
+        f"再{command_link('开始玄武岩径水标回响主线 水标入径', '开始玄武岩径水标回响主线 水标入径')}真实抵达玄武岩径；"
+        f"第二关用{command_link('挂机预览 玄武岩径筛砂', '挂机预览 玄武岩径筛砂')}、"
+        f"{command_link('开始挂机 玄武岩径筛砂', '开始挂机 玄武岩径筛砂')}安排八小时筛砂，完整领取后；"
+        f"第三关在山径用{command_link('派遣预览 玄武岩径水标勘务', '派遣预览 玄武岩径水标勘务')}，"
+        f"选择踏勘或整治并以成功回执结算，最后{command_link('领取玄武岩径水标回响主线奖励 水标回响', '领取玄武岩径水标回响主线奖励 水标回响')}。"
+        "提前、取消、逾时保底、旧安排、部分/失败/延误回执或他人记录都不推进；重启后用挂机状态、派遣状态恢复。\n\n"
         "万兽山守契夜巡是元婴十层可接的独立剧情尾声：在万兽山用"
         f"{command_link('挂机预览 万兽山守契', '挂机预览 万兽山守契')}确认十小时窗口与每日一次，"
         f"再{command_link('开始挂机 万兽山守契', '开始挂机 万兽山守契')}；重启后可从{command_link('挂机状态', '挂机状态')}恢复，完整领取后用"
@@ -405,6 +429,13 @@ class XiuxianApplication:
             title="铁木问工主线",
             start_command="开始铁木问工主线",
             claim_command="领取铁木问工主线奖励",
+        )
+        self.basalt_waymarker_mainline = AdventuresMainlineApplication(
+            repository,
+            story_key=BASALT_WAYMARKER_STORY_KEY,
+            title="玄武岩径水标回响主线",
+            start_command="开始玄武岩径水标回响主线",
+            claim_command="领取玄武岩径水标回响主线奖励",
         )
         self.dao_echoes = DaoEchoesApplication(repository)
         self.three_realms = ThreeRealmsApplication(repository)
@@ -1781,6 +1812,21 @@ class XiuxianApplication:
         return await self._invoke(
             context, lambda: self.ironwood_craft_mainline.claim_reward(context),
             write_message="此刻无法领取铁木问工所得。",
+        )
+
+    async def get_basalt_waymarker_mainline_status(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.basalt_waymarker_mainline.get_status(context), require_write=False)
+
+    async def start_basalt_waymarker_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context, lambda: self.basalt_waymarker_mainline.start_stage(context),
+            write_message="此刻无法开始玄武岩径水标回响。",
+        )
+
+    async def claim_basalt_waymarker_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context, lambda: self.basalt_waymarker_mainline.claim_reward(context),
+            write_message="此刻无法领取玄武岩径水标回响所得。",
         )
 
     async def preview_final_arena(self, context: CommandContext) -> CommandResult:
