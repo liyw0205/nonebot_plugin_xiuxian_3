@@ -1362,3 +1362,58 @@ def test_spring_supper_mainline_seed_upgrade_backup_repeat_and_custom_preservati
     assert "种子更新 0 个" in custom_deploy.stdout
     assert path.read_bytes() == custom
     preserved(host)
+
+
+def _pre_ironwood_mainline() -> bytes:
+    text = (ROOT / "data" / MAINLINE).read_text(encoding="utf-8")
+    marker = text.index('    {\n      "key": "ironwood_craft.1"')
+    old = (text[:marker].rstrip()[:-1] + "\n  ]\n}\n").encode("utf-8")
+    assert hashlib.sha256(old).hexdigest() == "bb15ca2fd397b5afb12c591ade83268ece040763c343a613665ec9db774eba9a"
+    return _registered_old_blob(MAINLINE, old)
+
+
+def test_ironwood_seed_upgrade_backup_repeat_and_custom_preservation(host: Path) -> None:
+    old = _pre_ironwood_mainline()
+    path = host / "data" / MAINLINE
+    path.write_bytes(old)
+    upgraded = deploy(host)
+    assert upgraded.returncode == 0, upgraded.stdout + upgraded.stderr
+    assert "种子更新 1 个" in upgraded.stdout
+    assert path.read_bytes() == (ROOT / "data" / MAINLINE).read_bytes()
+    backup = next((host / ".xiuxian3/backups").glob("deploy-*"))
+    assert (backup / "data" / MAINLINE).read_bytes() == old
+    preserved(host)
+    repeated = deploy(host)
+    assert repeated.returncode == 0, repeated.stdout + repeated.stderr
+    assert "种子更新 0 个" in repeated.stdout
+    document = json.loads(path.read_text(encoding="utf-8"))
+    stage = next(row for row in document["records"] if row["key"] == "ironwood_craft.2")
+    stage["body"] += "鲁槐另记下本地溪水的水位。"
+    custom = (json.dumps(document, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+    path.write_bytes(custom)
+    result = deploy(host)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "种子更新 0 个" in result.stdout
+    assert path.read_bytes() == custom
+    preserved(host)
+
+
+def test_ironwood_missing_custom_dispatch_rolls_back_source_and_seed(host: Path) -> None:
+    old = _pre_ironwood_mainline()
+    mainline = host / "data" / MAINLINE
+    mainline.write_bytes(old)
+    livelihood = host / "data/生活/生活.json"
+    document = json.loads(livelihood.read_text(encoding="utf-8"))
+    document["records"] = [row for row in document["records"] if row["key"] != "dispatch.ironwood_bridge_works"]
+    custom = (json.dumps(document, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+    livelihood.write_bytes(custom)
+    source = host / "src/plugins/nonebot_plugin_xiuxian_3/__init__.py"
+    previous_source, previous_toml = source.read_bytes(), (host / "pyproject.toml").read_bytes()
+    result = deploy(host)
+    assert result.returncode != 0
+    assert "ironwood_craft.2 objective survey_bridge references unknown dispatch" in result.stdout + result.stderr
+    assert "已回退" in result.stderr
+    assert mainline.read_bytes() == old and livelihood.read_bytes() == custom
+    assert source.read_bytes() == previous_source
+    assert (host / "pyproject.toml").read_bytes() == previous_toml
+    preserved(host)
