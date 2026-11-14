@@ -21,6 +21,7 @@ LIVELIHOOD_ECHOES_STORY_KEY = "story.mainline.livelihood_echoes"
 BEAST_HABITAT_ECHOES_STORY_KEY = "story.mainline.beast_habitat_echoes"
 COMPANION_OLD_TRAIL_STORY_KEY = "story.mainline.companion_old_trail"
 SPRING_SUPPER_STORY_KEY = "story.mainline.spring_supper"
+IRONWOOD_CRAFT_STORY_KEY = "story.mainline.ironwood_craft"
 MAINLINE_TOWN_COMMISSION_DELIVERED = "livelihood.town_commission.delivered"
 
 MAINLINE_LOCKED = "locked"
@@ -226,6 +227,9 @@ _VERTICAL_SLICE_STAGES = frozenset(
         "companion_old_trail.3",
         "spring_supper.1",
         "spring_supper.2",
+        "ironwood_craft.1",
+        "ironwood_craft.2",
+        "ironwood_craft.3",
         "lane.builder.chapter.01",
         "lane.builder.chapter.02",
         "lane.builder.chapter.03",
@@ -700,8 +704,12 @@ def mainline_definitions(
     content: ContentBundle | None = None,
     *,
     story_key: str | None = None,
+    validate_sources: bool = True,
 ) -> tuple[MainlineStageDefinition, ...]:
-    """Parse and validate all mainline stages from the current content bundle."""
+    """Parse mainline stages; loaders and new runs also validate live sources.
+
+    Recovery validates frozen objectives without requiring their sources to remain open.
+    """
 
     bundle = _content(content)
     rows = bundle.list("mainline", include_locked=True)
@@ -732,7 +740,7 @@ def mainline_definitions(
         if is_vertical_slice_stage and len(body.strip()) < 80:
             raise ContentError(f"mainline {key} body is too short to be a story stage")
         objectives = _story_objectives(
-            row.get("objectives"), key, bundle, required=is_vertical_slice_stage
+            row.get("objectives"), key, bundle if validate_sources else None, required=is_vertical_slice_stage,
         )
         actions = _story_actions(row.get("actions"), key, required=is_vertical_slice_stage)
         state_changes = row.get("state_changes")
@@ -899,10 +907,11 @@ def _stage_key(
     *,
     story_key: str | None = MAINLINE_STORY_KEY,
     content: ContentBundle | None = None,
+    validate_sources: bool = True,
 ) -> str:
     if isinstance(value, bool):
         raise ValueError("mainline stage must be an integer or stable key")
-    definitions = mainline_definitions(content, story_key=story_key)
+    definitions = mainline_definitions(content, story_key=story_key, validate_sources=validate_sources)
     aliases = {alias: definition.key for definition in definitions for alias in definition.aliases}
     if isinstance(value, int):
         return f"chapter.{int(chapter)}.stage.{value}"
@@ -948,9 +957,10 @@ def resolve_mainline(
     chapter: int = 1,
     story_key: str | None = MAINLINE_STORY_KEY,
     content: ContentBundle | None = None,
+    validate_sources: bool = True,
 ) -> str | None:
-    key = _stage_key(value, chapter, story_key=story_key, content=content)
-    return key if key in {item.key for item in mainline_definitions(content, story_key=story_key)} else None
+    key = _stage_key(value, chapter, story_key=story_key, content=content, validate_sources=validate_sources)
+    return key if key in {item.key for item in mainline_definitions(content, story_key=story_key, validate_sources=validate_sources)} else None
 
 
 def mainline_definition(
@@ -959,9 +969,10 @@ def mainline_definition(
     chapter: int = 1,
     story_key: str | None = MAINLINE_STORY_KEY,
     content: ContentBundle | None = None,
+    validate_sources: bool = True,
 ) -> MainlineStageDefinition:
-    key = _stage_key(value, chapter, story_key=story_key, content=content)
-    definitions = {item.key: item for item in mainline_definitions(content, story_key=story_key)}
+    key = _stage_key(value, chapter, story_key=story_key, content=content, validate_sources=validate_sources)
+    definitions = {item.key: item for item in mainline_definitions(content, story_key=story_key, validate_sources=validate_sources)}
     try:
         return definitions[key]
     except KeyError as exc:
@@ -979,8 +990,8 @@ def mainline_stage(
 
 
 def _contains_stage(values: Iterable[str], key: str, content: ContentBundle | None = None) -> bool:
-    target = _stage_key(key, story_key=None, content=content)
-    return target in {_stage_key(str(value), story_key=None, content=content) for value in values}
+    target = _stage_key(key, story_key=None, content=content, validate_sources=False)
+    return target in {_stage_key(str(value), story_key=None, content=content, validate_sources=False) for value in values}
 
 
 def realm_rank(realm_key: str, content: ContentBundle | None = None) -> int:
@@ -1026,7 +1037,7 @@ def mainline_prerequisites_met(
     stages = tuple(str(item) for item in completed_stages)
     events = {str(item) for item in completed_events}
     events.update(str(item) for item in flags)
-    stage_keys = {item.key for item in mainline_definitions(content, story_key=definition.story_key)}
+    stage_keys = {item.key for item in mainline_definitions(content, story_key=definition.story_key, validate_sources=False)}
     for prerequisite in definition.prerequisites:
         if prerequisite.startswith("chapter.") or prerequisite in stage_keys:
             if not _contains_stage(stages, prerequisite, content):
@@ -1139,6 +1150,7 @@ __all__ = [
     "BEAST_HABITAT_ECHOES_STORY_KEY",
     "COMPANION_OLD_TRAIL_STORY_KEY",
     "SPRING_SUPPER_STORY_KEY",
+    "IRONWOOD_CRAFT_STORY_KEY",
     "MAINLINE_TOWN_COMMISSION_DELIVERED",
     "MainlineDefinition",
     "MainlineStageDefinition",

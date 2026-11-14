@@ -4399,6 +4399,82 @@
       "lane_name": "泉边炊烟",
       "first_clear_reward": {"spirit_stones": 20, "service_reputation": 2},
       "repeat_reward": {"spirit_stones": 4}
+    },
+    {
+      "key": "ironwood_craft.1",
+      "story_key": "story.mainline.ironwood_craft",
+      "chapter": 1, "stage": 1,
+      "name": "林间备料",
+      "desc": "跟石伯辨木寻铁，把六小时山中劳作带回林口。",
+      "body": "铁木林的溪水涨过旧桥，樵匠石伯正在林口挑选风折木。他说修桥先问材料，做工具也不能只认账上的灵石。你沿近郊山路来到林中，留下六小时收拣木材和铁石；可顺纹取材多留柄木，也可翻根寻铁多拾矿料。完整收束后才能把这次备料记进行记。提前离开可撤回安排，雾后才归则只剩保底干木，都不能交作完整劳作。石伯把材料交还给你，请你去溪岸找桥匠鲁槐，学会让这些木石真正派上用场。",
+      "objectives": [{"key": "gather_ironwood", "type": "idle_claim", "label": "本关开始后完整领取一次铁木林拾材", "route_key": "idle.ironwood_gather"}],
+      "actions": [
+        {"command": "前往", "argument": "铁木林", "description": "从玄天近郊沿公开山路抵达铁木林，感气一层即可入林。"},
+        {"command": "挂机预览", "argument": "铁木林拾材", "description": "比较顺纹取材和翻根寻铁的额外投入、木石所得与六小时时长。"},
+        {"command": "开始挂机", "argument": "铁木林拾材 顺纹取材", "description": "选取柄木，完整收束可将木石用于桥基勘务和工具修缮。"},
+        {"command": "开始挂机", "argument": "铁木林拾材 翻根寻铁", "description": "或多取铁石，两种选择都能完成备料，不能同时安排。"},
+        {"command": "领取挂机", "argument": "", "description": "等满六小时后于完整窗口内收回材料与石伯行记。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.ironwood_craft:ironwood_craft.1"]},
+      "next_stage_key": "ironwood_craft.2",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "旧拾材、仍在途中、取消或逾时保底不能代替本关完整劳作。处理当前安排后按原有每日名额重新拾材；主线进度与材料保留。"},
+      "status": "open", "aliases": ["林间备料"],
+      "prerequisites": ["player.start_seeking"], "required_realm": "qi_sensing", "required_layer": 1,
+      "lane": "ironwood_craft", "lane_name": "铁木问工",
+      "reputation_key": "local.xuantian.new_town",
+      "first_clear_reward": {"spirit_stones": 10, "local_reputation": 1},
+      "repeat_reward": {"spirit_stones": 2}
+    },
+    {
+      "key": "ironwood_craft.2",
+      "story_key": "story.mainline.ironwood_craft",
+      "chapter": 1, "stage": 2,
+      "name": "桥基问工",
+      "desc": "在鲁槐的桥基勘务中选择踏勘或整治，成功交回实测回执。",
+      "body": "鲁槐守着铁木林旧桥，不让满载的车队涉险过溪。他把木尺和铁坠放在你面前：踏勘用一份木材、一份铁石，九十分钟复核支点；整治用两份木材、一份铁石，四小时撑柱验载。你须先把这一页约定记下，再本人接受勘务。只查看图纸、尚未到期、取消、部分交差或失败都不能称作验收；延误虽在追加时长后付酬，仍不是这页约定的准时成功回执，要另接一趟勘务。旧派遣后来结算也不记作新劳作。木石不够可再找石伯拾材，气力不足可按恢复周期恢复状态；鲁槐会保留你的问工记录，直到收到可靠的结果。",
+      "objectives": [{"key": "survey_bridge", "type": "dispatch_success", "label": "本关开始后接受并成功结算铁木林桥基勘务", "dispatch_key": "dispatch.ironwood_bridge_works"}],
+      "actions": [
+        {"command": "派遣预览", "argument": "铁木林桥基勘务", "description": "身在铁木林，比较踏勘与整治的成本、耗时和风险。"},
+        {"command": "接受派遣", "argument": "铁木林桥基勘务 踏勘", "description": "用一木一铁实测支点，等九十分钟后结算，延误另等半程。"},
+        {"command": "接受派遣", "argument": "铁木林桥基勘务 整治", "description": "或投入两木一铁撑桥，等待四小时验载；两方案均以成功回执完成约定。"},
+        {"command": "派遣状态", "argument": "", "description": "查看冻结方案、人物叙事与可结算时间，重启后继续原安排。"},
+        {"command": "结算派遣", "argument": "", "description": "到期交差，成功工料可带回青石镇修补工具。延误照常付酬，但须另接新勘务取得准时成功回执。"},
+        {"command": "恢复状态", "argument": "", "description": "体力或精力不足时，按三十分钟恢复周期补回气力，再继续采料与勘务。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.ironwood_craft:ironwood_craft.2"]},
+      "next_stage_key": "ironwood_craft.3",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "仅统计本关开始后本人新接受的桥基勘务成功回执。提前、取消、部分、失败、延误或旧派遣均不推进；延误等到期结算后另接新勘务，材料不足按拾材日限补足，气力不足恢复状态后重试。"},
+      "status": "open", "aliases": ["桥基问工"],
+      "prerequisites": ["ironwood_craft.1"], "required_realm": "qi_sensing", "required_layer": 1,
+      "lane": "ironwood_craft", "lane_name": "铁木问工",
+      "reputation_key": "local.xuantian.new_town",
+      "first_clear_reward": {"spirit_stones": 15, "local_reputation": 2, "service_reputation": 1},
+      "repeat_reward": {"spirit_stones": 3}
+    },
+    {
+      "key": "ironwood_craft.3",
+      "story_key": "story.mainline.ironwood_craft",
+      "chapter": 1, "stage": 3,
+      "name": "木石归铺",
+      "desc": "带回山中木石，为青石镇工具修缮交上一份真实材料。",
+      "body": "桥基的实测图已经收好，鲁槐却没有让你把剩余木石丢在溪边。他请你把两份木材和一份铁石带回青石镇，交给修补农具的工匠。先沿铁木林、近郊、青石镇的山路返回，再查看城镇委托，接取工具修缮并在有效期内交付。只有这一页开始后的本人成功交单才记入问工手记，旧交单和只接未交都不算。材料不足可以回林拾取，委托过期则保留主线、等待次日新单；真实交付会消耗木石，按镇务账册发放灵石与地方名望。到此，石伯拾来的山材才真正变成了镇中人手里可用的工具。",
+      "objectives": [{"key": "deliver_wood_ore", "type": "commission_delivery", "label": "本关开始后交付工具修缮委托", "commission_key": "town_commission.repair_tools"}],
+      "actions": [
+        {"command": "前往", "argument": "近郊", "description": "从铁木林返回近郊，再沿镇路前往青石镇。"},
+        {"command": "前往", "argument": "青石镇", "description": "结算抵达青石镇，准备两份木材与一份铁石。"},
+        {"command": "城镇委托", "argument": "", "description": "查看工具修缮的公开订单、当日库存与有效期。"},
+        {"command": "接取委托", "argument": "工具修缮", "description": "先备齐材料再接单，避免长时拾材超过订单期限。"},
+        {"command": "交付委托", "argument": "工具修缮", "description": "交出两木一铁，取得委托灵石与名望后领取本关奖励。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.ironwood_craft:ironwood_craft.3"]},
+      "next_stage_key": null,
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "只认本关开始后本人成功交付工具修缮，旧交单不计。材料不足不扣物品，过期须等次日重新接单；主线保持进行中，补足两木一铁后可继续。"},
+      "status": "open", "aliases": ["木石归铺"],
+      "prerequisites": ["ironwood_craft.2"], "required_realm": "qi_sensing", "required_layer": 1,
+      "lane": "ironwood_craft", "lane_name": "铁木问工",
+      "reputation_key": "local.xuantian.new_town",
+      "first_clear_reward": {"spirit_stones": 25, "local_reputation": 3, "service_reputation": 2},
+      "repeat_reward": {"spirit_stones": 5}
     }
   ]
 }
