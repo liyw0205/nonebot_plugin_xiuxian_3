@@ -3003,6 +3003,41 @@
       "next_stage_key": "chapter.10.stage.1"
     },
     {
+      "key": "chapter.9.stage.4",
+      "story_key": "story.mainline.xuantian",
+      "chapter": 9,
+      "stage": 4,
+      "name": "账房夜值",
+      "desc": "把雾中旧账送回云城账房，完整看守一夜店铺，替商路留下可复核的收支。",
+      "body": "灵叶上的旧账终于有了落款：云城账房要的不是一封口头保证，而是一整夜不曾断过的灯。你得亲自回到云城，把账页交给掌柜；若地方名望还不够，就按账房指给的云铁矿区勘测去挣一笔真实的信任。名望达到门槛后，新安排的店铺看守必须完整熬过八小时并由本人收回，逾时保底、取消和旧安排都只留下未完的空栏。夜值结束，掌柜才把下一卷云舟信札压进你的行囊。",
+      "objectives": [
+        {"key": "claim_cloud_ledger_watch", "type": "idle_claim", "label": "本关开始后完整领取一次云城店铺", "route_key": "idle.cloud_city_shop"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "云城", "description": "沿公开通路回到云城，等待行程结束后结算抵达。"},
+        {"command": "派遣预览", "argument": "云铁矿区勘测", "description": "名望不足时查看公开的云铁矿区勘测门槛、投入、结果与耗时。"},
+        {"command": "接受派遣", "argument": "云铁矿区勘测", "description": "在云城接受真实勘测，成功或部分完成后结算云城名望。"},
+        {"command": "挂机预览", "argument": "云城店铺", "description": "身在云城且名望达到 200 后确认八小时完整领取窗口与每日次数。"},
+        {"command": "开始挂机", "argument": "云城店铺", "description": "本关开始后新建店铺夜值，完整窗口结束后领取闲居所得。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.xuantian:chapter.9.stage.4"]},
+      "retry": {
+        "on_incomplete": "keep_running",
+        "cooldown_seconds": 0,
+        "message": "只统计本关开始后的本人云城店铺完整领取；地点、名望、日限不足或安排逾时/取消时不发主线奖励，按公开路线补足条件后重新安排。"
+      },
+      "status": "open",
+      "aliases": ["账房夜值"],
+      "lane": "chapter9_cloud_ledger",
+      "lane_name": "云城旧账夜值",
+      "prerequisites": ["chapter.9.stage.3"],
+      "required_realm": "golden_core",
+      "required_layer": 3,
+      "first_clear_reward": {"spirit_stones": 100, "service_reputation": 7},
+      "repeat_reward": {"spirit_stones": 35},
+      "next_stage_key": null
+    },
+    {
       "key": "chapter.10.stage.1",
       "story_key": "story.mainline.xuantian",
       "chapter": 10,
