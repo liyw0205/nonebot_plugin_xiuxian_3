@@ -1,10 +1,22 @@
 from __future__ import annotations
 
 import asyncio
+from importlib.util import find_spec
 from types import SimpleNamespace
 from urllib.parse import parse_qs, urlparse
 
 import pytest
+
+
+try:
+    _QQ_ADAPTER_AVAILABLE = find_spec("nonebot.adapters.qq") is not None
+except ModuleNotFoundError:
+    _QQ_ADAPTER_AVAILABLE = False
+
+pytestmark = pytest.mark.skipif(
+    not _QQ_ADAPTER_AVAILABLE,
+    reason="QQ adapter is an optional host dependency",
+)
 
 from nonebot_plugin_xiuxian_3.adapters.message.markdown import send_markdown_message
 from nonebot_plugin_xiuxian_3.adapters.nonebot import _normalizer_for_runtime

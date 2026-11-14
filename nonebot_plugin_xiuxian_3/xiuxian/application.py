@@ -463,6 +463,9 @@ class XiuxianApplication:
         self.quests = QuestApplication(repository)
 
     async def get_help(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self._get_help(context), require_write=False)
+
+    async def _get_help(self, context: CommandContext) -> CommandResult:
         if not context.command_args:
             return CommandResult(True, "HELP_OVERVIEW", _HELP_OVERVIEW, context.request_id)
         if len(context.command_args) == 1 and context.command_args[0] in _HELP_PAGES:

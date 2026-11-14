@@ -349,7 +349,9 @@ await send_onebot_v11_forward_message(
 QQ Markdown 使用 QQ 适配器的 `MessageSegment.markdown`；OneBot V11 合并转发使用
 `send_group_forward_msg` 或 `send_private_forward_msg`，目标从事件场景自动判断。
 QQ 蓝字使用 `mqqapi://aio/inlinecmd`，按键使用官方 `MessageKeyboard`；OneBot
-不会构造这些 QQ 专属消息段。
+不会构造这些 QQ 专属消息段。直接调用 QQ Markdown、蓝字或键盘发送器时，若宿主未安装
+可选 QQ SDK 或单项能力不可用，会在同一次投递中降级为可读纯文本并保留命令；不会重新调用
+application，也不会重复结算资产。QQ SDK 可用时仍按能力发送原生消息段。
 插件内普通 matcher 回复也通过同一适配器分发函数发送；不确定平台时才使用通用
 `send_text_message`，避免把 QQ 消息段发给 OneBot。
 

@@ -23,28 +23,37 @@ async def send_markdown_message(
 ) -> MessageSendResult:
     require_content(markdown, "markdown")
     if _supports_markdown(bot, event, capabilities):
-        # Unsupported keyboards keep the same action available as a body link.
         body = markdown
-        if actions and "keyboard" not in capabilities:
+        keyboard_requested = bool(actions and "keyboard" in capabilities)
+        if actions and not keyboard_requested:
             from ...xiuxian.utils.text import command_link
 
             body += "\n\n" + " · ".join(command_link(action.label, action.command) for action in actions)
         segment = qq_markdown_segment(body, command_prefix=command_prefix)
         if segment is not None:
             sent_format = "markdown"
-            if actions and "keyboard" in capabilities:
+            degraded = False
+            if keyboard_requested:
                 from .qq import qq_keyboard
 
-                segment += qq_keyboard((actions,), command_prefix=command_prefix)
-                sent_format = "markdown+keyboard"
-            response = await bot.send(event=event, message=segment, **kwargs)
-            return MessageSendResult(
-                requested_format="markdown+keyboard" if actions else "markdown",
-                sent_format=sent_format,
-                degraded=bool(actions) and sent_format != "markdown+keyboard",
-                response=response,
-                message_id=message_id_from_response(response),
-            )
+                try:
+                    segment += qq_keyboard((actions,), command_prefix=command_prefix)
+                    sent_format = "markdown+keyboard"
+                except (ImportError, RuntimeError, TypeError, ValueError):
+                    from ...xiuxian.utils.text import command_link
+
+                    body += "\n\n" + " · ".join(command_link(action.label, action.command) for action in actions)
+                    segment = qq_markdown_segment(body, command_prefix=command_prefix)
+                    degraded = True
+            if segment is not None:
+                response = await bot.send(event=event, message=segment, **kwargs)
+                return MessageSendResult(
+                    requested_format="markdown+keyboard" if actions else "markdown",
+                    sent_format=sent_format,
+                    degraded=degraded,
+                    response=response,
+                    message_id=message_id_from_response(response),
+                )
 
     text = fallback_text if fallback_text is not None else markdown_to_text(markdown)
     if actions:

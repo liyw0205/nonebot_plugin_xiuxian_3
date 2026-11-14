@@ -54,6 +54,7 @@ def test_onebot_v11_message_is_normalized() -> None:
 
 
 def test_qq_group_message_is_normalized() -> None:
+    pytest.importorskip("nonebot.adapters.qq")
     from nonebot.adapters.qq.event import GroupMessageCreateEvent
     from nonebot.adapters.qq.models.qq import GroupMemberAuthor
 
@@ -81,6 +82,7 @@ def test_qq_group_message_is_normalized() -> None:
 
 
 def test_event_operation_identity_is_stable_and_scoped() -> None:
+    pytest.importorskip("nonebot.adapters.qq")
     onebot = normalize_event(
         FakeOneBotEvent(
             message_id="shared-event",
@@ -127,6 +129,7 @@ def test_event_operation_identity_is_stable_and_scoped() -> None:
 
 
 def test_same_raw_event_id_does_not_conflict_between_adapters() -> None:
+    pytest.importorskip("nonebot.adapters.qq")
     onebot = normalize_event(
         FakeOneBotEvent(
             message_id="shared-event",
@@ -398,6 +401,7 @@ def test_nonebot_command_gate_uses_every_shared_router_command() -> None:
 
 
 def test_both_real_adapters_pass_dynamic_gate_to_shared_handler() -> None:
+    pytest.importorskip("nonebot.adapters.qq")
     onebot_event = FakeOneBotEvent(content="属性说明", message_id="gate-onebot")
     from nonebot.adapters.qq.event import GroupMessageCreateEvent
     from nonebot.adapters.qq.models.qq import GroupMemberAuthor
@@ -456,6 +460,7 @@ def test_both_real_adapters_pass_dynamic_gate_to_shared_handler() -> None:
 
 
 def test_normalized_qq_event_reaches_shared_application() -> None:
+    pytest.importorskip("nonebot.adapters.qq")
     from nonebot.adapters.qq.event import C2CMessageCreateEvent
     from nonebot.adapters.qq.models.qq import FriendAuthor
 

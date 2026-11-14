@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from importlib.util import find_spec
 
 import pytest
 
@@ -27,6 +28,13 @@ class FakeBot:
     async def send(self, event: object, message: object, **kwargs: object) -> dict[str, str]:
         self.sent.append((event, message, kwargs))
         return {"message_id": "reply-1"}
+
+
+def _qq_sdk_available() -> bool:
+    try:
+        return find_spec("nonebot.adapters.qq") is not None
+    except ModuleNotFoundError:
+        return False
 
 
 def test_message_dispatch_selects_adapter_family() -> None:
@@ -69,7 +77,12 @@ def test_qq_specific_senders_use_expected_formats() -> None:
         plain = await send_qq_text_message(bot, "event", "QQ 普通消息")
         markdown = await send_qq_markdown_message(bot, "event", "**QQ Markdown**")
         assert plain.sent_format == "text"
-        assert markdown.sent_format == "markdown"
+        if _qq_sdk_available():
+            assert markdown.sent_format == "markdown"
+        else:
+            assert markdown.sent_format == "text"
+            assert markdown.degraded is True
+            assert bot.sent[1][1] == "QQ Markdown"
         assert bot.sent[0][1] == "QQ 普通消息"
 
     asyncio.run(run())
@@ -88,10 +101,16 @@ def test_qq_blue_text_and_keyboard_use_qq_segments() -> None:
         keyboard = await send_qq_markdown_keyboard_message(
             bot, FakeQQEvent(), "**请选择**", [[("开始", "开始修仙")]]
         )
-        assert blue.sent_format == "markdown"
-        assert "mqqapi://aio/inlinecmd" in str(bot.sent[0])
-        assert keyboard.sent_format == "markdown+keyboard"
-        assert "keyboard" in str(bot.sent[1])
+        if _qq_sdk_available():
+            assert blue.sent_format == "markdown"
+            assert "mqqapi://aio/inlinecmd" in str(bot.sent[0])
+            assert keyboard.sent_format == "markdown+keyboard"
+            assert "keyboard" in str(bot.sent[1])
+        else:
+            assert blue.sent_format == "text"
+            assert bot.sent[0][1] == "开始（开始修仙）"
+            assert keyboard.sent_format == "text"
+            assert bot.sent[1][1] == "请选择\n\n可发送：开始修仙"
 
     asyncio.run(run())
 
@@ -112,7 +131,7 @@ def test_markdown_degrades_to_text_without_capability() -> None:
 
 
 def test_markdown_uses_qq_segment_when_capability_is_declared() -> None:
-    from nonebot.adapters.qq import MessageSegment
+    MessageSegment = pytest.importorskip("nonebot.adapters.qq").MessageSegment
 
     async def run() -> None:
         bot = FakeBot()
@@ -120,6 +139,92 @@ def test_markdown_uses_qq_segment_when_capability_is_declared() -> None:
         assert result.sent_format == "markdown"
         assert result.degraded is False
         assert isinstance(bot.sent[0][1], MessageSegment)
+
+    asyncio.run(run())
+
+
+def test_direct_qq_helpers_degrade_without_native_message_segments(monkeypatch) -> None:
+    from nonebot_plugin_xiuxian_3.adapters.message import qq as qq_message
+
+    monkeypatch.setattr(qq_message, "qq_markdown_segment", lambda markdown: None)
+
+    async def run() -> None:
+        bot = FakeBot()
+        blue = await send_qq_blue_text_message(bot, "event", "查看", "我的状态")
+        keyboard = await send_qq_markdown_keyboard_message(
+            bot, "event", "**下一步**", [[("查看", "我的状态")]]
+        )
+        assert blue.sent_format == "text" and blue.degraded
+        assert keyboard.sent_format == "text" and keyboard.degraded
+        assert bot.sent[0][1] == "查看（我的状态）"
+        assert bot.sent[1][1] == "下一步\n\n可发送：我的状态"
+
+    asyncio.run(run())
+
+
+def test_direct_qq_keyboard_degrades_to_markdown_when_keyboard_builder_fails(monkeypatch) -> None:
+    from nonebot_plugin_xiuxian_3.adapters.message import qq as qq_message
+
+    monkeypatch.setattr(qq_message, "qq_markdown_segment", lambda markdown: markdown)
+
+    def fail_keyboard(*args, **kwargs):
+        raise RuntimeError("keyboard unavailable")
+
+    monkeypatch.setattr(qq_message, "qq_keyboard", fail_keyboard)
+
+    async def run() -> None:
+        bot = FakeBot()
+        result = await send_qq_markdown_keyboard_message(
+            bot, "event", "**下一步**", [[("查看", "我的状态")]]
+        )
+        assert result.sent_format == "markdown"
+        assert result.degraded is True
+        assert "mqqapi://aio/inlinecmd" in str(bot.sent[0][1])
+
+    asyncio.run(run())
+
+
+def test_shared_markdown_sender_degrades_when_keyboard_capability_is_unavailable(monkeypatch) -> None:
+    from nonebot_plugin_xiuxian_3.adapters.message import markdown as formatter
+    from nonebot_plugin_xiuxian_3.adapters.message import qq as qq_message
+    from nonebot_plugin_xiuxian_3.contracts import CommandAction
+
+    monkeypatch.setattr(formatter, "qq_markdown_segment", lambda markdown, **kwargs: markdown)
+
+    def fail_keyboard(*args, **kwargs):
+        raise RuntimeError("keyboard unavailable")
+
+    monkeypatch.setattr(qq_message, "qq_keyboard", fail_keyboard)
+
+    async def run() -> None:
+        bot = FakeBot()
+        result = await send_markdown_message(
+            bot,
+            "event",
+            "**下一步**",
+            capabilities=("markdown", "keyboard"),
+            actions=(CommandAction("查看", "我的状态"),),
+        )
+        assert result.sent_format == "markdown"
+        assert result.degraded is True
+        assert "[查看](command:" in str(bot.sent[0][1])
+        assert "%E6%88%91%E7%9A%84%E7%8A%B6%E6%80%81" in str(bot.sent[0][1])
+
+    asyncio.run(run())
+
+
+def test_qq_fallback_does_not_swallow_delivery_failures(monkeypatch) -> None:
+    from nonebot_plugin_xiuxian_3.adapters.message import qq as qq_message
+
+    monkeypatch.setattr(qq_message, "qq_markdown_segment", lambda markdown: None)
+
+    class FailingBot(FakeBot):
+        async def send(self, event: object, message: object, **kwargs: object) -> dict[str, str]:
+            raise RuntimeError("transport unavailable")
+
+    async def run() -> None:
+        with pytest.raises(RuntimeError, match="transport unavailable"):
+            await send_qq_blue_text_message(FailingBot(), "event", "重试", "我的状态")
 
     asyncio.run(run())
 

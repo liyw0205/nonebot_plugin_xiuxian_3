@@ -6,6 +6,7 @@ import shutil
 import sqlite3
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
+from importlib.util import find_spec
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
@@ -13,6 +14,20 @@ from types import SimpleNamespace
 import pytest
 
 nonebot = pytest.importorskip("nonebot")
+
+try:
+    _ONEBOT_ADAPTER_AVAILABLE = find_spec("nonebot.adapters.onebot.v11") is not None
+except ModuleNotFoundError:
+    _ONEBOT_ADAPTER_AVAILABLE = False
+try:
+    _QQ_ADAPTER_AVAILABLE = find_spec("nonebot.adapters.qq") is not None
+except ModuleNotFoundError:
+    _QQ_ADAPTER_AVAILABLE = False
+
+pytestmark = pytest.mark.skipif(
+    not (_ONEBOT_ADAPTER_AVAILABLE and _QQ_ADAPTER_AVAILABLE),
+    reason="OneBot V11 and QQ adapters are optional host dependencies",
+)
 
 from nonebot_plugin_xiuxian_3.adapters.base import EventDeduplicator
 from nonebot_plugin_xiuxian_3.adapters.nonebot import _canonical_command
