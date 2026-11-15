@@ -183,6 +183,10 @@ def test_cloud_route_preview_reports_required_quest_before_start(tmp_path: Path)
             stamina=30,
             spirit_stones=1000,
         )
+        async def unexpected_second_read(**kwargs):
+            raise AssertionError(f"cloud quest was reread: {kwargs}")
+
+        runtime.repository.cloud_route_quest_completed = unexpected_second_read
 
         preview = await runtime.adapters.dispatch(
             "onebot.v11", _context(user, "preview"), "移动预览 魔界深渊门"
@@ -190,6 +194,23 @@ def test_cloud_route_preview_reports_required_quest_before_start(tmp_path: Path)
         assert preview.data["travel_mode"] == "cloud_boat"
         assert preview.data["dedicated_route_ready"] is False
         assert "任务权限" in preview.data["missing"]
+
+        with sqlite3.connect(runtime.settings.database_path) as connection:
+            connection.execute(
+                "UPDATE players SET intro_json=? WHERE platform='onebot.v11' AND platform_user_id=?",
+                (json.dumps({"flags": ["quest.demon_intro"]}), user),
+            )
+        flagged = await runtime.adapters.dispatch(
+            "onebot.v11", _context(user, "preview-flagged"), "移动预览 魔界深渊门"
+        )
+        assert flagged.data["dedicated_route_ready"] is True
+        assert "任务权限" not in flagged.data["missing"]
+
+        with sqlite3.connect(runtime.settings.database_path) as connection:
+            connection.execute(
+                "UPDATE players SET intro_json=? WHERE platform='onebot.v11' AND platform_user_id=?",
+                (json.dumps({"flags": []}), user),
+            )
 
         started = await runtime.adapters.dispatch(
             "onebot.v11", _context(user, "start", "route-requires-quest"), "登上云舟 魔界引导"

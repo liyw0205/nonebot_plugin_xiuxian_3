@@ -130,10 +130,8 @@ class WorldApplication:
                 missing_cloud.append("境界要求")
             if cloud_route.pass_key and inventory_amount(record.player.inventory, cloud_route.pass_key) < cloud_route.pass_quantity:
                 missing_cloud.append("通行物品")
-            if cloud_route.required_quest and not await self.repository.cloud_route_quest_completed(
-                platform=context.adapter,
-                platform_user_id=context.user_id,
-                quest_key=cloud_route.required_quest,
+            if cloud_route.required_quest and cloud_route.required_quest not in (
+                record.completed_quests | record.intro_flags
             ):
                 missing_cloud.append("任务权限")
             if record.player.stamina < cloud_route.stamina_cost:

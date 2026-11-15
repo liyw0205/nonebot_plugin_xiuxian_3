@@ -506,6 +506,8 @@ class TravelRepositoryMixin:
             pass_quantity=pass_quantity,
             ready=ready,
             missing=tuple(missing),
+            completed_quests=frozenset(str(item) for item in requirement_state["completed_quests"]),
+            intro_flags=frozenset(str(item) for item in requirement_state["intro_flags"]),
         )
 
     def _count_destination_starts_today(

@@ -19,6 +19,10 @@ class TravelPreview:
     pass_quantity: int
     ready: bool
     missing: tuple[str, ...]
+    # These gate projections come from the same SQLite read as the player;
+    # cloud-boat previews must not reopen the repository for quest evidence.
+    completed_quests: frozenset[str] = frozenset()
+    intro_flags: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True, slots=True)
