@@ -275,11 +275,10 @@ class SQLitePlayerRepository(
             raise RuntimeError("repository connections are closed")
         connection = getattr(self._connection_local, "connection", None)
         if connection is not None:
-            try:
-                connection.execute("SELECT 1")
-                return connection
-            except sqlite3.ProgrammingError:
-                self._connection_local.connection = None
+            # Executor-thread connections remain owned by this repository until
+            # runtime shutdown; probing them on every read only adds a SQLite
+            # round trip.  ``close`` flips the guard before releasing the registry.
+            return connection
         connection = connect_sqlite(
             self.settings.database_path,
             busy_timeout_ms=self.settings.busy_timeout_ms,

@@ -28,6 +28,7 @@ def test_opt_in_performance_benchmark_contract(monkeypatch: pytest.MonkeyPatch) 
     assert report["users"] == 1000
     assert report["errors"] == 0
     assert report["sql_profile_enabled"] is True
+    assert report["sql_profile_status"] == "collected"
     assert report["seed"]["domain_front_rows"] == report["users"]
     assert report["temporary_database_cleaned"] is True
     assert not any("TEMP B-TREE" in detail for detail in report["explain_query_plan"]["idle_status"])
@@ -53,3 +54,43 @@ def test_opt_in_performance_benchmark_contract(monkeypatch: pytest.MonkeyPatch) 
         for item in report["levels"]
     )
     assert all(item["sql_queries"] > 0 for item in report["levels"])
+
+
+def test_unprofiled_benchmark_does_not_report_zero_sql_queries() -> None:
+    import asyncio
+
+    from scripts.performance_benchmark import _run
+
+    report = asyncio.run(
+        _run(
+            users=8,
+            batch_size=8,
+            total_requests=20,
+            levels=(1,),
+            profile_sql=False,
+            commands=("主线状态",),
+        )
+    )
+    assert report["sql_profile_enabled"] is False
+    assert report["sql_profile_status"] == "not_collected"
+    assert report["levels"][0]["sql_queries"] is None
+    assert report["levels"][0]["requests"] == 20
+    assert report["errors"] == 0
+
+
+def test_thread_local_connection_reuse_skips_health_probe(tmp_path) -> None:
+    import asyncio
+
+    from nonebot_plugin_xiuxian_3.runtime import create_runtime
+
+    async def exercise() -> list[str]:
+        runtime = create_runtime(data_dir=tmp_path, adapters=())
+        await runtime.initialize()
+        connection = runtime.repository._connect()
+        statements: list[str] = []
+        connection.set_trace_callback(statements.append)
+        assert runtime.repository._connect() is connection
+        await runtime.close()
+        return statements
+
+    assert asyncio.run(exercise()) == []
