@@ -58,6 +58,134 @@ def test_install_and_control_entrypoints_share_commands_and_paths() -> None:
             assert option in text, (script, option)
 
 
+def test_linux_installers_default_to_shared_venv_and_preserve_overrides() -> None:
+    expected = "/home/nonebot-shared-venv"
+    for script in ("onekey.sh", "install.sh", "control.sh"):
+        text = (ROOT / "scripts" / script).read_text(encoding="utf-8")
+        assert expected in text
+        assert "VENV_PATH" in text
+        assert "$HOME/myenv" not in text
+    installer = (ROOT / "scripts/install.sh").read_text(encoding="utf-8")
+    assert 'venv="\\${VENV_PATH:-$venv_q}"' in installer
+    for guide in (
+        (ROOT / "README.md").read_text(encoding="utf-8"),
+        (ROOT / "docs/installation.md").read_text(encoding="utf-8"),
+    ):
+        assert expected in guide
+        assert "VENV_PATH" in guide
+
+    with TemporaryDirectory() as temporary:
+        target = Path(temporary) / "host"
+        target.mkdir()
+        launcher = target / "xiu3"
+        launcher.write_text("#!/bin/sh\nprintf '%s\\n' \"$@\"\n", encoding="utf-8")
+        launcher.chmod(0o755)
+        default = subprocess.run(
+            ["bash", str(ROOT / "scripts/onekey.sh"), "status", "--target", str(target)],
+            check=True,
+            capture_output=True,
+            text=True,
+            env={key: value for key, value in os.environ.items() if key != "VENV_PATH"},
+        )
+        assert expected in default.stdout
+        from_environment = subprocess.run(
+            ["bash", str(ROOT / "scripts/onekey.sh"), "status", "--target", str(target)],
+            check=True,
+            capture_output=True,
+            text=True,
+            env={**os.environ, "VENV_PATH": str(Path(temporary) / "environment")},
+        )
+        assert str(Path(temporary) / "environment") in from_environment.stdout
+        overridden = subprocess.run(
+            ["bash", str(ROOT / "scripts/onekey.sh"), "status", "--target", str(target),
+             "--venv", str(Path(temporary) / "explicit")],
+            check=True,
+            capture_output=True,
+            text=True,
+            env={**os.environ, "VENV_PATH": str(Path(temporary) / "environment")},
+        )
+        assert str(Path(temporary) / "explicit") in overridden.stdout
+        assert str(Path(temporary) / "environment") not in overridden.stdout
+
+
+def test_generated_launcher_resolves_venv_at_invocation_and_honors_explicit_override(tmp_path: Path) -> None:
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    fake_python = fake_bin / "python"
+    fake_python.write_text(
+        "#!/bin/sh\n"
+        "set -eu\n"
+        "if [ \"${1:-}\" = -m ] && [ \"${2:-}\" = venv ]; then\n"
+        "  if [ \"${3:-}\" = --help ]; then exit 0; fi\n"
+        "  venv=\n"
+        "  for arg in \"$@\"; do venv=$arg; done\n"
+        "  mkdir -p \"$venv/bin\"\n"
+        "  cp \"$0\" \"$venv/bin/python\"\n"
+        "  chmod +x \"$venv/bin/python\"\n"
+        "  printf '%s\\n' '#!/bin/sh' 'exit 0' > \"$venv/bin/nb\"\n"
+        "  chmod +x \"$venv/bin/nb\"\n"
+        "fi\n"
+        "exit 0\n",
+        encoding="utf-8",
+    )
+    fake_python.chmod(0o755)
+    target = tmp_path / "host"
+    installed_venv = tmp_path / "installed-venv"
+    env = {
+        **os.environ,
+        "HOME": str(tmp_path / "home"),
+        "PYTHONPATH": "",
+        "VENV_PATH": "",
+    }
+    subprocess.run(
+        [
+            "bash", str(ROOT / "scripts/install.sh"), "install",
+            "--target", str(target), "--venv", str(installed_venv),
+            "--python", str(fake_python), "--index-url", "https://example.invalid/simple",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=30,
+    )
+
+    control = target / ".xiuxian3/control.sh"
+    control.write_text(
+        "#!/bin/sh\n"
+        "venv=\n"
+        "while [ $# -gt 0 ]; do\n"
+        "  if [ \"$1\" = --venv ]; then venv=$2; shift 2; else shift; fi\n"
+        "done\n"
+        "printf '%s\\n' \"$venv\"\n",
+        encoding="utf-8",
+    )
+    control.chmod(0o755)
+    launcher = target / "xiu3"
+    assert "myenv" not in launcher.read_text(encoding="utf-8")
+
+    default = subprocess.run([str(launcher), "status"], check=True, capture_output=True, text=True, env=env)
+    assert default.stdout.strip() == str(installed_venv)
+    environment_venv = tmp_path / "environment-venv"
+    from_environment = subprocess.run(
+        [str(launcher), "status"],
+        check=True,
+        capture_output=True,
+        text=True,
+        env={**env, "VENV_PATH": str(environment_venv)},
+    )
+    assert from_environment.stdout.strip() == str(environment_venv)
+    explicit_venv = tmp_path / "explicit-venv"
+    explicit = subprocess.run(
+        [str(launcher), "status", "--venv", str(explicit_venv)],
+        check=True,
+        capture_output=True,
+        text=True,
+        env={**env, "VENV_PATH": str(environment_venv)},
+    )
+    assert explicit.stdout.strip() == str(explicit_venv)
+
+
 def test_onekey_control_routing_logs_and_official_qq_login() -> None:
     with TemporaryDirectory() as temporary:
         root = Path(temporary)

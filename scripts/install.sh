@@ -9,7 +9,7 @@ SOURCE="$ROOT"
 SOURCE_MODE=source
 MIRROR=direct
 MIRROR_URL=""
-VENV="${VENV_PATH:-$HOME/myenv}"
+VENV="${VENV_PATH:-/home/nonebot-shared-venv}"
 PYTHON="${PYTHON_BIN:-}"
 INDEX_URL="${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}"
 START=0
@@ -34,7 +34,7 @@ usage() {
   --mirror MODE       direct、accelerated 或 custom
   --mirror-url URL    自定义 Release 归档或 Git 仓库地址
   --python PATH       指定系统 Python（默认 python3）
-  --venv PATH         指定虚拟环境（默认 $HOME/myenv）
+  --venv PATH         指定虚拟环境（默认 /home/nonebot-shared-venv；也可用 VENV_PATH）
   --index-url URL     指定 pip 镜像，只影响本次安装
   --run               安装后立即执行 nb run（兼容旧用法）
   --yes               确认 uninstall，不删除共享虚拟环境
@@ -324,7 +324,8 @@ write_control_launcher() {
 #!/usr/bin/env bash
 action="\${1:-status}"
 if ((\$#)); then shift; fi
-exec "$TARGET/.xiuxian3/control.sh" "\$action" --target $target_q --venv $venv_q --source $root_q "\$@"
+venv="\${VENV_PATH:-$venv_q}"
+exec "$TARGET/.xiuxian3/control.sh" "\$action" --target $target_q --venv "\$venv" --source $root_q "\$@"
 EOF
     chmod +x "$launcher"
 }

@@ -5,10 +5,13 @@
 以下步骤使用 `v0.1.46` 的安装脚本。要求 Python 3.11+；宿主由 NoneBot 的 `nb run` 启动，插件不单独监听业务端口。
 
 Linux/Termux 的 Release 一键安装可直接运行版本化 raw 脚本，不需要先 clone 仓库。
+Linux 脚本默认复用已准备好的 `/home/nonebot-shared-venv`；也可以用 `VENV_PATH`
+或 `--venv` 指定其它环境，安装、更新、启动、状态和 QQ 登录会沿用同一路径。
 
 ## 一键安装
 
-安装器默认创建 `$HOME/xiu3` 宿主和 `$HOME/myenv` 虚拟环境。
+安装器默认使用 `$HOME/xiu3` 宿主和 `/home/nonebot-shared-venv` 共享环境；共享环境
+已存在时直接复用，不会另建项目 `.venv`。
 
 ### Linux 一键 Release 安装
 
@@ -29,7 +32,10 @@ curl -fsSL https://raw.githubusercontent.com/liyw0205/nonebot_plugin_xiuxian_3/v
 termux-wake-lock
 ```
 
-安装器会使用 `pkg` 补齐 Python、Git、curl 和 clang。使用 `proot-distro` 时在容器内单独创建虚拟环境，不要复用 Termux 的 venv。
+安装器会使用 `pkg` 补齐 Python、Git、curl 和 clang，并按脚本默认使用
+`/home/nonebot-shared-venv`；如果运行环境需要其它位置，请显式传入 `--venv PATH`
+或设置 `VENV_PATH`。使用 `proot-distro` 时在容器内单独创建并显式传入可用环境，
+不要复用宿主 Linux 的 venv。
 
 ### Release 下载与参数
 
@@ -40,12 +46,17 @@ termux-wake-lock
 ```bash
 --target "$HOME/xiu3"                 # 宿主目录
 --source "$HOME/.local/share/xiuxian3/source"  # Release 源码缓存
---venv "$HOME/myenv"                  # 虚拟环境
+--venv /home/nonebot-shared-venv       # Linux 默认共享环境
 --mirror direct|accelerated|custom
 --mirror-url URL
 --index-url https://pypi.tuna.tsinghua.edu.cn/simple
 --source-mode auto|release|source
 ```
+
+`--venv` 优先级高于 `VENV_PATH`；未提供时 Linux 使用 `/home/nonebot-shared-venv`。
+例如临时使用项目环境：`VENV_PATH="$PWD/.venv" bash scripts/onekey.sh status
+--target "$HOME/xiu3"`。安装生成的 `xiu3` launcher 也会读取 `VENV_PATH`，因此
+`VENV_PATH=/path/to/venv xiu3 start|status|login` 会把同一环境传给控制脚本。
 
 源码安装使用 `source`，Release 安装使用 `release`。代理下载失败时脚本会继续尝试并最终回退 GitHub 直连。
 
@@ -107,8 +118,8 @@ bash scripts/onekey.sh install --source-mode release --mirror direct --target /p
 ```bash
 XIUXIAN3_SRC="$PWD"
 XIUXIAN3_HOST="$HOME/xiu3"
-XIUXIAN3_ENV="$HOME/myenv"
-python3 -m venv "$XIUXIAN3_ENV"
+XIUXIAN3_ENV="${VENV_PATH:-/home/nonebot-shared-venv}"
+if [ ! -x "$XIUXIAN3_ENV/bin/python" ]; then python3 -m venv "$XIUXIAN3_ENV"; fi
 "$XIUXIAN3_ENV/bin/python" -m pip install -r requirements.txt
 mkdir -p "$XIUXIAN3_HOST"
 cp -n examples/nonebot/bot.py examples/nonebot/pyproject.toml "$XIUXIAN3_HOST/"
