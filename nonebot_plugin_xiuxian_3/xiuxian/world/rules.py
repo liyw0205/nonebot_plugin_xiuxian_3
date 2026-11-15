@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
+from threading import Lock
 
 from ..content import ContentBundle, bundled_content
 
@@ -42,6 +43,18 @@ class _RequirementSummary:
     required_faction: str | None
     required_faction_reputation: int
     requires_selected_domain: bool
+
+
+# Destination rules are immutable after the content bundle has been loaded.
+# Keep the parsed route by bundle/source so every preview does not deep-copy
+# the full location and world-region records again.  The bounded list avoids
+# retaining short-lived migration bundles forever.
+_DESTINATION_CACHE: list[
+    tuple[int, ContentBundle, str, str | None, DestinationDefinition | None]
+] = []
+_DESTINATION_CACHE_LOCK = Lock()
+_DESTINATION_RESOLUTION_CACHE: list[tuple[int, ContentBundle, str, str | None]] = []
+_DESTINATION_RESOLUTION_CACHE_LOCK = Lock()
 
 
 def _content_destination(destination: str, content: ContentBundle) -> DestinationDefinition | None:
@@ -182,23 +195,52 @@ def _requirement_summary(requirements: tuple[dict[str, object], ...]) -> _Requir
 def resolve_destination(value: str, content: ContentBundle | None = None) -> str | None:
     normalized = value.strip()
     bundle = content or bundled_content()
-    if bundle.has("location", normalized, include_locked=True):
-        return normalized
-    for location in bundle.list("location", include_locked=True):
-        if normalized == location.get("name") or normalized in location.get("aliases", []):
-            return str(location["key"])
-    return None
+    with _DESTINATION_RESOLUTION_CACHE_LOCK:
+        for cached_id, cached_bundle, cached_value, cached_result in reversed(
+            _DESTINATION_RESOLUTION_CACHE
+        ):
+            if cached_id == id(bundle) and cached_bundle is bundle and cached_value == normalized:
+                return cached_result
+        result: str | None
+        if bundle.has("location", normalized, include_locked=True):
+            result = normalized
+        else:
+            result = None
+            for location in bundle.list("location", include_locked=True):
+                if normalized == location.get("name") or normalized in location.get("aliases", []):
+                    result = str(location["key"])
+                    break
+        _DESTINATION_RESOLUTION_CACHE.append((id(bundle), bundle, normalized, result))
+        if len(_DESTINATION_RESOLUTION_CACHE) > 128:
+            del _DESTINATION_RESOLUTION_CACHE[:-128]
+        return result
 
 
 def destination_definition(
     destination: str, content: ContentBundle | None = None, *, source: str | None = None
 ) -> DestinationDefinition:
     bundle = content or bundled_content()
-    resolved = (
-        _content_destination_for_source(destination, source, bundle)
-        if source is not None
-        else _content_destination(destination, bundle)
-    )
+    with _DESTINATION_CACHE_LOCK:
+        for cached_id, cached_bundle, cached_destination, cached_source, cached_definition in reversed(
+            _DESTINATION_CACHE
+        ):
+            if (
+                cached_id == id(bundle)
+                and cached_bundle is bundle
+                and cached_destination == destination
+                and cached_source == source
+            ):
+                resolved = cached_definition
+                break
+        else:
+            resolved = (
+                _content_destination_for_source(destination, source, bundle)
+                if source is not None
+                else _content_destination(destination, bundle)
+            )
+            _DESTINATION_CACHE.append((id(bundle), bundle, destination, source, resolved))
+            if len(_DESTINATION_CACHE) > 256:
+                del _DESTINATION_CACHE[:-256]
     if resolved is None:
         raise ValueError(f"destination is not registered in content: {destination}")
     return resolved

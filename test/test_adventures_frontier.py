@@ -10,7 +10,10 @@ from combat_fixtures import BALANCED_QUALIFICATION, equip_damage_weapon
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
-from nonebot_plugin_xiuxian_3.xiuxian.exploration.rules import battle_roll_bp
+from nonebot_plugin_xiuxian_3.xiuxian.exploration.rules import (
+    battle_roll_bp,
+    exploration_encounter_selection,
+)
 
 
 def _context(adapter: str, user: str, request_id: str, *, operation_id: str = "") -> CommandContext:
@@ -258,6 +261,13 @@ def test_elite_bounty_grants_advanced_cave_pass_after_exploration_win() -> None:
                     f"{adapter}:elite-explore:{index}"
                     for index in range(1000)
                     if battle_roll_bp(f"{adapter}:elite-explore:{index}:battle") < 4000
+                    and exploration_encounter_selection(
+                        "explore.mist_grotto_2",
+                        seed=f"{adapter}:elite-explore:{index}",
+                        realm_key="golden_core",
+                        realm_layer=1,
+                    )[0]
+                    == "enemy.mist_elite"
                 )
                 started = await runtime.adapters.dispatch(
                     adapter,

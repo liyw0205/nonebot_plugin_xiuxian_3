@@ -1012,7 +1012,24 @@ class PlayerRepositoryMixin:
 
     def _get_player_profile_sync(self, platform: str, platform_user_id: str) -> tuple[PlayerView | None, dict[str, Any]]:
         with self._connect() as connection:
-            connection.execute("BEGIN IMMEDIATE")
+            initial = connection.execute(
+                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
+                (platform, platform_user_id),
+            ).fetchone()
+            if initial is None:
+                return None, {}
+            now = self._now()
+            needs_refresh = (
+                str(initial["realm_key"]) == "soul_transformation"
+                and player_integer(initial, "domain_charge_max") > 0
+                and str(initial["domain_charge_reset_date"] or "") != now.date().isoformat()
+            )
+            if initial["domain_crack_until"]:
+                try:
+                    needs_refresh = needs_refresh or now >= datetime.fromisoformat(str(initial["domain_crack_until"]))
+                except ValueError:
+                    pass
+            connection.execute("BEGIN IMMEDIATE" if needs_refresh else "BEGIN")
             row = self._profile_player_row(connection, platform, platform_user_id)
             if row is None:
                 return None, {}

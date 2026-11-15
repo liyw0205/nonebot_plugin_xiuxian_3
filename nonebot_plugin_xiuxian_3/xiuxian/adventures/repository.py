@@ -2229,9 +2229,10 @@ class AdventuresRepositoryMixin:
                 found = connection.execute(
                     "SELECT 1 FROM town_commission_claims AS claims "
                     "JOIN town_commissions AS commissions ON commissions.commission_id=claims.commission_id "
-                    "JOIN operations o ON o.operation_id=claims.deliver_operation_id AND o.player_id=claims.player_id "
+                    "LEFT JOIN operations o ON o.operation_id=claims.deliver_operation_id AND o.player_id=claims.player_id "
                     "WHERE claims.player_id=? AND claims.status='delivered' "
-                    "AND commissions.commission_key=? AND claims.delivered_at>=? AND o.rowid>? LIMIT 1",
+                    "AND commissions.commission_key=? AND claims.delivered_at>=? "
+                    "AND (o.rowid>? OR o.rowid IS NULL) LIMIT 1",
                     (player_id, objective.get("commission_key"), started_at, operation_baseline),
                 ).fetchone()
             elif kind == "public_project_contribution":

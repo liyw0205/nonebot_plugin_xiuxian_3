@@ -11,8 +11,8 @@ from nonebot_plugin_xiuxian_3.runtime import create_runtime
 from nonebot_plugin_xiuxian_3.xiuxian.content import ContentError
 from nonebot_plugin_xiuxian_3.xiuxian.production.rules import recipe_definitions, random_quality_bp
 from nonebot_plugin_xiuxian_3.xiuxian.specials.idle_rules import idle_route_definitions, select_wilderness_choice
-from test.test_wilderness_idle import Clock, send, starter, move, state
-from test.test_wilderness_idle import change_content
+from test_wilderness_idle import Clock, send, starter, move, state
+from test_wilderness_idle import change_content
 
 
 def test_six_choices_have_distinct_costs_rewards_and_consumers():

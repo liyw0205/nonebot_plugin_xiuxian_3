@@ -1424,6 +1424,8 @@ CREATE TABLE IF NOT EXISTS travel_sessions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_travel_sessions_player ON travel_sessions(player_id);
+CREATE INDEX IF NOT EXISTS idx_travel_sessions_player_destination_started
+    ON travel_sessions(player_id, destination, starts_at);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_travel_sessions_active
     ON travel_sessions(player_id) WHERE status = 'running';
 

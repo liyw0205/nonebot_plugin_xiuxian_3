@@ -89,6 +89,7 @@ class XiuxianRuntime:
                 await task
             except asyncio.CancelledError:
                 pass
+        await asyncio.to_thread(self.repository.close)
 
 
 def create_runtime(

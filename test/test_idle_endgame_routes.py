@@ -37,9 +37,16 @@ def _row(result, key: str):
 
 def test_endgame_routes_load_with_reachable_gates_and_pools() -> None:
     definitions = idle_route_definitions()
-    # 13 routes through the seeker slice, plus the two unlock-gated watch routes
-    # added by the codex-unlock consumers slice.
-    assert len(definitions) == 15
+    # The published idle catalogue contains the original seeker slice, the
+    # codex-unlock consumers, and the endgame routes. Keep the count explicit
+    # so a missing content record cannot silently pass this contract test.
+    assert len(definitions) == 21
+    assert {
+        "idle.domain_refuge_watch",
+        "idle.void_supply_watch",
+        "idle.dao_settlement_watch",
+        "idle.beast_hills_watch",
+    } <= definitions.keys()
 
     refuge = definitions["idle.domain_refuge_watch"]
     assert refuge.required_project_contribution == ("project.domain_refuge", 10)
@@ -76,7 +83,8 @@ def test_endgame_route_preview_enforces_contribution_realm_and_dao_route() -> No
             assert created.ok, created.message
             with sqlite3.connect(runtime.settings.database_path) as connection:
                 connection.execute(
-                    "UPDATE players SET stage='cultivator', realm_key='foundation', realm_layer=4 "
+                    "UPDATE players SET stage='cultivator', realm_key='foundation', realm_layer=4, "
+                    "stamina=100, stamina_max=100 "
                     "WHERE platform=? AND platform_user_id=?",
                     (adapter, user),
                 )
@@ -123,7 +131,7 @@ def test_endgame_route_preview_enforces_contribution_realm_and_dao_route() -> No
 
             supply = _row(await preview("虚空补给看守", "supply-blocked"), "idle.void_supply_watch")
             assert supply["ready"] is False
-            assert "境界不足" in supply["missing"]
+            assert any("境界不足" in item for item in supply["missing"])
             with sqlite3.connect(runtime.settings.database_path) as connection:
                 connection.execute(
                     "UPDATE players SET realm_key='void_refining', realm_layer=1 WHERE id=?",

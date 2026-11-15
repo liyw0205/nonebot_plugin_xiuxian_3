@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from threading import Lock
 from typing import Iterable, Mapping
 
 from ..content import ContentBundle, ContentError, bundled_content
@@ -279,6 +280,16 @@ class MainlineObjectivesIncompleteError(RuntimeError):
 
 def _content(content: ContentBundle | None) -> ContentBundle:
     return content if content is not None else _DEFAULT_CONTENT
+
+
+# Mainline status checks parse the same immutable content bundle for every
+# prerequisite. Keep a small identity cache so a request does not repeatedly
+# deep-copy and validate the complete content pack. The bound avoids retaining
+# every short-lived custom bundle created by migration tests.
+_MAINLINE_DEFINITION_CACHE: list[
+    tuple[int, ContentBundle, str | None, bool, tuple["MainlineStageDefinition", ...]]
+] = []
+_MAINLINE_DEFINITION_CACHE_LOCK = Lock()
 
 
 def _string_tuple(value: object, field: str, key: str) -> tuple[str, ...]:
@@ -706,7 +717,7 @@ def _reward_map(
     return tuple(result)
 
 
-def mainline_definitions(
+def _parse_mainline_definitions(
     content: ContentBundle | None = None,
     *,
     story_key: str | None = None,
@@ -923,6 +934,48 @@ def mainline_definitions(
         if definition.key in _VERTICAL_SLICE_STAGES and not definition.state_events:
             raise ContentError(f"mainline {definition.key} requires a state change")
     return tuple(definitions)
+
+
+def mainline_definitions(
+    content: ContentBundle | None = None,
+    *,
+    story_key: str | None = None,
+    validate_sources: bool = True,
+) -> tuple[MainlineStageDefinition, ...]:
+    """Return cached parsed stages for one immutable content bundle."""
+
+    bundle = _content(content)
+    cache_key = (id(bundle), story_key, validate_sources)
+    with _MAINLINE_DEFINITION_CACHE_LOCK:
+        for cached_id, cached_bundle, cached_story_key, cached_validate_sources, cached_definitions in reversed(
+            _MAINLINE_DEFINITION_CACHE
+        ):
+            if (
+                cached_id == cache_key[0]
+                and cached_bundle is bundle
+                and cached_story_key == story_key
+                and cached_validate_sources == validate_sources
+            ):
+                return cached_definitions
+        parsed = _parse_mainline_definitions(
+            bundle,
+            story_key=story_key,
+            validate_sources=validate_sources,
+        )
+        _MAINLINE_DEFINITION_CACHE[:] = [
+            item
+            for item in _MAINLINE_DEFINITION_CACHE
+            if not (
+                item[0] == cache_key[0]
+                and item[1] is bundle
+                and item[2] == story_key
+                and item[3] == validate_sources
+            )
+        ]
+        _MAINLINE_DEFINITION_CACHE.append((cache_key[0], bundle, story_key, validate_sources, parsed))
+        if len(_MAINLINE_DEFINITION_CACHE) > 16:
+            del _MAINLINE_DEFINITION_CACHE[:-16]
+        return parsed
 
 
 MAINLINE_STAGES = mainline_definitions(story_key=MAINLINE_STORY_KEY)

@@ -31,6 +31,8 @@ def ensure_idle_schema(connection: sqlite3.Connection) -> None:
         );
         CREATE INDEX IF NOT EXISTS idx_idle_assignments_player
             ON idle_assignments(player_id, status, starts_at);
+        CREATE INDEX IF NOT EXISTS idx_idle_assignments_player_status_id
+            ON idle_assignments(player_id, status, id DESC);
         CREATE UNIQUE INDEX IF NOT EXISTS idx_idle_assignments_active
             ON idle_assignments(player_id) WHERE status IN ('assigned', 'running');
         """

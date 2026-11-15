@@ -38,4 +38,5 @@ markers = [
   "web: exercises Web contracts",
   "e2e: exercises an end-to-end flow",
   "recovery: exercises backup and recovery behavior",
+  "performance: bounded opt-in temporary SQLite performance regression",
 ]
