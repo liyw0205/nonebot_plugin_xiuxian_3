@@ -42,7 +42,11 @@ class StatsRepositoryMixin:
         if any(type(value) is not int or value < 0 for value in player["inventory_json"].values()):
             raise ValueError("stat build inventory amounts must be non-negative integers")
         player_id = int(player["id"])
-        equipment = self._battle_equipment_snapshot(connection, player_id)
+        equipment = self._battle_equipment_snapshot(
+            connection,
+            player_id,
+            player_path_key=str(player.get("path_key") or ""),
+        )
         constitution = constitution_effect_snapshot(connection, player_id)
         manuals = manual_effect_totals(player_inventory(player), self.content)
         preview = build_stat_preview(
@@ -67,15 +71,24 @@ class StatsRepositoryMixin:
             "manual_effects": manuals,
         }
 
-    def _battle_equipment_snapshot(self, connection: Any, player_id: int) -> tuple[dict[str, Any], ...]:
+    def _battle_equipment_snapshot(
+        self,
+        connection: Any,
+        player_id: int,
+        *,
+        player_path_key: str | None = None,
+    ) -> tuple[dict[str, Any], ...]:
         rows = equipment_instance_rows(
             connection, player_id, equipped_only=True, durable_only=True, active_only=True
         )
         content = self.content or bundled_content()
-        player = connection.execute("SELECT path_key FROM players WHERE id = ?", (player_id,)).fetchone()
-        if player is None:
-            raise ValueError("equipment owner does not exist")
-        path_key = str(player["path_key"] or "")
+        if player_path_key is None:
+            player = connection.execute("SELECT path_key FROM players WHERE id = ?", (player_id,)).fetchone()
+            if player is None:
+                raise ValueError("equipment owner does not exist")
+            path_key = str(player["path_key"] or "")
+        else:
+            path_key = player_path_key
         equipment = []
         for row in rows:
             item_key = str(row["item_key"])
