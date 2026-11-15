@@ -87,6 +87,7 @@ class LevelResult:
     stage_latency_ms: dict[str, Percentiles]
     inflight_wait_ms: Percentiles
     connection_open_ms: Percentiles
+    sql_queries: int
 
 
 class _TimedSemaphore(asyncio.Semaphore):
@@ -113,6 +114,7 @@ def _instrument_repository(runtime: Any) -> dict[str, list[float]] | None:
         "idle_status_ms": [],
         "mainline_status_ms": [],
         "travel_preview_ms": [],
+        "sql_queries": [],
     }
     repository = runtime.repository
     repository._inflight = _TimedSemaphore(runtime.settings.max_inflight, metrics["inflight_wait_ms"])
@@ -138,7 +140,13 @@ def _instrument_repository(runtime: Any) -> dict[str, list[float]] | None:
     def timed_connect() -> sqlite3.Connection:
         started = time.perf_counter()
         try:
-            return original_connect()
+            connection = original_connect()
+            connection.set_trace_callback(
+                lambda statement: metrics["sql_queries"].append(1.0)
+                if not statement.lstrip().upper().startswith("PRAGMA")
+                else None
+            )
+            return connection
         finally:
             metrics["connection_open_ms"].append((time.perf_counter() - started) * 1000)
 
@@ -203,9 +211,50 @@ def _seed_database(runtime: Any, users: int, batch_size: int) -> dict[str, float
             connection.executemany(PLAYER_INSERT, players)
             connection.executemany(MAINLINE_INSERT, mainline)
             connection.executemany(IDLE_INSERT, idle)
+        connection.execute(
+            "INSERT INTO sects(sect_id,name,name_key,leader_id,status,level,max_members,warehouse_capacity,construction,spirit_stones,sect_merit,warehouse_json,created_at,updated_at) "
+            "VALUES ('perf-sect','性能宗门','perf-sect',1,'active',1,?,0,0,0,0,'{}',?,?)",
+            (users, now, now),
+        )
+        connection.execute(
+            "INSERT INTO domain_front_rounds(round_id,activity_id,location_key,status,activity_starts_at,activity_ends_at,starts_at,ends_at,claim_expires_at,target_quantity,rules_snapshot_json,total_contribution,result_json,created_at,updated_at) "
+            "VALUES ('perf-round','perf-activity','xuantian.domain_front','settled',?,?,?,?,?,1,'{}',0,'{}',?,?)",
+            (now, now, now, now, now, now, now),
+        )
+        domain_participants = []
+        domain_contributions = []
+        domain_claims = []
+        for number in range(users):
+            player_id = number + 1
+            domain_participants.append(
+                ('perf-round', player_id, 'perf-sect', 'domain.fire', 0, 1, 'active', '{}', now)
+            )
+            domain_contributions.append(
+                ('perf-round', player_id, 'perf-sect', 'domain.fire', f'perf-source-{number:07d}', 'point', 1, f'perf-domain-op-{number:07d}', now)
+            )
+            domain_claims.append(
+                ('perf-round', player_id, f'perf-domain-claim-{number:07d}', '{}', now)
+            )
+        connection.executemany(
+            "INSERT INTO domain_front_participants(round_id,player_id,sect_id,domain_key,stamina_cost,contribution,status,snapshot_json,joined_at) VALUES (?,?,?,?,?,?,?,?,?)",
+            domain_participants,
+        )
+        connection.executemany(
+            "INSERT INTO domain_front_contributions(round_id,player_id,sect_id,domain_key,source_operation_id,action_key,quantity,operation_id,occurred_at) VALUES (?,?,?,?,?,?,?,?,?)",
+            domain_contributions,
+        )
+        connection.executemany(
+            "INSERT INTO domain_front_claims(round_id,player_id,operation_id,reward_json,claimed_at) VALUES (?,?,?,?,?)",
+            domain_claims,
+        )
         connection.commit()
         connection.execute("PRAGMA synchronous=NORMAL")
-    return {"users": users, "seed_seconds": round(time.perf_counter() - started, 3), "db_bytes": _db_size(path)}
+    return {
+        "users": users,
+        "domain_front_rows": users,
+        "seed_seconds": round(time.perf_counter() - started, 3),
+        "db_bytes": _db_size(path),
+    }
 
 
 def _onebot_event(user_id: str, request_number: int, text: str) -> Any:
@@ -313,10 +362,11 @@ async def _measure(
         stage_latency_ms={
             key.removesuffix("_ms"): _percentiles(values)
             for key, values in (metrics or {}).items()
-            if key not in {"inflight_wait_ms", "connection_open_ms"}
+            if key not in {"inflight_wait_ms", "connection_open_ms", "sql_queries"}
         },
         inflight_wait_ms=_percentiles((metrics or {}).get("inflight_wait_ms", ())),
         connection_open_ms=_percentiles((metrics or {}).get("connection_open_ms", ())),
+        sql_queries=len((metrics or {}).get("sql_queries", ())),
     )
 
 
@@ -325,6 +375,62 @@ def _explain(path: Path, player_id: int) -> dict[str, list[str]]:
         "player_lookup": "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
         "idle_status": "SELECT * FROM idle_assignments WHERE player_id = ? AND status = 'running' ORDER BY id DESC LIMIT 1",
         "mainline_progress": "SELECT * FROM mainline_runs WHERE player_id = ? AND story_key = ?",
+        "mainline_evidence": """
+            SELECT ? AS event_key
+            WHERE EXISTS (
+                SELECT 1 FROM town_commission_claims
+                WHERE player_id = ? AND status = 'delivered'
+            )
+            UNION ALL
+            SELECT ? AS event_key
+            WHERE EXISTS (
+                SELECT 1 FROM domain_front_participants WHERE player_id = ?
+            )
+            UNION ALL
+            SELECT ? AS event_key
+            WHERE EXISTS (
+                SELECT 1
+                FROM domain_front_battle_links AS links
+                JOIN battle_sessions AS sessions
+                  ON sessions.battle_id = links.battle_id
+                WHERE links.player_id = ?
+                  AND sessions.player_id = links.player_id
+                  AND sessions.battle_type = 'pve.domain_front'
+                  AND sessions.status = 'settled'
+                  AND json_extract(sessions.result_json, '$.outcome') = 'won'
+            )
+            UNION ALL
+            SELECT ? AS event_key
+            WHERE EXISTS (SELECT 1 FROM domain_front_contributions WHERE player_id = ?)
+            UNION ALL
+            SELECT ? AS event_key
+            WHERE EXISTS (
+                SELECT 1 FROM domain_front_claims WHERE player_id = ?
+            )
+            UNION ALL
+            SELECT ? AS event_key
+            WHERE EXISTS (
+                SELECT 1 FROM void_archive_unlocks
+                WHERE player_id = ? AND event_key = ? AND ends_at > ?
+            )
+            UNION ALL
+            SELECT ? AS event_key
+            WHERE EXISTS (
+                SELECT 1 FROM void_archive_runs
+                WHERE player_id = ? AND outcome = 'won'
+            )
+            UNION ALL
+            SELECT ? AS event_key
+            WHERE EXISTS (
+                SELECT 1 FROM time_fort_members
+                WHERE player_id = ? AND status = 'settled' AND first_clear = 1
+            )
+            UNION ALL
+            SELECT 'livelihood.project.' || p.project_key || '.completed' AS event_key
+            FROM livelihood_project_rewards AS r
+            JOIN livelihood_projects AS p ON p.project_id = r.project_id
+            WHERE r.player_id = ? AND r.eligible = 1
+        """,
         "location_quest_progress": "SELECT quest_key FROM quest_progress WHERE player_id = ? AND status IN ('completed', 'claimed')",
         "location_mentor_relation": "SELECT 1 FROM mentor_relations WHERE apprentice_id = ? AND (status='active' OR (status='invited' AND expires_at>?)) LIMIT 1",
         "location_requirement_state": """
@@ -347,6 +453,17 @@ def _explain(path: Path, player_id: int) -> dict[str, list[str]]:
         "player_lookup": ("onebot.v11", f"perf-{player_id - 1:07d}"),
         "idle_status": (player_id,),
         "mainline_progress": (player_id, "story.mainline.xuantian"),
+        "mainline_evidence": (
+            "event.town_commission.delivered", player_id,
+            "event.domain_front.joined", player_id,
+            "event.domain_front.battle", player_id,
+            "event.domain_front.contribution", player_id,
+            "event.domain_front.claimed", player_id,
+            "event.archive_unlock", player_id, "event.archive_unlock", "2026-11-15T00:00:00+00:00",
+            "event.archive_guard.won", player_id,
+            "story.mainline.void_archive.time_fort", player_id,
+            player_id,
+        ),
         "location_quest_progress": (player_id,),
         "location_mentor_relation": (player_id, "2026-11-15T00:00:00+00:00"),
         "location_requirement_state": (player_id, player_id, "2026-11-15T00:00:00+00:00"),
@@ -359,13 +476,28 @@ def _explain(path: Path, player_id: int) -> dict[str, list[str]]:
         }
 
 
-async def _run(users: int, batch_size: int, total_requests: int, levels: tuple[int, ...]) -> dict[str, Any]:
+async def _run(
+    users: int,
+    batch_size: int,
+    total_requests: int,
+    levels: tuple[int, ...],
+    *,
+    drop_domain_front_indexes: bool = False,
+) -> dict[str, Any]:
     temporary_path: Path
     with tempfile.TemporaryDirectory(prefix="xiuxian-perf-") as data_dir:
         temporary_path = Path(data_dir)
         runtime = create_runtime(data_dir=data_dir, adapters=("onebot.v11", "qq.official"))
         await runtime.initialize()
         seed = _seed_database(runtime, users, batch_size)
+        if drop_domain_front_indexes:
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                for index in (
+                    "idx_domain_front_participants_player",
+                    "idx_domain_front_contributions_player",
+                    "idx_domain_front_claims_player",
+                ):
+                    connection.execute(f"DROP INDEX IF EXISTS {index}")
         explain = _explain(runtime.settings.database_path, 1)
         metrics = _instrument_repository(runtime)
         results = [
@@ -393,6 +525,11 @@ def main() -> int:
     parser.add_argument("--requests", type=int, default=200)
     parser.add_argument("--concurrency", type=int, nargs="+", default=(1, 10, 50))
     parser.add_argument("--json-out", type=Path)
+    parser.add_argument(
+        "--compare-domain-front-indexes",
+        action="store_true",
+        help="run before/after on the same deterministic domain-front dataset",
+    )
     args = parser.parse_args()
     if not 1 <= args.users <= 1_000_000:
         parser.error("--users must be between 1 and 1000000")
@@ -403,7 +540,26 @@ def main() -> int:
     levels = tuple(sorted(set(args.concurrency)))
     if any(level < 1 or level > 50 for level in levels):
         parser.error("--concurrency values must be between 1 and 50")
-    payload = asyncio.run(_run(args.users, args.batch_size, args.requests, levels))
+    if args.compare_domain_front_indexes:
+        before = asyncio.run(
+            _run(
+                args.users,
+                args.batch_size,
+                args.requests,
+                levels,
+                drop_domain_front_indexes=True,
+            )
+        )
+        after = asyncio.run(_run(args.users, args.batch_size, args.requests, levels))
+        payload = {
+            "comparison": {
+                "before_without_domain_front_player_indexes": before,
+                "after_with_domain_front_player_indexes": after,
+            },
+            "errors": int(before["errors"]) + int(after["errors"]),
+        }
+    else:
+        payload = asyncio.run(_run(args.users, args.batch_size, args.requests, levels))
     print(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True))
     if args.json_out:
         args.json_out.parent.mkdir(parents=True, exist_ok=True)
