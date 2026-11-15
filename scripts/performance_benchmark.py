@@ -598,6 +598,179 @@ async def _run_connection_probe_comparison(
     return payload
 
 
+async def _run_manual_catalogue_comparison(
+    users: int,
+    batch_size: int,
+    total_requests: int,
+    levels: tuple[int, ...],
+    *,
+    profile_sql: bool | None = None,
+    commands: tuple[str, ...] | None = None,
+) -> dict[str, Any]:
+    """Compare manual-only catalogue iteration without reseeding the fixture."""
+
+    from nonebot_plugin_xiuxian_3.xiuxian.content import bundled_content
+    from nonebot_plugin_xiuxian_3.xiuxian.items import manual_rules
+
+    temporary_path: Path
+    with tempfile.TemporaryDirectory(prefix="xiuxian-perf-") as data_dir:
+        temporary_path = Path(data_dir)
+        runtime = create_runtime(data_dir=data_dir, adapters=("onebot.v11", "qq.official"))
+        await runtime.initialize()
+        seed = _seed_database(runtime, users, batch_size)
+        explain = _explain(runtime.settings.database_path, 1)
+        metrics = _instrument_repository(runtime, enabled=profile_sql)
+        optimized_item_records = manual_rules._item_records
+        legacy_cache: list[tuple[int, Any, tuple[dict[str, object], ...]]] = []
+
+        def legacy_item_records(bundle: Any) -> tuple[dict[str, object], ...]:
+            bundle_id = id(bundle)
+            for cached_id, cached_bundle, records in reversed(legacy_cache):
+                if cached_id == bundle_id and cached_bundle is bundle:
+                    return records
+            records = tuple(bundle.list("item", include_locked=False))
+            legacy_cache[:] = [
+                item for item in legacy_cache
+                if not (item[0] == bundle_id and item[1] is bundle)
+            ]
+            legacy_cache.append((bundle_id, bundle, records))
+            if len(legacy_cache) > 16:
+                del legacy_cache[:-16]
+            return records
+
+        async def measure(item_records: Any) -> list[dict[str, Any]]:
+            manual_rules._item_records = item_records
+            manual_rules._ITEM_RECORD_CACHE.clear()
+            return [
+                asdict(await _measure(runtime, users, concurrency, total_requests, metrics, commands))
+                for concurrency in levels
+            ]
+
+        try:
+            before_results = await measure(legacy_item_records)
+            after_results = await measure(optimized_item_records)
+        finally:
+            manual_rules._item_records = optimized_item_records
+            manual_rules._ITEM_RECORD_CACHE.clear()
+        await runtime.close()
+        db_bytes = _db_size(runtime.settings.database_path)
+
+        def report(results: list[dict[str, Any]], records: tuple[dict[str, object], ...]) -> dict[str, Any]:
+            return {
+                "users": users,
+                "seed": seed,
+                "database_bytes_after_benchmark": db_bytes,
+                "catalogue_records": len(records),
+                "sql_profile_enabled": metrics is not None,
+                "sql_profile_status": "collected" if metrics is not None else "not_collected",
+                "explain_query_plan": explain,
+                "levels": results,
+                "errors": sum(int(item["errors"]) for item in results),
+            }
+
+        content = runtime.content or bundled_content()
+        legacy_records = legacy_item_records(content)
+        optimized_records = optimized_item_records(content)
+        payload = {
+            "comparison": {
+                "before_full_item_catalogue": report(before_results, legacy_records),
+                "after_manual_only_catalogue": report(after_results, optimized_records),
+            },
+            "errors": sum(
+                int(item["errors"])
+                for results in (before_results, after_results)
+                for item in results
+            ),
+        }
+    cleaned = not temporary_path.exists()
+    for result in payload["comparison"].values():
+        result["temporary_database_cleaned"] = cleaned
+    return payload
+
+
+async def _run_domain_front_index_comparison(
+    users: int,
+    batch_size: int,
+    total_requests: int,
+    levels: tuple[int, ...],
+    *,
+    profile_sql: bool | None = None,
+    commands: tuple[str, ...] | None = None,
+) -> dict[str, Any]:
+    """Compare domain-front indexes on one seeded runtime and database."""
+
+    indexes = (
+        (
+            "idx_domain_front_participants_player",
+            "CREATE INDEX IF NOT EXISTS idx_domain_front_participants_player "
+            "ON domain_front_participants(player_id)",
+        ),
+        (
+            "idx_domain_front_contributions_player",
+            "CREATE INDEX IF NOT EXISTS idx_domain_front_contributions_player "
+            "ON domain_front_contributions(player_id)",
+        ),
+        (
+            "idx_domain_front_claims_player",
+            "CREATE INDEX IF NOT EXISTS idx_domain_front_claims_player "
+            "ON domain_front_claims(player_id)",
+        ),
+    )
+    temporary_path: Path
+    with tempfile.TemporaryDirectory(prefix="xiuxian-perf-") as data_dir:
+        temporary_path = Path(data_dir)
+        runtime = create_runtime(data_dir=data_dir, adapters=("onebot.v11", "qq.official"))
+        await runtime.initialize()
+        seed = _seed_database(runtime, users, batch_size)
+        metrics = _instrument_repository(runtime, enabled=profile_sql)
+        with sqlite3.connect(runtime.settings.database_path) as connection:
+            for name, _ in indexes:
+                connection.execute(f"DROP INDEX IF EXISTS {name}")
+        explain_before = _explain(runtime.settings.database_path, 1)
+        before_results = [
+            asdict(await _measure(runtime, users, concurrency, total_requests, metrics, commands))
+            for concurrency in levels
+        ]
+        with sqlite3.connect(runtime.settings.database_path) as connection:
+            for _, statement in indexes:
+                connection.execute(statement)
+        explain_after = _explain(runtime.settings.database_path, 1)
+        after_results = [
+            asdict(await _measure(runtime, users, concurrency, total_requests, metrics, commands))
+            for concurrency in levels
+        ]
+        await runtime.close()
+        db_bytes = _db_size(runtime.settings.database_path)
+
+        def report(results: list[dict[str, Any]], explain: dict[str, list[str]]) -> dict[str, Any]:
+            return {
+                "users": users,
+                "seed": seed,
+                "database_bytes_after_benchmark": db_bytes,
+                "sql_profile_enabled": metrics is not None,
+                "sql_profile_status": "collected" if metrics is not None else "not_collected",
+                "explain_query_plan": explain,
+                "levels": results,
+                "errors": sum(int(item["errors"]) for item in results),
+            }
+
+        payload = {
+            "comparison": {
+                "before_without_domain_front_player_indexes": report(before_results, explain_before),
+                "after_with_domain_front_player_indexes": report(after_results, explain_after),
+            },
+            "errors": sum(
+                int(item["errors"])
+                for results in (before_results, after_results)
+                for item in results
+            ),
+        }
+    cleaned = not temporary_path.exists()
+    for result in payload["comparison"].values():
+        result["temporary_database_cleaned"] = cleaned
+    return payload
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--users", type=int, default=int(os.getenv("XIUXIAN_PERF_USERS", "1000000")))
@@ -615,6 +788,11 @@ def main() -> int:
         "--compare-connection-probe",
         action="store_true",
         help="compare the removed connection health probe without reseeding the fixture",
+    )
+    compare.add_argument(
+        "--compare-manual-catalogue",
+        action="store_true",
+        help="compare manual-only catalogue iteration without reseeding the fixture",
     )
     parser.add_argument(
         "--profile-sql",
@@ -649,20 +827,20 @@ def main() -> int:
                 commands=commands,
             )
         )
+    elif args.compare_manual_catalogue:
+        payload = asyncio.run(
+            _run_manual_catalogue_comparison(
+                args.users,
+                args.batch_size,
+                args.requests,
+                levels,
+                profile_sql=profile_sql,
+                commands=commands,
+            )
+        )
     elif args.compare_domain_front_indexes:
-        before = asyncio.run(
-            _run(
-                args.users,
-                args.batch_size,
-                args.requests,
-                levels,
-                drop_domain_front_indexes=True,
-                profile_sql=profile_sql,
-                commands=commands,
-            )
-        )
-        after = asyncio.run(
-            _run(
+        payload = asyncio.run(
+            _run_domain_front_index_comparison(
                 args.users,
                 args.batch_size,
                 args.requests,
@@ -671,13 +849,6 @@ def main() -> int:
                 commands=commands,
             )
         )
-        payload = {
-            "comparison": {
-                "before_without_domain_front_player_indexes": before,
-                "after_with_domain_front_player_indexes": after,
-            },
-            "errors": int(before["errors"]) + int(after["errors"]),
-        }
     else:
         payload = asyncio.run(
             _run(

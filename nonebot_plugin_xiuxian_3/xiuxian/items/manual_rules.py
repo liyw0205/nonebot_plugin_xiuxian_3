@@ -8,8 +8,8 @@ from ..content import ContentBundle, ContentError, bundled_content
 from ..utils.assets import inventory_amount
 
 
-# Item definitions are immutable for a loaded content bundle. Reusing the
-# validated list avoids deep-copying the complete item catalogue on every
+# Item definitions are immutable for a loaded content bundle. Reusing only the
+# manual subset avoids scanning unrelated item definitions on every
 # profile/stat request while retaining a bound for short-lived test bundles.
 _ITEM_RECORD_CACHE: list[tuple[int, ContentBundle, tuple[dict[str, object], ...]]] = []
 _ITEM_RECORD_CACHE_LOCK = Lock()
@@ -21,7 +21,11 @@ def _item_records(bundle: ContentBundle) -> tuple[dict[str, object], ...]:
         for cached_id, cached_bundle, records in reversed(_ITEM_RECORD_CACHE):
             if cached_id == bundle_id and cached_bundle is bundle:
                 return records
-        records = tuple(bundle.list("item", include_locked=False))
+        records = tuple(
+            item
+            for item in bundle.list("item", include_locked=False)
+            if item.get("item_type") == "manual"
+        )
         _ITEM_RECORD_CACHE[:] = [
             item for item in _ITEM_RECORD_CACHE if not (item[0] == bundle_id and item[1] is bundle)
         ]

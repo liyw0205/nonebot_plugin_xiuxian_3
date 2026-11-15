@@ -25,6 +25,8 @@ CORRECTNESS_TARGETS = (
     "test/test_player_interaction.py",
     "test/test_stat_integration.py",
     "test/test_stats.py",
+    "test/test_stat_rules.py",
+    "test/test_breakthrough.py",
     "test/test_status_query_performance.py",
     "test/test_performance_regression.py",
 )
@@ -43,7 +45,7 @@ BENCHMARK_ARGS = (
     "--command",
     "我的状态",
     "--profile-sql",
-    "--compare-connection-probe",
+    "--compare-manual-catalogue",
 )
 
 
