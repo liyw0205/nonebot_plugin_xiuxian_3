@@ -510,6 +510,7 @@ async def _run(
             "users": users,
             "seed": seed,
             "database_bytes_after_benchmark": db_bytes,
+            "sql_profile_enabled": metrics is not None,
             "explain_query_plan": explain,
             "levels": results,
             "errors": sum(int(item["errors"]) for item in results),

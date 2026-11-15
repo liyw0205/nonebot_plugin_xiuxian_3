@@ -27,6 +27,7 @@ def test_opt_in_performance_benchmark_contract(monkeypatch: pytest.MonkeyPatch) 
     report = asyncio.run(_run(users=1000, batch_size=250, total_requests=20, levels=(1, 10, 50)))
     assert report["users"] == 1000
     assert report["errors"] == 0
+    assert report["sql_profile_enabled"] is True
     assert report["seed"]["domain_front_rows"] == report["users"]
     assert report["temporary_database_cleaned"] is True
     assert not any("TEMP B-TREE" in detail for detail in report["explain_query_plan"]["idle_status"])

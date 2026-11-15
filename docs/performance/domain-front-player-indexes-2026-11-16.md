@@ -33,6 +33,26 @@ for each concurrency level; the indexed plan uses the three new player indexes,
 the battle-session player index, and the existing archive/time-fort/livelihood
 player indexes.
 
+The original 100,000-user single-version report was intentionally run without
+`XIUXIAN_PERF_PROFILE=1`, so its `sql_queries: 0` means “not collected”. The
+benchmark now emits `sql_profile_enabled` to make that state explicit. A
+profile-enabled same-dataset comparison was then run with 20 requests per
+concurrency level:
+
+| Index state | Concurrency | p50 ms | p95 ms | p99 ms | CPU s | Peak RSS MiB | SQL | Errors |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Before | 1 | 2.141 | 26.298 | 72.222 | 0.157 | 163.730 | 85 | 0 |
+| After | 1 | 2.110 | 4.917 | 5.838 | 0.059 | 184.293 | 85 | 0 |
+| Before | 10 | 35.035 | 69.193 | 72.018 | 0.218 | 163.730 | 79 | 0 |
+| After | 10 | 27.805 | 65.623 | 71.480 | 0.202 | 184.293 | 79 | 0 |
+| Before | 50 | 36.496 | 44.334 | 48.937 | 0.090 | 163.730 | 85 | 0 |
+| After | 50 | 36.006 | 45.150 | 54.255 | 0.088 | 184.293 | 85 | 0 |
+
+Both 100,000-user runs set `XIUXIAN_PERF_PROFILE=1`; the benchmark now exposes
+that state as `sql_profile_enabled: true`, and both temporary databases were
+cleaned. The indexed query plans and SQL counts therefore come from the same
+real dispatch workload rather than from a benchmark-only query.
+
 ## Scale gates
 
 All scale runs used `/home/nonebot-shared-venv/bin/python`,
