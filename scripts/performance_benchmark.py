@@ -327,6 +327,20 @@ def _explain(path: Path, player_id: int) -> dict[str, list[str]]:
         "mainline_progress": "SELECT * FROM mainline_runs WHERE player_id = ? AND story_key = ?",
         "location_quest_progress": "SELECT quest_key FROM quest_progress WHERE player_id = ? AND status IN ('completed', 'claimed')",
         "location_mentor_relation": "SELECT 1 FROM mentor_relations WHERE apprentice_id = ? AND (status='active' OR (status='invited' AND expires_at>?)) LIMIT 1",
+        "location_requirement_state": """
+            SELECT quest_key AS value, 0 AS mentor
+            FROM quest_progress
+            WHERE player_id = ? AND status IN ('completed', 'claimed')
+            UNION ALL
+            SELECT NULL AS value,
+                   EXISTS(
+                       SELECT 1
+                       FROM mentor_relations
+                       WHERE apprentice_id = ?
+                         AND (status = 'active' OR (status = 'invited' AND expires_at > ?))
+                       LIMIT 1
+                   ) AS mentor
+        """,
         "location_daily_travel": "SELECT COUNT(*) AS count FROM travel_sessions WHERE player_id = ? AND destination = ? AND starts_at >= ? AND starts_at < ?",
     }
     params = {
@@ -335,6 +349,7 @@ def _explain(path: Path, player_id: int) -> dict[str, list[str]]:
         "mainline_progress": (player_id, "story.mainline.xuantian"),
         "location_quest_progress": (player_id,),
         "location_mentor_relation": (player_id, "2026-11-15T00:00:00+00:00"),
+        "location_requirement_state": (player_id, player_id, "2026-11-15T00:00:00+00:00"),
         "location_daily_travel": (player_id, "xuantian.suburb", "2026-11-15T00:00:00+00:00", "2026-11-16T00:00:00+00:00"),
     }
     with sqlite3.connect(path) as connection:

@@ -29,6 +29,8 @@ def test_opt_in_performance_benchmark_contract() -> None:
     assert report["temporary_database_cleaned"] is True
     assert not any("TEMP B-TREE" in detail for detail in report["explain_query_plan"]["idle_status"])
     assert not any("SCAN" in detail.upper() for detail in report["explain_query_plan"]["location_daily_travel"])
+    assert not any("SCAN QUEST_PROGRESS" in detail.upper() for detail in report["explain_query_plan"]["location_requirement_state"])
+    assert not any("SCAN MENTOR_RELATIONS" in detail.upper() for detail in report["explain_query_plan"]["location_requirement_state"])
     assert all(item["latency_ms"]["p99_ms"] >= item["latency_ms"]["p50_ms"] for item in report["levels"])
     assert all(
         set(item["command_errors"]) == {"我的状态", "挂机状态", "主线状态", "移动预览 玄天近郊"}

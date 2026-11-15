@@ -979,6 +979,8 @@ CREATE INDEX IF NOT EXISTS idx_mentor_relations_master
     ON mentor_relations(master_id, status, created_at);
 CREATE INDEX IF NOT EXISTS idx_mentor_relations_apprentice
     ON mentor_relations(apprentice_id, status, created_at);
+CREATE INDEX IF NOT EXISTS idx_mentor_relations_apprentice_status_expiry
+    ON mentor_relations(apprentice_id, status, expires_at);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_mentor_relations_active_master
     ON mentor_relations(master_id, apprentice_id) WHERE status IN ('invited', 'active');
 CREATE UNIQUE INDEX IF NOT EXISTS idx_mentor_relations_active_apprentice
@@ -2765,6 +2767,8 @@ CREATE TABLE IF NOT EXISTS quest_progress (
 
 CREATE INDEX IF NOT EXISTS idx_quest_progress_player
     ON quest_progress(player_id, quest_key, status);
+CREATE INDEX IF NOT EXISTS idx_quest_progress_player_status
+    ON quest_progress(player_id, status, quest_key);
 
 CREATE TABLE IF NOT EXISTS quest_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -381,15 +381,32 @@ class TravelRepositoryMixin:
         intro = cls._json_object(row["intro_json"], {})
         flags = intro.get("flags", [])
         intro_flags = {item for item in flags if isinstance(item, str)} if isinstance(flags, list) else set()
-        completed = connection.execute(
-            "SELECT quest_key FROM quest_progress WHERE player_id=? AND status IN ('completed', 'claimed')",
-            (row["id"],),
+        # The preview and start paths need the same two gate sets. Keep them in one
+        # bounded read so a hot location command does not open two cursors and repeat
+        # player-scoped lookups while preserving the mentor expiry predicate.
+        requirement_rows = connection.execute(
+            """
+            SELECT quest_key AS value, 0 AS mentor
+            FROM quest_progress
+            WHERE player_id = ? AND status IN ('completed', 'claimed')
+            UNION ALL
+            SELECT NULL AS value,
+                   EXISTS(
+                       SELECT 1
+                       FROM mentor_relations
+                       WHERE apprentice_id = ?
+                         AND (status = 'active' OR (status = 'invited' AND expires_at > ?))
+                       LIMIT 1
+                   ) AS mentor
+            """,
+            (row["id"], row["id"], serialize_datetime(now)),
         ).fetchall()
-        mentor_invitation = connection.execute(
-            "SELECT 1 FROM mentor_relations WHERE apprentice_id=? AND "
-            "(status='active' OR (status='invited' AND expires_at>?)) LIMIT 1",
-            (row["id"], serialize_datetime(now)),
-        ).fetchone() is not None
+        completed_quests = {
+            str(item["value"])
+            for item in requirement_rows
+            if item["value"] is not None
+        }
+        mentor_invitation = any(bool(item["mentor"]) for item in requirement_rows)
         return {
             "realm_key": str(row["realm_key"]),
             "realm_layer": player_integer(row, "realm_layer"),
@@ -397,7 +414,7 @@ class TravelRepositoryMixin:
             "intro_flags": intro_flags,
             "inventory": player_inventory(row),
             "faction_reputation": player_reputation(row),
-            "completed_quests": {str(item["quest_key"]) for item in completed},
+            "completed_quests": completed_quests,
             "mentor_invitation": mentor_invitation,
             "endgame_status": str(row["endgame_status"] or "none"),
             "domain_key": str(row["domain_key"]) if row["domain_key"] else None,

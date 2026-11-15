@@ -381,6 +381,15 @@ class SQLitePlayerRepository(
             )
             if connection.execute(
                 "SELECT 1 FROM schema_migrations WHERE migration_key=?",
+                ("world.travel_requirement_indexes",),
+            ).fetchone() is None:
+                self._migrate_travel_requirement_indexes(connection)
+                connection.execute(
+                    "INSERT INTO schema_migrations(migration_key, applied_at) VALUES (?, ?)",
+                    ("world.travel_requirement_indexes", serialize_datetime(self._now())),
+                )
+            if connection.execute(
+                "SELECT 1 FROM schema_migrations WHERE migration_key=?",
                 ("world.void_route_discoveries",),
             ).fetchone() is None:
                 self._migrate_void_route_discovery_count(connection)
@@ -448,6 +457,19 @@ class SQLitePlayerRepository(
                 "CREATE UNIQUE INDEX IF NOT EXISTS idx_players_dao_name "
                 "ON players(dao_name) WHERE dao_name <> ''"
             )
+
+    @staticmethod
+    def _migrate_travel_requirement_indexes(connection: sqlite3.Connection) -> None:
+        """Add covering gate indexes while keeping existing player databases readable."""
+
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_quest_progress_player_status "
+            "ON quest_progress(player_id, status, quest_key)"
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_mentor_relations_apprentice_status_expiry "
+            "ON mentor_relations(apprentice_id, status, expires_at)"
+        )
 
     def _materialize_redemption_codes(
         self,
