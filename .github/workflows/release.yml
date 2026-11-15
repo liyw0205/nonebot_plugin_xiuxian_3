@@ -48,7 +48,7 @@ jobs:
           python-version: "3.12"
           cache: pip
       - name: Install from checkout
-        run: bash scripts/onekey.sh install --target "$RUNNER_TEMP/xiu3" --source-mode source --mirror direct --index-url https://pypi.org/simple
+        run: bash scripts/onekey.sh install --target "$RUNNER_TEMP/xiu3" --venv "$HOME/myenv" --source-mode source --mirror direct --index-url https://pypi.org/simple
       - name: Verify isolated runtime and preserved files
         run: |
           test -x "$RUNNER_TEMP/xiu3/xiu3"
