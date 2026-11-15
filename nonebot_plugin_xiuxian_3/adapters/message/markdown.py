@@ -45,7 +45,9 @@ async def send_markdown_message(
     effective_actions = _actions_without_inline_links(markdown, actions)
     if _supports_markdown(bot, event, capabilities):
         body = markdown
-        keyboard_requested = bool(effective_actions and "keyboard" in capabilities)
+        # Inline links can replace appended links, but they must not remove a
+        # caller-provided native button from the keyboard action set.
+        keyboard_requested = bool(actions and "keyboard" in capabilities)
         if effective_actions and not keyboard_requested:
             from ...xiuxian.utils.text import command_link
 
@@ -60,7 +62,7 @@ async def send_markdown_message(
                 from .qq import qq_keyboard
 
                 try:
-                    segment += qq_keyboard((effective_actions,), command_prefix=command_prefix)
+                    segment += qq_keyboard((actions,), command_prefix=command_prefix)
                     sent_format = "markdown+keyboard"
                 except (ImportError, RuntimeError, TypeError, ValueError):
                     from ...xiuxian.utils.text import command_link

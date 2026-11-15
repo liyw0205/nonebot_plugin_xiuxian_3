@@ -34,6 +34,7 @@ _LEGACY_TARGET_FEES = {
     "demon.abyss_market": (300, 12, 500, None, 0, 0),
     "demon.fallen_ruins": (480, 20, 0, None, 0, 0),
     "tribulation.sky_terrace": (1800, 0, 0, "item.tribulation_token", 1, 0),
+    "location.final_arena": (900, 15, 0, None, 0, 0),
     "void.archive_ruins": (2700, 40, 0, None, 0, 0),
     "void.first_route": (1800, 35, 0, None, 0, 0),
     "void.portal": (300, 10, 0, None, 0, 0),
@@ -90,7 +91,10 @@ def test_every_incoming_route_preserves_legacy_target_cost_and_pass() -> None:
             )
             for edge in edges
         }
-        assert actual == {_LEGACY_TARGET_FEES[target]}, target
+        expected = {_LEGACY_TARGET_FEES[target]}
+        if target == "tribulation.sky_terrace":
+            expected.add(_LEGACY_TARGET_FEES["location.final_arena"])
+        assert actual == expected, target
 
     assert not incoming.keys() & _NO_ORDINARY_INCOMING_DESTINATIONS
 
@@ -129,11 +133,17 @@ def test_shared_gates_and_special_entry_edges_are_complete() -> None:
     )
 
     sky_entries = [edge for edge in edges.values() if edge["to"] == "tribulation.sky_terrace"]
-    assert {edge["from"] for edge in sky_entries} == {"dao.origin_gate", "ascension.heaven_path"}
+    assert {edge["from"] for edge in sky_entries} == {
+        "dao.origin_gate",
+        "ascension.heaven_path",
+        "location.final_arena",
+    }
     assert all(
         edge.get("item_key") == "item.tribulation_token" and edge.get("item_quantity") == 1
         for edge in sky_entries
+        if edge["from"] in {"dao.origin_gate", "ascension.heaven_path"}
     )
+    assert edges[("location.final_arena", "tribulation.sky_terrace")].get("item_key") is None
 
     assert "requirements" not in edges[("xuantian.war_front", "cave.boundary_realm")]
 

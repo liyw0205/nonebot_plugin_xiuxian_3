@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
+from threading import Lock
 from typing import Any
 
 from ..content import ContentBundle, ContentError, bundled_content
@@ -60,34 +61,49 @@ _STAGE_ORDER = {
 }
 _IDLE_REWARD_PREFIXES = ("item.", "local.", "codex.")
 
+_IDLE_DEFINITION_CACHE: list[tuple[int, ContentBundle, tuple[IdleRouteDefinition, ...]]] = []
+_IDLE_DEFINITION_CACHE_LOCK = Lock()
+
+
+def _cached_idle_definitions(content: ContentBundle | None = None) -> tuple[IdleRouteDefinition, ...]:
+    bundle = content or bundled_content()
+    with _IDLE_DEFINITION_CACHE_LOCK:
+        for cached_id, cached_bundle, definitions in reversed(_IDLE_DEFINITION_CACHE):
+            if cached_id == id(bundle) and cached_bundle is bundle:
+                return definitions
+        definitions_by_key: dict[str, IdleRouteDefinition] = {}
+        selectors: dict[str, str] = {}
+        for row in bundle.list("livelihood", include_locked=False):
+            if row.get("record_type") != "idle_route":
+                continue
+            definition = _parse_route(row, bundle)
+            if definition.key in definitions_by_key:
+                raise ContentError(f"idle route {definition.key} is duplicated")
+            for selector in {definition.key, definition.label, *definition.aliases}:
+                if selector in selectors:
+                    raise ContentError(f"idle route {definition.key} has a duplicate name or alias")
+                selectors[selector] = definition.key
+            definitions_by_key[definition.key] = definition
+        definitions = tuple(definitions_by_key.values())
+        _IDLE_DEFINITION_CACHE.append((id(bundle), bundle, definitions))
+        if len(_IDLE_DEFINITION_CACHE) > 16:
+            del _IDLE_DEFINITION_CACHE[:-16]
+        return definitions
+
 
 def idle_route_definitions(content: ContentBundle | None = None) -> dict[str, IdleRouteDefinition]:
-    bundle = content or bundled_content()
-    definitions: dict[str, IdleRouteDefinition] = {}
-    selectors: dict[str, str] = {}
-    for row in bundle.list("livelihood", include_locked=False):
-        if row.get("record_type") != "idle_route":
-            continue
-        definition = _parse_route(row, bundle)
-        if definition.key in definitions:
-            raise ContentError(f"idle route {definition.key} is duplicated")
-        for selector in {definition.key, definition.label, *definition.aliases}:
-            if selector in selectors:
-                raise ContentError(f"idle route {definition.key} has a duplicate name or alias")
-            selectors[selector] = definition.key
-        definitions[definition.key] = definition
-    return definitions
+    return {definition.key: definition for definition in _cached_idle_definitions(content)}
 
 
 def idle_route_order(content: ContentBundle | None = None) -> tuple[IdleRouteDefinition, ...]:
-    return tuple(idle_route_definitions(content).values())
+    return _cached_idle_definitions(content)
 
 
 def resolve_route(value: str | None, content: ContentBundle | None = None) -> IdleRouteDefinition:
-    definitions = idle_route_definitions(content)
+    definitions = _cached_idle_definitions(content)
     selectors = {
         selector: definition
-        for definition in definitions.values()
+        for definition in definitions
         for selector in (definition.key, definition.label, *definition.aliases)
     }
     try:

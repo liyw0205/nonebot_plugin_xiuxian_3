@@ -6,6 +6,7 @@ import asyncio
 import hashlib
 import json
 import sqlite3
+from threading import Lock, local
 from datetime import date, datetime, timezone
 from typing import Any, Callable
 
@@ -240,6 +241,10 @@ class SQLitePlayerRepository(
         self._initialized = False
         self._initialize_lock = asyncio.Lock()
         self._inflight = asyncio.Semaphore(settings.max_inflight)
+        self._connection_local = local()
+        self._connection_registry: set[sqlite3.Connection] = set()
+        self._connection_registry_lock = Lock()
+        self._connections_closed = False
 
     def _now(self) -> datetime:
         value = self._clock()
@@ -266,7 +271,37 @@ class SQLitePlayerRepository(
             self._initialized = True
 
     def _connect(self) -> sqlite3.Connection:
-        return connect_sqlite(self.settings.database_path, busy_timeout_ms=self.settings.busy_timeout_ms)
+        if self._connections_closed:
+            raise RuntimeError("repository connections are closed")
+        connection = getattr(self._connection_local, "connection", None)
+        if connection is not None:
+            try:
+                connection.execute("SELECT 1")
+                return connection
+            except sqlite3.ProgrammingError:
+                self._connection_local.connection = None
+        connection = connect_sqlite(
+            self.settings.database_path,
+            busy_timeout_ms=self.settings.busy_timeout_ms,
+        )
+        self._connection_local.connection = connection
+        with self._connection_registry_lock:
+            self._connection_registry.add(connection)
+        return connection
+
+    def close(self) -> None:
+        """Close executor-thread SQLite connections after runtime shutdown."""
+
+        self._connections_closed = True
+        with self._connection_registry_lock:
+            connections = tuple(self._connection_registry)
+            self._connection_registry.clear()
+        self._connection_local.connection = None
+        for connection in connections:
+            try:
+                connection.close()
+            except sqlite3.ProgrammingError:
+                pass
 
     @staticmethod
     def _require_player(

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nonebot-plugin-xiuxian-3"
-version = "0.1.45"
+version = "0.1.46"
 description = "A maintainable NoneBot cultivation text game, implemented from scratch."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -38,4 +38,5 @@ markers = [
   "web: exercises Web contracts",
   "e2e: exercises an end-to-end flow",
   "recovery: exercises backup and recovery behavior",
+  "performance: bounded opt-in temporary SQLite performance regression",
 ]

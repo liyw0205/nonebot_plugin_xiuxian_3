@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from threading import Lock
 from typing import Iterable, Mapping
 
 from ..content import ContentBundle, ContentError, bundled_content
@@ -22,6 +23,7 @@ BEAST_HABITAT_ECHOES_STORY_KEY = "story.mainline.beast_habitat_echoes"
 COMPANION_OLD_TRAIL_STORY_KEY = "story.mainline.companion_old_trail"
 SPRING_SUPPER_STORY_KEY = "story.mainline.spring_supper"
 IRONWOOD_CRAFT_STORY_KEY = "story.mainline.ironwood_craft"
+BASALT_WAYMARKER_STORY_KEY = "story.mainline.basalt_waymarker"
 MAINLINE_TOWN_COMMISSION_DELIVERED = "livelihood.town_commission.delivered"
 
 MAINLINE_LOCKED = "locked"
@@ -232,6 +234,9 @@ _VERTICAL_SLICE_STAGES = frozenset(
         "ironwood_craft.1",
         "ironwood_craft.2",
         "ironwood_craft.3",
+        "basalt_waymarker.1",
+        "basalt_waymarker.2",
+        "basalt_waymarker.3",
         "lane.builder.chapter.01",
         "lane.builder.chapter.02",
         "lane.builder.chapter.03",
@@ -275,6 +280,16 @@ class MainlineObjectivesIncompleteError(RuntimeError):
 
 def _content(content: ContentBundle | None) -> ContentBundle:
     return content if content is not None else _DEFAULT_CONTENT
+
+
+# Mainline status checks parse the same immutable content bundle for every
+# prerequisite. Keep a small identity cache so a request does not repeatedly
+# deep-copy and validate the complete content pack. The bound avoids retaining
+# every short-lived custom bundle created by migration tests.
+_MAINLINE_DEFINITION_CACHE: list[
+    tuple[int, ContentBundle, str | None, bool, tuple["MainlineStageDefinition", ...]]
+] = []
+_MAINLINE_DEFINITION_CACHE_LOCK = Lock()
 
 
 def _string_tuple(value: object, field: str, key: str) -> tuple[str, ...]:
@@ -702,7 +717,7 @@ def _reward_map(
     return tuple(result)
 
 
-def mainline_definitions(
+def _parse_mainline_definitions(
     content: ContentBundle | None = None,
     *,
     story_key: str | None = None,
@@ -749,6 +764,11 @@ def mainline_definitions(
             key == "chapter.13.stage.4"
             and bundle.get("livelihood", "idle.beast_hills_watch", include_locked=True) is None
         )
+        legacy_basalt_waymarker_seed = (
+            key.startswith("basalt_waymarker.")
+            and bundle.get("livelihood", "dispatch.basalt_watermark_works", include_locked=True) is None
+            and bundle.get("livelihood", "project.basalt_waymarker", include_locked=True) is None
+        )
         body = row.get("body", description)
         if not isinstance(body, str) or not body.strip():
             raise ContentError(f"mainline {key} body must be a non-empty string")
@@ -757,7 +777,9 @@ def mainline_definitions(
         objectives = _story_objectives(
             row.get("objectives"),
             key,
-            bundle if validate_sources and not (legacy_ironwood_seed or legacy_beast_watch_seed) else None,
+            bundle if validate_sources and not (
+                legacy_ironwood_seed or legacy_beast_watch_seed or legacy_basalt_waymarker_seed
+            ) else None,
             required=is_vertical_slice_stage,
         )
         actions = _story_actions(row.get("actions"), key, required=is_vertical_slice_stage)
@@ -845,7 +867,7 @@ def mainline_definitions(
         runtime_status = row.get("status", "locked")
         if runtime_status not in {"open", "active", "locked"}:
             raise ContentError(f"mainline {key} has unsupported status {runtime_status}")
-        if legacy_ironwood_seed or legacy_beast_watch_seed:
+        if legacy_ironwood_seed or legacy_beast_watch_seed or legacy_basalt_waymarker_seed:
             runtime_status = "locked"
         reputation_key = row.get("reputation_key")
         if reputation_key is not None and (not isinstance(reputation_key, str) or not reputation_key.strip()):
@@ -912,6 +934,48 @@ def mainline_definitions(
         if definition.key in _VERTICAL_SLICE_STAGES and not definition.state_events:
             raise ContentError(f"mainline {definition.key} requires a state change")
     return tuple(definitions)
+
+
+def mainline_definitions(
+    content: ContentBundle | None = None,
+    *,
+    story_key: str | None = None,
+    validate_sources: bool = True,
+) -> tuple[MainlineStageDefinition, ...]:
+    """Return cached parsed stages for one immutable content bundle."""
+
+    bundle = _content(content)
+    cache_key = (id(bundle), story_key, validate_sources)
+    with _MAINLINE_DEFINITION_CACHE_LOCK:
+        for cached_id, cached_bundle, cached_story_key, cached_validate_sources, cached_definitions in reversed(
+            _MAINLINE_DEFINITION_CACHE
+        ):
+            if (
+                cached_id == cache_key[0]
+                and cached_bundle is bundle
+                and cached_story_key == story_key
+                and cached_validate_sources == validate_sources
+            ):
+                return cached_definitions
+        parsed = _parse_mainline_definitions(
+            bundle,
+            story_key=story_key,
+            validate_sources=validate_sources,
+        )
+        _MAINLINE_DEFINITION_CACHE[:] = [
+            item
+            for item in _MAINLINE_DEFINITION_CACHE
+            if not (
+                item[0] == cache_key[0]
+                and item[1] is bundle
+                and item[2] == story_key
+                and item[3] == validate_sources
+            )
+        ]
+        _MAINLINE_DEFINITION_CACHE.append((cache_key[0], bundle, story_key, validate_sources, parsed))
+        if len(_MAINLINE_DEFINITION_CACHE) > 16:
+            del _MAINLINE_DEFINITION_CACHE[:-16]
+        return parsed
 
 
 MAINLINE_STAGES = mainline_definitions(story_key=MAINLINE_STORY_KEY)
@@ -1179,6 +1243,7 @@ __all__ = [
     "COMPANION_OLD_TRAIL_STORY_KEY",
     "SPRING_SUPPER_STORY_KEY",
     "IRONWOOD_CRAFT_STORY_KEY",
+    "BASALT_WAYMARKER_STORY_KEY",
     "MAINLINE_TOWN_COMMISSION_DELIVERED",
     "MainlineDefinition",
     "MainlineStageDefinition",

@@ -4543,6 +4543,73 @@
       "reputation_key": "local.xuantian.new_town",
       "first_clear_reward": {"spirit_stones": 25, "local_reputation": 3, "service_reputation": 2},
       "repeat_reward": {"spirit_stones": 5}
+    },
+    {
+      "key": "basalt_waymarker.1",
+      "story_key": "story.mainline.basalt_waymarker",
+      "chapter": 1, "stage": 1,
+      "name": "水标入径",
+      "desc": "沿真实山路抵达玄武岩径，听石砚讲清潮线旧标的来历。",
+      "body": "石砚把缺角罗盘压在黑岩上，说旧水标不是一块孤零零的石头，而是挑担人避开湿滑断层的凭据。你须从当前所在处沿公开通路走到玄武岩径，等行程真正结束并结算，才算把自己的脚印记进水标卷；尚未抵达、提前查看或旁人的行程都不替你入册。抵达后，石砚会把一套筛盘留在背风坡，等你下一关亲手筛出完整矿料。",
+      "objectives": [{"key": "reach_basalt_waymarker", "type": "travel_arrival", "label": "本关开始后真实抵达玄武岩径", "destination_key": "xuantian.basalt_pass"}],
+      "actions": [
+        {"command": "前往", "argument": "玄武岩径", "description": "沿当前地点可达的公开路线前往玄武岩径，等待行程结束后发送 `结算移动`。"},
+        {"command": "我的状态", "argument": "", "description": "确认当前位置与行程状态；未结算行程不能作为水标抵达凭据。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.basalt_waymarker:basalt_waymarker.1"]},
+      "next_stage_key": "basalt_waymarker.2",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "只有本关开始后本人在玄武岩径结算成功的行程才算抵达；未结算、取消或开始前的旧行程不推进，按公开路线重新前往即可。"},
+      "status": "open", "aliases": ["水标入径"],
+      "prerequisites": ["player.start_seeking"], "required_realm": "qi_gathering", "required_layer": 1,
+      "lane": "basalt_waymarker", "lane_name": "玄武岩径水标回响",
+      "first_clear_reward": {"item.mat.array_sand": 1, "service_reputation": 1},
+      "repeat_reward": {"spirit_stones": 3}
+    },
+    {
+      "key": "basalt_waymarker.2",
+      "story_key": "story.mainline.basalt_waymarker",
+      "chapter": 1, "stage": 2,
+      "name": "筛砂留线",
+      "desc": "在主线开始后完整领取玄武岩径筛砂，把阵砂和铁石收进水标工棚。",
+      "body": "抵达黑石坡后，石砚把筛盘交到你手里：阵砂要封住水标石缝，铁石要换成新的刻度钉。这一关只认主线开始之后新安排的玄武岩径筛砂，并且必须在完整窗口内领取；取消、提前领取、逾时保底、旧安排或他人记录都只是山野劳作，不能冒充水标回响。你可以在安排前查看八小时、每日一次与气力消耗，离线或重启后从挂机状态恢复，完整收束时石砚才会把本人的筛砂记录写进卷册。",
+      "objectives": [{"key": "sift_basalt_material", "type": "idle_claim", "label": "本关开始后完整领取一次玄武岩径筛砂", "route_key": "idle.basalt_sifting"}],
+      "actions": [
+        {"command": "挂机预览", "argument": "玄武岩径筛砂", "description": "确认玄武岩径位置、八小时窗口、每日一次与体力精力成本。"},
+        {"command": "开始挂机", "argument": "玄武岩径筛砂", "description": "在抵达玄武岩径后安排筛砂；只能有一份本人安排，完整领取才记入剧情。"},
+        {"command": "挂机状态", "argument": "", "description": "重启或离线回来后查看冻结的八小时安排与可领取时间。"},
+        {"command": "领取挂机", "argument": "", "description": "满八小时后在完整领取窗口收回阵砂、铁石与筛砂行记。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.basalt_waymarker:basalt_waymarker.2"]},
+      "next_stage_key": "basalt_waymarker.3",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "本关只统计开始后本人完整领取的玄武岩径筛砂；取消、提前、逾时保底、旧安排和他人记录均不推进。处理当前安排后按每日额度重试，重启可用 `挂机状态` 接续。"},
+      "status": "open", "aliases": ["筛砂留线"],
+      "prerequisites": ["basalt_waymarker.1"], "required_realm": "qi_gathering", "required_layer": 1,
+      "lane": "basalt_waymarker", "lane_name": "玄武岩径水标回响",
+      "first_clear_reward": {"item.ore.ironstone": 1, "service_reputation": 2},
+      "repeat_reward": {"spirit_stones": 5}
+    },
+    {
+      "key": "basalt_waymarker.3",
+      "story_key": "story.mainline.basalt_waymarker",
+      "chapter": 1, "stage": 3,
+      "name": "水标回响",
+      "desc": "以成功结算的水标勘务回执交还石砚，完成玄武岩径的公共路标。",
+      "body": "筛盘里的阵砂已经封好，石砚仍不肯把旧水标交给一张漂亮的草图。他要你本人重新接受玄武岩径水标勘务，选择踏勘或整治，等冻结的方案到期后结算并取得成功回执；延误、部分、失败、取消、提前结算和本关开始前的旧派遣都不能完成交卷。成功回执会同时留下真实派遣事件与工料流水，石砚据此重刻潮线并把路标工程的下一段交给往来修士。材料和气力不足时先按派遣预览补给，重启后用派遣状态恢复原方案，失败不会扣掉尚未验收的剧情奖励。",
+      "objectives": [{"key": "settle_watermark_success", "type": "dispatch_success", "label": "本关开始后接受并成功结算玄武岩径水标勘务", "dispatch_key": "dispatch.basalt_watermark_works"}],
+      "actions": [
+        {"command": "派遣预览", "argument": "玄武岩径水标勘务", "description": "在玄武岩径查看踏勘与整治的成本、耗时、材料来源和风险。"},
+        {"command": "接受派遣", "argument": "玄武岩径水标勘务 踏勘", "description": "选择两小时踏勘方案，等到期后结算；延误虽有回报但不能完成本关。"},
+        {"command": "接受派遣", "argument": "玄武岩径水标勘务 整治", "description": "或选择五小时整治方案，投入阵砂稳固标石后取得成功回执。"},
+        {"command": "派遣状态", "argument": "", "description": "查看冻结方案与可结算时间；重启后继续原派遣。"},
+        {"command": "结算派遣", "argument": "", "description": "只以 outcome=success 的本人新回执完成水标交卷。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.basalt_waymarker:basalt_waymarker.3"]},
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "只认本关开始后本人新接受且成功结算的水标勘务；旧派遣、取消、部分、失败、延误或提前结算均不推进。按派遣状态处理当前记录，补足材料后再接一趟成功方案。"},
+      "status": "open", "aliases": ["水标回响"],
+      "prerequisites": ["basalt_waymarker.2"], "required_realm": "qi_gathering", "required_layer": 1,
+      "lane": "basalt_waymarker", "lane_name": "玄武岩径水标回响",
+      "first_clear_reward": {"spirit_stones": 30, "service_reputation": 4},
+      "repeat_reward": {"spirit_stones": 8}
     }
   ]
 }

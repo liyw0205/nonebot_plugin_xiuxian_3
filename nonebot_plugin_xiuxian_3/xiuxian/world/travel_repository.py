@@ -411,6 +411,34 @@ class TravelRepositoryMixin:
             row = self._require_player(connection, platform, platform_user_id, writable=False)
             return self._travel_requirement_state_in(connection, row, now)
 
+    def _preview_travel_database_state(
+        self,
+        platform: str,
+        platform_user_id: str,
+        destination: str,
+        now: datetime,
+    ) -> tuple[PlayerView, dict[str, Any], int | None]:
+        """Read the preview identity, gates, and quota in one connection."""
+
+        with self._connect() as connection:
+            row = self._profile_player_row(connection, platform, platform_user_id)
+            if row is None:
+                raise PlayerNotFoundError("player does not exist")
+            if row["status"] != "active":
+                raise PlayerSuspendedError("player is not readable")
+            requirement_state = self._travel_requirement_state_in(connection, row, now)
+            content = self.content or bundled_content()
+            definition = destination_definition(destination, content, source=str(row["location_key"]))
+            starts_today = None
+            if definition.daily_start_limit:
+                starts_today = self._count_destination_starts_today_in(
+                    connection,
+                    player_id=int(row["id"]),
+                    destination=destination,
+                    now=now,
+                )
+            return self._row_to_player(row), requirement_state, starts_today
+
     async def preview_travel(
         self,
         *,
@@ -419,15 +447,17 @@ class TravelRepositoryMixin:
         destination: str,
     ) -> TravelPreview:
         await self.initialize()
-        player = await self.get_player(platform=platform, platform_user_id=platform_user_id)
-        if player is None:
-            raise PlayerNotFoundError("player does not exist")
         now = self._now()
         travel_content = self.content or bundled_content()
+        async with self._inflight:
+            player, requirement_state, starts_today = await asyncio.to_thread(
+                self._preview_travel_database_state,
+                platform,
+                platform_user_id,
+                destination,
+                now,
+            )
         definition = destination_definition(destination, travel_content, source=player.location_key)
-        requirement_state = await asyncio.to_thread(
-            self._travel_requirement_state, platform, platform_user_id, now
-        )
         missing: list[str] = []
         if not destination_location_is_open(destination, travel_content):
             missing.append("此地尚未开放")
@@ -461,13 +491,7 @@ class TravelRepositoryMixin:
         if not definition.required_endgame_status and endgame_status in {"ascension_ready", "ascended", "remained_in_world"}:
             missing.append("当前状态")
         if definition.daily_start_limit:
-            starts_today = await asyncio.to_thread(
-                self._count_destination_starts_today,
-                platform,
-                platform_user_id,
-                destination,
-                now,
-            )
+            assert starts_today is not None
             if starts_today >= definition.daily_start_limit:
                 missing.append("今日访问次数")
         ready = player.status == "active" and player.stage in {STAGE_MORTAL, "seeker", "cultivator"} and not missing

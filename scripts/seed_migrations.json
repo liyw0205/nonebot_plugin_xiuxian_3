@@ -113,10 +113,11 @@
       "0ebe7d841042d1688778d1a19d7b640e5edaa621ecc9778989ae015cd1260fb8": "09d5deda6e28dcdf3310d21c5d7a6425afa8d913:data/剧情/主线.json",
       "bb15ca2fd397b5afb12c591ade83268ece040763c343a613665ec9db774eba9a": "45fd2509bc513c9d545f10df36f21a6f46d55c78:data/剧情/主线.json",
       "be168dec5f0122661db95fef85fe21ad983425804cebde89ea9062119cb3af17": "af640f91c5a5b632ce4b7e72e7f971282b24fe2d:data/剧情/主线.json",
-      "940fbc128b9b8beaf3cdfafed155a9465f375d6f669455e9eab13f1f419a7020": "577c7ae1f1bc73e6646f536b99667b08ff6d8abe:data/剧情/主线.json"
+      "940fbc128b9b8beaf3cdfafed155a9465f375d6f669455e9eab13f1f419a7020": "577c7ae1f1bc73e6646f536b99667b08ff6d8abe:data/剧情/主线.json",
+      "cb9813850018f7867b1951851c4906c80641af6a4e1b75e5a5f86dab71050155": "a735ba5ccced8922d4f91a61b7119d67677c316f:data/剧情/主线.json"
     },
-    "new_sha256": "cb9813850018f7867b1951851c4906c80641af6a4e1b75e5a5f86dab71050155",
-    "new_commit": "c000f1b8b7a7292907fde8f201c8e01de0702dcf:data/剧情/主线.json"
+    "new_sha256": "00bb902cdf7d3f628ae5ec8c4cfa563bb5f4971b042bb6c82b1897dbfda0309f",
+    "new_commit": "20d3e6884ae17a368d0935848930338d91bb4727:data/剧情/主线.json"
   },
   "内容清单.json": {
     "old_sha256": {
