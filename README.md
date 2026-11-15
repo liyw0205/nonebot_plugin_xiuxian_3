@@ -38,9 +38,12 @@ Termux 安装器会使用 `pkg` 准备 Python、Git 和构建工具。不要混�
 的 Python/虚拟环境；在容器内单独执行安装流程。
 
 Release 一键安装不需要先 clone 仓库。Linux 安装器默认使用 `$HOME/xiu3` 宿主及
-`/home/nonebot-shared-venv` 共享 Python 环境，可通过 `--venv` 或 `VENV_PATH` 指定独立路径；
+`/root/myenv` Python 环境，可通过 `--venv` 或 `VENV_PATH` 指定独立路径；
 安装生成的 `xiu3` 命令会把同一路径传给 install/update/start/status/login。Termux 与
 `proot-distro` 也应显式传入可用的 `--venv PATH`，不要混用不同系统的 Python 环境。
+
+本机远程开发、定向测试和性能基准统一使用 `/home/nonebot-shared-venv/bin/python`；这只是
+开发工具环境，不改变 Linux 安装器或宿主运行时的 `/root/myenv` 默认。
 
 ### 手动获取脚本或源码安装
 

@@ -58,13 +58,14 @@ def test_install_and_control_entrypoints_share_commands_and_paths() -> None:
             assert option in text, (script, option)
 
 
-def test_linux_installers_default_to_shared_venv_and_preserve_overrides() -> None:
-    expected = "/home/nonebot-shared-venv"
+def test_linux_installers_default_to_host_venv_and_preserve_overrides() -> None:
+    expected = "/root/myenv"
+    development_python = "/home/nonebot-shared-venv/bin/python"
     for script in ("onekey.sh", "install.sh", "control.sh"):
         text = (ROOT / "scripts" / script).read_text(encoding="utf-8")
         assert expected in text
         assert "VENV_PATH" in text
-        assert "$HOME/myenv" not in text
+        assert "/home/nonebot-shared-venv" not in text
     installer = (ROOT / "scripts/install.sh").read_text(encoding="utf-8")
     assert 'venv="\\${VENV_PATH:-$venv_q}"' in installer
     for guide in (
@@ -73,6 +74,7 @@ def test_linux_installers_default_to_shared_venv_and_preserve_overrides() -> Non
     ):
         assert expected in guide
         assert "VENV_PATH" in guide
+        assert development_python in guide
 
     with TemporaryDirectory() as temporary:
         target = Path(temporary) / "host"
@@ -162,7 +164,7 @@ def test_generated_launcher_resolves_venv_at_invocation_and_honors_explicit_over
     )
     control.chmod(0o755)
     launcher = target / "xiu3"
-    assert "myenv" not in launcher.read_text(encoding="utf-8")
+    assert "/root/myenv" not in launcher.read_text(encoding="utf-8")
 
     default = subprocess.run([str(launcher), "status"], check=True, capture_output=True, text=True, env=env)
     assert default.stdout.strip() == str(installed_venv)

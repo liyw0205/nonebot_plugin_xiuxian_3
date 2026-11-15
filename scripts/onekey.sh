@@ -26,7 +26,7 @@ TUNA_INDEX="https://pypi.tuna.tsinghua.edu.cn/simple"
 ACTION=install
 TARGET="$HOME/xiu3"
 SOURCE="${XIUXIAN3_SOURCE_DIR:-$HOME/.local/share/xiuxian3/source}"
-VENV="${VENV_PATH:-/home/nonebot-shared-venv}"
+VENV="${VENV_PATH:-/root/myenv}"
 MIRROR=""
 MIRROR_URL=""
 SOURCE_MODE="${XIUXIAN3_SOURCE_MODE:-auto}"
@@ -45,7 +45,7 @@ usage() {
 选项：
   --target PATH       宿主目录（默认 $HOME/xiu3）
   --source PATH       插件源码目录（默认 $HOME/.local/share/xiuxian3/source）
-  --venv PATH         Python 虚拟环境（默认 /home/nonebot-shared-venv；也可用 VENV_PATH）
+  --venv PATH         Python 虚拟环境（默认 /root/myenv；也可用 VENV_PATH）
   --mirror MODE       direct、accelerated 或 custom
   --mirror-url URL    自定义 Release 归档 URL（source 模式为 Git 地址）
   --source-mode MODE  auto、release 或 source；默认本地源码、远程 Release
