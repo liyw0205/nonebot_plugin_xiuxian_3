@@ -1502,6 +1502,7 @@ class AdventuresRepositoryMixin:
         player: sqlite3.Row,
         *,
         now: datetime | None = None,
+        mainline_rows: tuple[sqlite3.Row, ...] | None = None,
     ) -> set[str]:
         """Build server-owned evidence shared by status and start checks."""
 
@@ -1515,87 +1516,96 @@ class AdventuresRepositoryMixin:
             if str(item) != "story.mainline.void_archive.time_fort"
         }
         # Cross-story progress comes from first clears, not projected event flags.
+        # These evidence tables are all player-scoped and indexed. Fetching
+        # their positive evidence in one UNION keeps the same gate semantics
+        # while avoiding a dozen executor/SQLite round trips per status read.
+        unlock_condition = " AND ends_at > ?" if now is not None else ""
+        evidence_query = f"""
+            SELECT ? AS event_key
+            WHERE EXISTS (
+                SELECT 1 FROM town_commission_claims
+                WHERE player_id = ? AND status = 'delivered'
+            )
+            UNION ALL
+            SELECT ? AS event_key
+            WHERE EXISTS (
+                SELECT 1 FROM domain_front_participants WHERE player_id = ?
+            )
+            UNION ALL
+            SELECT ? AS event_key
+            WHERE EXISTS (
+                SELECT 1
+                FROM domain_front_battle_links AS links
+                JOIN battle_sessions AS sessions
+                  ON sessions.battle_id = links.battle_id
+                WHERE links.player_id = ?
+                  AND sessions.player_id = links.player_id
+                  AND sessions.battle_type = 'pve.domain_front'
+                  AND sessions.status = 'settled'
+                  AND json_extract(sessions.result_json, '$.outcome') = 'won'
+            )
+            UNION ALL
+            SELECT ? AS event_key
+            WHERE EXISTS (
+                SELECT 1 FROM domain_front_contributions WHERE player_id = ?
+            )
+            UNION ALL
+            SELECT ? AS event_key
+            WHERE EXISTS (
+                SELECT 1 FROM domain_front_claims WHERE player_id = ?
+            )
+            UNION ALL
+            SELECT ? AS event_key
+            WHERE EXISTS (
+                SELECT 1 FROM void_archive_unlocks
+                WHERE player_id = ? AND event_key = ?{unlock_condition}
+            )
+        """
+        evidence_params: list[Any] = [MAINLINE_TOWN_COMMISSION_DELIVERED, player["id"]]
+        evidence_params.extend(("event.domain_front.joined", player["id"]))
+        evidence_params.extend(("event.domain_front.battle", player["id"]))
+        evidence_params.extend(("event.domain_front.contribution", player["id"]))
+        evidence_params.extend(("event.domain_front.claimed", player["id"]))
+        evidence_params.extend(("event.archive_unlock", player["id"], "event.archive_unlock"))
+        if now is not None:
+            evidence_params.append(serialize_datetime(now))
+        evidence_query += """
+            UNION ALL
+            SELECT ? AS event_key
+            WHERE EXISTS (
+                SELECT 1 FROM void_archive_runs
+                WHERE player_id = ? AND outcome = 'won'
+            )
+            UNION ALL
+            SELECT ? AS event_key
+            WHERE EXISTS (
+                SELECT 1 FROM time_fort_members
+                WHERE player_id = ? AND status = 'settled' AND first_clear = 1
+            )
+            UNION ALL
+            SELECT 'livelihood.project.' || p.project_key || '.completed' AS event_key
+            FROM livelihood_project_rewards AS r
+            JOIN livelihood_projects AS p ON p.project_id = r.project_id
+            WHERE r.player_id = ? AND r.eligible = 1
+        """
+        evidence_params.extend(("event.archive_guard.won", player["id"]))
+        evidence_params.extend(("story.mainline.void_archive.time_fort", player["id"]))
+        evidence_params.append(player["id"])
+        if mainline_rows is None:
+            mainline_rows = tuple(
+                connection.execute(
+                    "SELECT story_key, stage_key, first_clear_claimed FROM mainline_runs WHERE player_id = ?",
+                    (player["id"],),
+                ).fetchall()
+            )
         events.update(
             f"{row['story_key']}:{row['stage_key']}"
-            for row in connection.execute(
-                "SELECT story_key, stage_key FROM mainline_runs "
-                "WHERE player_id = ? AND first_clear_claimed = 1",
-                (player["id"],),
-            ).fetchall()
+            for row in mainline_rows
+            if bool(row["first_clear_claimed"])
         )
+        events.update(str(row["event_key"]) for row in connection.execute(evidence_query, evidence_params).fetchall())
         if str(player["stage"]) != STAGE_NEW_USER:
             events.add("player.start_seeking")
-        if connection.execute(
-            """
-            SELECT 1
-            FROM town_commission_claims
-            WHERE player_id = ? AND status = 'delivered'
-            LIMIT 1
-            """,
-            (player["id"],),
-        ).fetchone() is not None:
-            events.add(MAINLINE_TOWN_COMMISSION_DELIVERED)
-        if connection.execute(
-            "SELECT 1 FROM domain_front_participants WHERE player_id = ? LIMIT 1",
-            (player["id"],),
-        ).fetchone() is not None:
-            events.add("event.domain_front.joined")
-        if connection.execute(
-            """
-            SELECT 1
-            FROM domain_front_battle_links AS links
-            JOIN battle_sessions AS sessions ON sessions.battle_id = links.battle_id
-            WHERE links.player_id = ?
-              AND sessions.player_id = links.player_id
-              AND sessions.battle_type = 'pve.domain_front'
-              AND sessions.status = 'settled'
-              AND json_extract(sessions.result_json, '$.outcome') = 'won'
-            LIMIT 1
-            """,
-            (player["id"],),
-        ).fetchone() is not None:
-            events.add("event.domain_front.battle")
-        if connection.execute(
-            "SELECT 1 FROM domain_front_contributions WHERE player_id = ? LIMIT 1",
-            (player["id"],),
-        ).fetchone() is not None:
-            events.add("event.domain_front.contribution")
-        if connection.execute(
-            "SELECT 1 FROM domain_front_claims WHERE player_id = ? LIMIT 1",
-            (player["id"],),
-        ).fetchone() is not None:
-            events.add("event.domain_front.claimed")
-        unlock_query = (
-            "SELECT 1 FROM void_archive_unlocks "
-            "WHERE player_id = ? AND event_key = ?"
-        )
-        unlock_params: tuple[Any, ...] = (player["id"], "event.archive_unlock")
-        if now is not None:
-            unlock_query += " AND ends_at > ?"
-            unlock_params += (serialize_datetime(now),)
-        if connection.execute(unlock_query, unlock_params).fetchone() is not None:
-            events.add("event.archive_unlock")
-        if connection.execute(
-            "SELECT 1 FROM void_archive_runs WHERE player_id = ? AND outcome = 'won' LIMIT 1",
-            (player["id"],),
-        ).fetchone() is not None:
-            events.add("event.archive_guard.won")
-        if connection.execute(
-            "SELECT 1 FROM time_fort_members WHERE player_id = ? AND status = 'settled' AND first_clear = 1 LIMIT 1",
-            (player["id"],),
-        ).fetchone() is not None:
-            events.add("story.mainline.void_archive.time_fort")
-        project_rows = connection.execute(
-            """
-            SELECT DISTINCT p.project_key
-            FROM livelihood_project_rewards r
-            JOIN livelihood_projects p ON p.project_id = r.project_id
-            WHERE r.player_id = ? AND r.eligible = 1
-            """,
-            (player["id"],),
-        ).fetchall()
-        for project in project_rows:
-            events.add(f"livelihood.project.{project['project_key']}.completed")
         return events
 
     @staticmethod
@@ -1608,19 +1618,28 @@ class AdventuresRepositoryMixin:
         replay: bool = False,
         now: datetime | None = None,
     ) -> MainlineStatusRecord:
+        all_runs = tuple(
+            connection.execute(
+                "SELECT * FROM mainline_runs WHERE player_id = ?",
+                (player["id"],),
+            ).fetchall()
+        )
         runs = {
             str(item["stage_key"]): item
-            for item in connection.execute(
-                "SELECT * FROM mainline_runs WHERE player_id = ? AND story_key = ?",
-                (player["id"], story_key),
-            ).fetchall()
+            for item in all_runs
+            if str(item["story_key"]) == story_key
         }
         completed_stages = {
             str(item["stage_key"])
             for item in runs.values()
             if bool(item["first_clear_claimed"])
         }
-        completed_events = AdventuresRepositoryMixin._mainline_completed_events(connection, player, now=now)
+        completed_events = AdventuresRepositoryMixin._mainline_completed_events(
+            connection,
+            player,
+            now=now,
+            mainline_rows=all_runs,
+        )
         views: list[MainlineStageView] = []
         for current_definition in mainline_definitions(content, story_key=story_key, validate_sources=False):
             run = runs.get(current_definition.key)

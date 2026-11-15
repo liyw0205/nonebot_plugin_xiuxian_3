@@ -1030,17 +1030,34 @@ class PlayerRepositoryMixin:
                 except ValueError:
                     pass
             connection.execute("BEGIN IMMEDIATE" if needs_refresh else "BEGIN")
-            row = self._profile_player_row(connection, platform, platform_user_id)
+            # The initial lookup is already inside this short-lived request.
+            # Refreshes deliberately reload after BEGIN IMMEDIATE so a state
+            # mutation still returns the committed row.
+            row = self._profile_player_row(
+                connection,
+                platform,
+                platform_user_id,
+                initial=initial if not needs_refresh else None,
+            )
             if row is None:
                 return None, {}
             stats = {} if row["stage"] == STAGE_NEW_USER else self._build_player_stat_snapshot(connection, row)
             return self._row_to_player(row), stats
 
-    def _profile_player_row(self, connection: sqlite3.Connection, platform: str, platform_user_id: str) -> sqlite3.Row | None:
-        row = connection.execute(
-            "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
-            (platform, platform_user_id),
-        ).fetchone()
+    def _profile_player_row(
+        self,
+        connection: sqlite3.Connection,
+        platform: str,
+        platform_user_id: str,
+        *,
+        initial: sqlite3.Row | None = None,
+    ) -> sqlite3.Row | None:
+        row = initial
+        if row is None:
+            row = connection.execute(
+                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
+                (platform, platform_user_id),
+            ).fetchone()
         if row is None:
             return None
         if str(row["realm_key"]) == "soul_transformation" and player_integer(row, "domain_charge_max") > 0:
