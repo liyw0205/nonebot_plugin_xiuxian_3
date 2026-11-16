@@ -99,6 +99,14 @@ def validate_exploration_content(bundle: ContentBundle) -> int:
     return len(definitions)
 
 
+def validate_mainline_content(bundle: ContentBundle) -> int:
+    """Validate every story stage and its executable cross-domain references."""
+
+    from .adventures.mainline import mainline_definitions
+
+    return len(mainline_definitions(bundle))
+
+
 def validate_content_references(bundle: ContentBundle) -> dict[str, int]:
     """Run the release-time validation for all currently active content domains."""
 
@@ -113,6 +121,7 @@ def validate_content_references(bundle: ContentBundle) -> dict[str, int]:
 
     world = validate_world_content(bundle)
     combat = validate_combat_content(bundle)
+    mainline = validate_mainline_content(bundle)
     modes = validate_exploration_content(bundle)
     rewards = validate_reward_content(bundle)
     bounties = len(bounty_definitions(bundle))
@@ -124,6 +133,7 @@ def validate_content_references(bundle: ContentBundle) -> dict[str, int]:
     dispatch_definitions(bundle)
     return {
         **world,
+        "mainline_stages": mainline,
         "exploration_modes": modes,
         "reward_pools": rewards,
         "bounties": bounties,
@@ -194,6 +204,7 @@ def _labels(row: dict[str, Any], context: str) -> None:
 __all__ = [
     "validate_content_references",
     "validate_exploration_content",
+    "validate_mainline_content",
     "validate_reward_content",
     "validate_source_content",
 ]

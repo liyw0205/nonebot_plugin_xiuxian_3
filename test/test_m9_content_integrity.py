@@ -11,6 +11,7 @@ from nonebot_plugin_xiuxian_3.xiuxian.content import ContentBundle, ContentError
 from nonebot_plugin_xiuxian_3.xiuxian.content_integrity import (
     validate_content_references,
     validate_exploration_content,
+    validate_mainline_content,
     validate_reward_content,
     validate_source_content,
 )
@@ -39,6 +40,7 @@ def test_m9_content_references_are_closed() -> None:
     summary = validate_content_references(ContentBundle.load(DATA))
     # These counts pin the shipped content inventory.
     assert summary["locations"] == 34
+    assert summary["mainline_stages"] == 157
     assert summary["exploration_modes"] == 27
     assert summary["bounties"] == 54
     assert summary["recipes"] == 37
@@ -51,6 +53,16 @@ def test_exploration_rejects_missing_reward_pool(tmp_path: Path) -> None:
     _edit(root, "探索/模式.json", "explore.gather_outskirts", reward_pool_key="reward_pool.missing")
     with pytest.raises(ContentError, match="reward pool"):
         validate_exploration_content(ContentBundle.load(root))
+
+
+def test_mainline_rejects_empty_story_body_at_release_validation(tmp_path: Path) -> None:
+    root = _copy(tmp_path)
+    _edit(root, "剧情/主线.json", "chapter.1.stage.1", body="   ")
+    bundle = ContentBundle.load(root)
+    with pytest.raises(ContentError, match="body must be a non-empty string"):
+        validate_mainline_content(bundle)
+    with pytest.raises(ContentError, match="body must be a non-empty string"):
+        validate_content_references(bundle)
 
 
 def test_combat_rejects_empty_encounter_pool(tmp_path: Path) -> None:
