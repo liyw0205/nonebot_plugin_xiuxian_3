@@ -38,9 +38,9 @@ def _active_exploration_pool_keys(bundle: ContentBundle) -> list[str]:
 def test_all_active_exploration_pools_have_at_least_two_distinct_outcomes() -> None:
     bundle = _bundle()
     pool_keys = _active_exploration_pool_keys(bundle)
-    # 25 shipped exploration pools + 2 foundation pools added by the
-    # foundation-coverage slice; both carry >=2 distinct outcomes as well.
-    assert len(pool_keys) == 27
+    # Keep this count explicit so adding an open pool also updates the source
+    # and consumer contracts in the same change.
+    assert len(pool_keys) == 29
     distinct_counts: dict[str, int] = {}
     for pool_key in pool_keys:
         outcomes = reward_pool_outcomes(pool_key, bundle)
@@ -52,6 +52,24 @@ def test_all_active_exploration_pools_have_at_least_two_distinct_outcomes() -> N
     # The two historically thinnest pools are explicitly verified.
     assert distinct_counts["reward_pool.exploration.demon_threshold"] >= 2
     assert distinct_counts["reward_pool.exploration.ancestral_lake"] >= 2
+
+
+def test_new_foundation_exploration_pools_have_declared_sources() -> None:
+    bundle = _bundle()
+    expected = {
+        "reward_pool.exploration.cloud_city_patrol",
+        "reward_pool.exploration.cloud_city_escort",
+        "reward_pool.exploration.spirit_field_tending",
+        "reward_pool.exploration.array_hall_drill",
+        "reward_pool.exploration.war_front_patrol",
+    }
+    references = {
+        channel["reference"]
+        for source in bundle.list("source", include_locked=False)
+        for channel in source.get("channels", [])
+        if channel.get("operation") == "exploration.settle"
+    }
+    assert expected <= references
 
 
 def test_every_battle_mode_resolves_a_battle_failure_result() -> None:

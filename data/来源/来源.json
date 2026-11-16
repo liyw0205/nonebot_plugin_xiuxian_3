@@ -182,6 +182,28 @@
       "status": "active"
     },
     {
+      "key": "source.item.foundation_exploration_routes",
+      "name": "基础探索路线来源",
+      "desc": "云城、灵田与阵堂的公开探索路线提供基础修为、灵石及可核验材料产出。",
+      "asset_keys": [
+        "item.food.coarse_spirit_rice",
+        "item.spirit_water",
+        "item.mat.wood",
+        "item.herb.spirit_leaf",
+        "item.mat.array_sand",
+        "item.material.ward_plate",
+        "item.material.cloud_iron"
+      ],
+      "channels": [
+        {"operation": "exploration.settle", "reference": "reward_pool.exploration.cloud_city_patrol"},
+        {"operation": "exploration.settle", "reference": "reward_pool.exploration.cloud_city_escort"},
+        {"operation": "exploration.settle", "reference": "reward_pool.exploration.spirit_field_tending"},
+        {"operation": "exploration.settle", "reference": "reward_pool.exploration.array_hall_drill"},
+        {"operation": "exploration.settle", "reference": "reward_pool.exploration.war_front_patrol"}
+      ],
+      "status": "active"
+    },
+    {
       "key": "source.item.war_front_ward",
       "name": "战线护阵来源",
       "desc": "由阵盘残片与阵砂在阵堂公开生产。",
