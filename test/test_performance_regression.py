@@ -231,6 +231,7 @@ def test_idle_preview_comparison_reuses_one_fixture_and_shared_route_state() -> 
     assert before["sql_profile_enabled"] is after["sql_profile_enabled"] is True
     assert len(before["levels"]) == len(after["levels"]) == 2
     assert before["seed"]["idle_preview_history_rows"] == 16
+    assert before["seed"]["active_idle_rows_for_preview"] == 0
     assert not any(
         "SCAN IDLE_ASSIGNMENTS" in detail.upper()
         for detail in after["explain_query_plan"]["idle_daily_grouped"]

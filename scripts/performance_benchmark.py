@@ -385,6 +385,20 @@ def _seed_idle_preview_history(path: Path, users: int) -> int:
     return len(rows)
 
 
+def _prepare_idle_preview_fixture(path: Path) -> int:
+    with sqlite3.connect(path) as connection:
+        connection.execute(
+            "UPDATE idle_assignments SET status = 'cancelled' "
+            "WHERE status IN ('assigned', 'running')"
+        )
+        return int(
+            connection.execute(
+                "SELECT COUNT(*) FROM idle_assignments "
+                "WHERE status IN ('assigned', 'running')"
+            ).fetchone()[0]
+        )
+
+
 def _seed_arena_history(runtime: Any, path: Path, users: int, now: str) -> int:
     if users < 2:
         return 0
@@ -1237,6 +1251,9 @@ async def _run_idle_preview_comparison(
         seed = _seed_database(runtime, users, batch_size)
         seed["idle_preview_history_rows"] = _seed_idle_preview_history(
             runtime.settings.database_path, users
+        )
+        seed["active_idle_rows_for_preview"] = _prepare_idle_preview_fixture(
+            runtime.settings.database_path
         )
         seed["db_bytes"] = _db_size(runtime.settings.database_path)
         explain = _explain(runtime.settings.database_path, 1)

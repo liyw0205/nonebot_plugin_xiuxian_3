@@ -18,9 +18,10 @@ their message/presentation contracts are unchanged.
 
 ## Same-Fixture Comparison
 
-One temporary 1,000-user SQLite fixture was reused by both variants. It
-contained 2,000 deterministic daily-history rows (one `claimed` and one
-`expired` row per player across two routes). Each variant ran 60 actual
+One temporary 1,000-user SQLite fixture was reused by both variants. The
+preview players had no active idle assignments and had 2,000 deterministic
+daily-history rows (one `claimed` and one `expired` row per player across two
+routes). Each variant ran 60 actual
 `挂机预览` dispatches at concurrency 1/10/50, alternating OneBot and QQ
 normalization, with SQL tracing and two counterbalanced repetitions per level:
 
@@ -32,22 +33,22 @@ Each value is `p50 / p95 / p99 ms`; repeats are shown in execution order.
 
 | Concurrency | Before: repeated route reads | After: shared request state |
 | ---: | --- | --- |
-| 1 | `16.510/17.794/25.574`; `16.418/17.369/19.099` | `12.760/15.809/18.919`; `12.757/14.237/17.806` |
-| 10 | `468.474/531.181/537.148`; `466.666/530.436/537.662` | `233.946/282.506/292.691`; `226.869/278.433/281.884` |
-| 50 | `1383.353/2862.586/2902.234`; `1401.247/2838.681/2878.029` | `692.550/1406.065/1444.100`; `678.999/1402.699/1450.539` |
+| 1 | `18.716/28.083/29.214`; `18.584/19.710/28.995` | `12.880/13.571/14.971`; `12.925/13.751/16.082` |
+| 10 | `632.212/708.256/728.051`; `633.968/699.309/706.644` | `246.063/303.402/305.470`; `244.569/304.745/320.218` |
+| 50 | `1941.685/3828.004/3887.420`; `1953.235/3855.408/3908.576` | `740.292/1523.807/1579.826`; `746.787/1521.902/1563.262` |
 
 All 720 measured requests returned without error, all preview records matched
 field-for-field before and after, and both reports confirmed cleanup of the
 temporary database. The seeded database was `29,331,904` bytes; the shared
-post-run database was `16,965,632` bytes. Traced SQL fell from 19,560 per
-60-request level to 840 (95.7% fewer statements). CPU seconds at c1/c10/c50
-were `1.015/1.000`, `5.011/4.925`, `5.350/5.412` before and
-`0.791/0.787`, `2.304/2.185`, `2.292/2.309` after. The process RSS high-water
-was at most `130.84 MiB`; it is a process-wide high-water shared across
-variants and is not presented as a per-variant memory reduction.
+post-run database was `16,969,728` bytes. Traced SQL fell from 35,940 per
+60-request level to 2,340 (93.5% fewer statements). CPU seconds at c1/c10/c50
+were `1.184/1.142`, `6.902/6.964`, `7.680/7.726` before and
+`0.785/0.788`, `2.424/2.403`, `2.535/2.529` after. The process RSS
+high-water was at most `132.19 MiB`; it is a process-wide high-water shared
+across variants and is not presented as a per-variant memory reduction.
 
-At c50 executor queue p95 fell from `2445.357/2374.286ms` to
-`1194.171/1190.434ms`; eight workers were active in both variants. The active
+At c50 executor queue p95 fell from `3236.116/3269.220ms` to
+`1270.112/1272.602ms`; eight workers were active in both variants. The active
 idle lookup uses the existing covering player/status index. The grouped daily
 count uses the existing player/status index and a small temporary B-tree for
 `GROUP BY`; no index or schema change was added.
