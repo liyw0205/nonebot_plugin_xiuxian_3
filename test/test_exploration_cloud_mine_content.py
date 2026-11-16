@@ -12,7 +12,6 @@ from combat_fixtures import BALANCED_QUALIFICATION
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
-from nonebot_plugin_xiuxian_3.xiuxian.rewards.rules import RewardContentError
 from nonebot_plugin_xiuxian_3.xiuxian.exploration.rules import (
     battle_roll_bp,
     exploration_encounter_selection,
@@ -239,10 +238,10 @@ def test_cloud_mine_rejects_invalid_reward_content_without_cost_or_session(
             user = f"cloud-mine-invalid-{adapter}"
             await _prepare_player(runtime, adapter, user)
             before = _state(runtime)
-            with pytest.raises(RewardContentError, match="item.missing"):
-                await _send(
-                    runtime, adapter, user, "invalid-cloud-mine", "开始探索 云铁矿区采集"
-                )
+            rejected = await _send(
+                runtime, adapter, user, "invalid-cloud-mine", "开始探索 云铁矿区采集"
+            )
+            assert rejected.code == "PERSISTENCE_ERROR"
             assert _state(runtime) == before
         finally:
             await runtime.close()

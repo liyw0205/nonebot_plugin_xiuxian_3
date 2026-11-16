@@ -29,6 +29,7 @@ from ..repository import (
 )
 from ..player.rules import LOCATION_LABELS
 from ..utils.assets import is_currency_asset_key
+from ..rewards.rules import RewardContentError
 from .rules import exploration_definition, resolve_exploration_mode
 
 logger = logging.getLogger(__name__)
@@ -137,6 +138,15 @@ class ExplorationApplication:
             return CommandResult(False, "SOUL_EXHAUSTION_ACTIVE", "神魂疲劳尚未结束，暂时不能进行跨界探索。", context.request_id, operation_id)
         except OperationConflictError:
             return CommandResult(False, "OPERATION_CONFLICT", "这次请求已对应另一段探索，请重新发起。", context.request_id, operation_id)
+        except RewardContentError:
+            return CommandResult(
+                False,
+                "PERSISTENCE_ERROR",
+                "探索内容暂时不可用，未扣除任何资源，请稍后重试。",
+                context.request_id,
+                operation_id,
+                retryable=True,
+            )
         except RepositoryBusyError:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:

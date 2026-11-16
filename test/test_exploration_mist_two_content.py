@@ -12,8 +12,10 @@ from combat_fixtures import BALANCED_QUALIFICATION
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
-from nonebot_plugin_xiuxian_3.xiuxian.rewards.rules import RewardContentError
-from nonebot_plugin_xiuxian_3.xiuxian.exploration.rules import battle_roll_bp
+from nonebot_plugin_xiuxian_3.xiuxian.exploration.rules import (
+    battle_roll_bp,
+    exploration_encounter_selection,
+)
 
 
 ADAPTERS = ("qq.official", "onebot.v11")
@@ -77,6 +79,21 @@ def _operation_for_encounter(adapter: str, *, encounter: bool) -> str:
         f"{adapter}-mist-two-{index}"
         for index in range(1_000)
         if (battle_roll_bp(f"{adapter}-mist-two-{index}:battle") < 4_000) == encounter
+    )
+
+
+def _operation_for_elite(adapter: str) -> str:
+    return next(
+        f"{adapter}-mist-two-{index}"
+        for index in range(1_000)
+        if (battle_roll_bp(f"{adapter}-mist-two-{index}:battle") < 4_000)
+        and exploration_encounter_selection(
+            "explore.mist_grotto_2",
+            seed=f"{adapter}-mist-two-{index}",
+            realm_key="golden_core",
+            realm_layer=1,
+        )[0]
+        == "enemy.mist_elite"
     )
 
 
@@ -202,10 +219,10 @@ def test_mist_grotto_two_rejects_invalid_pool_without_cost_or_session(
             user = f"mist-two-invalid-{adapter}"
             await _prepare_player(runtime, adapter, user)
             before = _state(runtime)
-            with pytest.raises(RewardContentError, match="item.missing"):
-                await _send(
-                    runtime, adapter, user, "invalid-start", "开始探索 洞天二层探索"
-                )
+            rejected = await _send(
+                runtime, adapter, user, "invalid-start", "开始探索 洞天二层探索"
+            )
+            assert rejected.code == "PERSISTENCE_ERROR"
             assert _state(runtime) == before
         finally:
             await runtime.close()
@@ -235,7 +252,7 @@ def test_mist_grotto_two_real_encounters_settle_frozen_rewards_by_outcome(
             for adapter in ADAPTERS:
                 user = f"mist-two-battle-{outcome}-{adapter}"
                 await _prepare_player(runtime, adapter, user, outcome=outcome)
-                start_operation = _operation_for_encounter(adapter, encounter=True)
+                start_operation = _operation_for_elite(adapter)
                 started = await _send(
                     runtime, adapter, user, start_operation, "开始探索 洞天二层探索"
                 )
