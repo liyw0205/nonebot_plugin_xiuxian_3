@@ -19,6 +19,7 @@ import tempfile
 import threading
 import time
 from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Iterable
@@ -136,6 +137,7 @@ def _instrument_repository(runtime: Any, *, enabled: bool | None = None) -> dict
         "connection_open_ms": [],
         "player_profile_ms": [],
         "idle_status_ms": [],
+        "idle_preview_ms": [],
         "mainline_status_ms": [],
         "travel_preview_ms": [],
         "arena_season_board_ms": [],
@@ -161,6 +163,7 @@ def _instrument_repository(runtime: Any, *, enabled: bool | None = None) -> dict
 
     timed_method("_get_player_profile_sync", "player_profile_ms")
     timed_method("_get_idle_status_once", "idle_status_ms")
+    timed_method("_preview_idle_once", "idle_preview_ms")
     timed_method("_get_mainline_status_sync", "mainline_status_ms")
     timed_method("_preview_travel_database_state", "travel_preview_ms")
     timed_method("_arena_season_board_once", "arena_season_board_ms")
@@ -338,6 +341,48 @@ def _seed_database(runtime: Any, users: int, batch_size: int) -> dict[str, float
         "seed_seconds": round(time.perf_counter() - started, 3),
         "db_bytes": _db_size(path),
     }
+
+
+def _seed_idle_preview_history(path: Path, users: int) -> int:
+    timestamp = datetime.now(timezone.utc)
+    now = timestamp.isoformat()
+    business_date = timestamp.date().isoformat()
+    rows = []
+    for number in range(users):
+        player_id = number + 1
+        for label, route_key, status in (
+            ("town", "idle.town_errand", "claimed"),
+            ("herb", "idle.herb_vale_gather", "expired"),
+        ):
+            suffix = f"{label}-{number:07d}"
+            rows.append(
+                (
+                    f"perf-idle-history-{suffix}",
+                    player_id,
+                    f"perf-idle-history-op-{suffix}",
+                    route_key,
+                    status,
+                    business_date,
+                    now,
+                    now,
+                    now,
+                    now,
+                    "{}",
+                    "{}",
+                    "{}",
+                    now,
+                    now,
+                )
+            )
+    with sqlite3.connect(path) as connection:
+        connection.executemany(
+            "INSERT INTO idle_assignments(assignment_id, player_id, operation_id, route_key, "
+            "status, business_date, starts_at, claim_at, max_claim_at, cancel_until, cost_json, "
+            "snapshot_json, result_json, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            rows,
+        )
+    return len(rows)
 
 
 def _seed_arena_history(runtime: Any, path: Path, users: int, now: str) -> int:
@@ -562,6 +607,9 @@ def _explain(path: Path, player_id: int) -> dict[str, list[str]]:
     queries = {
         "player_lookup": "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
         "idle_status": "SELECT * FROM idle_assignments WHERE player_id = ? AND status = 'running' ORDER BY id DESC LIMIT 1",
+        "idle_active_preview": "SELECT 1 FROM idle_assignments WHERE player_id = ? AND status IN ('assigned', 'running') LIMIT 1",
+        "idle_daily_route": "SELECT COUNT(*) AS count FROM idle_assignments WHERE player_id = ? AND route_key = ? AND business_date = ? AND status IN ('claimed', 'expired')",
+        "idle_daily_grouped": "SELECT route_key, COUNT(*) AS count FROM idle_assignments WHERE player_id = ? AND business_date = ? AND status IN ('claimed', 'expired') AND route_key IN (?, ?) GROUP BY route_key",
         "mainline_progress": "SELECT * FROM mainline_runs WHERE player_id = ? AND story_key = ?",
         "mainline_evidence": """
             SELECT ? AS event_key
@@ -641,6 +689,9 @@ def _explain(path: Path, player_id: int) -> dict[str, list[str]]:
     params = {
         "player_lookup": ("onebot.v11", f"perf-{player_id - 1:07d}"),
         "idle_status": (player_id,),
+        "idle_active_preview": (player_id,),
+        "idle_daily_route": (player_id, "idle.herb_vale_gather", "2026-11-15"),
+        "idle_daily_grouped": (player_id, "2026-11-15", "idle.herb_vale_gather", "idle.town_errand"),
         "mainline_progress": (player_id, "story.mainline.xuantian"),
         "mainline_evidence": (
             "event.town_commission.delivered", player_id,
@@ -1156,6 +1207,176 @@ async def _run_arena_season_event_comparison(
     return payload
 
 
+async def _run_idle_preview_comparison(
+    users: int,
+    batch_size: int,
+    total_requests: int,
+    levels: tuple[int, ...],
+    *,
+    profile_sql: bool | None = None,
+    commands: tuple[str, ...] | None = None,
+) -> dict[str, Any]:
+    """Compare repeated per-route state reads with one shared preview context."""
+
+    selected_commands = commands or ("挂机预览",)
+    if selected_commands != ("挂机预览",):
+        raise ValueError("idle preview comparison only supports the all-route preview command")
+
+    import importlib
+    from types import SimpleNamespace
+
+    idle_rules = importlib.import_module(
+        "nonebot_plugin_xiuxian_3.xiuxian.specials.idle_rules"
+    )
+    player_module = importlib.import_module("nonebot_plugin_xiuxian_3.xiuxian.utils.player")
+    temporary_path: Path
+    with tempfile.TemporaryDirectory(prefix="xiuxian-perf-") as data_dir:
+        temporary_path = Path(data_dir)
+        runtime = create_runtime(data_dir=data_dir, adapters=("onebot.v11", "qq.official"))
+        await runtime.initialize()
+        seed = _seed_database(runtime, users, batch_size)
+        seed["idle_preview_history_rows"] = _seed_idle_preview_history(
+            runtime.settings.database_path, users
+        )
+        seed["db_bytes"] = _db_size(runtime.settings.database_path)
+        explain = _explain(runtime.settings.database_path, 1)
+        metrics = _instrument_repository(runtime, enabled=profile_sql)
+        restore_executor = _instrument_executor(metrics) if metrics is not None else None
+        repository = runtime.repository
+        optimized_preview = repository._preview_idle_once
+
+        def repeated_state_preview(
+            platform: str, platform_user_id: str, route_key: str | None
+        ) -> tuple[Any, ...]:
+            requested = (
+                (idle_rules.resolve_route(route_key, repository.content),)
+                if route_key
+                else idle_rules.idle_route_order(repository.content)
+            )
+            now = repository._now()
+            with repository._connect() as connection:
+                player = repository._require_player(
+                    connection, platform, platform_user_id, writable=False
+                )
+                previews = []
+                for definition in requested:
+                    active_idle = connection.execute(
+                        "SELECT 1 FROM idle_assignments WHERE player_id = ? "
+                        "AND status IN ('assigned', 'running') LIMIT 1",
+                        (player["id"],),
+                    ).fetchone() is not None
+                    active_long_action = repository._has_active_long_action(
+                        connection, int(player["id"])
+                    )
+                    daily_row = connection.execute(
+                        "SELECT COUNT(*) AS count FROM idle_assignments "
+                        "WHERE player_id = ? AND route_key = ? AND business_date = ? "
+                        "AND status IN ('claimed', 'expired')",
+                        (player["id"], definition.key, now.date().isoformat()),
+                    ).fetchone()
+                    shared_state = SimpleNamespace(
+                        local_reputation=player_module.player_reputation_state(
+                            connection, int(player["id"])
+                        ).local,
+                        active_idle=active_idle,
+                        active_long_action=active_long_action,
+                        daily_used={
+                            definition.key: int(daily_row["count"])
+                            if daily_row is not None
+                            else 0
+                        },
+                    )
+                    previews.append(
+                        repository._idle_preview(
+                            connection, player, definition, now, shared_state
+                        )
+                    )
+                return tuple(previews)
+
+        def legacy_timed_preview(*args: Any, **kwargs: Any) -> Any:
+            started = time.perf_counter()
+            try:
+                return repeated_state_preview(*args, **kwargs)
+            finally:
+                if metrics is not None:
+                    metrics["idle_preview_ms"].append(
+                        (time.perf_counter() - started) * 1000
+                    )
+
+        variants: dict[str, list[dict[str, Any]]] = {
+            "before_repeated_route_state_reads": [],
+            "after_shared_preview_state": [],
+        }
+        try:
+            baseline_records = repeated_state_preview("onebot.v11", "perf-0000000", None)
+            optimized_records = optimized_preview("onebot.v11", "perf-0000000", None)
+            correctness_equivalent = [asdict(record) for record in baseline_records] == [
+                asdict(record) for record in optimized_records
+            ]
+            if not correctness_equivalent:
+                raise AssertionError("idle preview results differ between comparison variants")
+            for level_index, concurrency in enumerate(levels):
+                for repetition in range(2):
+                    before_first = (level_index + repetition) % 2 == 0
+                    order = (
+                        (
+                            ("before_repeated_route_state_reads", legacy_timed_preview),
+                            ("after_shared_preview_state", optimized_preview),
+                        )
+                        if before_first
+                        else (
+                            ("after_shared_preview_state", optimized_preview),
+                            ("before_repeated_route_state_reads", legacy_timed_preview),
+                        )
+                    )
+                    for label, preview in order:
+                        repository._preview_idle_once = preview
+                        result = asdict(
+                            await _measure(
+                                runtime,
+                                users,
+                                concurrency,
+                                total_requests,
+                                metrics,
+                                selected_commands,
+                            )
+                        )
+                        result["repeat"] = repetition + 1
+                        variants[label].append(result)
+        finally:
+            if restore_executor is not None:
+                restore_executor()
+            repository._preview_idle_once = optimized_preview
+            await runtime.close()
+        db_bytes = _db_size(runtime.settings.database_path)
+
+        def report(results: list[dict[str, Any]]) -> dict[str, Any]:
+            return {
+                "users": users,
+                "seed": seed,
+                "database_bytes_after_benchmark": db_bytes,
+                "sql_profile_enabled": metrics is not None,
+                "sql_profile_status": "collected" if metrics is not None else "not_collected",
+                "explain_query_plan": explain,
+                "levels": results,
+                "errors": sum(int(item["errors"]) for item in results),
+            }
+
+        payload = {
+            "comparison": {label: report(results) for label, results in variants.items()},
+            "preview_records_equivalent": correctness_equivalent,
+            "errors": sum(
+                int(item["errors"])
+                for results in variants.values()
+                for item in results
+            ),
+        }
+    cleaned = not temporary_path.exists()
+    for result in payload["comparison"].values():
+        result["temporary_database_cleaned"] = cleaned
+    return payload
+
+
 async def _run_arena_season_index_comparison(
     users: int,
     batch_size: int,
@@ -1306,6 +1527,11 @@ def main() -> int:
         help="compare a covering season-history index on one fixture",
     )
     compare.add_argument(
+        "--compare-idle-preview-state",
+        action="store_true",
+        help="compare repeated vs shared route state on one idle-preview fixture",
+    )
+    compare.add_argument(
         "--compare-connection-probe",
         action="store_true",
         help="compare the removed connection health probe without reseeding the fixture",
@@ -1322,7 +1548,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--command",
-        choices=("我的状态", "挂机状态", "主线状态", "移动预览 玄天近郊", "竞技场赛季"),
+        choices=("我的状态", "挂机状态", "挂机预览", "主线状态", "移动预览 玄天近郊", "竞技场赛季"),
         help="measure one real command with all requests assigned to it",
     )
     args = parser.parse_args()
@@ -1337,7 +1563,18 @@ def main() -> int:
         parser.error("--concurrency values must be between 1 and 50")
     commands = (args.command,) if args.command else None
     profile_sql = True if args.profile_sql else None
-    if args.compare_arena_season_index:
+    if args.compare_idle_preview_state:
+        payload = asyncio.run(
+            _run_idle_preview_comparison(
+                args.users,
+                args.batch_size,
+                args.requests,
+                levels,
+                profile_sql=profile_sql,
+                commands=commands,
+            )
+        )
+    elif args.compare_arena_season_index:
         payload = asyncio.run(
             _run_arena_season_index_comparison(
                 args.users,

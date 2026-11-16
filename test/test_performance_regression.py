@@ -206,6 +206,47 @@ def test_arena_season_index_comparison_uses_one_clean_fixture() -> None:
     )
 
 
+def test_idle_preview_comparison_reuses_one_fixture_and_shared_route_state() -> None:
+    import asyncio
+
+    from scripts.performance_benchmark import _run_idle_preview_comparison
+
+    report = asyncio.run(
+        _run_idle_preview_comparison(
+            users=8,
+            batch_size=8,
+            total_requests=8,
+            levels=(1,),
+            profile_sql=True,
+            commands=("挂机预览",),
+        )
+    )
+    before = report["comparison"]["before_repeated_route_state_reads"]
+    after = report["comparison"]["after_shared_preview_state"]
+    assert report["errors"] == 0
+    assert report["preview_records_equivalent"] is True
+    assert before["seed"] == after["seed"]
+    assert before["database_bytes_after_benchmark"] == after["database_bytes_after_benchmark"]
+    assert before["temporary_database_cleaned"] is after["temporary_database_cleaned"] is True
+    assert before["sql_profile_enabled"] is after["sql_profile_enabled"] is True
+    assert len(before["levels"]) == len(after["levels"]) == 2
+    assert before["seed"]["idle_preview_history_rows"] == 16
+    assert not any(
+        "SCAN IDLE_ASSIGNMENTS" in detail.upper()
+        for detail in after["explain_query_plan"]["idle_daily_grouped"]
+    )
+    for old, new in zip(before["levels"], after["levels"], strict=True):
+        assert old["sql_queries"] > new["sql_queries"] > 0
+        assert old["errors"] == new["errors"] == 0
+        assert old["command_errors"]["挂机预览"] == new["command_errors"]["挂机预览"] == 0
+        assert old["stage_latency_ms"]["idle_preview"]["count"] == old["requests"]
+        assert new["stage_latency_ms"]["idle_preview"]["count"] == new["requests"]
+        assert old["executor_queue_wait_ms"]["count"] >= old["requests"]
+        assert new["executor_queue_wait_ms"]["count"] >= new["requests"]
+        assert old["executor_worker_count"] > 0
+        assert new["executor_worker_count"] > 0
+
+
 def test_thread_local_connection_reuse_skips_health_probe(tmp_path) -> None:
     import asyncio
 

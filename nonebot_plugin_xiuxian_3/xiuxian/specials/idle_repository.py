@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import sqlite3
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from math import ceil
 from typing import Any
@@ -57,6 +58,14 @@ from ..utils.player import (
     player_reputation_state,
     spend_player_state,
 )
+
+
+@dataclass(frozen=True, slots=True)
+class _IdlePreviewSharedState:
+    local_reputation: dict[str, int]
+    active_idle: bool
+    active_long_action: bool
+    daily_used: dict[str, int]
 
 
 class IdleRepositoryMixin:
@@ -132,7 +141,45 @@ class IdleRepositoryMixin:
         now = self._now()
         with self._connect() as connection:
             player = self._require_player(connection, platform, platform_user_id, writable=False)
-            return tuple(self._idle_preview(connection, player, definition, now) for definition in requested)
+            shared_state = self._idle_preview_shared_state(connection, player, requested, now)
+            return tuple(
+                self._idle_preview(connection, player, definition, now, shared_state)
+                for definition in requested
+            )
+
+    def _idle_preview_shared_state(
+        self,
+        connection: sqlite3.Connection,
+        player: sqlite3.Row,
+        definitions: tuple[IdleRouteDefinition, ...],
+        now: datetime,
+    ) -> _IdlePreviewSharedState:
+        player_id = int(player["id"])
+        local_reputation = player_reputation_state(connection, player_id).local
+        active_idle = connection.execute(
+            "SELECT 1 FROM idle_assignments WHERE player_id = ? AND status IN ('assigned', 'running') LIMIT 1",
+            (player_id,),
+        ).fetchone() is not None
+        # The long-action predicate includes these active idle statuses.
+        active_long_action = active_idle or self._has_active_long_action(connection, player_id)
+        route_keys = tuple(dict.fromkeys(definition.key for definition in definitions))
+        daily_used: dict[str, int] = {}
+        if route_keys:
+            placeholders = ", ".join("?" for _ in route_keys)
+            rows = connection.execute(
+                "SELECT route_key, COUNT(*) AS count FROM idle_assignments "
+                "WHERE player_id = ? AND business_date = ? "
+                "AND status IN ('claimed', 'expired') "
+                f"AND route_key IN ({placeholders}) GROUP BY route_key",
+                (player_id, now.date().isoformat(), *route_keys),
+            ).fetchall()
+            daily_used = {str(row["route_key"]): int(row["count"]) for row in rows}
+        return _IdlePreviewSharedState(
+            local_reputation=local_reputation,
+            active_idle=active_idle,
+            active_long_action=active_long_action,
+            daily_used=daily_used,
+        )
 
     def _idle_requirements_missing(
         self,
@@ -140,6 +187,7 @@ class IdleRepositoryMixin:
         player: sqlite3.Row,
         definition: IdleRouteDefinition,
         now: datetime,
+        local_reputation: dict[str, int],
     ) -> list[str]:
         missing: list[str] = []
         stage_order = {"new_user": 0, "mortal": 1, "seeker": 2, "cultivator": 3, "suspended": -1}
@@ -148,7 +196,6 @@ class IdleRepositoryMixin:
             missing.append(f"角色尚未完成{stage_labels.get(definition.required_stage, '入道')}")
         if definition.required_location and str(player["location_key"]) != definition.required_location:
             missing.append(f"所在地点不符（需要抵达{(self.content or bundled_content()).label('location', definition.required_location)}）")
-        local_reputation = player_reputation_state(connection, int(player["id"])).local
         for reputation_key, minimum in definition.required_local_reputation:
             if int(local_reputation.get(reputation_key, 0)) < minimum:
                 missing.append(f"地方名望不足（需要 {minimum}）")
@@ -214,21 +261,20 @@ class IdleRepositoryMixin:
         player: sqlite3.Row,
         definition: IdleRouteDefinition,
         now: datetime,
+        shared_state: _IdlePreviewSharedState | None = None,
     ) -> IdleRoutePreviewRecord:
-        missing = self._idle_requirements_missing(connection, player, definition, now)
-        active = connection.execute(
-            "SELECT 1 FROM idle_assignments WHERE player_id = ? AND status IN ('assigned', 'running') LIMIT 1",
-            (player["id"],),
-        ).fetchone()
-        if active is not None:
+        if shared_state is None:
+            shared_state = self._idle_preview_shared_state(
+                connection, player, (definition,), now
+            )
+        missing = self._idle_requirements_missing(
+            connection, player, definition, now, shared_state.local_reputation
+        )
+        if shared_state.active_idle:
             missing.append("已有进行中的挂机")
-        if self._has_active_long_action(connection, int(player["id"])):
+        if shared_state.active_long_action:
             missing.append("已有进行中的长时行动")
-        used = connection.execute(
-            "SELECT COUNT(*) AS count FROM idle_assignments WHERE player_id = ? AND route_key = ? AND business_date = ? AND status IN ('claimed', 'expired')",
-            (player["id"], definition.key, now.date().isoformat()),
-        ).fetchone()
-        daily_used = int(used["count"]) if used is not None else 0
+        daily_used = shared_state.daily_used.get(definition.key, 0)
         if daily_used >= definition.daily_limit:
             missing.append("今日挂机结算次数已用尽")
         return IdleRoutePreviewRecord(

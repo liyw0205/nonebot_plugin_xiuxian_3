@@ -142,6 +142,13 @@ def test_seeker_herb_route_requires_residence_and_pays_a_codex_discovery() -> No
                     _context(adapter, user, "herb-start"), f"开始挂机 {HERB_LABEL}"
                 )
                 assert started.code == "IDLE_STARTED", started.message
+                active_preview = await runtime.dispatch(
+                    _context(adapter, user, "preview-active"), f"挂机预览 {HERB_LABEL}"
+                )
+                active_row = _row(active_preview, HERB)
+                assert active_row["ready"] is False
+                assert "已有进行中的挂机" in active_row["missing"]
+                assert "已有进行中的长时行动" in active_row["missing"]
                 clock.advance(hours=4)
                 claimed = await runtime.dispatch(
                     _context(adapter, user, "herb-claim"), "领取挂机"
@@ -181,6 +188,13 @@ def test_seeker_herb_route_requires_residence_and_pays_a_codex_discovery() -> No
                     _context(adapter, user, "herb-again"), f"开始挂机 {HERB_LABEL}"
                 )
                 assert limited.code == "IDLE_DAILY_LIMIT", limited
+                daily_preview = await runtime.dispatch(
+                    _context(adapter, user, "preview-daily"), f"挂机预览 {HERB_LABEL}"
+                )
+                daily_row = _row(daily_preview, HERB)
+                assert daily_row["ready"] is False
+                assert daily_row["daily_used"] == daily_row["daily_limit"] == 1
+                assert "今日挂机结算次数已用尽" in daily_row["missing"]
             finally:
                 await runtime.close()
 

@@ -264,6 +264,35 @@ def test_idle_claim_rejects_malformed_reputation_and_retries_same_operation(tmp_
     asyncio.run(run())
 
 
+def test_idle_preview_preserves_malformed_reputation_diagnostic(tmp_path: Path) -> None:
+    async def run() -> None:
+        runtime = create_runtime(
+            data_dir=_copy_content(tmp_path), adapters=("qq.official", "onebot.v11")
+        )
+        try:
+            for adapter, user in (("qq.official", "idle-preview-bad-qq"), ("onebot.v11", "idle-preview-bad-ob")):
+                await _create_player(runtime, adapter, user)
+                _set_player_local_json(runtime, adapter, user, "{")
+                with pytest.raises(ValueError, match="player local reputation is invalid JSON"):
+                    await _command(runtime, adapter, user, f"{user}-preview", "挂机预览")
+                with runtime.repository._connect() as connection:
+                    row = connection.execute(
+                        "SELECT local_json FROM player_reputations WHERE player_id = "
+                        "(SELECT id FROM players WHERE platform = ? AND platform_user_id = ?)",
+                        (adapter, user),
+                    ).fetchone()
+                    assert row["local_json"] == "{"
+                    assert connection.execute(
+                        "SELECT COUNT(*) FROM idle_assignments WHERE player_id = "
+                        "(SELECT id FROM players WHERE platform = ? AND platform_user_id = ?)",
+                        (adapter, user),
+                    ).fetchone()[0] == 0
+        finally:
+            await runtime.close()
+
+    asyncio.run(run())
+
+
 def test_idle_claim_ledger_failure_rolls_back_and_retries(monkeypatch, tmp_path: Path) -> None:
     async def run() -> None:
         clock = MutableClock()
