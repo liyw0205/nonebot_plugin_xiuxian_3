@@ -69,7 +69,7 @@ def test_idle_claims_bounty_requires_a_claim_since_acceptance() -> None:
             assert created.ok, created.message
             with sqlite3.connect(runtime.settings.database_path) as connection:
                 connection.execute(
-                    "UPDATE players SET stage='cultivator', realm_key='foundation', "
+                    "UPDATE players SET stage='cultivator', realm_key='foundation', energy=2, "
                     "realm_layer=4 WHERE platform=? AND platform_user_id=?",
                     (adapter, user),
                 )

@@ -7,6 +7,7 @@ import hashlib
 import json
 import sqlite3
 import time
+from collections.abc import Mapping
 from dataclasses import replace
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Callable
@@ -176,6 +177,7 @@ from ..utils.player import (
     player_integer,
     player_inventory,
     player_reputation_state,
+    player_values,
     split_player_rewards,
 )
 from ..rewards.rules import local_reputation_maximum
@@ -421,6 +423,19 @@ def _bounty_daily_counts(
     return {str(row["bounty_key"]): int(row["count"]) for row in rows}
 
 
+def _bounty_local_reputation(
+    connection: sqlite3.Connection,
+    player_id: int,
+    definitions: tuple[Any, ...],
+) -> dict[str, int]:
+    if any(
+        item.runtime_status == "open" and item.target_kind == "idle_claims"
+        for item in definitions
+    ):
+        return dict(player_reputation_state(connection, player_id).local)
+    return {}
+
+
 class AdventuresRepositoryMixin:
     async def get_bounty_board(
         self,
@@ -439,6 +454,9 @@ class AdventuresRepositoryMixin:
         business_date: str,
         refresh_seed: str,
         daily_counts: dict[str, int],
+        *,
+        definitions: tuple[Any, ...] | None = None,
+        local_reputation: dict[str, int] | None = None,
     ) -> list[Any]:
         """Return today's stable batch: eligible open definitions in the
         player's seeded order, truncated to the batch size. Ineligible
@@ -446,11 +464,18 @@ class AdventuresRepositoryMixin:
         slots, so a fresh player always sees actionable offers."""
 
         batch_size = 3
+        definitions = definitions or tuple(bounty_definitions(self.content))
+        if local_reputation is None:
+            local_reputation = _bounty_local_reputation(
+                connection, int(row["id"]), definitions
+            )
         open_definitions = [
             definition
-            for definition in bounty_definitions(self.content)
+            for definition in definitions
             if definition.runtime_status == "open"
-            and self._bounty_player_eligible(connection, row, definition, now)
+            and self._bounty_player_eligible(
+                connection, row, definition, now, local_reputation
+            )
             and daily_counts.get(definition.key, 0) < definition.daily_limit
         ]
         return list(refresh_bounty_candidates(open_definitions, seed=refresh_seed))[:batch_size]
@@ -477,6 +502,10 @@ class AdventuresRepositoryMixin:
                     (row["id"], serialize_datetime(now)),
                 ).fetchone()
             daily_counts = _bounty_daily_counts(connection, int(row["id"]), business_date)
+            definitions = tuple(bounty_definitions(self.content))
+            local_reputation = _bounty_local_reputation(
+                connection, int(row["id"]), definitions
+            )
             # The board shows a stable daily batch. Ineligible bounties
             # (realm/permit prerequisites not yet met) never consume batch
             # slots — the board keeps them out so a fresh player always sees
@@ -484,7 +513,14 @@ class AdventuresRepositoryMixin:
             # (appended if outside the batch), and claimed/expired ones stay
             # visible through it.
             batched_definitions = self._bounty_daily_batch(
-                connection, row, now, business_date, refresh_seed, daily_counts
+                connection,
+                row,
+                now,
+                business_date,
+                refresh_seed,
+                daily_counts,
+                definitions=definitions,
+                local_reputation=local_reputation,
             )
             batch_keys = {definition.key for definition in batched_definitions}
             accepted_key = accepted["bounty_key"] if accepted is not None else None
@@ -492,7 +528,7 @@ class AdventuresRepositoryMixin:
                 accepted_definition = next(
                     (
                         definition
-                        for definition in bounty_definitions(self.content)
+                        for definition in definitions
                         if definition.key == accepted_key
                     ),
                     None,
@@ -549,7 +585,9 @@ class AdventuresRepositoryMixin:
                     status = "daily_limit"
                 elif definition.runtime_status != "open":
                     status = "locked"
-                elif not self._bounty_player_eligible(connection, row, definition, now):
+                elif not self._bounty_player_eligible(
+                    connection, row, definition, now, local_reputation
+                ):
                     status = "requirement"
                 elif daily_counts.get(definition.key, 0) >= definition.daily_limit:
                     status = "daily_limit"
@@ -607,6 +645,7 @@ class AdventuresRepositoryMixin:
         row: sqlite3.Row | dict[str, Any],
         definition,
         now: datetime,
+        local_reputation: dict[str, int],
     ) -> bool:
         stage = str(row["stage"] if isinstance(row, sqlite3.Row) else row.get("stage", ""))
         if stage not in {STAGE_MORTAL, "seeker", "cultivator"}:
@@ -643,7 +682,11 @@ class AdventuresRepositoryMixin:
             ) < definition.target_amount:
                 return False
         if definition.target_kind == "idle_claims" and self._idle_requirements_missing(
-            connection, row, resolve_route(definition.target_key, self.content), now
+            connection,
+            row,
+            resolve_route(definition.target_key, self.content),
+            now,
+            local_reputation,
         ):
             return False
         if definition.required_intro_flag:
@@ -848,6 +891,10 @@ class AdventuresRepositoryMixin:
             if active is not None:
                 raise BountyDailyLimitError("player already has an active bounty")
 
+            definitions = tuple(bounty_definitions(self.content))
+            local_reputation = _bounty_local_reputation(
+                connection, int(row["id"]), definitions
+            )
             daily_counts = _bounty_daily_counts(
                 connection, int(row["id"]), business_date
             )
@@ -856,13 +903,22 @@ class AdventuresRepositoryMixin:
             refresh_seed = bounty_refresh_seed(int(row["id"]), business_date)
             if bounty_key is None:
                 candidates = self._bounty_daily_batch(
-                    connection, row, now, business_date, refresh_seed, daily_counts
+                    connection,
+                    row,
+                    now,
+                    business_date,
+                    refresh_seed,
+                    daily_counts,
+                    definitions=definitions,
+                    local_reputation=local_reputation,
                 )
                 if not candidates:
                     if any(
                         item.runtime_status == "open"
-                        and self._bounty_player_eligible(connection, row, item, now)
-                        for item in bounty_definitions(self.content)
+                        and self._bounty_player_eligible(
+                            connection, row, item, now, local_reputation
+                        )
+                        for item in definitions
                     ):
                         raise BountyDailyLimitError("daily bounty limit reached")
                     raise BountyRequirementError("no eligible bounty candidates")
@@ -883,7 +939,9 @@ class AdventuresRepositoryMixin:
             expires_at = serialize_datetime(now + timedelta(seconds=definition.duration_seconds))
             if definition.runtime_status != "open":
                 raise BountyContentClosedError("bounty runtime is closed")
-            if not self._bounty_player_eligible(connection, row, definition, now):
+            if not self._bounty_player_eligible(
+                connection, row, definition, now, local_reputation
+            ):
                 raise BountyRequirementError("bounty requirements are not met")
             if daily_counts.get(definition.key, 0) >= definition.daily_limit:
                 raise BountyDailyLimitError("daily bounty limit reached")
