@@ -377,6 +377,39 @@ def test_equipment_definition_cache_comparison_preserves_previews_and_cleans_fix
         assert new["stage_latency_ms"]["equipment_definition_provider"]["count"] == new["requests"]
 
 
+def test_equipment_preview_render_cache_comparison_preserves_contract_and_cleans_fixture() -> None:
+    import asyncio
+
+    from scripts.performance_benchmark import _run_equipment_preview_render_cache_comparison
+
+    report = asyncio.run(
+        _run_equipment_preview_render_cache_comparison(
+            users=8,
+            batch_size=8,
+            total_requests=8,
+            levels=(1,),
+            profile_sql=True,
+            commands=("法器预览",),
+        )
+    )
+    before = report["comparison"]["before_repeated_preview_render"]
+    after = report["comparison"]["after_rendered_preview_cache"]
+    assert report["errors"] == 0
+    assert report["preview_outputs_equivalent"] is True
+    assert before["seed"] == after["seed"]
+    assert before["database_bytes_after_benchmark"] == after["database_bytes_after_benchmark"]
+    assert before["temporary_database_cleaned"] is after["temporary_database_cleaned"] is True
+    assert before["sql_profile_enabled"] is after["sql_profile_enabled"] is True
+    assert len(before["levels"]) == len(after["levels"]) == 2
+    for old, new in zip(before["levels"], after["levels"], strict=True):
+        assert old["errors"] == new["errors"] == 0
+        assert old["command_errors"]["法器预览"] == new["command_errors"]["法器预览"] == 0
+        assert old["equipment_preview_render_count"] == old["requests"]
+        assert new["equipment_preview_render_count"] == 1
+        assert old["stage_latency_ms"]["equipment_preview"]["count"] == old["requests"]
+        assert new["stage_latency_ms"]["equipment_preview"]["count"] == new["requests"]
+
+
 def test_void_material_item_cache_comparison_preserves_gate_response_and_cleans_fixture() -> None:
     import asyncio
 

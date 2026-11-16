@@ -159,6 +159,7 @@ def _instrument_repository(runtime: Any, *, enabled: bool | None = None) -> dict
         "idle_preview_ms": [],
         "mainline_status_ms": [],
         "travel_preview_ms": [],
+        "equipment_preview_ms": [],
         "arena_season_board_ms": [],
         "sql_queries": [],
         "companion_gear_queries": [],
@@ -184,6 +185,7 @@ def _instrument_repository(runtime: Any, *, enabled: bool | None = None) -> dict
     timed_method(repository, "_preview_idle_once", "idle_preview_ms")
     timed_method(repository, "_get_mainline_status_sync", "mainline_status_ms")
     timed_method(repository, "_preview_travel_database_state", "travel_preview_ms")
+    timed_method(runtime.application.equipment, "_equipment_preview_text", "equipment_preview_ms")
     timed_method(repository, "_arena_season_board_once", "arena_season_board_ms")
     timed_method(runtime.application.void_material, "_resolve_item", "item_resolution_ms")
     original_connect = repository._connect
@@ -2569,6 +2571,149 @@ async def _run_equipment_definition_cache_comparison(
     return payload
 
 
+async def _run_equipment_preview_render_cache_comparison(
+    users: int,
+    batch_size: int,
+    total_requests: int,
+    levels: tuple[int, ...],
+    *,
+    profile_sql: bool | None = None,
+    commands: tuple[str, ...] | None = None,
+) -> dict[str, Any]:
+    """Compare repeated equipment preview rendering with text reuse."""
+
+    selected_commands = commands or ("法器预览",)
+    if selected_commands != ("法器预览",):
+        raise ValueError("equipment preview render comparison only supports 法器预览")
+
+    temporary_path: Path
+    with tempfile.TemporaryDirectory(prefix="xiuxian-perf-") as data_dir:
+        temporary_path = Path(data_dir)
+        runtime = create_runtime(data_dir=data_dir, adapters=("onebot.v11", "qq.official"))
+        await runtime.initialize()
+        seed = _seed_database(runtime, users, batch_size)
+        database_path = runtime.settings.database_path
+        metrics = _instrument_repository(runtime, enabled=profile_sql)
+        equipment_application = runtime.application.equipment
+        instrumented_preview = equipment_application._equipment_preview_text
+        render_count = [0]
+
+        def counted_preview(content: Any, *, mode: str) -> str:
+            cached = equipment_application._equipment_preview_cache
+            hit = cached is not None and cached[0] is content and mode in cached[1]
+            result = instrumented_preview(content, mode=mode)
+            if not hit:
+                render_count[0] += 1
+            return result
+
+        def uncached_preview(content: Any, *, mode: str) -> str:
+            equipment_application._equipment_preview_cache = None
+            return counted_preview(content, mode=mode)
+
+        def set_variant(uncached: bool) -> None:
+            equipment_application._equipment_preview_text = (
+                uncached_preview if uncached else counted_preview
+            )
+            equipment_application._equipment_preview_cache = None
+            render_count[0] = 0
+
+        def response_contract(result: Any) -> tuple[Any, ...]:
+            return (
+                result.ok,
+                result.code,
+                result.message,
+                result.operation_id,
+                result.data,
+                result.retryable,
+                result.actions,
+            )
+
+        async def sample_contract(uncached: bool) -> tuple[Any, ...]:
+            set_variant(uncached)
+            results = []
+            for request_number, adapter in enumerate(("onebot.v11", "qq.official")):
+                normalized = _normalize(adapter, "perf-0000000", request_number, selected_commands[0])
+                results.append(
+                    response_contract(
+                        await runtime.adapters.dispatch(adapter, normalized.context, normalized.text)
+                    )
+                )
+            return tuple(results)
+
+        before_contract = await sample_contract(True)
+        after_contract = await sample_contract(False)
+        outputs_equivalent = before_contract == after_contract
+        if not outputs_equivalent:
+            raise AssertionError("equipment preview responses differ between render variants")
+
+        variants: dict[str, list[dict[str, Any]]] = {
+            "before_repeated_preview_render": [],
+            "after_rendered_preview_cache": [],
+        }
+        try:
+            for level_index, concurrency in enumerate(levels):
+                for repetition in range(2):
+                    before_first = (level_index + repetition) % 2 == 0
+                    order = (
+                        (
+                            ("before_repeated_preview_render", True),
+                            ("after_rendered_preview_cache", False),
+                        )
+                        if before_first
+                        else (
+                            ("after_rendered_preview_cache", False),
+                            ("before_repeated_preview_render", True),
+                        )
+                    )
+                    for label, uncached in order:
+                        set_variant(uncached)
+                        result = asdict(
+                            await _measure(
+                                runtime,
+                                users,
+                                concurrency,
+                                total_requests,
+                                metrics,
+                                selected_commands,
+                            )
+                        )
+                        result["repeat"] = repetition + 1
+                        result["equipment_preview_render_count"] = render_count[0]
+                        variants[label].append(result)
+        finally:
+            equipment_application._equipment_preview_text = instrumented_preview
+            equipment_application._equipment_preview_cache = None
+            await runtime.close()
+
+        db_bytes = _db_size(database_path)
+
+        def report(results: list[dict[str, Any]]) -> dict[str, Any]:
+            return {
+                "users": users,
+                "seed": seed,
+                "database_bytes_after_benchmark": db_bytes,
+                "sql_profile_enabled": metrics is not None,
+                "sql_profile_status": "collected" if metrics is not None else "not_collected",
+                "explain_query_plan": {"preview_database_access": ["none"]},
+                "levels": results,
+                "errors": sum(int(item["errors"]) for item in results),
+            }
+
+        payload = {
+            "comparison": {label: report(results) for label, results in variants.items()},
+            "preview_outputs_equivalent": outputs_equivalent,
+            "errors": sum(
+                int(item["errors"])
+                for results in variants.values()
+                for item in results
+            ),
+        }
+    cleaned = not temporary_path.exists()
+    for result in payload["comparison"].values():
+        result["temporary_database_cleaned"] = cleaned
+    return payload
+
+
 async def _run_void_material_item_cache_comparison(
     users: int,
     batch_size: int,
@@ -2935,6 +3080,11 @@ def main() -> int:
         help="compare repeated equipment catalogue validation with bundle reuse",
     )
     compare.add_argument(
+        "--compare-equipment-preview-render-cache",
+        action="store_true",
+        help="compare repeated equipment preview rendering with rendered text reuse",
+    )
+    compare.add_argument(
         "--compare-void-material-item-cache",
         action="store_true",
         help="compare linear void-material item alias scans with bundle reuse",
@@ -3028,6 +3178,17 @@ def main() -> int:
     elif args.compare_equipment_definition_cache:
         payload = asyncio.run(
             _run_equipment_definition_cache_comparison(
+                args.users,
+                args.batch_size,
+                args.requests,
+                levels,
+                profile_sql=profile_sql,
+                commands=commands,
+            )
+        )
+    elif args.compare_equipment_preview_render_cache:
+        payload = asyncio.run(
+            _run_equipment_preview_render_cache_comparison(
                 args.users,
                 args.batch_size,
                 args.requests,
