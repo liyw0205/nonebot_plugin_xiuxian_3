@@ -56,6 +56,7 @@ from ..utils.player import (
     player_integer,
     player_inventory,
     player_reputation_state,
+    split_player_rewards,
     spend_player_state,
 )
 
@@ -545,10 +546,12 @@ class IdleRepositoryMixin:
             if now < expected_claim_at:
                 raise IdleClaimTooEarlyError("idle assignment is not ready")
             fallback = now > expected_max_claim_at
-            reward_value = snapshot["fallback_reward"] if fallback else snapshot["full_reward"]
-            if not isinstance(reward_value, dict):
-                raise ValueError("idle snapshot reward must be an object")
-            reward = {str(key): int(quantity) for key, quantity in reward_value.items()}
+            # Validate both frozen outcomes before mutating player, companion, or
+            # projection state.  A persisted snapshot is an input boundary after
+            # restart and must not gain permissive JSON-to-int coercion here.
+            full_reward = self._required_idle_reward(snapshot.get("full_reward"), "full")
+            fallback_reward = self._required_idle_reward(snapshot.get("fallback_reward"), "fallback")
+            reward = fallback_reward if fallback else full_reward
             local_deltas = {key: value for key, value in reward.items() if key.startswith("local.")}
             codex_keys = tuple(key for key in reward if key.startswith("codex."))
             grant_reward = {key: value for key, value in reward.items() if not key.startswith("codex.")}
@@ -880,6 +883,31 @@ class IdleRepositoryMixin:
         if not isinstance(decoded, dict):
             raise ValueError(f"{label} must be an object")
         return dict(decoded)
+
+    @staticmethod
+    def _required_idle_reward(value: Any, label: str) -> dict[str, int]:
+        if not isinstance(value, dict):
+            raise ValueError(f"idle snapshot {label} reward must be an object")
+        if any(
+            not isinstance(key, str) or not key
+            or isinstance(quantity, bool)
+            or not isinstance(quantity, int)
+            for key, quantity in value.items()
+        ):
+            raise ValueError(
+                f"idle snapshot {label} reward keys must be non-empty strings and quantities must be integers"
+            )
+        reward = dict(value)
+        codex_rewards = {key: quantity for key, quantity in reward.items() if key.startswith("codex.")}
+        if any(not key.removeprefix("codex.") or quantity != 1 for key, quantity in codex_rewards.items()):
+            raise ValueError(f"idle snapshot {label} codex rewards must have quantity 1")
+        try:
+            split_player_rewards(
+                {key: quantity for key, quantity in reward.items() if not key.startswith("codex.")}
+            )
+        except ValueError as exc:
+            raise ValueError(f"idle snapshot {label} reward is invalid: {exc}") from exc
+        return reward
 
     def _idle_select_companion(
         self,

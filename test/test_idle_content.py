@@ -264,6 +264,81 @@ def test_idle_claim_rejects_malformed_reputation_and_retries_same_operation(tmp_
     asyncio.run(run())
 
 
+def test_idle_claim_rejects_non_integer_frozen_reward_before_writes(tmp_path: Path) -> None:
+    async def run() -> None:
+        clock = MutableClock()
+        runtime = create_runtime(
+            data_dir=_copy_content(tmp_path),
+            clock=clock,
+            adapters=("qq.official", "onebot.v11"),
+        )
+        try:
+            assignments: dict[tuple[str, str], dict] = {}
+            for adapter, user in (
+                ("qq.official", "idle-reward-type-qq"),
+                ("onebot.v11", "idle-reward-type-ob"),
+            ):
+                await _create_player(runtime, adapter, user)
+                started = await _command(
+                    runtime, adapter, user, f"{user}-start", "开始挂机 镇中行旅"
+                )
+                assert started.code == "IDLE_STARTED", started.message
+                with runtime.repository._connect() as connection:
+                    row = connection.execute(
+                        "SELECT * FROM idle_assignments WHERE assignment_id = ?",
+                        (started.data["assignment_id"],),
+                    ).fetchone()
+                    assignments[(adapter, user)] = {
+                        "snapshot": json.loads(row["snapshot_json"]),
+                        "stones": connection.execute(
+                            "SELECT spirit_stones FROM players WHERE platform = ? AND platform_user_id = ?",
+                            (adapter, user),
+                        ).fetchone()[0],
+                    }
+
+            clock.advance(hours=2)
+            for adapter, user in assignments:
+                operation = f"{user}-claim"
+                original = assignments[(adapter, user)]["snapshot"]
+                corrupted = dict(original)
+                corrupted["full_reward"] = dict(original["full_reward"])
+                corrupted["full_reward"]["spirit_stones"] = "77"
+                with runtime.repository._connect() as connection:
+                    connection.execute(
+                        "UPDATE idle_assignments SET snapshot_json = ? WHERE assignment_id = "
+                        "(SELECT assignment_id FROM idle_assignments WHERE player_id = "
+                        "(SELECT id FROM players WHERE platform = ? AND platform_user_id = ?))",
+                        (json.dumps(corrupted, ensure_ascii=False), adapter, user),
+                    )
+                with pytest.raises(ValueError, match="integer"):
+                    await _command(runtime, adapter, user, operation, "领取挂机")
+                with runtime.repository._connect() as connection:
+                    player = connection.execute(
+                        "SELECT id, spirit_stones FROM players WHERE platform = ? AND platform_user_id = ?",
+                        (adapter, user),
+                    ).fetchone()
+                    assignment = connection.execute(
+                        "SELECT status FROM idle_assignments WHERE player_id = ?",
+                        (player["id"],),
+                    ).fetchone()
+                    assert player["spirit_stones"] == assignments[(adapter, user)]["stones"]
+                    assert assignment["status"] == "running"
+                    assert connection.execute(
+                        "SELECT 1 FROM operations WHERE operation_id = ?", (operation,)
+                    ).fetchone() is None
+                    connection.execute(
+                        "UPDATE idle_assignments SET snapshot_json = ? WHERE player_id = ?",
+                        (json.dumps(original, ensure_ascii=False), player["id"]),
+                    )
+                retried = await _command(runtime, adapter, user, operation, "领取挂机")
+                assert retried.code == "IDLE_CLAIMED", retried.message
+                assert retried.data["idempotent_replay"] is False
+        finally:
+            await runtime.close()
+
+    asyncio.run(run())
+
+
 def test_idle_preview_preserves_malformed_reputation_diagnostic(tmp_path: Path) -> None:
     async def run() -> None:
         runtime = create_runtime(
