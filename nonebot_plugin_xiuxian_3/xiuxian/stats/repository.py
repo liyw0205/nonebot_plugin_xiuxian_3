@@ -10,17 +10,27 @@ from typing import Any
 
 from ...contracts import serialize_datetime
 from ..advancement.constitution_effects import constitution_effect_snapshot
-from ..content import bundled_content
+from ..content import ContentBundle, bundled_content
 from ..items.manual_rules import manual_effect_totals
 from ..utils.equipment import equipment_instance_rows
 from ..utils.json_cache import decode_json_strict
 from ..utils.operations import operation_replay, record_operation
 from ..utils.player import player_inventory
 from .models import StatSnapshot
-from .rules import StatError, build_stat_preview, explain_stat
+from .rules import StatsFormula, StatError, build_stat_preview, explain_stat, stats_formula
 
 
 class StatsRepositoryMixin:
+    def _stats_formula_for_snapshot(self, content: ContentBundle) -> StatsFormula:
+        cached: tuple[ContentBundle, StatsFormula] | None = getattr(
+            self, "_player_stats_formula_cache", None
+        )
+        if cached is not None and cached[0] is content:
+            return cached[1]
+        formula = stats_formula(content)
+        self._player_stats_formula_cache = (content, formula)
+        return formula
+
     async def preview_stats(self, *, platform: str, platform_user_id: str) -> dict[str, Any]:
         await self.initialize()
         async with self._inflight:
@@ -42,19 +52,21 @@ class StatsRepositoryMixin:
         if any(type(value) is not int or value < 0 for value in player["inventory_json"].values()):
             raise ValueError("stat build inventory amounts must be non-negative integers")
         player_id = int(player["id"])
+        content = self.content or bundled_content()
         equipment = self._battle_equipment_snapshot(
             connection,
             player_id,
             player_path_key=str(player.get("path_key") or ""),
         )
         constitution = constitution_effect_snapshot(connection, player_id)
-        manuals = manual_effect_totals(player_inventory(player), self.content)
+        manuals = manual_effect_totals(player_inventory(player), content)
         preview = build_stat_preview(
             player,
-            self.content,
+            content,
             equipment=equipment,
             constitution_effect=constitution,
             manual_effects=manuals,
+            _formula=self._stats_formula_for_snapshot(content),
         )
         for gear in self.companion_carry_snapshot(connection, player_id):
             value = int(gear["carry_capacity"])

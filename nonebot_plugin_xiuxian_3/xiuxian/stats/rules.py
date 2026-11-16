@@ -231,6 +231,7 @@ def build_stat_preview(
     equipment: tuple[Mapping[str, Any], ...] = (),
     constitution_effect: Mapping[str, Any] | None = None,
     manual_effects: Mapping[str, Any] | None = None,
+    _formula: StatsFormula | None = None,
 ) -> dict[str, Any]:
     base = _qualification(row)
     permanent = {
@@ -240,7 +241,7 @@ def build_stat_preview(
     _nonnegative_integer(player_field(row, "realm_layer", 0), "realm_layer")
     row = player_values(row)
     bundle = _content(content)
-    formula = stats_formula(bundle)
+    formula = _formula if _formula is not None else stats_formula(bundle)
     realm_key, realm_index, layer_tail = _realm_index(row, bundle)
     f = formula.values
     derived = {

@@ -38,6 +38,7 @@ CORRECTNESS_TARGETS = (
 )
 CORRECTNESS_DESELECT = (
     "test/test_performance_regression.py::test_arena_season_top_n_comparison_preserves_board_and_cleans_fixture",
+    "test/test_performance_regression.py::test_player_stats_formula_cache_comparison_preserves_profile_and_cleans_fixture",
 )
 BENCHMARK_ARGS = (
     "scripts/performance_benchmark.py",
@@ -52,9 +53,9 @@ BENCHMARK_ARGS = (
     "10",
     "50",
     "--command",
-    "竞技场赛季",
+    "我的状态",
     "--profile-sql",
-    "--compare-arena-season-top-n",
+    "--compare-player-stats-formula-cache",
 )
 
 

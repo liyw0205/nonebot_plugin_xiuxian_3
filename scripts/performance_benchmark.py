@@ -230,6 +230,11 @@ def _instrument_stat_helpers(metrics: dict[str, list[float]]) -> Any:
         ),
         (
             importlib.import_module("nonebot_plugin_xiuxian_3.xiuxian.stats.repository"),
+            "stats_formula",
+            "player_stats_formula_ms",
+        ),
+        (
+            importlib.import_module("nonebot_plugin_xiuxian_3.xiuxian.stats.repository"),
             "build_stat_preview",
             "player_stat_calculation_ms",
         ),
@@ -713,6 +718,17 @@ async def _measure(
 def _explain(path: Path, player_id: int) -> dict[str, list[str]]:
     queries = {
         "player_lookup": "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
+        "stats_equipment": (
+            "SELECT * FROM equipment_instances WHERE player_id = ? AND status = 'active' "
+            "AND equipped = 1 AND durability_bp > 0 ORDER BY id"
+        ),
+        "stats_constitution": "SELECT snapshot_json FROM constitution_profiles WHERE player_id = ? LIMIT 1",
+        "stats_companion_carry": (
+            "SELECT g.gear_instance_id, g.gear_key, g.durability_bp "
+            "FROM companion_gear_instances g JOIN companion_instances c ON c.id=g.companion_instance_id "
+            "WHERE g.player_id=? AND g.status='equipped' AND g.durability_bp>0 "
+            "AND c.kind='beast' AND c.deployed=1 AND c.status IN ('active', 'available') ORDER BY g.id"
+        ),
         "idle_status": "SELECT * FROM idle_assignments WHERE player_id = ? AND status = 'running' ORDER BY id DESC LIMIT 1",
         "idle_active_preview": "SELECT 1 FROM idle_assignments WHERE player_id = ? AND status IN ('assigned', 'running') LIMIT 1",
         "idle_daily_route": "SELECT COUNT(*) AS count FROM idle_assignments WHERE player_id = ? AND route_key = ? AND business_date = ? AND status IN ('claimed', 'expired')",
@@ -795,6 +811,9 @@ def _explain(path: Path, player_id: int) -> dict[str, list[str]]:
     }
     params = {
         "player_lookup": ("onebot.v11", f"perf-{player_id - 1:07d}"),
+        "stats_equipment": (player_id,),
+        "stats_constitution": (player_id,),
+        "stats_companion_carry": (player_id,),
         "idle_status": (player_id,),
         "idle_active_preview": (player_id,),
         "idle_daily_route": (player_id, "idle.herb_vale_gather", "2026-11-15"),
@@ -1739,6 +1758,118 @@ async def _run_arena_season_top_n_comparison(
     return payload
 
 
+async def _run_player_stats_formula_cache_comparison(
+    users: int,
+    batch_size: int,
+    total_requests: int,
+    levels: tuple[int, ...],
+    *,
+    profile_sql: bool | None = None,
+    commands: tuple[str, ...] | None = None,
+) -> dict[str, Any]:
+    """Compare uncached and repository-scoped formula reuse on one player fixture."""
+
+    selected_commands = commands or ("我的状态",)
+    if selected_commands != ("我的状态",):
+        raise ValueError("player stats formula comparison only supports 我的状态")
+
+    from nonebot_plugin_xiuxian_3.xiuxian.stats import repository as stats_repository_module
+
+    temporary_path: Path
+    with tempfile.TemporaryDirectory(prefix="xiuxian-perf-") as data_dir:
+        temporary_path = Path(data_dir)
+        runtime = create_runtime(data_dir=data_dir, adapters=("onebot.v11", "qq.official"))
+        await runtime.initialize()
+        seed = _seed_database(runtime, users, batch_size)
+        database_path = runtime.settings.database_path
+        explain = _explain(database_path, 1)
+        metrics = _instrument_repository(runtime, enabled=profile_sql)
+        restore_executor = _instrument_executor(metrics) if metrics is not None else None
+        restore_stat_helpers = _instrument_stat_helpers(metrics) if metrics is not None else None
+        repository = runtime.repository
+        cached_provider = repository._stats_formula_for_snapshot
+
+        def uncached_provider(content: Any) -> Any:
+            return stats_repository_module.stats_formula(content)
+
+        try:
+            repository._stats_formula_for_snapshot = uncached_provider
+            uncached_profile = repository._get_player_profile_sync("onebot.v11", "perf-0000000")
+            repository._stats_formula_for_snapshot = cached_provider
+            cached_profile = repository._get_player_profile_sync("onebot.v11", "perf-0000000")
+            profile_results_equivalent = uncached_profile == cached_profile
+            if not profile_results_equivalent:
+                raise AssertionError("player profile differs between uncached and cached formula variants")
+
+            variants: dict[str, list[dict[str, Any]]] = {
+                "before_uncached_formula": [],
+                "after_repository_formula_cache": [],
+            }
+            for level_index, concurrency in enumerate(levels):
+                for repetition in range(4):
+                    before_first = (level_index + repetition) % 2 == 0
+                    order = (
+                        (
+                            ("before_uncached_formula", uncached_provider),
+                            ("after_repository_formula_cache", cached_provider),
+                        )
+                        if before_first
+                        else (
+                            ("after_repository_formula_cache", cached_provider),
+                            ("before_uncached_formula", uncached_provider),
+                        )
+                    )
+                    for label, provider in order:
+                        repository._stats_formula_for_snapshot = provider
+                        result = asdict(
+                            await _measure(
+                                runtime,
+                                users,
+                                concurrency,
+                                total_requests,
+                                metrics,
+                                selected_commands,
+                            )
+                        )
+                        result["repeat"] = repetition + 1
+                        variants[label].append(result)
+        finally:
+            repository._stats_formula_for_snapshot = cached_provider
+            if restore_executor is not None:
+                restore_executor()
+            if restore_stat_helpers is not None:
+                restore_stat_helpers()
+            await runtime.close()
+
+        db_bytes = _db_size(database_path)
+
+        def report(results: list[dict[str, Any]]) -> dict[str, Any]:
+            return {
+                "users": users,
+                "seed": seed,
+                "database_bytes_after_benchmark": db_bytes,
+                "sql_profile_enabled": metrics is not None,
+                "sql_profile_status": "collected" if metrics is not None else "not_collected",
+                "explain_query_plan": explain,
+                "levels": results,
+                "errors": sum(int(item["errors"]) for item in results),
+            }
+
+        payload = {
+            "comparison": {label: report(results) for label, results in variants.items()},
+            "profile_results_equivalent": profile_results_equivalent,
+            "errors": sum(
+                int(item["errors"])
+                for results in variants.values()
+                for item in results
+            ),
+        }
+    cleaned = not temporary_path.exists()
+    for result in payload["comparison"].values():
+        result["temporary_database_cleaned"] = cleaned
+    return payload
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--users", type=int, default=int(os.getenv("XIUXIAN_PERF_USERS", "1000000")))
@@ -1771,6 +1902,11 @@ def main() -> int:
         "--compare-arena-season-top-n",
         action="store_true",
         help="compare full ranking sorts with top-N selection on one arena fixture",
+    )
+    compare.add_argument(
+        "--compare-player-stats-formula-cache",
+        action="store_true",
+        help="compare uncached and repository-scoped stats formula reuse on one fixture",
     )
     compare.add_argument(
         "--compare-idle-preview-state",
@@ -1820,6 +1956,17 @@ def main() -> int:
     if args.compare_arena_season_top_n:
         payload = asyncio.run(
             _run_arena_season_top_n_comparison(
+                args.users,
+                args.batch_size,
+                args.requests,
+                levels,
+                profile_sql=profile_sql,
+                commands=commands,
+            )
+        )
+    elif args.compare_player_stats_formula_cache:
+        payload = asyncio.run(
+            _run_player_stats_formula_cache_comparison(
                 args.users,
                 args.batch_size,
                 args.requests,

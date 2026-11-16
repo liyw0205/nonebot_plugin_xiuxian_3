@@ -35,5 +35,7 @@
 
 - [挂机预览共享状态](performance/idle-preview-shared-state-2026-11-16.md)：同一临时 SQLite fixture 的公开指令前后对照。
 - [竞技场赛季历史查询](performance/arena-season-history-index-2026-11-16.md)：同一临时 SQLite fixture 的覆盖索引前后对照。
+- [竞技场赛季前二十名](performance/arena-season-top-n-2026-11-16.md)：保留榜单语义的同库排名计算对照。
+- [玩家状态公式复用](performance/player-stats-formula-cache-2026-11-16.md)：按内容包身份复用属性计算公式的实际指令对照。
 
 各领域 README 是该领域的阅读入口；`model.md`、`workflow.md`、`use-cases.md` 与内容快照分别描述实体、行为和具体数据。玩家是否能使用某项能力以[当前可用能力](availability.md)及实际公开入口为准，配置记录存在不等同于入口已开放。
