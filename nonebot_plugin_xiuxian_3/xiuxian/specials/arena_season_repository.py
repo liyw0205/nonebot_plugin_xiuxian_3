@@ -16,6 +16,7 @@ from datetime import timedelta
 from typing import Any
 
 from ...contracts import serialize_datetime
+from ..content import bundled_content
 from ..utils.player import grant_player_honor_title, grant_player_state, player_integer
 from ..persistence.errors import (
     ArenaSeasonAlreadyClaimedError,
@@ -87,13 +88,55 @@ class ArenaSeasonRepositoryMixin:
         _start, end = week_window_for_key(week_key(start), anchor)
         return week_key(start), start, end
 
-    @staticmethod
-    def _season_events(connection: sqlite3.Connection, end: Any) -> list[MatchEvent]:
+    def _arena_season_cache_state(self, connection: sqlite3.Connection) -> dict[str, Any]:
+        """Return a per-connection cache that invalidates on external writes."""
+
+        version_row = connection.execute("PRAGMA data_version").fetchone()
+        data_version = int(version_row[0]) if version_row else 0
+        generation = int(getattr(self, "_arena_season_cache_generation", 0))
+        cache = getattr(self, "_arena_season_cache", None)
+        if cache is None:
+            cache = {}
+            self._arena_season_cache = cache
+        state = cache.get(connection)
+        if (
+            state is None
+            or state["generation"] != generation
+            or state["data_version"] != data_version
+            or not getattr(self, "_arena_season_cache_enabled", True)
+        ):
+            state = {
+                "generation": generation,
+                "data_version": data_version,
+                "events": {},
+                "boards": {},
+            }
+            if getattr(self, "_arena_season_cache_enabled", True):
+                cache[connection] = state
+        return state
+
+    def _invalidate_arena_season_cache(self) -> None:
+        self._arena_season_cache_generation = int(
+            getattr(self, "_arena_season_cache_generation", 0)
+        ) + 1
+        cache = getattr(self, "_arena_season_cache", None)
+        if cache is not None:
+            cache.clear()
+
+    def _arena_season_content_token(self) -> int:
+        return id(self.content or bundled_content())
+
+    def _season_events(self, connection: sqlite3.Connection, end: Any) -> list[MatchEvent]:
+        state = self._arena_season_cache_state(connection)
+        cache_key = serialize_datetime(end)
+        cached = state["events"].get(cache_key)
+        if cached is not None:
+            return cached
         rows = connection.execute(
             "SELECT challenger_id, defender_id, outcome, score_counted, settled_at, "
             "challenger_rating_delta, defender_rating_delta FROM arena_matches "
             "WHERE settled_at < ?",
-            (serialize_datetime(end),),
+            (cache_key,),
         ).fetchall()
         events: list[MatchEvent] = []
         for row in rows:
@@ -113,6 +156,8 @@ class ArenaSeasonRepositoryMixin:
                         settled_at=settled,
                     )
                 )
+        if getattr(self, "_arena_season_cache_enabled", True):
+            state["events"][cache_key] = events
         return events
 
     def _arena_season_events_for_board_windows(
@@ -235,12 +280,25 @@ class ArenaSeasonRepositoryMixin:
                 # A live week shows its current standing; a closed-but-unfrozen
                 # week shows exactly what settlement will freeze. Either way the
                 # read writes nothing.
-                board = build_board(
-                    events_by_end[end],
-                    start=start,
-                    end=end,
-                    limit=int(record["board_size"]),
+                content_token = self._arena_season_content_token()
+                board_key = (
+                    key,
+                    serialize_datetime(start),
+                    serialize_datetime(end),
+                    int(record["board_size"]),
+                    content_token,
                 )
+                cache_state = self._arena_season_cache_state(connection)
+                board = cache_state["boards"].get(board_key)
+                if board is None:
+                    board = build_board(
+                        events_by_end[end],
+                        start=start,
+                        end=end,
+                        limit=int(record["board_size"]),
+                    )
+                    if getattr(self, "_arena_season_cache_enabled", True):
+                        cache_state["boards"][board_key] = tuple(board)
                 rows = [
                     {
                         "player_id": entry.player_id,
@@ -263,12 +321,24 @@ class ArenaSeasonRepositoryMixin:
                 (key, player_id),
             ).fetchone() is not None
             if not previous_rows:
-                previous_board = build_board(
-                    events_by_end[previous_end],
-                    start=previous_start,
-                    end=previous_end,
-                    limit=int(record["board_size"]),
+                previous_key_for_cache = (
+                    previous_key,
+                    serialize_datetime(previous_start),
+                    serialize_datetime(previous_end),
+                    int(record["board_size"]),
+                    self._arena_season_content_token(),
                 )
+                cache_state = self._arena_season_cache_state(connection)
+                previous_board = cache_state["boards"].get(previous_key_for_cache)
+                if previous_board is None:
+                    previous_board = build_board(
+                        events_by_end[previous_end],
+                        start=previous_start,
+                        end=previous_end,
+                        limit=int(record["board_size"]),
+                    )
+                    if getattr(self, "_arena_season_cache_enabled", True):
+                        cache_state["boards"][previous_key_for_cache] = tuple(previous_board)
                 previous_rows = [
                     {
                         "player_id": entry.player_id,

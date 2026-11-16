@@ -175,6 +175,38 @@ def test_arena_season_comparison_reuses_one_fixture_and_removes_one_history_quer
         assert old["command_errors"]["竞技场赛季"] == new["command_errors"]["竞技场赛季"] == 0
 
 
+def test_arena_season_cache_comparison_preserves_board_and_cleans_fixture() -> None:
+    import asyncio
+
+    from scripts.performance_benchmark import _run_arena_season_cache_comparison
+
+    report = asyncio.run(
+        _run_arena_season_cache_comparison(
+            users=8,
+            batch_size=8,
+            total_requests=8,
+            levels=(1,),
+            profile_sql=True,
+            commands=("竞技场赛季",),
+        )
+    )
+    before = report["comparison"]["before_without_cache"]
+    after = report["comparison"]["after_event_and_board_cache"]
+    assert report["errors"] == 0
+    assert report["board_outputs_equivalent"] is True
+    assert before["seed"] == after["seed"]
+    assert before["database_bytes_after_benchmark"] == after["database_bytes_after_benchmark"]
+    assert before["temporary_database_cleaned"] is after["temporary_database_cleaned"] is True
+    assert before["sql_profile_enabled"] is after["sql_profile_enabled"] is True
+    assert len(before["levels"]) == len(after["levels"]) == 2
+    for old, new in zip(before["levels"], after["levels"], strict=True):
+        assert old["errors"] == new["errors"] == 0
+        assert old["command_errors"]["竞技场赛季"] == new["command_errors"]["竞技场赛季"] == 0
+        assert old["sql_queries"] >= new["sql_queries"] > 0
+        assert old["stage_latency_ms"]["arena_season_board"]["count"] == old["requests"]
+        assert new["stage_latency_ms"]["arena_season_board"]["count"] == new["requests"]
+
+
 def test_arena_season_top_n_comparison_preserves_board_and_cleans_fixture() -> None:
     import asyncio
 

@@ -140,6 +140,32 @@ def test_season_board_reuses_one_history_read_for_current_and_previous_weeks() -
     asyncio.run(run())
 
 
+def test_live_season_board_cache_invalidates_after_a_new_match() -> None:
+    async def run() -> None:
+        clock = MutableClock(datetime(2026, 9, 24, 12, tzinfo=timezone.utc))
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir, clock=clock)
+            challenger, defender = "arena-cache-a", "arena-cache-b"
+            await _prepare_pair(runtime, challenger, defender)
+            await _ranked_match(runtime, challenger, defender, prefix="cache-first", clock=clock)
+            before = await runtime.repository.arena_season_board(
+                platform="web", platform_user_id=challenger, week=None
+            )
+            before_mine = before["mine"]
+            assert before_mine is not None
+
+            await _ranked_match(runtime, defender, challenger, prefix="cache-second", clock=clock)
+            after = await runtime.repository.arena_season_board(
+                platform="web", platform_user_id=challenger, week=None
+            )
+            after_mine = after["mine"]
+            assert after_mine is not None
+            assert after_mine["rating"] != before_mine["rating"]
+            await runtime.close()
+
+    asyncio.run(run())
+
+
 def test_existing_arena_history_gets_season_index_on_restart_without_row_changes() -> None:
     async def run() -> None:
         clock = MutableClock(datetime(2026, 9, 24, 12, tzinfo=timezone.utc))

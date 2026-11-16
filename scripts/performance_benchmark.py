@@ -1378,6 +1378,10 @@ async def _run_arena_season_event_comparison(
                         )
                     )
                     for label, reader in order:
+                        repository._arena_season_cache_enabled = label == "after_shared_history_read"
+                        cache = getattr(repository, "_arena_season_cache", None)
+                        if cache is not None:
+                            cache.clear()
                         repository._arena_season_events_for_board_windows = reader
                         result = asdict(
                             await _measure(
@@ -1393,6 +1397,7 @@ async def _run_arena_season_event_comparison(
                         variants[label].append(result)
         finally:
             repository._arena_season_events_for_board_windows = shared_reader
+            repository._arena_season_cache_enabled = True
             await runtime.close()
         db_bytes = _db_size(runtime.settings.database_path)
 
@@ -1410,6 +1415,114 @@ async def _run_arena_season_event_comparison(
 
         payload = {
             "comparison": {label: report(results) for label, results in variants.items()},
+            "errors": sum(
+                int(item["errors"])
+                for results in variants.values()
+                for item in results
+            ),
+        }
+    cleaned = not temporary_path.exists()
+    for result in payload["comparison"].values():
+        result["temporary_database_cleaned"] = cleaned
+    return payload
+
+
+async def _run_arena_season_cache_comparison(
+    users: int,
+    batch_size: int,
+    total_requests: int,
+    levels: tuple[int, ...],
+    *,
+    profile_sql: bool | None = None,
+    commands: tuple[str, ...] | None = None,
+) -> dict[str, Any]:
+    """Compare repeated season-history work with the per-connection cache."""
+
+    selected_commands = commands or ("竞技场赛季",)
+    if selected_commands != ("竞技场赛季",):
+        raise ValueError("arena season cache comparison only supports the season-board command")
+
+    temporary_path: Path
+    with tempfile.TemporaryDirectory(prefix="xiuxian-perf-") as data_dir:
+        temporary_path = Path(data_dir)
+        runtime = create_runtime(data_dir=data_dir, adapters=("onebot.v11", "qq.official"))
+        await runtime.initialize()
+        seed = _seed_database(runtime, users, batch_size)
+        explain = _explain(runtime.settings.database_path, 1)
+        metrics = _instrument_repository(runtime, enabled=profile_sql)
+        repository = runtime.repository
+        original_board = repository._arena_season_board_once
+        current_label = ""
+        outputs: dict[str, list[str]] = {
+            "before_without_cache": [],
+            "after_event_and_board_cache": [],
+        }
+
+        def recording_board(*args: Any, **kwargs: Any) -> dict[str, Any]:
+            payload = original_board(*args, **kwargs)
+            if current_label and len(outputs[current_label]) < 1:
+                outputs[current_label].append(
+                    json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+                )
+            return payload
+
+        repository._arena_season_board_once = recording_board
+        variants: dict[str, list[dict[str, Any]]] = {
+            "before_without_cache": [],
+            "after_event_and_board_cache": [],
+        }
+        try:
+            for index, concurrency in enumerate(levels):
+                for repetition in range(2):
+                    before_first = (index + repetition) % 2 == 0
+                    order = (
+                        ("before_without_cache", False),
+                        ("after_event_and_board_cache", True),
+                    ) if before_first else (
+                        ("after_event_and_board_cache", True),
+                        ("before_without_cache", False),
+                    )
+                    for label, enabled in order:
+                        current_label = label
+                        repository._arena_season_cache_enabled = enabled
+                        cache = getattr(repository, "_arena_season_cache", None)
+                        if cache is not None:
+                            cache.clear()
+                        result = asdict(
+                            await _measure(
+                                runtime,
+                                users,
+                                concurrency,
+                                total_requests,
+                                metrics,
+                                selected_commands,
+                            )
+                        )
+                        result["repeat"] = repetition + 1
+                        variants[label].append(result)
+        finally:
+            current_label = ""
+            repository._arena_season_board_once = original_board
+            repository._arena_season_cache_enabled = True
+            await runtime.close()
+        db_bytes = _db_size(runtime.settings.database_path)
+        output_equivalent = outputs["before_without_cache"] == outputs["after_event_and_board_cache"]
+
+        def report(results: list[dict[str, Any]]) -> dict[str, Any]:
+            return {
+                "users": users,
+                "seed": seed,
+                "database_bytes_after_benchmark": db_bytes,
+                "sql_profile_enabled": metrics is not None,
+                "sql_profile_status": "collected" if metrics is not None else "not_collected",
+                "explain_query_plan": explain,
+                "levels": results,
+                "errors": sum(int(item["errors"]) for item in results),
+            }
+
+        payload = {
+            "comparison": {label: report(results) for label, results in variants.items()},
+            "board_outputs_equivalent": output_equivalent,
             "errors": sum(
                 int(item["errors"])
                 for results in variants.values()
@@ -2349,6 +2462,11 @@ def main() -> int:
         help="compare separate vs shared season history reads on one fixture",
     )
     compare.add_argument(
+        "--compare-arena-season-cache",
+        action="store_true",
+        help="compare repeated season history work with the per-connection cache",
+    )
+    compare.add_argument(
         "--compare-arena-season-index",
         action="store_true",
         help="compare a covering season-history index on one fixture",
@@ -2489,6 +2607,17 @@ def main() -> int:
     elif args.compare_arena_season_events:
         payload = asyncio.run(
             _run_arena_season_event_comparison(
+                args.users,
+                args.batch_size,
+                args.requests,
+                levels,
+                profile_sql=profile_sql,
+                commands=commands,
+            )
+        )
+    elif args.compare_arena_season_cache:
+        payload = asyncio.run(
+            _run_arena_season_cache_comparison(
                 args.users,
                 args.batch_size,
                 args.requests,

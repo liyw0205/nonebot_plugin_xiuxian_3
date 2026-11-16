@@ -548,6 +548,7 @@ class ArenaRepositoryMixin:
                     now_text,
                 ),
             )
+            self._invalidate_arena_season_cache()
             for action in actions:
                 connection.execute(
                     "INSERT INTO arena_actions(action_id, match_id, sequence_no, round_no, actor_key, strategy_key, skill_key, target_key, hit_roll_bp, damage, state_json, operation_id, created_at) "
