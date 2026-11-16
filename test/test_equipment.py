@@ -261,6 +261,36 @@ def test_equipment_growth_profile_changes_real_tempering() -> None:
         asyncio.run(run(data_dir))
 
 
+def test_equipment_definition_cache_tracks_content_identity_and_keeps_last_valid_bundle(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from nonebot_plugin_xiuxian_3.xiuxian.advancement import equipment_use_cases
+    from nonebot_plugin_xiuxian_3.xiuxian.advancement.equipment_use_cases import EquipmentApplication
+    from nonebot_plugin_xiuxian_3.xiuxian.content import ContentBundle
+
+    application = EquipmentApplication(None)
+    original_content = bundled_content()
+    original_definitions = application._equipment_definitions(original_content)
+
+    assert application._equipment_definitions(original_content) is original_definitions
+
+    replacement_content = ContentBundle.load(original_content.root)
+    replacement_definitions = application._equipment_definitions(replacement_content)
+    assert replacement_definitions == original_definitions
+    assert replacement_definitions is not original_definitions
+    assert application._equipment_definition_cache == (replacement_content, replacement_definitions)
+
+    invalid_content = ContentBundle.load(original_content.root)
+
+    def invalid_definition_build(_content: ContentBundle) -> dict[str, object]:
+        raise ValueError("invalid equipment definitions")
+
+    monkeypatch.setattr(equipment_use_cases, "equipment_definitions", invalid_definition_build)
+    with pytest.raises(ValueError, match="invalid equipment definitions"):
+        application._equipment_definitions(invalid_content)
+    assert application._equipment_definition_cache == (replacement_content, replacement_definitions)
+
+
 def test_equipment_tempering_is_idempotent_and_migrates_legacy_inventory() -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:

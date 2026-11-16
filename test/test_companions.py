@@ -85,6 +85,93 @@ def test_companion_flow_is_shared_by_qq_and_onebot_and_survives_restart() -> Non
     asyncio.run(run())
 
 
+def test_companion_status_batches_gear_and_preserves_companion_order() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            adapters = (("onebot.v11", "ob-user"), ("qq.official", "qq-user"))
+            runtime = create_runtime(
+                data_dir=data_dir, adapters=tuple(adapter for adapter, _ in adapters)
+            )
+            timestamps = ("2026-11-16T00:00:00+00:00",) * 2
+            for adapter, user in adapters:
+                await _prepare(runtime, adapter=adapter, user=user)
+                with runtime.repository._connect() as connection:
+                    player = connection.execute(
+                        "SELECT id FROM players WHERE platform = ? AND platform_user_id = ?",
+                        (adapter, user),
+                    ).fetchone()
+                    for companion_number in range(2):
+                        cursor = connection.execute(
+                            "INSERT INTO companion_instances(instance_id, player_id, companion_key, "
+                            "kind, status, level, experience, affinity, stamina, deployed, "
+                            "evolution_stage, skill_slots, snapshot_json, created_at, updated_at) "
+                            "VALUES (?, ?, 'beast.wood_rat', 'beast', 'active', 1, 0, 0, 100, "
+                            "0, 'base', 0, '{}', ?, ?)",
+                            (
+                                f"{adapter}-companion-{companion_number}",
+                                player["id"],
+                                timestamps[0],
+                                timestamps[1],
+                            ),
+                        )
+                        for gear_number in range(2):
+                            gear_id = f"{adapter}-gear-{companion_number}-{gear_number}"
+                            connection.execute(
+                                "INSERT INTO companion_gear_instances(gear_instance_id, player_id, "
+                                "companion_instance_id, gear_key, status, durability_bp, operation_id, "
+                                "created_at, updated_at) VALUES (?, ?, ?, 'beast.gear.sack_small', "
+                                "'equipped', 10000, ?, ?, ?)",
+                                (
+                                    gear_id,
+                                    player["id"],
+                                    cursor.lastrowid,
+                                    f"{adapter}-gear-op-{companion_number}-{gear_number}",
+                                    timestamps[0],
+                                    timestamps[1],
+                                ),
+                            )
+
+            statements: list[str] = []
+            original_connect = runtime.repository._connect
+
+            def traced_connect():
+                connection = original_connect()
+                connection.set_trace_callback(statements.append)
+                return connection
+
+            runtime.repository._connect = traced_connect
+            for adapter, user in adapters:
+                statements.clear()
+                result = await runtime.dispatch(
+                    _context(adapter, user, f"{adapter}:status", "status"), "灵兽状态"
+                )
+                assert result.code == "COMPANION_STATUS"
+                companions = result.data["companions"]
+                assert [item["instance_id"] for item in companions] == [
+                    f"{adapter}-companion-0",
+                    f"{adapter}-companion-1",
+                ]
+                assert [item["instance_id"] for item in companions[0]["gear"]] == [
+                    f"{adapter}-gear-0-0",
+                    f"{adapter}-gear-0-1",
+                ]
+                assert [item["instance_id"] for item in companions[1]["gear"]] == [
+                    f"{adapter}-gear-1-0",
+                    f"{adapter}-gear-1-1",
+                ]
+                gear_queries = [
+                    statement
+                    for statement in statements
+                    if "FROM COMPANION_GEAR_INSTANCES" in statement.upper()
+                ]
+                assert len(gear_queries) == 1
+                assert "PLAYER_ID" in gear_queries[0].upper()
+
+            await runtime.close()
+
+    asyncio.run(run())
+
+
 def test_companion_bond_replays_after_content_closes_on_both_adapters() -> None:
     async def run() -> None:
         with TemporaryDirectory() as directory:

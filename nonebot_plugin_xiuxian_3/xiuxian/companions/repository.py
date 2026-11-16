@@ -666,6 +666,7 @@ class CompanionRepositoryMixin:
             "SELECT * FROM companion_instances WHERE player_id = ? AND status <> 'retired' ORDER BY id",
             (player_id,),
         ).fetchall()
+        gear_by_companion = self._gear_snapshots_for_player(connection, player_id) if rows else {}
         result = []
         for row in rows:
             definition = companion_definition(str(row["companion_key"]), getattr(self, "content", None))
@@ -683,10 +684,38 @@ class CompanionRepositoryMixin:
                     deployed=bool(row["deployed"]),
                     evolution_stage=str(player_field(row, "evolution_stage", "base")),
                     skill_slots=int(player_field(row, "skill_slots", 0) or 0),
-                    gear=tuple(self._gear_snapshot(connection, int(row["id"]))),
+                    gear=gear_by_companion.get(int(row["id"]), ()),
                 )
             )
         return result
+
+    @staticmethod
+    def _gear_snapshots_for_player(
+        connection: sqlite3.Connection, player_id: int
+    ) -> dict[int, tuple[dict[str, object], ...]]:
+        rows = connection.execute(
+            "SELECT id, companion_instance_id, gear_instance_id, gear_key, status, durability_bp "
+            "FROM companion_gear_instances WHERE player_id = ? AND status = 'equipped'",
+            (player_id,),
+        ).fetchall()
+        grouped: dict[int, list[tuple[int, dict[str, object]]]] = {}
+        for row in rows:
+            companion_id = int(row["companion_instance_id"])
+            grouped.setdefault(companion_id, []).append(
+                (
+                    int(row["id"]),
+                    {
+                        "instance_id": str(row["gear_instance_id"]),
+                        "gear_key": str(row["gear_key"]),
+                        "status": str(row["status"]),
+                        "durability_bp": int(row["durability_bp"]),
+                    },
+                )
+            )
+        return {
+            companion_id: tuple(item for _, item in sorted(items, key=lambda pair: pair[0]))
+            for companion_id, items in grouped.items()
+        }
 
     def _gear_snapshot(self, connection: sqlite3.Connection, companion_id: int) -> list[dict[str, object]]:
         rows = connection.execute(

@@ -241,6 +241,41 @@ def test_player_stats_formula_cache_comparison_preserves_profile_and_cleans_fixt
         assert old["sql_queries"] == new["sql_queries"] > 0
 
 
+def test_equipment_definition_cache_comparison_preserves_previews_and_cleans_fixture() -> None:
+    import asyncio
+
+    from scripts.performance_benchmark import _run_equipment_definition_cache_comparison
+
+    report = asyncio.run(
+        _run_equipment_definition_cache_comparison(
+            users=8,
+            batch_size=8,
+            total_requests=8,
+            levels=(1,),
+            profile_sql=True,
+        )
+    )
+    before = report["comparison"]["before_full_definition_build"]
+    after = report["comparison"]["after_bundle_identity_cache"]
+    assert report["errors"] == 0
+    assert report["preview_outputs_equivalent"] is True
+    assert before["seed"] == after["seed"]
+    assert before["database_bytes_after_benchmark"] == after["database_bytes_after_benchmark"]
+    assert before["temporary_database_cleaned"] is after["temporary_database_cleaned"] is True
+    assert before["sql_profile_enabled"] is after["sql_profile_enabled"] is True
+    assert before["item_records"] > before["equipment_definitions"] > 0
+    assert len(before["levels"]) == len(after["levels"]) == 2
+    for old, new in zip(before["levels"], after["levels"], strict=True):
+        assert old["errors"] == new["errors"] == 0
+        assert not any(old["command_errors"].values())
+        assert not any(new["command_errors"].values())
+        assert old["sql_queries"] == new["sql_queries"] == 0
+        assert old["equipment_definition_build_count"] == old["requests"]
+        assert new["equipment_definition_build_count"] == 1
+        assert old["stage_latency_ms"]["equipment_definition_provider"]["count"] == old["requests"]
+        assert new["stage_latency_ms"]["equipment_definition_provider"]["count"] == new["requests"]
+
+
 def test_arena_season_index_comparison_uses_one_clean_fixture() -> None:
     import asyncio
 

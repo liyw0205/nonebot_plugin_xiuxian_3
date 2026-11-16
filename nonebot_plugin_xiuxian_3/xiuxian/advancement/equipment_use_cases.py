@@ -22,6 +22,7 @@ from ..repository import (
     SQLitePlayerRepository,
 )
 from .equipment_rules import (
+    EquipmentDefinition,
     equipment_affix_label,
     equipment_definitions,
     equipment_resource_label,
@@ -38,6 +39,15 @@ class EquipmentApplication:
 
     def __init__(self, repository: SQLitePlayerRepository):
         self.repository = repository
+        self._equipment_definition_cache: tuple[ContentBundle, dict[str, EquipmentDefinition]] | None = None
+
+    def _equipment_definitions(self, content: ContentBundle) -> dict[str, EquipmentDefinition]:
+        cached = self._equipment_definition_cache
+        if cached is None or cached[0] is not content:
+            definitions = equipment_definitions(content)
+            cached = (content, definitions)
+            self._equipment_definition_cache = cached
+        return cached[1]
 
     @staticmethod
     def _operation_id(context: CommandContext, operation_name: str) -> str:
@@ -84,7 +94,7 @@ class EquipmentApplication:
         if context.command_args:
             return CommandResult(False, "INVALID_EQUIPMENT_COMMAND", "法器预览无需附加参数。", context.request_id)
         content = self._content()
-        definitions = equipment_definitions(content)
+        definitions = self._equipment_definitions(content)
         lines = ["## 装备祭炼", ""]
         for definition in sorted(definitions.values(), key=lambda item: item.label):
             lines.append(f"### {definition.label}")
@@ -107,7 +117,7 @@ class EquipmentApplication:
         if context.command_args:
             return CommandResult(False, "INVALID_EQUIPMENT_COMMAND", "重铸预览无需附加参数。", context.request_id)
         content = self._content()
-        definitions = equipment_definitions(content)
+        definitions = self._equipment_definitions(content)
         lines = ["## 灵纹重铸", ""]
         for definition in sorted(definitions.values(), key=lambda item: item.label):
             refinement = definition.growth["refinement"]

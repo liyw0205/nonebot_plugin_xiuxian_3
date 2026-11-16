@@ -116,6 +116,7 @@ class LevelResult:
     connection_open_ms: Percentiles
     connection_count: int
     sql_queries: int | None
+    companion_gear_queries: int | None
     expected_command_responses: dict[str, int]
 
 
@@ -149,6 +150,10 @@ def _instrument_repository(runtime: Any, *, enabled: bool | None = None) -> dict
         "player_stat_calculation_ms": [],
         "player_companion_carry_ms": [],
         "player_view_normalization_ms": [],
+        "companion_status_view_ms": [],
+        "companion_gear_batch_ms": [],
+        "equipment_definition_provider_ms": [],
+        "equipment_definition_build_ms": [],
         "item_resolution_ms": [],
         "idle_status_ms": [],
         "idle_preview_ms": [],
@@ -156,6 +161,7 @@ def _instrument_repository(runtime: Any, *, enabled: bool | None = None) -> dict
         "travel_preview_ms": [],
         "arena_season_board_ms": [],
         "sql_queries": [],
+        "companion_gear_queries": [],
         "executor_queue_wait_ms": [],
         "executor_worker_count": [],
         "executor_active_workers": [],
@@ -172,6 +178,8 @@ def _instrument_repository(runtime: Any, *, enabled: bool | None = None) -> dict
     timed_method(repository, "_battle_equipment_snapshot", "player_equipment_snapshot_ms")
     timed_method(repository, "companion_carry_snapshot", "player_companion_carry_ms")
     timed_method(repository, "_row_to_player", "player_view_normalization_ms")
+    timed_method(repository, "_view_rows", "companion_status_view_ms")
+    timed_method(repository, "_gear_snapshots_for_player", "companion_gear_batch_ms")
     timed_method(repository, "_get_idle_status_once", "idle_status_ms")
     timed_method(repository, "_preview_idle_once", "idle_preview_ms")
     timed_method(repository, "_get_mainline_status_sync", "mainline_status_ms")
@@ -184,11 +192,15 @@ def _instrument_repository(runtime: Any, *, enabled: bool | None = None) -> dict
         started = time.perf_counter()
         try:
             connection = original_connect()
-            connection.set_trace_callback(
-                lambda statement: metrics["sql_queries"].append(1.0)
-                if not statement.lstrip().upper().startswith("PRAGMA")
-                else None
-            )
+            def trace(statement: str) -> None:
+                normalized = statement.lstrip().upper()
+                if normalized.startswith("PRAGMA"):
+                    return
+                metrics["sql_queries"].append(1.0)
+                if "FROM COMPANION_GEAR_INSTANCES" in normalized:
+                    metrics["companion_gear_queries"].append(1.0)
+
+            connection.set_trace_callback(trace)
             return connection
         finally:
             metrics["connection_open_ms"].append((time.perf_counter() - started) * 1000)
@@ -412,6 +424,76 @@ def _seed_database(runtime: Any, users: int, batch_size: int) -> dict[str, float
         "arena_matches": arena_matches,
         "seed_seconds": round(time.perf_counter() - started, 3),
         "db_bytes": _db_size(path),
+    }
+
+
+def _seed_companion_status_fixture(
+    path: Path,
+    users: int,
+    *,
+    companions_per_user: int = 5,
+    gears_per_companion: int = 1,
+) -> dict[str, int]:
+    now = "2026-11-15T00:00:00+00:00"
+    companions = []
+    gears = []
+    for number in range(users):
+        player_id = number + 1
+        for slot in range(companions_per_user):
+            companion_id = number * companions_per_user + slot + 1
+            instance_id = f"perf-companion-{companion_id:07d}"
+            companions.append(
+                (
+                    instance_id,
+                    player_id,
+                    "beast.wood_rat",
+                    "beast",
+                    "active",
+                    1,
+                    0,
+                    0,
+                    100,
+                    0,
+                    "base",
+                    0,
+                    "{}",
+                    now,
+                    now,
+                )
+            )
+            for gear_slot in range(gears_per_companion):
+                gear_id = (companion_id - 1) * gears_per_companion + gear_slot + 1
+                gears.append(
+                    (
+                        f"perf-companion-gear-{gear_id:07d}",
+                        player_id,
+                        companion_id,
+                        "beast.gear.sack_small",
+                        10000,
+                        f"perf-companion-gear-op-{gear_id:07d}",
+                        now,
+                        now,
+                    )
+                )
+    with sqlite3.connect(path) as connection:
+        connection.execute("PRAGMA foreign_keys=ON")
+        connection.executemany(
+            "INSERT INTO companion_instances(instance_id, player_id, companion_key, kind, status, "
+            "level, experience, affinity, stamina, deployed, evolution_stage, skill_slots, "
+            "snapshot_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            companions,
+        )
+        connection.executemany(
+            "INSERT INTO companion_gear_instances(gear_instance_id, player_id, companion_instance_id, "
+            "gear_key, status, durability_bp, operation_id, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, 'equipped', ?, ?, ?, ?)",
+            gears,
+        )
+    return {
+        "companions": len(companions),
+        "gears": len(gears),
+        "companions_per_user": companions_per_user,
+        "gears_per_companion": gears_per_companion,
     }
 
 
@@ -699,6 +781,7 @@ async def _measure(
                 "inflight_wait_ms",
                 "connection_open_ms",
                 "sql_queries",
+                "companion_gear_queries",
                 "executor_queue_wait_ms",
                 "executor_worker_count",
                 "executor_active_workers",
@@ -711,6 +794,9 @@ async def _measure(
         connection_open_ms=_percentiles((metrics or {}).get("connection_open_ms", ())),
         connection_count=len(runtime.repository._connection_registry),
         sql_queries=(len(metrics["sql_queries"]) if metrics is not None else None),
+        companion_gear_queries=(
+            len(metrics["companion_gear_queries"]) if metrics is not None else None
+        ),
         expected_command_responses=expected_responses_by_command,
     )
 
@@ -1870,6 +1956,375 @@ async def _run_player_stats_formula_cache_comparison(
     return payload
 
 
+async def _run_equipment_definition_cache_comparison(
+    users: int,
+    batch_size: int,
+    total_requests: int,
+    levels: tuple[int, ...],
+    *,
+    profile_sql: bool | None = None,
+    commands: tuple[str, ...] | None = None,
+) -> dict[str, Any]:
+    """Compare direct catalogue validation with per-application bundle reuse."""
+
+    from nonebot_plugin_xiuxian_3.xiuxian.advancement import equipment_use_cases
+
+    selected_commands = commands or ("法器预览", "重铸预览")
+    if not selected_commands or any(command not in {"法器预览", "重铸预览"} for command in selected_commands):
+        raise ValueError("equipment definition comparison only supports 法器预览 and 重铸预览")
+
+    temporary_path: Path
+    with tempfile.TemporaryDirectory(prefix="xiuxian-perf-") as data_dir:
+        temporary_path = Path(data_dir)
+        runtime = create_runtime(data_dir=data_dir, adapters=("onebot.v11", "qq.official"))
+        await runtime.initialize()
+        seed = _seed_database(runtime, users, batch_size)
+        database_path = runtime.settings.database_path
+        await asyncio.sleep(0.05)
+        recovery_task = runtime._dispatch_recovery_task
+        if recovery_task is not None:
+            recovery_task.cancel()
+            try:
+                await recovery_task
+            except asyncio.CancelledError:
+                pass
+            runtime._dispatch_recovery_task = None
+        metrics = _instrument_repository(runtime, enabled=profile_sql)
+        equipment_application = runtime.application.equipment
+        cached_provider = equipment_application._equipment_definitions
+        original_builder = equipment_use_cases.equipment_definitions
+        content = equipment_application._content()
+        item_record_count = len(content.list("item", include_locked=False))
+        cache_definition_count = len(cached_provider(content))
+
+        def uncached_provider(bundle: Any) -> Any:
+            return equipment_use_cases.equipment_definitions(bundle)
+
+        def timed_provider(provider: Any) -> Any:
+            def measure_provider(bundle: Any) -> Any:
+                started = time.perf_counter()
+                try:
+                    return provider(bundle)
+                finally:
+                    if metrics is not None:
+                        metrics["equipment_definition_provider_ms"].append(
+                            (time.perf_counter() - started) * 1000
+                        )
+
+            return measure_provider
+
+        def timed_builder(bundle: Any) -> Any:
+            started = time.perf_counter()
+            try:
+                return original_builder(bundle)
+            finally:
+                if metrics is not None:
+                    metrics["equipment_definition_build_ms"].append(
+                        (time.perf_counter() - started) * 1000
+                    )
+
+        async def preview_results(provider: Any) -> list[Any]:
+            equipment_application._equipment_definitions = timed_provider(provider)
+            results = []
+            for request_number, adapter in enumerate(("onebot.v11", "qq.official")):
+                for command in selected_commands:
+                    normalized = _normalize(adapter, "perf-0000000", request_number, command)
+                    results.append(
+                        await runtime.adapters.dispatch(adapter, normalized.context, normalized.text)
+                    )
+            return results
+
+        def response_contract(result: Any) -> tuple[Any, ...]:
+            return (
+                result.ok,
+                result.code,
+                result.message,
+                result.operation_id,
+                result.data,
+                result.retryable,
+                result.actions,
+            )
+
+        try:
+            equipment_use_cases.equipment_definitions = timed_builder
+            before_equivalence = await preview_results(uncached_provider)
+            equipment_application._equipment_definition_cache = None
+            after_equivalence = await preview_results(cached_provider)
+            outputs_equivalent = tuple(map(response_contract, before_equivalence)) == tuple(
+                map(response_contract, after_equivalence)
+            )
+            if not outputs_equivalent:
+                raise AssertionError("equipment preview responses differ between uncached and cached variants")
+
+            variants: dict[str, list[dict[str, Any]]] = {
+                "before_full_definition_build": [],
+                "after_bundle_identity_cache": [],
+            }
+            for level_index, concurrency in enumerate(levels):
+                for repetition in range(2):
+                    before_first = (level_index + repetition) % 2 == 0
+                    order = (
+                        (
+                            ("before_full_definition_build", uncached_provider),
+                            ("after_bundle_identity_cache", cached_provider),
+                        )
+                        if before_first
+                        else (
+                            ("after_bundle_identity_cache", cached_provider),
+                            ("before_full_definition_build", uncached_provider),
+                        )
+                    )
+                    for label, provider in order:
+                        equipment_application._equipment_definitions = timed_provider(provider)
+                        if label == "after_bundle_identity_cache":
+                            equipment_application._equipment_definition_cache = None
+                        result = asdict(
+                            await _measure(
+                                runtime,
+                                users,
+                                concurrency,
+                                total_requests,
+                                metrics,
+                                selected_commands,
+                            )
+                        )
+                        result["repeat"] = repetition + 1
+                        result["equipment_definition_build_count"] = len(
+                            metrics["equipment_definition_build_ms"]
+                            if metrics is not None
+                            else ()
+                        )
+                        variants[label].append(result)
+        finally:
+            equipment_use_cases.equipment_definitions = original_builder
+            equipment_application._equipment_definitions = cached_provider
+            await runtime.close()
+
+        db_bytes = _db_size(database_path)
+
+        def report(results: list[dict[str, Any]]) -> dict[str, Any]:
+            return {
+                "users": users,
+                "seed": seed,
+                "database_bytes_after_benchmark": db_bytes,
+                "item_records": item_record_count,
+                "equipment_definitions": cache_definition_count,
+                "sql_profile_enabled": metrics is not None,
+                "sql_profile_status": "collected" if metrics is not None else "not_collected",
+                "explain_query_plan": {"preview_database_access": ["none"]},
+                "levels": results,
+                "errors": sum(int(item["errors"]) for item in results),
+            }
+
+        payload = {
+            "comparison": {label: report(results) for label, results in variants.items()},
+            "preview_outputs_equivalent": outputs_equivalent,
+            "errors": sum(
+                int(item["errors"])
+                for results in variants.values()
+                for item in results
+            ),
+        }
+    cleaned = not temporary_path.exists()
+    for result in payload["comparison"].values():
+        result["temporary_database_cleaned"] = cleaned
+    return payload
+
+
+async def _run_companion_status_batch_comparison(
+    users: int,
+    batch_size: int,
+    total_requests: int,
+    levels: tuple[int, ...],
+    *,
+    profile_sql: bool | None = None,
+) -> dict[str, Any]:
+    """Compare per-companion gear reads with one indexed player-scoped read."""
+
+    from nonebot_plugin_xiuxian_3.xiuxian.companions.models import CompanionView
+    from nonebot_plugin_xiuxian_3.xiuxian.companions.rules import companion_definition
+    from nonebot_plugin_xiuxian_3.xiuxian.utils.player import player_field
+
+    temporary_path: Path
+    with tempfile.TemporaryDirectory(prefix="xiuxian-perf-") as data_dir:
+        temporary_path = Path(data_dir)
+        runtime = create_runtime(data_dir=data_dir, adapters=("onebot.v11", "qq.official"))
+        await runtime.initialize()
+        seed = _seed_database(runtime, users, batch_size)
+        path = runtime.settings.database_path
+        companion_seed = _seed_companion_status_fixture(path, users)
+        seed.update(companion_seed)
+        seed["db_bytes"] = _db_size(path)
+        with sqlite3.connect(path) as connection:
+            explain = {
+                "per_companion_gear": [
+                    str(row[3])
+                    for row in connection.execute(
+                        "EXPLAIN QUERY PLAN SELECT gear_instance_id, gear_key, status, durability_bp "
+                        "FROM companion_gear_instances WHERE companion_instance_id = ? "
+                        "AND status = 'equipped' ORDER BY id",
+                        (1,),
+                    )
+                ],
+                "player_scoped_gear": [
+                    str(row[3])
+                    for row in connection.execute(
+                        "EXPLAIN QUERY PLAN SELECT id, companion_instance_id, gear_instance_id, "
+                        "gear_key, status, durability_bp FROM companion_gear_instances "
+                        "WHERE player_id = ? AND status = 'equipped'",
+                        (1,),
+                    )
+                ],
+            }
+        await asyncio.sleep(0.05)
+        recovery_task = runtime._dispatch_recovery_task
+        if recovery_task is not None:
+            recovery_task.cancel()
+            try:
+                await recovery_task
+            except asyncio.CancelledError:
+                pass
+            runtime._dispatch_recovery_task = None
+
+        metrics = _instrument_repository(runtime, enabled=profile_sql)
+        batch_view = runtime.repository._view_rows
+
+        def legacy_view(connection: sqlite3.Connection, player_id: int) -> list[CompanionView]:
+            rows = connection.execute(
+                "SELECT * FROM companion_instances WHERE player_id = ? "
+                "AND status <> 'retired' ORDER BY id",
+                (player_id,),
+            ).fetchall()
+            result = []
+            for row in rows:
+                definition = companion_definition(
+                    str(row["companion_key"]), getattr(runtime.repository, "content", None)
+                )
+                result.append(
+                    CompanionView(
+                        instance_id=str(row["instance_id"]),
+                        companion_key=definition.key,
+                        name=definition.label,
+                        kind=definition.kind,
+                        level=int(row["level"]),
+                        experience=int(row["experience"]),
+                        affinity=int(row["affinity"]),
+                        stamina=int(row["stamina"]),
+                        status=str(row["status"]),
+                        deployed=bool(row["deployed"]),
+                        evolution_stage=str(player_field(row, "evolution_stage", "base")),
+                        skill_slots=int(player_field(row, "skill_slots", 0) or 0),
+                        gear=tuple(runtime.repository._gear_snapshot(connection, int(row["id"]))),
+                    )
+                )
+            return result
+
+        def variant_view(view: Any) -> Any:
+            if metrics is None:
+                return view
+            return _timed_callable(view, metrics["companion_status_view_ms"])
+
+        def response_contract(result: Any) -> tuple[Any, ...]:
+            return (
+                result.ok,
+                result.code,
+                result.message,
+                result.operation_id,
+                result.data,
+                result.retryable,
+                result.actions,
+            )
+
+        async def status_pair() -> list[Any]:
+            results = []
+            for request_number, (adapter, user_id) in enumerate(
+                (("onebot.v11", "perf-0000000"), ("qq.official", "perf-0000001"))
+            ):
+                normalized = _normalize(adapter, user_id, request_number, "灵兽状态")
+                results.append(
+                    await runtime.adapters.dispatch(adapter, normalized.context, normalized.text)
+                )
+            return results
+
+        try:
+            runtime.repository._view_rows = variant_view(legacy_view)
+            before_equivalence = await status_pair()
+            runtime.repository._view_rows = batch_view
+            after_equivalence = await status_pair()
+            outputs_equivalent = tuple(map(response_contract, before_equivalence)) == tuple(
+                map(response_contract, after_equivalence)
+            )
+            if not outputs_equivalent:
+                raise AssertionError("灵兽状态 response differs between per-companion and batched reads")
+
+            variants: dict[str, list[dict[str, Any]]] = {
+                "before_per_companion_reads": [],
+                "after_indexed_player_batch": [],
+            }
+            commands = ("灵兽状态",)
+            for level_index, concurrency in enumerate(levels):
+                for repetition in range(2):
+                    before_first = (level_index + repetition) % 2 == 0
+                    order = (
+                        (
+                            ("before_per_companion_reads", legacy_view),
+                            ("after_indexed_player_batch", batch_view.__wrapped__
+                             if hasattr(batch_view, "__wrapped__") else batch_view),
+                        )
+                        if before_first
+                        else (
+                            ("after_indexed_player_batch", batch_view.__wrapped__
+                             if hasattr(batch_view, "__wrapped__") else batch_view),
+                            ("before_per_companion_reads", legacy_view),
+                        )
+                    )
+                    for label, view in order:
+                        runtime.repository._view_rows = variant_view(view)
+                        result = asdict(
+                            await _measure(
+                                runtime,
+                                users,
+                                concurrency,
+                                total_requests,
+                                metrics,
+                                commands,
+                            )
+                        )
+                        result["repeat"] = repetition + 1
+                        variants[label].append(result)
+        finally:
+            runtime.repository._view_rows = batch_view
+            await runtime.close()
+
+        db_bytes = _db_size(path)
+
+        def report(results: list[dict[str, Any]]) -> dict[str, Any]:
+            return {
+                "users": users,
+                "seed": seed,
+                "database_bytes_after_benchmark": db_bytes,
+                "sql_profile_enabled": metrics is not None,
+                "sql_profile_status": "collected" if metrics is not None else "not_collected",
+                "explain_query_plan": explain,
+                "levels": results,
+                "errors": sum(int(item["errors"]) for item in results),
+            }
+
+        payload = {
+            "comparison": {label: report(results) for label, results in variants.items()},
+            "status_outputs_equivalent": outputs_equivalent,
+            "errors": sum(
+                int(item["errors"])
+                for results in variants.values()
+                for item in results
+            ),
+        }
+    cleaned = not temporary_path.exists()
+    for result in payload["comparison"].values():
+        result["temporary_database_cleaned"] = cleaned
+    return payload
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--users", type=int, default=int(os.getenv("XIUXIAN_PERF_USERS", "1000000")))
@@ -1909,6 +2364,16 @@ def main() -> int:
         help="compare uncached and repository-scoped stats formula reuse on one fixture",
     )
     compare.add_argument(
+        "--compare-equipment-definition-cache",
+        action="store_true",
+        help="compare repeated equipment catalogue validation with bundle reuse",
+    )
+    compare.add_argument(
+        "--compare-companion-status-batch",
+        action="store_true",
+        help="compare per-companion and indexed player-scoped gear reads",
+    )
+    compare.add_argument(
         "--compare-idle-preview-state",
         action="store_true",
         help="compare repeated vs shared route state on one idle-preview fixture",
@@ -1938,6 +2403,9 @@ def main() -> int:
             "移动预览 玄天近郊",
             "竞技场赛季",
             "寄售物资 虚空晶体 1 100",
+            "法器预览",
+            "重铸预览",
+            "灵兽状态",
         ),
         help="measure one real command with all requests assigned to it",
     )
@@ -1973,6 +2441,27 @@ def main() -> int:
                 levels,
                 profile_sql=profile_sql,
                 commands=commands,
+            )
+        )
+    elif args.compare_equipment_definition_cache:
+        payload = asyncio.run(
+            _run_equipment_definition_cache_comparison(
+                args.users,
+                args.batch_size,
+                args.requests,
+                levels,
+                profile_sql=profile_sql,
+                commands=commands,
+            )
+        )
+    elif args.compare_companion_status_batch:
+        payload = asyncio.run(
+            _run_companion_status_batch_comparison(
+                args.users,
+                args.batch_size,
+                args.requests,
+                levels,
+                profile_sql=profile_sql,
             )
         )
     elif args.compare_idle_preview_state:

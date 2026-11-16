@@ -25,6 +25,7 @@ CORRECTNESS_TARGETS = (
     "test/test_documentation.py",
     "test/test_player_interaction.py",
     "test/test_content.py",
+    "test/test_companions.py",
     "test/test_void_material.py",
     "test/test_arena_season_settlement.py",
     "test/test_stat_integration.py",
@@ -39,6 +40,7 @@ CORRECTNESS_TARGETS = (
 CORRECTNESS_DESELECT = (
     "test/test_performance_regression.py::test_arena_season_top_n_comparison_preserves_board_and_cleans_fixture",
     "test/test_performance_regression.py::test_player_stats_formula_cache_comparison_preserves_profile_and_cleans_fixture",
+    "test/test_performance_regression.py::test_equipment_definition_cache_comparison_preserves_previews_and_cleans_fixture",
 )
 BENCHMARK_ARGS = (
     "scripts/performance_benchmark.py",
@@ -52,10 +54,8 @@ BENCHMARK_ARGS = (
     "1",
     "10",
     "50",
-    "--command",
-    "我的状态",
     "--profile-sql",
-    "--compare-player-stats-formula-cache",
+    "--compare-companion-status-batch",
 )
 
 
