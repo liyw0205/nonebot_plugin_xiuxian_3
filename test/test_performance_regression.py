@@ -308,6 +308,66 @@ def test_equipment_definition_cache_comparison_preserves_previews_and_cleans_fix
         assert new["stage_latency_ms"]["equipment_definition_provider"]["count"] == new["requests"]
 
 
+def test_void_material_item_cache_comparison_preserves_gate_response_and_cleans_fixture() -> None:
+    import asyncio
+
+    from scripts.performance_benchmark import _run_void_material_item_cache_comparison
+
+    report = asyncio.run(
+        _run_void_material_item_cache_comparison(
+            users=8,
+            batch_size=8,
+            total_requests=8,
+            levels=(1,),
+            profile_sql=True,
+            commands=("寄售物资 虚空晶体 1 100",),
+        )
+    )
+    before = report["comparison"]["before_linear_item_alias_scan"]
+    after = report["comparison"]["after_bundle_item_alias_cache"]
+    assert report["errors"] == 0
+    assert report["item_resolution_outputs_equivalent"] is True
+    assert before["seed"] == after["seed"]
+    assert before["database_bytes_after_benchmark"] == after["database_bytes_after_benchmark"]
+    assert before["temporary_database_cleaned"] is after["temporary_database_cleaned"] is True
+    assert before["sql_profile_enabled"] is after["sql_profile_enabled"] is True
+    assert before["item_record_count"] > 0
+    assert len(before["levels"]) == len(after["levels"]) == 2
+    for old, new in zip(before["levels"], after["levels"], strict=True):
+        assert old["errors"] == new["errors"] == 0
+        assert old["command_errors"]["寄售物资 虚空晶体 1 100"] == new["command_errors"]["寄售物资 虚空晶体 1 100"] == 0
+        assert old["item_alias_cache_build_count"] == old["requests"]
+        assert new["item_alias_cache_build_count"] == 1
+        assert old["stage_latency_ms"]["item_resolution"]["count"] == old["requests"]
+        assert new["stage_latency_ms"]["item_resolution"]["count"] == new["requests"]
+
+
+def test_void_material_item_alias_cache_rebuilds_when_content_bundle_changes() -> None:
+    from types import SimpleNamespace
+
+    from nonebot_plugin_xiuxian_3.xiuxian.economy.void_material_use_cases import VoidMaterialApplication
+
+    class ContentStub:
+        def __init__(self, items):
+            self.items = items
+
+        def list(self, kind, *, include_locked=True):
+            assert kind == "item"
+            return [dict(item) for item in self.items]
+
+    first = ContentStub([{"key": "item.first", "name": "首物", "aliases": ["一"]}])
+    second = ContentStub([{"key": "item.second", "name": "次物", "aliases": ["二"]}])
+    repository = SimpleNamespace(content=first)
+    application = VoidMaterialApplication(repository)
+    assert application._resolve_item("一") == "item.first"
+    assert application._resolve_item("二") is None
+    assert application._item_alias_cache_build_count == 1
+    repository.content = second
+    assert application._resolve_item("一") is None
+    assert application._resolve_item("二") == "item.second"
+    assert application._item_alias_cache_build_count == 2
+
+
 def test_arena_season_index_comparison_uses_one_clean_fixture() -> None:
     import asyncio
 

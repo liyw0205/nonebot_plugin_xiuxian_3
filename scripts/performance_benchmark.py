@@ -85,7 +85,7 @@ ARENA_SEASON_INDEX_SQL = (
     "score_counted, challenger_rating_delta, defender_rating_delta)"
 )
 EXPECTED_COMMAND_CODES = {
-    "寄售物资 虚空晶体 1 100": "VOID_MARKET_NOT_ENOUGH_ITEMS",
+    "寄售物资 虚空晶体 1 100": "VOID_MARKET_ADMISSION",
 }
 
 
@@ -2244,6 +2244,119 @@ async def _run_equipment_definition_cache_comparison(
     return payload
 
 
+async def _run_void_material_item_cache_comparison(
+    users: int,
+    batch_size: int,
+    total_requests: int,
+    levels: tuple[int, ...],
+    *,
+    profile_sql: bool | None = None,
+    commands: tuple[str, ...] | None = None,
+) -> dict[str, Any]:
+    """Compare linear item alias scans with bundle-scoped alias reuse."""
+
+    selected_commands = commands or ("寄售物资 虚空晶体 1 100",)
+    if selected_commands != ("寄售物资 虚空晶体 1 100",):
+        raise ValueError("void material item comparison only supports the admission-gated list command")
+
+    temporary_path: Path
+    with tempfile.TemporaryDirectory(prefix="xiuxian-perf-") as data_dir:
+        temporary_path = Path(data_dir)
+        runtime = create_runtime(data_dir=data_dir, adapters=("onebot.v11", "qq.official"))
+        await runtime.initialize()
+        seed = _seed_database(runtime, users, batch_size)
+        database_path = runtime.settings.database_path
+        metrics = _instrument_repository(runtime, enabled=profile_sql)
+        application = runtime.application.void_material
+        item_record_count = len(application._content().list("item", include_locked=False))
+
+        async def sample_contract(enabled: bool) -> tuple[Any, ...]:
+            application._item_alias_cache_enabled = enabled
+            application._item_alias_cache = None
+            results = []
+            for request_number, adapter in enumerate(("onebot.v11", "qq.official")):
+                normalized = _normalize(adapter, "perf-0000000", request_number, selected_commands[0])
+                result = await runtime.adapters.dispatch(adapter, normalized.context, normalized.text)
+                results.append(
+                    (result.ok, result.code, result.message, result.data, result.retryable, result.actions)
+                )
+            return tuple(results)
+
+        before_contract = await sample_contract(False)
+        after_contract = await sample_contract(True)
+        application._item_alias_cache_enabled = True
+        application._item_alias_cache = None
+        variants: dict[str, list[dict[str, Any]]] = {
+            "before_linear_item_alias_scan": [],
+            "after_bundle_item_alias_cache": [],
+        }
+        try:
+            for level_index, concurrency in enumerate(levels):
+                for repetition in range(2):
+                    before_first = (level_index + repetition) % 2 == 0
+                    order = (
+                        (
+                            ("before_linear_item_alias_scan", False),
+                            ("after_bundle_item_alias_cache", True),
+                        )
+                        if before_first
+                        else (
+                            ("after_bundle_item_alias_cache", True),
+                            ("before_linear_item_alias_scan", False),
+                        )
+                    )
+                    for label, enabled in order:
+                        application._item_alias_cache_enabled = enabled
+                        application._item_alias_cache = None
+                        started_builds = application._item_alias_cache_build_count
+                        result = asdict(
+                            await _measure(
+                                runtime,
+                                users,
+                                concurrency,
+                                total_requests,
+                                metrics,
+                                selected_commands,
+                            )
+                        )
+                        result["repeat"] = repetition + 1
+                        result["item_alias_cache_build_count"] = (
+                            application._item_alias_cache_build_count - started_builds
+                        )
+                        variants[label].append(result)
+        finally:
+            application._item_alias_cache_enabled = True
+            await runtime.close()
+
+        db_bytes = _db_size(database_path)
+
+        def report(results: list[dict[str, Any]]) -> dict[str, Any]:
+            return {
+                "users": users,
+                "seed": seed,
+                "item_record_count": item_record_count,
+                "database_bytes_after_benchmark": db_bytes,
+                "sql_profile_enabled": metrics is not None,
+                "sql_profile_status": "collected" if metrics is not None else "not_collected",
+                "levels": results,
+                "errors": sum(int(item["errors"]) for item in results),
+            }
+
+        payload = {
+            "comparison": {label: report(results) for label, results in variants.items()},
+            "item_resolution_outputs_equivalent": before_contract == after_contract,
+            "errors": sum(
+                int(item["errors"])
+                for results in variants.values()
+                for item in results
+            ),
+        }
+    cleaned = not temporary_path.exists()
+    for result in payload["comparison"].values():
+        result["temporary_database_cleaned"] = cleaned
+    return payload
+
+
 async def _run_companion_status_batch_comparison(
     users: int,
     batch_size: int,
@@ -2487,6 +2600,11 @@ def main() -> int:
         help="compare repeated equipment catalogue validation with bundle reuse",
     )
     compare.add_argument(
+        "--compare-void-material-item-cache",
+        action="store_true",
+        help="compare linear void-material item alias scans with bundle reuse",
+    )
+    compare.add_argument(
         "--compare-companion-status-batch",
         action="store_true",
         help="compare per-companion and indexed player-scoped gear reads",
@@ -2564,6 +2682,17 @@ def main() -> int:
     elif args.compare_equipment_definition_cache:
         payload = asyncio.run(
             _run_equipment_definition_cache_comparison(
+                args.users,
+                args.batch_size,
+                args.requests,
+                levels,
+                profile_sql=profile_sql,
+                commands=commands,
+            )
+        )
+    elif args.compare_void_material_item_cache:
+        payload = asyncio.run(
+            _run_void_material_item_cache_comparison(
                 args.users,
                 args.batch_size,
                 args.requests,
