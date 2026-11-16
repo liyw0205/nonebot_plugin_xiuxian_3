@@ -368,11 +368,26 @@ def test_construction_seed_upgrade_from_v0136_backup_repeat_and_custom(host: Pat
     old = pre_construction_livelihood()
     original = old + b"\n" if custom else old
     path.write_bytes(original)
+    source = host / "src/plugins/nonebot_plugin_xiuxian_3/__init__.py"
+    previous_source = source.read_bytes()
+    previous_toml = (host / "pyproject.toml").read_bytes()
     result = deploy(host)
+    if custom:
+        assert result.returncode != 0
+        assert "mist_lamp.2 objective watch references unknown idle route" in result.stdout + result.stderr
+        assert "已回退" in result.stderr
+        assert path.read_bytes() == original
+        assert source.read_bytes() == previous_source
+        assert (host / "pyproject.toml").read_bytes() == previous_toml
+        preserved(host)
+        # A curated historical board needs an explicit merge of the new routes.
+        original = (ROOT / "data/生活/生活.json").read_bytes() + b"\n"
+        path.write_bytes(original)
+        result = deploy(host)
     assert result.returncode == 0, result.stdout + result.stderr
     assert path.read_bytes() == (original if custom else (ROOT / "data/生活/生活.json").read_bytes())
     backups = list((host / ".xiuxian3/backups").glob("deploy-*"))
-    assert len(backups) == 1
+    assert len(backups) == (2 if custom else 1)
     if not custom:
         assert (backups[0] / "data/生活/生活.json").read_bytes() == old
     repeated = deploy(host)
@@ -414,7 +429,21 @@ def test_fieldwork_seeds_upgrade_from_v0134_and_preserve_custom(host: Path, cust
         assert hashlib.sha256(original).hexdigest() in manifest[relative]["old_sha256"]
         originals[relative] = original + (b"\n" if custom else b"")
         (host / "data" / relative).write_bytes(originals[relative])
+    source = host / "src/plugins/nonebot_plugin_xiuxian_3/__init__.py"
+    previous_source = source.read_bytes()
+    previous_toml = (host / "pyproject.toml").read_bytes()
     result = deploy(host)
+    if custom:
+        assert result.returncode != 0
+        assert "mist_lamp.2 objective watch references unknown idle route" in result.stdout + result.stderr
+        assert "已回退" in result.stderr
+        assert all((host / "data" / relative).read_bytes() == blob for relative, blob in originals.items())
+        assert source.read_bytes() == previous_source
+        assert (host / "pyproject.toml").read_bytes() == previous_toml
+        preserved(host)
+        originals["生活/生活.json"] = (ROOT / "data/生活/生活.json").read_bytes() + b"\n"
+        (host / "data/生活/生活.json").write_bytes(originals["生活/生活.json"])
+        result = deploy(host)
     assert result.returncode == 0, result.stdout + result.stderr
     backup = next((host / ".xiuxian3/backups").glob("deploy-*"))
     for relative in files:
