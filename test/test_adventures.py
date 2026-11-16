@@ -242,7 +242,8 @@ def test_equipment_rewards_follow_path_and_realm_and_create_instances() -> None:
 def test_bounty_board_herb_claim_replay_and_reputation() -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:
-            runtime = create_runtime(data_dir=data_dir)
+            now = datetime(2026, 10, 1, 4, 0, tzinfo=timezone.utc)
+            runtime = create_runtime(data_dir=data_dir, clock=lambda: now)
             user = "bounty-herb"
             await _enter_mortal(runtime, user)
 
@@ -256,23 +257,16 @@ def test_bounty_board_herb_claim_replay_and_reputation() -> None:
             ]
             assert available, "a fresh eligible player must see actionable offers"
             assert "前置不足" not in board.message
-            first = available[0]
+            definition = bounty_definition("bounty.herb_supply", runtime.content)
 
             accepted = await runtime.dispatch(
                 _context(user, "accept", operation_id="bounty-accept-1"),
-                f"接取悬赏 {first['label']}",
+                f"接取悬赏 {definition.label}",
             )
             assert accepted.code == "BOUNTY_ACCEPTED"
-            assert accepted.data["bounty_key"] == first["bounty_key"]
+            assert accepted.data["bounty_key"] == definition.key
             assert accepted.data["progress"] == 0
-            target_key = next(
-                definition["target_key"]
-                for definition in json.load(
-                    open(Path(__file__).parents[1] / "data/任务/悬赏.json", encoding="utf-8")
-                )["records"]
-                if definition["key"] == first["bounty_key"]
-            )
-            _inventory(runtime, user, **{target_key: 5})
+            _inventory(runtime, user, **{definition.target_key: definition.target_amount})
 
             claimed = await runtime.dispatch(
                 _context(user, "claim", operation_id="bounty-claim-1"),
