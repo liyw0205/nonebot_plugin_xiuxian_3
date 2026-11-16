@@ -8,6 +8,15 @@ from ...contracts import PlayerView
 
 
 @dataclass(frozen=True, slots=True)
+class StoryBeatView:
+    key: str
+    title: str
+    content: str
+    objective: str
+    action: str
+
+
+@dataclass(frozen=True, slots=True)
 class StoryBranchView:
     key: str
     label: str
@@ -15,6 +24,7 @@ class StoryBranchView:
     required_source_count: int
     source_label: str
     evidence_operation_ids: tuple[str, ...] = ()
+    beats: tuple[StoryBeatView, ...] = ()
 
     @property
     def eligible(self) -> bool:
@@ -39,4 +49,4 @@ class StoryRecord:
     already_completed: bool = False
 
 
-__all__ = ["StoryBranchView", "StoryRecord"]
+__all__ = ["StoryBeatView", "StoryBranchView", "StoryRecord"]

@@ -23,7 +23,30 @@
           "flag_key": "flag.road.merchant",
           "codex_entry_key": "codex.story.xuantian.road.merchant",
           "appearance_key": "appearance.home.merchant",
-          "completed_nodes": ["node.merchant.1", "node.merchant.2", "node.merchant.3"]
+          "completed_nodes": ["node.merchant.1", "node.merchant.2", "node.merchant.3"],
+          "beats": [
+            {
+              "key": "node.merchant.1",
+              "title": "雨夜验货",
+              "content": "你替药材商在雨夜核对货箱，发现受潮的药包并及时封存。",
+              "objective": "完成一项城镇委托并保全货物",
+              "action": "交付城镇委托"
+            },
+            {
+              "key": "node.merchant.2",
+              "title": "旧账新约",
+              "content": "你带着清点无误的账册走访两家铺子，让互不信任的商户重新签下供货约。",
+              "objective": "完成第二项城镇委托并促成交易",
+              "action": "再次交付城镇委托"
+            },
+            {
+              "key": "node.merchant.3",
+              "title": "青石集市",
+              "content": "集市开张时，你把最后一批货送到约定摊位，镇民终于记住了你的信用。",
+              "objective": "完成第三项城镇委托并赢得商路信任",
+              "action": "完成第三项城镇委托"
+            }
+          ]
         },
         {
           "key": "warden",

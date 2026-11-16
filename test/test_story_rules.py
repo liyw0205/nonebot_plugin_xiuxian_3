@@ -33,6 +33,13 @@ def test_story_rules_consume_content_and_reject_bad_references(tmp_path: Path) -
         lambda row: row["branches"][0].update(
             required_source_count=4,
             completed_nodes=["node.merchant.1", "node.merchant.2", "node.merchant.3", "node.merchant.4"],
+            beats=row["branches"][0].get("beats", []) + [{
+                "key": "node.merchant.4",
+                "title": "补货",
+                "content": "你完成补货。",
+                "objective": "完成第四项委托",
+                "action": "交付城镇委托",
+            }],
         ),
     )
     _edit_record(

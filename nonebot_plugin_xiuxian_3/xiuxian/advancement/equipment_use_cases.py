@@ -40,6 +40,7 @@ class EquipmentApplication:
     def __init__(self, repository: SQLitePlayerRepository):
         self.repository = repository
         self._equipment_definition_cache: tuple[ContentBundle, dict[str, EquipmentDefinition]] | None = None
+        self._equipment_preview_cache: tuple[ContentBundle, dict[str, str]] | None = None
 
     def _equipment_definitions(self, content: ContentBundle) -> dict[str, EquipmentDefinition]:
         cached = self._equipment_definition_cache
@@ -47,7 +48,55 @@ class EquipmentApplication:
             definitions = equipment_definitions(content)
             cached = (content, definitions)
             self._equipment_definition_cache = cached
+            self._equipment_preview_cache = None
         return cached[1]
+
+    def _equipment_preview_text(self, content: ContentBundle, *, mode: str) -> str:
+        definitions = self._equipment_definitions(content)
+        cached = self._equipment_preview_cache
+        if cached is None or cached[0] is not content:
+            cached = (content, {})
+            self._equipment_preview_cache = cached
+        message = cached[1].get(mode)
+        if message is not None:
+            return message
+
+        lines = ["## 装备祭炼" if mode == "temper" else "## 灵纹重铸", ""]
+        for definition in sorted(definitions.values(), key=lambda item: item.label):
+            if mode == "temper":
+                lines.append(f"### {definition.label}")
+                if definition.min_realm_key:
+                    lines.append(
+                        f"最低境界：{content.label('realm', definition.min_realm_key)} L{definition.min_layer}"
+                    )
+                lines.append(f"最高阶数：{definition.max_temper_level}")
+                for level in range(1, definition.max_temper_level + 1):
+                    costs = temper_cost(level, definition)
+                    success_bp = temper_success_bp(level, definition)
+                    lines.append(
+                        f"- **{level} 阶**：{self._cost_text(costs, content)}，成功率 `{success_bp / 100:.0f}%`。"
+                    )
+                lines.append("")
+            else:
+                refinement = definition.growth["refinement"]
+                affixes = refinement["affix_pool"]
+                results = "、".join(
+                    f"**{equipment_affix_label(row['key'], content)} +{row['value']}**"
+                    for row in affixes
+                )
+                lines.extend(
+                    [
+                        f"### {definition.label}",
+                        f"消耗：{self._cost_text(refinement_cost(definition), content)}",
+                        f"成功率：`{refinement_success_bp(definition) / 100:.0f}%`；连续失败 {refinement_pity_failures(definition)} 次后必定成功。",
+                        f"可能词条：{results}。",
+                        "",
+                    ]
+                )
+        lines.append("> 使用 `强化法器 <装备名称>`。" if mode == "temper" else "> 使用 `重铸法器 <装备名称>`。")
+        message = "\n".join(lines)
+        cached[1][mode] = message
+        return message
 
     @staticmethod
     def _operation_id(context: CommandContext, operation_name: str) -> str:
@@ -94,49 +143,23 @@ class EquipmentApplication:
         if context.command_args:
             return CommandResult(False, "INVALID_EQUIPMENT_COMMAND", "法器预览无需附加参数。", context.request_id)
         content = self._content()
-        definitions = self._equipment_definitions(content)
-        lines = ["## 装备祭炼", ""]
-        for definition in sorted(definitions.values(), key=lambda item: item.label):
-            lines.append(f"### {definition.label}")
-            if definition.min_realm_key:
-                lines.append(
-                    f"最低境界：{content.label('realm', definition.min_realm_key)} L{definition.min_layer}"
-                )
-            lines.append(f"最高阶数：{definition.max_temper_level}")
-            for level in range(1, definition.max_temper_level + 1):
-                costs = temper_cost(level, definition)
-                success_bp = temper_success_bp(level, definition)
-                lines.append(
-                    f"- **{level} 阶**：{self._cost_text(costs, content)}，成功率 `{success_bp / 100:.0f}%`。"
-                )
-            lines.append("")
-        lines.append("> 使用 `强化法器 <装备名称>`。")
-        return CommandResult(True, "EQUIPMENT_TEMPER_PREVIEW", "\n".join(lines), context.request_id)
+        return CommandResult(
+            True,
+            "EQUIPMENT_TEMPER_PREVIEW",
+            self._equipment_preview_text(content, mode="temper"),
+            context.request_id,
+        )
 
     async def preview_refinement(self, context: CommandContext) -> CommandResult:
         if context.command_args:
             return CommandResult(False, "INVALID_EQUIPMENT_COMMAND", "重铸预览无需附加参数。", context.request_id)
         content = self._content()
-        definitions = self._equipment_definitions(content)
-        lines = ["## 灵纹重铸", ""]
-        for definition in sorted(definitions.values(), key=lambda item: item.label):
-            refinement = definition.growth["refinement"]
-            affixes = refinement["affix_pool"]
-            results = "、".join(
-                f"**{equipment_affix_label(row['key'], content)} +{row['value']}**"
-                for row in affixes
-            )
-            lines.extend(
-                [
-                    f"### {definition.label}",
-                    f"消耗：{self._cost_text(refinement_cost(definition), content)}",
-                    f"成功率：`{refinement_success_bp(definition) / 100:.0f}%`；连续失败 {refinement_pity_failures(definition)} 次后必定成功。",
-                    f"可能词条：{results}。",
-                    "",
-                ]
-            )
-        lines.append("> 使用 `重铸法器 <装备名称>`。")
-        return CommandResult(True, "EQUIPMENT_REFINE_PREVIEW", "\n".join(lines), context.request_id)
+        return CommandResult(
+            True,
+            "EQUIPMENT_REFINE_PREVIEW",
+            self._equipment_preview_text(content, mode="refine"),
+            context.request_id,
+        )
 
     async def temper(self, context: CommandContext) -> CommandResult:
         return await self._mutate(context, mode="temper")

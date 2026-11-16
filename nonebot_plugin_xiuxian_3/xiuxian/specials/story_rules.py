@@ -19,6 +19,15 @@ class StoryContentError(ContentError):
 
 
 @dataclass(frozen=True, slots=True)
+class StoryBeatDefinition:
+    key: str
+    title: str
+    content: str
+    objective: str
+    action: str
+
+
+@dataclass(frozen=True, slots=True)
 class StoryBranchDefinition:
     key: str
     label: str
@@ -34,6 +43,7 @@ class StoryBranchDefinition:
     completed_nodes: tuple[str, ...]
     harvest_operation_name: str | None
     dispatch_key: str | None
+    beats: tuple[StoryBeatDefinition, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -110,19 +120,40 @@ def story_definition(
             # A branch that starts at the story's entry node still needs one beat
             # per required source; without them the branch ends on a single beat
             # while requiring several claims.
-            beats = nodes[1:]
+            node_beats = nodes[1:]
             expected = tuple(f"node.{key}.{index}" for index in range(1, required_count + 1))
-            if beats != expected:
+            if node_beats != expected:
                 raise StoryContentError(
                     f"{label} completed_nodes must declare beats {expected} after {entry_node}"
                 )
         else:
             expected = tuple(f"node.{key}.{index}" for index in range(1, required_count + 1))
             if nodes != expected:
-                raise StoryContentError(
-                    f"{label} completed_nodes must declare beats {expected}"
+                raise StoryContentError(f"{label} completed_nodes must declare beats {expected}")
+        raw_beats = raw.get("beats", [])
+        if key == "merchant" and not isinstance(raw_beats, list):
+            raise StoryContentError(f"{label} requires beats")
+        beats: list[StoryBeatDefinition] = []
+        if raw_beats:
+            expected_keys = tuple(f"node.{key}.{index}" for index in range(1, required_count + 1))
+            if not isinstance(raw_beats, list) or len(raw_beats) != required_count:
+                raise StoryContentError(f"{label} beats must cover every source requirement")
+            for beat_index, raw_beat in enumerate(raw_beats):
+                beat_label = f"{label} beat {beat_index}"
+                if not isinstance(raw_beat, dict):
+                    raise StoryContentError(f"{beat_label} must be an object")
+                beat_key = _required_text(raw_beat, "key", beat_label)
+                if beat_key != expected_keys[beat_index]:
+                    raise StoryContentError(f"{beat_label} key must be {expected_keys[beat_index]}")
+                beats.append(
+                    StoryBeatDefinition(
+                        key=beat_key,
+                        title=_required_text(raw_beat, "title", beat_label),
+                        content=_required_text(raw_beat, "content", beat_label),
+                        objective=_required_text(raw_beat, "objective", beat_label),
+                        action=_required_text(raw_beat, "action", beat_label),
+                    )
                 )
-
         ending_key = _required_text(raw, "ending_key", label)
         flag_key = _required_text(raw, "flag_key", label)
         codex_key = _required_text(raw, "codex_entry_key", label)
@@ -157,6 +188,7 @@ def story_definition(
                 completed_nodes=nodes,
                 harvest_operation_name=harvest_operation_name,
                 dispatch_key=dispatch_key,
+                beats=tuple(beats),
             )
         )
     return StoryDefinition(
@@ -205,6 +237,7 @@ __all__ = [
     "CLAIM_OPERATION",
     "STORY_KEY",
     "StoryBranchDefinition",
+    "StoryBeatDefinition",
     "StoryContentError",
     "StoryDefinition",
     "resolve_branch",

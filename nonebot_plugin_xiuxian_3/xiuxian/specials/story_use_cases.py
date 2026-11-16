@@ -131,6 +131,16 @@ class StoryApplication:
                         "source_label": branch.source_label,
                         "evidence_operation_ids": list(branch.evidence_operation_ids),
                         "eligible": branch.eligible,
+                        "beats": [
+                            {
+                                "key": beat.key,
+                                "title": beat.title,
+                                "content": beat.content,
+                                "objective": beat.objective,
+                                "action": beat.action,
+                            }
+                            for beat in branch.beats
+                        ],
                     }
                     for branch in record.branches
                 ],
@@ -191,10 +201,14 @@ class StoryApplication:
         except Exception as exc:
             return self._error(context, operation_id, exc)
         branch = next(item for item in record.branches if item.key == route_key)
+        beat_lines = "\n".join(
+            f"- **{beat.title}**：{beat.content} 目标：{beat.objective}；动作：`{beat.action}`。"
+            for beat in branch.beats
+        )
         return CommandResult(
             True,
             "STORY_ROUTE_LOCKED",
-            f"已选定 **{branch.label}** 这段经历，记下了 {len(record.completed_nodes)} 段过往。发送 `领取剧情结局` 领取结局嘉奖。",
+            f"已选定 **{branch.label}** 这段经历，记下了 {len(record.completed_nodes)} 段过往。\n\n{beat_lines}\n\n发送 `领取剧情结局` 领取结局嘉奖。",
             context.request_id,
             operation_id,
             data={
@@ -205,6 +219,16 @@ class StoryApplication:
                 "ending_key": record.ending_key,
                 "completed_nodes": list(record.completed_nodes),
                 "source_operation_ids": list(record.snapshot.get("choice", {}).get("source_operation_ids", [])),
+                "beats": [
+                    {
+                        "key": beat.key,
+                        "title": beat.title,
+                        "content": beat.content,
+                        "objective": beat.objective,
+                        "action": beat.action,
+                    }
+                    for beat in branch.beats
+                ],
                 "idempotent_replay": record.already_completed,
             },
         )

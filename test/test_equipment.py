@@ -7,6 +7,7 @@ import shutil
 from collections import defaultdict
 from tempfile import TemporaryDirectory
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -289,6 +290,37 @@ def test_equipment_definition_cache_tracks_content_identity_and_keeps_last_valid
     with pytest.raises(ValueError, match="invalid equipment definitions"):
         application._equipment_definitions(invalid_content)
     assert application._equipment_definition_cache == (replacement_content, replacement_definitions)
+
+
+
+def test_equipment_preview_cache_reuses_text_and_follows_content_identity() -> None:
+    from nonebot_plugin_xiuxian_3.xiuxian.advancement.equipment_use_cases import EquipmentApplication
+    from nonebot_plugin_xiuxian_3.xiuxian.content import ContentBundle
+
+    original_content = bundled_content()
+    replacement_content = ContentBundle.load(original_content.root)
+    repository = SimpleNamespace(content=original_content)
+    application = EquipmentApplication(repository)
+
+    async def run() -> None:
+        first = await application.preview_tempering(_context("preview", "preview-1"))
+        second = await application.preview_tempering(_context("preview", "preview-2"))
+        assert first.ok and second.ok
+        assert first.message == second.message
+        assert application._equipment_preview_cache == (
+            original_content,
+            {"temper": first.message},
+        )
+
+        repository.content = replacement_content
+        third = await application.preview_tempering(_context("preview", "preview-3"))
+        assert third.ok and third.message == first.message
+        assert application._equipment_preview_cache == (
+            replacement_content,
+            {"temper": third.message},
+        )
+
+    asyncio.run(run())
 
 
 def test_equipment_tempering_is_idempotent_and_migrates_legacy_inventory() -> None:
