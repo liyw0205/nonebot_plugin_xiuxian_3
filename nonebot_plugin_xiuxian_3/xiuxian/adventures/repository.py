@@ -2221,6 +2221,8 @@ class AdventuresRepositoryMixin:
             if isinstance(idle_baseline, bool) or not isinstance(idle_baseline, int) or idle_baseline < 0:
                 raise ValueError("mainline idle baseline is invalid")
             operation_baseline = snapshot.get("baseline_operation_rowid", 0)
+            if any(item.get("type") == "field_harvest" for item in objectives):
+                operation_baseline = snapshot.get("baseline_operation_rowid")
             if (
                 isinstance(operation_baseline, bool)
                 or not isinstance(operation_baseline, int)
@@ -2380,6 +2382,10 @@ class AdventuresRepositoryMixin:
                     if isinstance(amount, int) and not isinstance(amount, bool) and amount > 0:
                         found = operation
                         break
+            elif kind == "field_harvest":
+                from .field_objectives import has_field_harvest
+
+                found = True if has_field_harvest(connection, player_id, objective, operation_baseline) else None
             elif kind == "production_complete":
                 found = completed_production(objective)
             elif kind == "item_use":
@@ -2506,6 +2512,11 @@ class AdventuresRepositoryMixin:
                             for field in ("mode_key", "location_key")
                         )
                     )
+                if objective["type"] == "field_harvest":
+                    from .field_objectives import field_harvest_objective
+
+                    field_harvest_objective(objective)
+                    return True
                 if objective["type"] == "commission_delivery":
                     return (
                         set(objective) == {"key", "type", "label", "commission_key"}

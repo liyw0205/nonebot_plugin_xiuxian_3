@@ -27,6 +27,7 @@ BASALT_WAYMARKER_STORY_KEY = "story.mainline.basalt_waymarker"
 HERB_SHELTER_STORY_KEY = "story.mainline.herb_shelter"
 MIST_LAMP_STORY_KEY = "story.mainline.mist_lamp"
 CLOUD_TIDE_STORY_KEY = "story.mainline.cloud_tide"
+FIELD_SEEDS_STORY_KEY = "story.mainline.field_seeds"
 MAINLINE_TOWN_COMMISSION_DELIVERED = "livelihood.town_commission.delivered"
 
 MAINLINE_LOCKED = "locked"
@@ -249,6 +250,9 @@ _VERTICAL_SLICE_STAGES = frozenset(
         "cloud_tide.1",
         "cloud_tide.2",
         "cloud_tide.3",
+        "field_seeds.1",
+        "field_seeds.2",
+        "field_seeds.3",
         "lane.builder.chapter.01",
         "lane.builder.chapter.02",
         "lane.builder.chapter.03",
@@ -458,6 +462,10 @@ def _story_objectives(
                 "key": str(objective_key), "type": kind, "label": label.strip(),
                 "mode_key": mode_key, "location_key": location_key,
             }
+        elif kind == "field_harvest":
+            from .field_objectives import field_harvest_objective
+
+            normalized = field_harvest_objective(objective, bundle)
         elif kind == "commission_delivery":
             if set(objective) != {"key", "type", "label", "commission_key"}:
                 raise ContentError(f"mainline {key} objective {objective_key} has an invalid commission shape")
@@ -1387,6 +1395,7 @@ __all__ = [
     "HERB_SHELTER_STORY_KEY",
     "MIST_LAMP_STORY_KEY",
     "CLOUD_TIDE_STORY_KEY",
+    "FIELD_SEEDS_STORY_KEY",
     "MAINLINE_TOWN_COMMISSION_DELIVERED",
     "MainlineDefinition",
     "MainlineStageDefinition",

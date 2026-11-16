@@ -33,6 +33,7 @@ from .adventures.mainline import (
     HERB_SHELTER_STORY_KEY,
     MIST_LAMP_STORY_KEY,
     CLOUD_TIDE_STORY_KEY,
+    FIELD_SEEDS_STORY_KEY,
     DAO_SETTLEMENT_STORY_KEY,
     DOMAIN_FRONTIER_STORY_KEY,
     VOID_ARCHIVE_STORY_KEY,
@@ -144,6 +145,14 @@ _CLOUD_TIDE_HELP = (
     f"{command_link('交付委托 候潮备材', '交付委托 候潮备材')}，实际交两云铁一阵砂。"
     "旧行程、未结算、风暴无票、取消、逾时保底和旧交单不算相应目标，重启后用主线与挂机状态继续。"
 )
+_FIELD_SEEDS_HELP = (
+    "\n\n感气二层后可走"
+    f"{command_link('药畦换种主线', '药畦换种主线')}：先归镇认畦，再租客房，"
+    f"在分苗换种关开始后{command_link('灵田播种 止血草 精耕', '灵田播种 止血草 精耕')}，"
+    "照料两次，四小时成熟后完整收获，取得云纹稻种。最后在青石镇交付止血草供应。"
+    "旧田、本关才收的旧苗、少照料与枯萎都不算；用我的灵田看窗口，保留种子按日限重种。"
+    "换种后可积累镇中名望，租灵圃小院，继续种云纹稻。"
+)
 _HELP_PAGES = {
     "启程": (
         "**启程**\n\n"
@@ -217,6 +226,7 @@ _HELP_PAGES = {
         + _HERB_SHELTER_HELP
         + _MIST_LAMP_HELP
         + _CLOUD_TIDE_HELP
+        + _FIELD_SEEDS_HELP
     ),
     "悬赏": (
         "**悬赏**\n\n"
@@ -353,6 +363,7 @@ _HELP_PAGES = {
         + _HERB_SHELTER_HELP
         + _MIST_LAMP_HELP
         + _CLOUD_TIDE_HELP
+        + _FIELD_SEEDS_HELP
     ),
     "社交": (
         "**社交**\n\n"
@@ -494,6 +505,10 @@ class XiuxianApplication:
         self.cloud_tide_mainline = AdventuresMainlineApplication(
             repository, story_key=CLOUD_TIDE_STORY_KEY, title="云舟候潮主线",
             start_command="开始云舟候潮主线", claim_command="领取云舟候潮主线奖励",
+        )
+        self.field_seeds_mainline = AdventuresMainlineApplication(
+            repository, story_key=FIELD_SEEDS_STORY_KEY, title="药畦换种主线",
+            start_command="开始药畦换种主线", claim_command="领取药畦换种主线奖励",
         )
         self.three_realms = ThreeRealmsApplication(repository)
         self.secret_realms = SecretRealmApplication(repository)
@@ -1888,6 +1903,21 @@ class XiuxianApplication:
 
     async def get_herb_shelter_mainline_status(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.herb_shelter_mainline.get_status(context), require_write=False)
+
+    async def get_field_seeds_mainline_status(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.field_seeds_mainline.get_status(context), require_write=False)
+
+    async def start_field_seeds_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context, lambda: self.field_seeds_mainline.start_stage(context),
+            write_message="此刻无法开始药畦换种。",
+        )
+
+    async def claim_field_seeds_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context, lambda: self.field_seeds_mainline.claim_reward(context),
+            write_message="此刻无法领取药畦换种所得。",
+        )
 
     async def start_herb_shelter_mainline(self, context: CommandContext) -> CommandResult:
         return await self._invoke(

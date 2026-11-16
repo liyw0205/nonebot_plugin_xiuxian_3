@@ -4797,6 +4797,56 @@
       "lane": "herb_shelter", "lane_name": "百草坡药棚", "reputation_key": "local.xuantian.new_town",
       "first_clear_reward": {"spirit_stones": 24, "local_reputation": 3, "service_reputation": 3},
       "repeat_reward": {"spirit_stones": 5}
+    },
+    {
+      "key": "field_seeds.1", "story_key": "story.mainline.field_seeds", "chapter": 1, "stage": 1,
+      "name": "归镇认畦", "desc": "回青石镇找姜婆认田，把山路上采来的药根留在院中。",
+      "body": "山路上的药草总有采尽的一天，姜婆在青石镇门口摊开一张田畦图，请你把一小段止血草根留下来。先记下这一页，再沿公开山路回镇，行程抵达后到她的苗盘前认一认行距。若你已经在镇中，可以去近郊看看药根，再回来交卷。她指着客房后的空地说，租住期间也有一垄小田，不必等到买下大院才学种药。先查看居所和租金，把药种与照料的精力留好；下一页才正式分苗，旧田不能代替这一次练习。",
+      "objectives": [{"key": "return", "type": "travel_arrival", "label": "本关实际抵达青石镇", "destination_key": "xuantian.new_town"}],
+      "actions": [
+        {"command": "前往", "argument": "青石镇", "description": "从近郊回镇，到时结算移动；已在镇中可先走近郊再返回。"},
+        {"command": "结算移动", "argument": "", "description": "真实抵达后交卷。"},
+        {"command": "居所预览", "argument": "", "description": "核对租金与田垄；客房即可种止血草。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.field_seeds:field_seeds.1"]}, "next_stage_key": "field_seeds.2",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "需在本关开始后亲自抵达青石镇。旧行程不算；用移动状态查看途中安排，再结算移动，已完成行动保留。"},
+      "status": "open", "aliases": ["归镇认畦"], "prerequisites": ["player.start_seeking"], "required_realm": "qi_sensing", "required_layer": 2,
+      "lane": "field_seeds", "lane_name": "药畦换种", "first_clear_reward": {"spirit_stones": 10}, "repeat_reward": {"spirit_stones": 2}
+    },
+    {
+      "key": "field_seeds.2", "story_key": "story.mainline.field_seeds", "chapter": 1, "stage": 2,
+      "name": "分苗换种", "desc": "精耕一畦新药苗，照料两次，以成熟药苗换来云纹稻种。",
+      "body": "姜婆将两只苗盘摆在田边，一只装药根，一只空着等阿禾的稻种。她要看的是你从下种到收苗亲手做完一回，而不是把旧田的收成拿来应付。先在青石镇租下客房或已有带田居所，本页开始后用一份止血草新播精耕田，成熟前照料两次。四小时后、收割窗口内收下充分照料的药苗，阿禾才会照约送来一份云纹稻种。缓养虽能收药，却没有换种之约；漏了照料、放到枯萎或领取旧田都不算。这一页会一直留着，缺药种可去近郊采集或百草坡采药，按每日名额再种一畦。",
+      "objectives": [{"key": "seed_exchange", "type": "field_harvest", "label": "本关新播精耕止血草并充分照料收获云纹稻种", "crop_key": "crop.blood_grass", "plan_keys": ["intensive"], "item_key": "item.grain.cloud_rice", "quantity": 1}],
+      "actions": [
+        {"command": "租住居所", "argument": "客房", "description": "已有有效带田居所无需重租；租金以居所预览为准。"},
+        {"command": "灵田预览", "argument": "止血草", "description": "核对种子、精力、每日名额和精耕窗口。"},
+        {"command": "灵田播种", "argument": "止血草 精耕", "description": "本关新播；旧田即使现在收获也不计。"},
+        {"command": "灵田维护", "argument": "1", "description": "成熟前照料两次；多垄居所按实际田垄选择。"},
+        {"command": "灵田收获", "argument": "1", "description": "四小时后在窗口内收获，实际取得稻种。"},
+        {"command": "我的灵田", "argument": "", "description": "断线重启后查看照料次数和剩余窗口。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.field_seeds:field_seeds.2"]}, "next_stage_key": "field_seeds.3",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "只认本关新播精耕止血草的充分照料收获。旧田、缓养、少照料与枯萎都不算；用我的灵田查看窗口，补药种和精力，按日限重种，已完成剧情不丢失。"},
+      "status": "open", "aliases": ["分苗换种"], "prerequisites": ["field_seeds.1"], "required_realm": "qi_sensing", "required_layer": 2,
+      "lane": "field_seeds", "lane_name": "药畦换种", "first_clear_reward": {"spirit_stones": 18, "service_reputation": 2}, "repeat_reward": {"spirit_stones": 3}
+    },
+    {
+      "key": "field_seeds.3", "story_key": "story.mainline.field_seeds", "chapter": 1, "stage": 3,
+      "name": "药畦入铺", "desc": "将三份止血草交给镇中药铺，留下稻种，准备下一季的饭。",
+      "body": "阿禾把稻种扎紧，提醒你别把这一小袋当成眼前的饭吃掉。姜婆则将余下药草摊开晾干，让你给镇中药铺送三份能用的止血草。这一页开始后先看当日公示，备齐材料再接止血草供应，按期限亲自交货。药铺给的是实物报酬与地方认可，不会因为你曾经种过药就免去交付；库存不够时可以继续养药，也可以沿山路补采。交卷后田垄仍归你照看，云纹稻种也仍在行囊里。日后镇中名望达到六十，租得灵圃小院，便能和阿禾试种云纹稻，把一袋种子养成下一桌热饭。",
+      "objectives": [{"key": "supply", "type": "commission_delivery", "label": "本关实际交付止血草供应", "commission_key": "town_commission.herb_supply"}],
+      "actions": [
+        {"command": "城镇委托", "argument": "", "description": "备齐三份止血草，再查看公示截止时间。"},
+        {"command": "接取委托", "argument": "止血草供应", "description": "在青石镇接单；逾期次日重接。"},
+        {"command": "交付委托", "argument": "止血草供应", "description": "交出实物后领取本关奖励。"},
+        {"command": "灵田预览", "argument": "云纹稻", "description": "保留换来的稻种，积累名望租灵圃小院后继续养稻。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.field_seeds:field_seeds.3"]}, "next_stage_key": null,
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "需要本关的止血草供应交单；旧交单和只接未交不算。缺料不扣物，先补三份止血草，公示过期次日重接。"},
+      "status": "open", "aliases": ["药畦入铺"], "prerequisites": ["field_seeds.2"], "required_realm": "qi_sensing", "required_layer": 2,
+      "lane": "field_seeds", "lane_name": "药畦换种", "reputation_key": "local.xuantian.new_town",
+      "first_clear_reward": {"spirit_stones": 24, "local_reputation": 4, "service_reputation": 2}, "repeat_reward": {"spirit_stones": 5}
     }
   ]
 }
