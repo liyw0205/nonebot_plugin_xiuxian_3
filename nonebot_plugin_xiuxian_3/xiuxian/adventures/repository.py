@@ -1504,16 +1504,21 @@ class AdventuresRepositoryMixin:
         *,
         now: datetime | None = None,
         mainline_rows: tuple[sqlite3.Row, ...] | None = None,
+        normalized: Mapping[str, Any] | None = None,
     ) -> set[str]:
         """Build server-owned evidence shared by status and start checks."""
 
-        intro = SQLitePlayerRepository._json_object(player["intro_json"], {})
+        intro_flags = (
+            normalized.get("intro_flags", ())
+            if normalized is not None
+            else SQLitePlayerRepository._json_object(player["intro_json"], {}).get("flags", ())
+        )
         # The time-fort story flag is only a projection of a first clear.  It
         # must be rebuilt from the settlement table so a stale flag cannot
         # unlock the returner's route by itself.
         events = {
             str(item)
-            for item in intro.get("flags", [])
+            for item in intro_flags
             if str(item) != "story.mainline.void_archive.time_fort"
         }
         # Cross-story progress comes from first clears, not projected event flags.
@@ -1618,7 +1623,9 @@ class AdventuresRepositoryMixin:
         content=None,
         replay: bool = False,
         now: datetime | None = None,
+        normalized: Mapping[str, Any] | None = None,
     ) -> MainlineStatusRecord:
+        normalized = dict(normalized) if normalized is not None else player_values(player)
         all_runs = tuple(
             connection.execute(
                 "SELECT * FROM mainline_runs WHERE player_id = ?",
@@ -1640,6 +1647,7 @@ class AdventuresRepositoryMixin:
             player,
             now=now,
             mainline_rows=all_runs,
+            normalized=normalized,
         )
         views: list[MainlineStageView] = []
         definitions = mainline_definitions(
@@ -1704,7 +1712,7 @@ class AdventuresRepositoryMixin:
         elif any(item.status == MAINLINE_REWARD_PENDING for item in views):
             overall = MAINLINE_REWARD_PENDING
         return MainlineStatusRecord(
-            player=SQLitePlayerRepository._row_to_player(player),
+            player=SQLitePlayerRepository._row_to_player(player, normalized=normalized),
             story_key=story_key,
             chapter=current.chapter,
             current_stage=current.stage,

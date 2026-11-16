@@ -1326,6 +1326,175 @@ async def _run_mainline_prerequisite_comparison(
     return payload
 
 
+async def _run_mainline_player_projection_comparison(
+    users: int,
+    batch_size: int,
+    total_requests: int,
+    levels: tuple[int, ...],
+    *,
+    profile_sql: bool | None = None,
+    commands: tuple[str, ...] | None = None,
+) -> dict[str, Any]:
+    """Compare duplicate intro projection parsing with shared player values."""
+
+    selected_commands = commands or ("主线状态",)
+    if selected_commands != ("主线状态",):
+        raise ValueError("mainline player projection comparison only supports 主线状态")
+
+    import importlib
+
+    repository_module = importlib.import_module(
+        "nonebot_plugin_xiuxian_3.xiuxian.adventures.repository"
+    )
+    mixin = repository_module.AdventuresRepositoryMixin
+    optimized_events = mixin._mainline_completed_events
+    legacy_decodes = 0
+
+    def legacy_events(
+        connection: sqlite3.Connection,
+        player: Any,
+        *,
+        now: Any,
+        mainline_rows: Any,
+        normalized: Any,
+    ) -> Any:
+        nonlocal legacy_decodes
+        legacy_decodes += 1
+        return optimized_events(
+            connection,
+            player,
+            now=now,
+            mainline_rows=mainline_rows,
+            normalized=None,
+        )
+
+    temporary_path: Path
+    with tempfile.TemporaryDirectory(prefix="xiuxian-perf-") as data_dir:
+        temporary_path = Path(data_dir)
+        runtime = create_runtime(data_dir=data_dir, adapters=("onebot.v11", "qq.official"))
+        await runtime.initialize()
+        seed = _seed_database(runtime, users, batch_size)
+        explain = _explain(runtime.settings.database_path, 1)
+        metrics = _instrument_repository(runtime, enabled=profile_sql)
+        restore_executor = _instrument_executor(metrics) if metrics is not None else None
+        variants: dict[str, list[dict[str, Any]]] = {
+            "before_duplicate_intro_projection": [],
+            "after_shared_mainline_projection": [],
+        }
+
+        def set_variant(legacy: bool) -> None:
+            mixin._mainline_completed_events = staticmethod(
+                legacy_events if legacy else optimized_events
+            )
+
+        def response_contract(result: Any) -> tuple[Any, ...]:
+            return (
+                result.ok,
+                result.code,
+                result.message,
+                result.operation_id,
+                result.data,
+                result.retryable,
+                result.actions,
+            )
+
+        async def status_pair() -> list[Any]:
+            results = []
+            for request_number, (adapter, user_id) in enumerate(
+                (("onebot.v11", "perf-0000000"), ("qq.official", "perf-0000001"))
+            ):
+                normalized = _normalize(adapter, user_id, request_number, "主线状态")
+                results.append(
+                    await runtime.adapters.dispatch(
+                        adapter, normalized.context, normalized.text
+                    )
+                )
+            return results
+
+        try:
+            set_variant(True)
+            before_equivalence = await status_pair()
+            set_variant(False)
+            after_equivalence = await status_pair()
+            profile_results_equivalent = tuple(map(response_contract, before_equivalence)) == tuple(
+                map(response_contract, after_equivalence)
+            )
+            if not profile_results_equivalent:
+                raise AssertionError("mainline status differs between projection variants")
+
+            for level_index, concurrency in enumerate(levels):
+                for repetition in range(4):
+                    before_first = (level_index + repetition) % 2 == 0
+                    order = (
+                        (
+                            ("before_duplicate_intro_projection", True),
+                            ("after_shared_mainline_projection", False),
+                        )
+                        if before_first
+                        else (
+                            ("after_shared_mainline_projection", False),
+                            ("before_duplicate_intro_projection", True),
+                        )
+                    )
+                    for label, legacy in order:
+                        set_variant(legacy)
+                        await _measure(
+                            runtime,
+                            users,
+                            concurrency,
+                            max(1, min(8, total_requests // 4)),
+                            metrics,
+                            selected_commands,
+                        )
+                        legacy_decodes = 0
+                        result = asdict(
+                            await _measure(
+                                runtime,
+                                users,
+                                concurrency,
+                                total_requests,
+                                metrics,
+                                selected_commands,
+                            )
+                        )
+                        result["repeat"] = repetition + 1
+                        result["mainline_intro_evidence_decodes"] = legacy_decodes
+                        variants[label].append(result)
+        finally:
+            mixin._mainline_completed_events = staticmethod(optimized_events)
+            if restore_executor is not None:
+                restore_executor()
+            await runtime.close()
+
+        db_bytes = _db_size(runtime.settings.database_path)
+
+        def report(results: list[dict[str, Any]]) -> dict[str, Any]:
+            return {
+                "users": users,
+                "seed": seed,
+                "database_bytes_after_benchmark": db_bytes,
+                "sql_profile_enabled": metrics is not None,
+                "sql_profile_status": "collected" if metrics is not None else "not_collected",
+                "explain_query_plan": explain,
+                "levels": results,
+                "errors": sum(int(item["errors"]) for item in results),
+            }
+
+        payload = {
+            "comparison": {label: report(results) for label, results in variants.items()},
+            "profile_results_equivalent": profile_results_equivalent,
+            "errors": sum(
+                int(item["errors"])
+                for results in variants.values()
+                for item in results
+            ),
+        }
+    cleaned = not temporary_path.exists()
+    for result in payload["comparison"].values():
+        result["temporary_database_cleaned"] = cleaned
+    return payload
+
+
 async def _run_arena_season_event_comparison(
     users: int,
     batch_size: int,
@@ -2726,6 +2895,11 @@ def main() -> int:
         help="compare shared vs per-stage mainline prerequisite preparation",
     )
     compare.add_argument(
+        "--compare-mainline-player-projection",
+        action="store_true",
+        help="compare duplicate versus shared mainline player projection parsing",
+    )
+    compare.add_argument(
         "--compare-arena-season-events",
         action="store_true",
         help="compare separate vs shared season history reads on one fixture",
@@ -2963,6 +3137,17 @@ def main() -> int:
     elif args.compare_mainline_prerequisites:
         payload = asyncio.run(
             _run_mainline_prerequisite_comparison(
+                args.users,
+                args.batch_size,
+                args.requests,
+                levels,
+                profile_sql=profile_sql,
+                commands=commands,
+            )
+        )
+    elif args.compare_mainline_player_projection:
+        payload = asyncio.run(
+            _run_mainline_player_projection_comparison(
                 args.users,
                 args.batch_size,
                 args.requests,

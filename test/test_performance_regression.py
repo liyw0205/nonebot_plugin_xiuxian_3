@@ -310,6 +310,38 @@ def test_player_profile_projection_comparison_reuses_normalization_and_cleans_fi
         assert abs(old["sql_queries"] - new["sql_queries"]) <= 1
 
 
+def test_mainline_player_projection_comparison_reuses_intro_projection() -> None:
+    import asyncio
+
+    from scripts.performance_benchmark import _run_mainline_player_projection_comparison
+
+    report = asyncio.run(
+        _run_mainline_player_projection_comparison(
+            users=8,
+            batch_size=8,
+            total_requests=8,
+            levels=(1,),
+            profile_sql=True,
+            commands=("主线状态",),
+        )
+    )
+    before = report["comparison"]["before_duplicate_intro_projection"]
+    after = report["comparison"]["after_shared_mainline_projection"]
+    assert report["errors"] == 0
+    assert report["profile_results_equivalent"] is True
+    assert before["seed"] == after["seed"]
+    assert before["database_bytes_after_benchmark"] == after["database_bytes_after_benchmark"]
+    assert before["temporary_database_cleaned"] is after["temporary_database_cleaned"] is True
+    assert before["sql_profile_enabled"] is after["sql_profile_enabled"] is True
+    assert len(before["levels"]) == len(after["levels"]) == 4
+    for old, new in zip(before["levels"], after["levels"], strict=True):
+        assert old["errors"] == new["errors"] == 0
+        assert old["command_errors"]["主线状态"] == new["command_errors"]["主线状态"] == 0
+        assert old["mainline_intro_evidence_decodes"] == old["requests"]
+        assert new["mainline_intro_evidence_decodes"] == 0
+        assert old["sql_queries"] > 0 and new["sql_queries"] > 0
+
+
 def test_equipment_definition_cache_comparison_preserves_previews_and_cleans_fixture() -> None:
     import asyncio
 
