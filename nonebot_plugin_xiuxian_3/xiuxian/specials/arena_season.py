@@ -10,6 +10,7 @@ because of later matches or later player edits.
 
 from __future__ import annotations
 
+import heapq
 from dataclasses import dataclass
 from fractions import Fraction
 from datetime import date, datetime, timedelta, timezone
@@ -102,6 +103,7 @@ def build_board(
     start: datetime,
     end: datetime,
     base_rating: int = BASE_RATING,
+    limit: int | None = None,
 ) -> tuple[BoardEntry, ...]:
     """Rank the players who scored inside ``[start, end)``.
 
@@ -109,6 +111,9 @@ def build_board(
     the moment the player first scored in the week asc, then player id asc so the
     order is total and stable.
     """
+
+    if limit is not None and (isinstance(limit, bool) or not isinstance(limit, int) or limit < 0):
+        raise ValueError("board limit must be a non-negative integer")
 
     start = _aware(start)
     end = _aware(end)
@@ -142,14 +147,18 @@ def build_board(
         played = wins.get(player_id, 0) + losses.get(player_id, 0) + draws.get(player_id, 0)
         return Fraction(wins.get(player_id, 0), played) if played else Fraction(0)
 
-    ordered = sorted(
-        counted_week,
-        key=lambda player_id: (
+    def sort_key(player_id: int) -> tuple[int, Fraction, datetime, int]:
+        return (
             -rating.get(player_id, base_rating),
             -win_rate(player_id),
             first[player_id],
             player_id,
-        ),
+        )
+
+    ordered = (
+        sorted(counted_week, key=sort_key)
+        if limit is None
+        else heapq.nsmallest(limit, counted_week, key=sort_key)
     )
     return tuple(
         BoardEntry(

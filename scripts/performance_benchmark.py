@@ -84,6 +84,9 @@ ARENA_SEASON_INDEX_SQL = (
     "ON arena_matches(settled_at, challenger_id, defender_id, outcome, "
     "score_counted, challenger_rating_delta, defender_rating_delta)"
 )
+EXPECTED_COMMAND_CODES = {
+    "寄售物资 虚空晶体 1 100": "VOID_MARKET_NOT_ENOUGH_ITEMS",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -111,7 +114,9 @@ class LevelResult:
     executor_worker_count: int
     executor_max_active_workers: int
     connection_open_ms: Percentiles
+    connection_count: int
     sql_queries: int | None
+    expected_command_responses: dict[str, int]
 
 
 class _TimedSemaphore(asyncio.Semaphore):
@@ -136,6 +141,15 @@ def _instrument_repository(runtime: Any, *, enabled: bool | None = None) -> dict
         "inflight_wait_ms": [],
         "connection_open_ms": [],
         "player_profile_ms": [],
+        "player_stat_snapshot_ms": [],
+        "player_equipment_snapshot_ms": [],
+        "player_constitution_effect_ms": [],
+        "player_manual_effects_ms": [],
+        "player_stats_formula_ms": [],
+        "player_stat_calculation_ms": [],
+        "player_companion_carry_ms": [],
+        "player_view_normalization_ms": [],
+        "item_resolution_ms": [],
         "idle_status_ms": [],
         "idle_preview_ms": [],
         "mainline_status_ms": [],
@@ -149,24 +163,21 @@ def _instrument_repository(runtime: Any, *, enabled: bool | None = None) -> dict
     repository = runtime.repository
     repository._inflight = _TimedSemaphore(runtime.settings.max_inflight, metrics["inflight_wait_ms"])
 
-    def timed_method(name: str, metric: str) -> None:
-        original = getattr(repository, name)
+    def timed_method(target: Any, name: str, metric: str) -> None:
+        original = getattr(target, name)
+        setattr(target, name, _timed_callable(original, metrics[metric]))
 
-        def wrapped(*args: Any, **kwargs: Any) -> Any:
-            started = time.perf_counter()
-            try:
-                return original(*args, **kwargs)
-            finally:
-                metrics[metric].append((time.perf_counter() - started) * 1000)
-
-        setattr(repository, name, wrapped)
-
-    timed_method("_get_player_profile_sync", "player_profile_ms")
-    timed_method("_get_idle_status_once", "idle_status_ms")
-    timed_method("_preview_idle_once", "idle_preview_ms")
-    timed_method("_get_mainline_status_sync", "mainline_status_ms")
-    timed_method("_preview_travel_database_state", "travel_preview_ms")
-    timed_method("_arena_season_board_once", "arena_season_board_ms")
+    timed_method(repository, "_get_player_profile_sync", "player_profile_ms")
+    timed_method(repository, "_build_player_stat_snapshot", "player_stat_snapshot_ms")
+    timed_method(repository, "_battle_equipment_snapshot", "player_equipment_snapshot_ms")
+    timed_method(repository, "companion_carry_snapshot", "player_companion_carry_ms")
+    timed_method(repository, "_row_to_player", "player_view_normalization_ms")
+    timed_method(repository, "_get_idle_status_once", "idle_status_ms")
+    timed_method(repository, "_preview_idle_once", "idle_preview_ms")
+    timed_method(repository, "_get_mainline_status_sync", "mainline_status_ms")
+    timed_method(repository, "_preview_travel_database_state", "travel_preview_ms")
+    timed_method(repository, "_arena_season_board_once", "arena_season_board_ms")
+    timed_method(runtime.application.void_material, "_resolve_item", "item_resolution_ms")
     original_connect = repository._connect
 
     def timed_connect() -> sqlite3.Connection:
@@ -186,6 +197,64 @@ def _instrument_repository(runtime: Any, *, enabled: bool | None = None) -> dict
     return metrics
 
 
+def _timed_callable(original: Any, samples: list[float]) -> Any:
+    def wrapped(*args: Any, **kwargs: Any) -> Any:
+        started = time.perf_counter()
+        try:
+            return original(*args, **kwargs)
+        finally:
+            samples.append((time.perf_counter() - started) * 1000)
+
+    wrapped.__wrapped__ = original
+    return wrapped
+
+
+def _instrument_stat_helpers(metrics: dict[str, list[float]]) -> Any:
+    import importlib
+
+    targets = (
+        (
+            importlib.import_module("nonebot_plugin_xiuxian_3.xiuxian.stats.repository"),
+            "constitution_effect_snapshot",
+            "player_constitution_effect_ms",
+        ),
+        (
+            importlib.import_module("nonebot_plugin_xiuxian_3.xiuxian.stats.repository"),
+            "manual_effect_totals",
+            "player_manual_effects_ms",
+        ),
+        (
+            importlib.import_module("nonebot_plugin_xiuxian_3.xiuxian.stats.rules"),
+            "stats_formula",
+            "player_stats_formula_ms",
+        ),
+        (
+            importlib.import_module("nonebot_plugin_xiuxian_3.xiuxian.stats.repository"),
+            "build_stat_preview",
+            "player_stat_calculation_ms",
+        ),
+    )
+    originals: list[tuple[Any, str, Any]] = []
+    for module, name, metric in targets:
+        original = getattr(module, name)
+
+        def timed(*args: Any, _original: Any = original, _metric: str = metric, **kwargs: Any) -> Any:
+            started = time.perf_counter()
+            try:
+                return _original(*args, **kwargs)
+            finally:
+                metrics[_metric].append((time.perf_counter() - started) * 1000)
+
+        originals.append((module, name, original))
+        setattr(module, name, timed)
+
+    def restore() -> None:
+        for module, name, original in reversed(originals):
+            setattr(module, name, original)
+
+    return restore
+
+
 def _instrument_executor(metrics: dict[str, list[float]]) -> Any:
     loop = asyncio.get_running_loop()
     original = loop.run_in_executor
@@ -194,8 +263,6 @@ def _instrument_executor(metrics: dict[str, list[float]]) -> Any:
     active = 0
 
     def measured_run_in_executor(executor: Any, function: Any, *args: Any) -> Any:
-        if executor is not None:
-            return original(executor, function, *args)
         submitted_at = time.perf_counter()
 
         def measured_function(*function_args: Any) -> Any:
@@ -528,15 +595,28 @@ def _serialize_response(adapter: str, result: Any) -> float:
     return (time.perf_counter() - started) * 1000
 
 
-async def _request(runtime: Any, adapter: str, user_id: str, request_number: int, text: str) -> tuple[float, float, bool]:
+async def _request(
+    runtime: Any,
+    adapter: str,
+    user_id: str,
+    request_number: int,
+    text: str,
+) -> tuple[float, float, bool, bool]:
     started = time.perf_counter()
     try:
         normalized = _normalize(adapter, user_id, request_number, text)
         result = await runtime.adapters.dispatch(adapter, normalized.context, normalized.text)
         serialization_ms = _serialize_response(adapter, result)
-        return (time.perf_counter() - started) * 1000, serialization_ms, not result.ok
+        expected_code = EXPECTED_COMMAND_CODES.get(text)
+        expected_response = expected_code is not None and result.code == expected_code
+        failed = (
+            result.code != expected_code
+            if expected_code is not None
+            else not result.ok
+        )
+        return (time.perf_counter() - started) * 1000, serialization_ms, failed, expected_response
     except Exception:
-        return (time.perf_counter() - started) * 1000, 0.0, True
+        return (time.perf_counter() - started) * 1000, 0.0, True, False
 
 
 async def _measure(
@@ -565,6 +645,7 @@ async def _measure(
     serialization: list[float] = []
     latency_by_command: dict[str, list[float]] = {command: [] for command in commands}
     errors_by_command: dict[str, int] = {command: 0 for command in commands}
+    expected_responses_by_command: dict[str, int] = {command: 0 for command in commands}
     errors = 0
     if metrics is not None:
         for values in metrics.values():
@@ -574,15 +655,25 @@ async def _measure(
     while cursor < len(samples):
         batch = samples[cursor : cursor + concurrency]
         values = await asyncio.gather(
-            *(_request(runtime, adapter, user_id, cursor + offset, command) for offset, (adapter, user_id, command) in enumerate(batch))
+            *(
+                _request(
+                    runtime,
+                    adapter,
+                    user_id,
+                    cursor + offset,
+                    command,
+                )
+                for offset, (adapter, user_id, command) in enumerate(batch)
+            )
         )
-        for offset, (request_latency, response_serialization, failed) in enumerate(values):
+        for offset, (request_latency, response_serialization, failed, expected_response) in enumerate(values):
             latency.append(request_latency)
             serialization.append(response_serialization)
             errors += int(failed)
             command = batch[offset][2]
             latency_by_command[command].append(request_latency)
             errors_by_command[command] += int(failed)
+            expected_responses_by_command[command] += int(expected_response)
         cursor += len(batch)
     after_cpu = resource.getrusage(resource.RUSAGE_SELF)
     cpu_seconds = (after_cpu.ru_utime + after_cpu.ru_stime) - (before_cpu.ru_utime + before_cpu.ru_stime)
@@ -613,7 +704,9 @@ async def _measure(
         executor_worker_count=int(max((metrics or {}).get("executor_worker_count", ()), default=0)),
         executor_max_active_workers=int(max((metrics or {}).get("executor_active_workers", ()), default=0)),
         connection_open_ms=_percentiles((metrics or {}).get("connection_open_ms", ())),
+        connection_count=len(runtime.repository._connection_registry),
         sql_queries=(len(metrics["sql_queries"]) if metrics is not None else None),
+        expected_command_responses=expected_responses_by_command,
     )
 
 
@@ -758,6 +851,7 @@ async def _run(
         explain = _explain(runtime.settings.database_path, 1)
         metrics = _instrument_repository(runtime, enabled=profile_sql)
         restore_executor = _instrument_executor(metrics) if metrics is not None else None
+        restore_stat_helpers = _instrument_stat_helpers(metrics) if metrics is not None else None
         try:
             results = [
                 asdict(await _measure(runtime, users, concurrency, total_requests, metrics, commands))
@@ -766,6 +860,8 @@ async def _run(
         finally:
             if restore_executor is not None:
                 restore_executor()
+            if restore_stat_helpers is not None:
+                restore_stat_helpers()
         await runtime.close()
         db_bytes = _db_size(runtime.settings.database_path)
         payload = {
@@ -1515,6 +1611,134 @@ async def _run_arena_season_index_comparison(
     return payload
 
 
+async def _run_arena_season_top_n_comparison(
+    users: int,
+    batch_size: int,
+    total_requests: int,
+    levels: tuple[int, ...],
+    *,
+    profile_sql: bool | None = None,
+    commands: tuple[str, ...] | None = None,
+) -> dict[str, Any]:
+    """Compare complete ranking sorts with top-N selection on one arena fixture."""
+
+    selected_commands = commands or ("竞技场赛季",)
+    if selected_commands != ("竞技场赛季",):
+        raise ValueError("arena top-N comparison only supports the season-board command")
+
+    from nonebot_plugin_xiuxian_3.xiuxian.specials import arena_season as arena_rules
+    from nonebot_plugin_xiuxian_3.xiuxian.specials import (
+        arena_season_repository as arena_repository_module,
+    )
+
+    temporary_path: Path
+    with tempfile.TemporaryDirectory(prefix="xiuxian-perf-") as data_dir:
+        temporary_path = Path(data_dir)
+        runtime = create_runtime(data_dir=data_dir, adapters=("onebot.v11", "qq.official"))
+        await runtime.initialize()
+        seed = _seed_database(runtime, users, batch_size)
+        database_path = runtime.settings.database_path
+        explain = _explain(database_path, 1)
+        metrics = _instrument_repository(runtime, enabled=profile_sql)
+        restore_executor = _instrument_executor(metrics) if metrics is not None else None
+        optimized_builder = arena_repository_module.build_board
+
+        def full_sort_then_slice(
+            events: Iterable[Any],
+            *,
+            start: Any,
+            end: Any,
+            base_rating: int = arena_rules.BASE_RATING,
+            limit: int | None = None,
+        ) -> Any:
+            return arena_rules.build_board(
+                events,
+                start=start,
+                end=end,
+                base_rating=base_rating,
+            )
+
+        repository = runtime.repository
+        try:
+            arena_repository_module.build_board = full_sort_then_slice
+            before_payload = repository._arena_season_board_once(
+                "onebot.v11", "perf-0000000", None
+            )
+            arena_repository_module.build_board = optimized_builder
+            after_payload = repository._arena_season_board_once(
+                "onebot.v11", "perf-0000000", None
+            )
+            board_results_equivalent = before_payload == after_payload
+            if not board_results_equivalent:
+                raise AssertionError("arena season board differs between full-sort and top-N variants")
+
+            variants: dict[str, list[dict[str, Any]]] = {
+                "before_full_sort_then_slice": [],
+                "after_top_n_selection": [],
+            }
+            for level_index, concurrency in enumerate(levels):
+                for repetition in range(2):
+                    before_first = (level_index + repetition) % 2 == 0
+                    order = (
+                        (
+                            ("before_full_sort_then_slice", full_sort_then_slice),
+                            ("after_top_n_selection", optimized_builder),
+                        )
+                        if before_first
+                        else (
+                            ("after_top_n_selection", optimized_builder),
+                            ("before_full_sort_then_slice", full_sort_then_slice),
+                        )
+                    )
+                    for label, builder in order:
+                        arena_repository_module.build_board = builder
+                        result = asdict(
+                            await _measure(
+                                runtime,
+                                users,
+                                concurrency,
+                                total_requests,
+                                metrics,
+                                selected_commands,
+                            )
+                        )
+                        result["repeat"] = repetition + 1
+                        variants[label].append(result)
+        finally:
+            arena_repository_module.build_board = optimized_builder
+            if restore_executor is not None:
+                restore_executor()
+            await runtime.close()
+
+        db_bytes = _db_size(database_path)
+
+        def report(results: list[dict[str, Any]]) -> dict[str, Any]:
+            return {
+                "users": users,
+                "seed": seed,
+                "database_bytes_after_benchmark": db_bytes,
+                "sql_profile_enabled": metrics is not None,
+                "sql_profile_status": "collected" if metrics is not None else "not_collected",
+                "explain_query_plan": explain,
+                "levels": results,
+                "errors": sum(int(item["errors"]) for item in results),
+            }
+
+        payload = {
+            "comparison": {label: report(results) for label, results in variants.items()},
+            "board_results_equivalent": board_results_equivalent,
+            "errors": sum(
+                int(item["errors"])
+                for results in variants.values()
+                for item in results
+            ),
+        }
+    cleaned = not temporary_path.exists()
+    for result in payload["comparison"].values():
+        result["temporary_database_cleaned"] = cleaned
+    return payload
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--users", type=int, default=int(os.getenv("XIUXIAN_PERF_USERS", "1000000")))
@@ -1544,6 +1768,11 @@ def main() -> int:
         help="compare a covering season-history index on one fixture",
     )
     compare.add_argument(
+        "--compare-arena-season-top-n",
+        action="store_true",
+        help="compare full ranking sorts with top-N selection on one arena fixture",
+    )
+    compare.add_argument(
         "--compare-idle-preview-state",
         action="store_true",
         help="compare repeated vs shared route state on one idle-preview fixture",
@@ -1565,7 +1794,15 @@ def main() -> int:
     )
     parser.add_argument(
         "--command",
-        choices=("我的状态", "挂机状态", "挂机预览", "主线状态", "移动预览 玄天近郊", "竞技场赛季"),
+        choices=(
+            "我的状态",
+            "挂机状态",
+            "挂机预览",
+            "主线状态",
+            "移动预览 玄天近郊",
+            "竞技场赛季",
+            "寄售物资 虚空晶体 1 100",
+        ),
         help="measure one real command with all requests assigned to it",
     )
     args = parser.parse_args()
@@ -1580,7 +1817,18 @@ def main() -> int:
         parser.error("--concurrency values must be between 1 and 50")
     commands = (args.command,) if args.command else None
     profile_sql = True if args.profile_sql else None
-    if args.compare_idle_preview_state:
+    if args.compare_arena_season_top_n:
+        payload = asyncio.run(
+            _run_arena_season_top_n_comparison(
+                args.users,
+                args.batch_size,
+                args.requests,
+                levels,
+                profile_sql=profile_sql,
+                commands=commands,
+            )
+        )
+    elif args.compare_idle_preview_state:
         payload = asyncio.run(
             _run_idle_preview_comparison(
                 args.users,

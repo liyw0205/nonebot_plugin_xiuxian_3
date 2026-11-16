@@ -137,7 +137,12 @@ class ArenaSeasonRepositoryMixin:
         if existing:
             return existing
         record = self._season_record()
-        board = build_board(self._season_events(connection, end), start=start, end=end)
+        board = build_board(
+            self._season_events(connection, end),
+            start=start,
+            end=end,
+            limit=int(record["board_size"]),
+        )
         for entry in board[: int(record["board_size"])]:
             reward = reward_for_rank(record, entry.rank, board_size=int(record["board_size"]))
             connection.execute(
@@ -230,7 +235,12 @@ class ArenaSeasonRepositoryMixin:
                 # A live week shows its current standing; a closed-but-unfrozen
                 # week shows exactly what settlement will freeze. Either way the
                 # read writes nothing.
-                board = build_board(events_by_end[end], start=start, end=end)
+                board = build_board(
+                    events_by_end[end],
+                    start=start,
+                    end=end,
+                    limit=int(record["board_size"]),
+                )
                 rows = [
                     {
                         "player_id": entry.player_id,
@@ -257,6 +267,7 @@ class ArenaSeasonRepositoryMixin:
                     events_by_end[previous_end],
                     start=previous_start,
                     end=previous_end,
+                    limit=int(record["board_size"]),
                 )
                 previous_rows = [
                     {

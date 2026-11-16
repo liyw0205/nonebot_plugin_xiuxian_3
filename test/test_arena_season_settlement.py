@@ -107,6 +107,8 @@ def test_the_board_orders_by_rating_then_wins_and_breaks_ties_stably() -> None:
     assert [entry.player_id for entry in board] == [2, 1, 3]
     assert [entry.rank for entry in board] == [1, 2, 3]
     assert board[0].rating == 1050 and board[0].wins == 1 and board[0].losses == 1
+    assert build_board(events, start=start, end=end, limit=2) == board[:2]
+    assert build_board(events, start=start, end=end, limit=0) == ()
 
 
 def test_season_board_reuses_one_history_read_for_current_and_previous_weeks() -> None:

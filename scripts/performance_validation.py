@@ -22,13 +22,22 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_PYTHON = "/home/nonebot-shared-venv/bin/python"
 CORRECTNESS_TARGETS = (
+    "test/test_documentation.py",
     "test/test_player_interaction.py",
+    "test/test_content.py",
+    "test/test_void_material.py",
+    "test/test_arena_season_settlement.py",
     "test/test_stat_integration.py",
     "test/test_stats.py",
     "test/test_stat_rules.py",
     "test/test_breakthrough.py",
+    "test/test_bounty_batch.py",
+    "test/test_bounty_idle_claims.py",
     "test/test_status_query_performance.py",
     "test/test_performance_regression.py",
+)
+CORRECTNESS_DESELECT = (
+    "test/test_performance_regression.py::test_arena_season_top_n_comparison_preserves_board_and_cleans_fixture",
 )
 BENCHMARK_ARGS = (
     "scripts/performance_benchmark.py",
@@ -43,9 +52,9 @@ BENCHMARK_ARGS = (
     "10",
     "50",
     "--command",
-    "我的状态",
+    "竞技场赛季",
     "--profile-sql",
-    "--compare-manual-catalogue",
+    "--compare-arena-season-top-n",
 )
 
 
@@ -79,7 +88,20 @@ def main() -> int:
     if args.phase in {"correctness", "all"}:
         _run(
             "correctness",
-            [interpreter, "-m", "pytest", "-q", "-m", "not performance", *CORRECTNESS_TARGETS],
+            [
+                interpreter,
+                "-m",
+                "pytest",
+                "-q",
+                "-m",
+                "not performance",
+                *CORRECTNESS_TARGETS,
+                *(
+                    argument
+                    for node_id in CORRECTNESS_DESELECT
+                    for argument in ("--deselect", node_id)
+                ),
+            ],
         )
     if args.phase in {"performance", "all"}:
         environment = os.environ.copy()

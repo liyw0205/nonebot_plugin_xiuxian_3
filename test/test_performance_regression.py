@@ -108,6 +108,11 @@ def test_profiled_benchmark_reports_executor_queue_and_workers() -> None:
         and item["errors"] == 0
         for item in report["levels"]
     )
+    assert all(
+        item["stage_latency_ms"]["player_stat_snapshot"]["count"] == item["requests"]
+        and item["stage_latency_ms"]["player_view_normalization"]["count"] == item["requests"]
+        for item in report["levels"]
+    )
 
 
 def test_mainline_prerequisite_comparison_reuses_and_cleans_one_fixture() -> None:
@@ -168,6 +173,38 @@ def test_arena_season_comparison_reuses_one_fixture_and_removes_one_history_quer
         assert old["sql_queries"] - new["sql_queries"] >= old["requests"]
         assert old["errors"] == new["errors"] == 0
         assert old["command_errors"]["竞技场赛季"] == new["command_errors"]["竞技场赛季"] == 0
+
+
+def test_arena_season_top_n_comparison_preserves_board_and_cleans_fixture() -> None:
+    import asyncio
+
+    from scripts.performance_benchmark import _run_arena_season_top_n_comparison
+
+    report = asyncio.run(
+        _run_arena_season_top_n_comparison(
+            users=8,
+            batch_size=8,
+            total_requests=8,
+            levels=(1,),
+            profile_sql=True,
+            commands=("竞技场赛季",),
+        )
+    )
+    before = report["comparison"]["before_full_sort_then_slice"]
+    after = report["comparison"]["after_top_n_selection"]
+    assert report["errors"] == 0
+    assert report["board_results_equivalent"] is True
+    assert before["seed"] == after["seed"]
+    assert before["database_bytes_after_benchmark"] == after["database_bytes_after_benchmark"]
+    assert before["temporary_database_cleaned"] is after["temporary_database_cleaned"] is True
+    assert before["sql_profile_enabled"] is after["sql_profile_enabled"] is True
+    assert len(before["levels"]) == len(after["levels"]) == 2
+    for old, new in zip(before["levels"], after["levels"], strict=True):
+        assert old["errors"] == new["errors"] == 0
+        assert old["command_errors"]["竞技场赛季"] == new["command_errors"]["竞技场赛季"] == 0
+        assert old["stage_latency_ms"]["arena_season_board"]["count"] == old["requests"]
+        assert new["stage_latency_ms"]["arena_season_board"]["count"] == new["requests"]
+        assert old["sql_queries"] > 0 and new["sql_queries"] > 0
 
 
 def test_arena_season_index_comparison_uses_one_clean_fixture() -> None:
