@@ -1181,7 +1181,7 @@ class PlayerRepositoryMixin:
                 if player_field(row, "domain_crack_until") else None
             ),
             initiative=normalized["initiative"],
-            faction_reputation=player_reputation(row),
+            faction_reputation=dict(normalized["faction_reputation"]),
             domain_level=normalized["domain_level"],
             void_power=normalized["void_power"],
             void_power_max=normalized["void_power_max"],

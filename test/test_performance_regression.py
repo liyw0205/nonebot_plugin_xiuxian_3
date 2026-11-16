@@ -306,6 +306,8 @@ def test_player_profile_projection_comparison_reuses_normalization_and_cleans_fi
         assert old["command_errors"]["我的状态"] == new["command_errors"]["我的状态"] == 0
         assert old["player_value_normalization_calls"] == old["requests"] * 2
         assert new["player_value_normalization_calls"] == new["requests"]
+        assert old["player_reputation_parse_calls"] == old["requests"]
+        assert new["player_reputation_parse_calls"] == 0
         assert old["sql_queries"] > 0 and new["sql_queries"] > 0
         assert abs(old["sql_queries"] - new["sql_queries"]) <= 1
 

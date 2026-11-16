@@ -2269,7 +2269,9 @@ async def _run_player_profile_projection_comparison(
         restore_executor = _instrument_executor(metrics) if metrics is not None else None
         restore_stat_helpers = _instrument_stat_helpers(metrics) if metrics is not None else None
         original_player_values = player_repository_module.player_values
+        original_row_to_player = runtime.repository._row_to_player
         calls = 0
+        reputation_calls = 0
 
         def profile_values(row: Any, *, duplicate: bool) -> Any:
             nonlocal calls
@@ -2281,8 +2283,21 @@ async def _run_player_profile_projection_comparison(
             return values
 
         def set_variant(duplicate: bool) -> None:
+            def before_row_to_player(
+                row: Any,
+                *,
+                normalized: Any = None,
+            ) -> Any:
+                nonlocal reputation_calls
+                reputation_calls += 1
+                player_repository_module.player_reputation(row)
+                return original_row_to_player(row, normalized=normalized)
+
             player_repository_module.player_values = lambda row: profile_values(
                 row, duplicate=duplicate
+            )
+            runtime.repository._row_to_player = (
+                before_row_to_player if duplicate else original_row_to_player
             )
 
         def response_contract(result: Any) -> tuple[Any, ...]:
@@ -2346,6 +2361,7 @@ async def _run_player_profile_projection_comparison(
                             selected_commands,
                         )
                         calls = 0
+                        reputation_calls = 0
                         result = asdict(
                             await _measure(
                                 runtime,
@@ -2358,9 +2374,11 @@ async def _run_player_profile_projection_comparison(
                         )
                         result["repeat"] = repetition + 1
                         result["player_value_normalization_calls"] = calls
+                        result["player_reputation_parse_calls"] = reputation_calls
                         variants[label].append(result)
         finally:
             player_repository_module.player_values = original_player_values
+            runtime.repository._row_to_player = original_row_to_player
             if restore_executor is not None:
                 restore_executor()
             if restore_stat_helpers is not None:
