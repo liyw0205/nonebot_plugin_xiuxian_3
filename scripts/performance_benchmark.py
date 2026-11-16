@@ -86,6 +86,7 @@ ARENA_SEASON_INDEX_SQL = (
 )
 EXPECTED_COMMAND_CODES = {
     "寄售物资 虚空晶体 1 100": "VOID_MARKET_ADMISSION",
+    "使用 灵米饭 精力": "ITEM_USED",
 }
 
 
@@ -427,6 +428,20 @@ def _seed_database(runtime: Any, users: int, batch_size: int) -> dict[str, float
         "seed_seconds": round(time.perf_counter() - started, 3),
         "db_bytes": _db_size(path),
     }
+
+
+def _reset_item_use_fixture(path: Path, users: int) -> None:
+    """Return seeded players to an independent, cooldown-free item-use state."""
+
+    inventory = json.dumps({"item.food.spirit_rice": 10_000}, sort_keys=True)
+    with sqlite3.connect(path) as connection:
+        connection.execute(
+            "UPDATE players SET inventory_json = ?, energy = 0, item_effects_json = '{}' "
+            "WHERE id BETWEEN 1 AND ?",
+            (inventory, users),
+        )
+        connection.execute("DELETE FROM item_use_cooldowns")
+        connection.execute("DELETE FROM operations WHERE operation_name = 'items.use'")
 
 
 def _seed_companion_status_fixture(
@@ -2828,6 +2843,172 @@ async def _run_void_material_item_cache_comparison(
                 "sql_profile_status": "collected" if metrics is not None else "not_collected",
                 "levels": results,
                 "errors": sum(int(item["errors"]) for item in results),
+
+
+async def _run_item_use_catalogue_comparison(
+    users: int,
+    batch_size: int,
+    total_requests: int,
+    levels: tuple[int, ...],
+    *,
+    profile_sql: bool | None = None,
+    commands: tuple[str, ...] | None = None,
+) -> dict[str, Any]:
+    """Compare the real item-use path before and after bundle catalogue reuse."""
+
+    selected_commands = commands or ("使用 灵米饭 精力",)
+    if selected_commands != ("使用 灵米饭 精力",):
+        raise ValueError("item-use catalogue comparison only supports 使用 灵米饭 精力")
+
+    from nonebot_plugin_xiuxian_3.xiuxian.content import bundled_content
+    from nonebot_plugin_xiuxian_3.xiuxian.items import repository as item_repository_module
+    from nonebot_plugin_xiuxian_3.xiuxian.items import rules as item_rules
+    from nonebot_plugin_xiuxian_3.xiuxian.items import use_cases as item_use_module
+
+    optimized_use_resolver = item_use_module.resolve_item
+    optimized_repository_resolver = item_repository_module.resolve_item
+
+    def legacy_resolve_item(value: str, content: Any = None) -> Any:
+        bundle = content or bundled_content()
+        # Match the former resolver's independent records pass for the
+        # definitions and alias lookup.
+        definitions = item_rules._build_item_definitions(
+            bundle, item_rules._build_item_records(bundle)
+        )
+        aliases = item_rules._build_item_aliases(item_rules._build_item_records(bundle))
+        key = aliases.get((value or "").strip(), (value or "").strip())
+        try:
+            return definitions[key]
+        except KeyError as exc:
+            raise ValueError(f"unsupported usable item: {value}") from exc
+
+    temporary_path: Path
+    with tempfile.TemporaryDirectory(prefix="xiuxian-perf-") as data_dir:
+        temporary_path = Path(data_dir)
+        runtime = create_runtime(
+            data_dir=data_dir,
+            adapters=("onebot.v11", "qq.official"),
+            clock=lambda: datetime(2026, 11, 15, tzinfo=timezone.utc),
+        )
+        await runtime.initialize()
+        seed = _seed_database(runtime, users, batch_size)
+        database_path = runtime.settings.database_path
+        metrics = _instrument_repository(runtime, enabled=profile_sql)
+        variants: dict[str, list[dict[str, Any]]] = {
+            "before_rebuild_item_catalogue": [],
+            "after_bundle_item_catalogue_cache": [],
+        }
+
+        def set_variant(legacy: bool) -> None:
+            resolver = legacy_resolve_item if legacy else optimized_use_resolver
+            item_use_module.resolve_item = resolver
+            item_repository_module.resolve_item = (
+                legacy_resolve_item if legacy else optimized_repository_resolver
+            )
+
+        async def response_contract(legacy: bool) -> tuple[Any, ...]:
+            set_variant(legacy)
+            _reset_item_use_fixture(database_path, users)
+            results = []
+            for request_number, adapter in enumerate(("onebot.v11", "qq.official")):
+                normalized = _normalize(
+                    adapter,
+                    f"perf-{request_number:07d}",
+                    request_number,
+                    selected_commands[0],
+                )
+                result = await runtime.adapters.dispatch(
+                    adapter, normalized.context, normalized.text
+                )
+                results.append(
+                    (
+                        result.ok,
+                        result.code,
+                        result.message,
+                        result.data,
+                        result.retryable,
+                        result.actions,
+                    )
+                )
+            return tuple(results)
+
+        try:
+            # Reset the process-local counters so the report reflects only this
+            # fixture, not module import-time constants.
+            item_rules._ITEM_CATALOGUE_CACHE.clear()
+            item_rules._ITEM_CATALOGUE_BUILD_COUNT = 0
+            before_contract = await response_contract(True)
+            after_contract = await response_contract(False)
+            if before_contract != after_contract:
+                raise AssertionError("item-use response differs between catalogue variants")
+
+            for level_index, concurrency in enumerate(levels):
+                for repetition in range(2):
+                    before_first = (level_index + repetition) % 2 == 0
+                    order = (
+                        (
+                            ("before_rebuild_item_catalogue", True),
+                            ("after_bundle_item_catalogue_cache", False),
+                        )
+                        if before_first
+                        else (
+                            ("after_bundle_item_catalogue_cache", False),
+                            ("before_rebuild_item_catalogue", True),
+                        )
+                    )
+                    for label, legacy in order:
+                        set_variant(legacy)
+                        _reset_item_use_fixture(database_path, users)
+                        build_start = item_rules._ITEM_CATALOGUE_BUILD_COUNT
+                        result = asdict(
+                            await _measure(
+                                runtime,
+                                users,
+                                concurrency,
+                                total_requests,
+                                metrics,
+                                selected_commands,
+                            )
+                        )
+                        result["repeat"] = repetition + 1
+                        result["item_catalogue_build_count"] = (
+                            item_rules._ITEM_CATALOGUE_BUILD_COUNT - build_start
+                        )
+                        variants[label].append(result)
+        finally:
+            item_use_module.resolve_item = optimized_use_resolver
+            item_repository_module.resolve_item = optimized_repository_resolver
+            await runtime.close()
+
+        db_bytes = _db_size(database_path)
+
+        def report(results: list[dict[str, Any]]) -> dict[str, Any]:
+            return {
+                "users": users,
+                "seed": seed,
+                "database_bytes_after_benchmark": db_bytes,
+                "sql_profile_enabled": metrics is not None,
+                "sql_profile_status": "collected" if metrics is not None else "not_collected",
+                "levels": results,
+                "errors": sum(int(item["errors"]) for item in results),
+            }
+
+        payload = {
+            "comparison": {label: report(results) for label, results in variants.items()},
+            "item_use_outputs_equivalent": before_contract == after_contract,
+            "item_catalogue_build_count": item_rules._ITEM_CATALOGUE_BUILD_COUNT,
+            "errors": sum(
+                int(item["errors"])
+                for results in variants.values()
+                for item in results
+            ),
+        }
+    cleaned = not temporary_path.exists()
+    for result in payload["comparison"].values():
+        result["temporary_database_cleaned"] = cleaned
+    return payload
+
+
             }
 
         payload = {
@@ -3108,6 +3289,11 @@ def main() -> int:
         help="compare linear void-material item alias scans with bundle reuse",
     )
     compare.add_argument(
+        "--compare-item-use-catalogue",
+        action="store_true",
+        help="compare the real item-use path with and without bundle catalogue reuse",
+    )
+    compare.add_argument(
         "--compare-companion-status-batch",
         action="store_true",
         help="compare per-companion and indexed player-scoped gear reads",
@@ -3142,6 +3328,7 @@ def main() -> int:
             "移动预览 玄天近郊",
             "竞技场赛季",
             "寄售物资 虚空晶体 1 100",
+            "使用 灵米饭 精力",
             "法器预览",
             "重铸预览",
             "灵兽状态",
@@ -3218,6 +3405,17 @@ def main() -> int:
     elif args.compare_void_material_item_cache:
         payload = asyncio.run(
             _run_void_material_item_cache_comparison(
+                args.users,
+                args.batch_size,
+                args.requests,
+                levels,
+                profile_sql=profile_sql,
+                commands=commands,
+            )
+        )
+    elif args.compare_item_use_catalogue:
+        payload = asyncio.run(
+            _run_item_use_catalogue_comparison(
                 args.users,
                 args.batch_size,
                 args.requests,

@@ -14,6 +14,7 @@ from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 from nonebot_plugin_xiuxian_3.xiuxian.economy.rules import resolve_market_item
 from nonebot_plugin_xiuxian_3.xiuxian.content import ContentBundle, ContentError
+from nonebot_plugin_xiuxian_3.xiuxian.items import rules as item_rules
 from nonebot_plugin_xiuxian_3.xiuxian.items.rules import resolve_item
 from nonebot_plugin_xiuxian_3.xiuxian.production.rules import random_quality_bp
 
@@ -26,6 +27,32 @@ def _context(adapter: str, user: str, request: str, operation: str = "") -> Comm
         operation_id=operation,
         can_write_assets=True,
     )
+
+
+def test_item_catalogue_reuses_one_bundle_and_keeps_custom_content_isolated(tmp_path: Path) -> None:
+    bundle = ContentBundle.load(Path(__file__).parents[1] / "data")
+    before = item_rules._ITEM_CATALOGUE_BUILD_COUNT
+
+    assert resolve_item("云纹灵米饭", bundle).key == "item.food.cloud_rice_meal"
+    assert item_rules.item_aliases(bundle)["云纹饭"] == "item.food.cloud_rice_meal"
+    assert item_rules.item_records(bundle)["item.food.cloud_rice_meal"].name == "云纹灵米饭"
+    assert item_rules._ITEM_CATALOGUE_BUILD_COUNT == before + 1
+
+    custom_root = tmp_path / "content"
+    shutil.copytree(Path(__file__).parents[1] / "data", custom_root)
+    materials = custom_root / "道具" / "材料.json"
+    document = json.loads(materials.read_text(encoding="utf-8"))
+    rice = next(row for row in document["records"] if row["key"] == "item.food.cloud_rice_meal")
+    rice["name"] = "测试灵米饭"
+    rice["aliases"] = ["测试米饭"]
+    materials.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+    custom = ContentBundle.load(custom_root)
+    assert resolve_item("测试米饭", custom).key == "item.food.cloud_rice_meal"
+    with pytest.raises(ValueError):
+        resolve_item("云纹灵米饭", custom)
+    assert resolve_item("云纹灵米饭", bundle).name == "云纹灵米饭"
+    assert item_rules._ITEM_CATALOGUE_BUILD_COUNT == before + 2
 
 
 async def _player(runtime, adapter: str, user: str, *, realm: str, location: str, inventory: dict[str, int], subprofession: str | None = None) -> None:

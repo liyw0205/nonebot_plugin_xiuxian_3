@@ -4,6 +4,7 @@ from __future__ import annotations
 
 
 from dataclasses import dataclass
+from threading import Lock
 from typing import Any
 
 from ..content import ContentBundle, ContentError, bundled_content
@@ -47,8 +48,19 @@ class ItemRecord:
     effects: tuple[dict[str, Any], ...]
 
 
-def item_records(content: ContentBundle | None = None) -> dict[str, ItemRecord]:
-    bundle = content or bundled_content()
+@dataclass(frozen=True, slots=True)
+class _ItemCatalogue:
+    records: dict[str, ItemRecord]
+    aliases: dict[str, str]
+    definitions: dict[str, ItemDefinition]
+
+
+_ITEM_CATALOGUE_CACHE: list[tuple[int, ContentBundle, _ItemCatalogue]] = []
+_ITEM_CATALOGUE_CACHE_LOCK = Lock()
+_ITEM_CATALOGUE_BUILD_COUNT = 0
+
+
+def _build_item_records(bundle: ContentBundle) -> dict[str, ItemRecord]:
     result: dict[str, ItemRecord] = {}
     for row in bundle.list("item", include_locked=False):
         key = row.get("key")
@@ -82,9 +94,9 @@ def item_records(content: ContentBundle | None = None) -> dict[str, ItemRecord]:
     return result
 
 
-def item_aliases(content: ContentBundle | None = None) -> dict[str, str]:
+def _build_item_aliases(records: dict[str, ItemRecord]) -> dict[str, str]:
     result: dict[str, str] = {}
-    for key, record in item_records(content).items():
+    for key, record in records.items():
         for alias in (key, record.name, *record.aliases):
             if alias in result and result[alias] != key:
                 raise ContentError(f"duplicate item alias: {alias}")
@@ -92,10 +104,11 @@ def item_aliases(content: ContentBundle | None = None) -> dict[str, str]:
     return result
 
 
-def _content_item_definitions(content: ContentBundle | None = None) -> dict[str, ItemDefinition]:
-    bundle = content or bundled_content()
+def _build_item_definitions(
+    bundle: ContentBundle, records: dict[str, ItemRecord]
+) -> dict[str, ItemDefinition]:
     result: dict[str, ItemDefinition] = {}
-    for key, record in item_records(bundle).items():
+    for key, record in records.items():
         effects = list(record.effects)
         supported = [effect for effect in effects if effect.get("type") in _SUPPORTED_EFFECTS]
         if not supported:
@@ -168,6 +181,58 @@ def _content_item_definitions(content: ContentBundle | None = None) -> dict[str,
     return result
 
 
+def _item_catalogue(content: ContentBundle | None = None) -> _ItemCatalogue:
+    global _ITEM_CATALOGUE_BUILD_COUNT
+    bundle = content or bundled_content()
+    bundle_id = id(bundle)
+    with _ITEM_CATALOGUE_CACHE_LOCK:
+        for cached_id, cached_bundle, catalogue in reversed(_ITEM_CATALOGUE_CACHE):
+            if cached_id == bundle_id and cached_bundle is bundle:
+                return catalogue
+        records = _build_item_records(bundle)
+        catalogue = _ItemCatalogue(
+            records=records,
+            aliases=_build_item_aliases(records),
+            definitions=_build_item_definitions(bundle, records),
+        )
+        _ITEM_CATALOGUE_CACHE[:] = [
+            item for item in _ITEM_CATALOGUE_CACHE
+            if not (item[0] == bundle_id and item[1] is bundle)
+        ]
+        _ITEM_CATALOGUE_CACHE.append((bundle_id, bundle, catalogue))
+        if len(_ITEM_CATALOGUE_CACHE) > 16:
+            del _ITEM_CATALOGUE_CACHE[:-16]
+        _ITEM_CATALOGUE_BUILD_COUNT += 1
+        return catalogue
+
+
+def _copy_item_records(records: dict[str, ItemRecord]) -> dict[str, ItemRecord]:
+    return {
+        key: ItemRecord(
+            key=record.key,
+            name=record.name,
+            aliases=record.aliases,
+            item_type=record.item_type,
+            bind_type=record.bind_type,
+            tradeable=record.tradeable,
+            effects=tuple(dict(effect) for effect in record.effects),
+        )
+        for key, record in records.items()
+    }
+
+
+def item_records(content: ContentBundle | None = None) -> dict[str, ItemRecord]:
+    return _copy_item_records(_item_catalogue(content).records)
+
+
+def item_aliases(content: ContentBundle | None = None) -> dict[str, str]:
+    return dict(_item_catalogue(content).aliases)
+
+
+def _content_item_definitions(content: ContentBundle | None = None) -> dict[str, ItemDefinition]:
+    return dict(_item_catalogue(content).definitions)
+
+
 ITEM_ALIASES = item_aliases()
 ITEM_DEFINITIONS = _content_item_definitions()
 ITEM_LABELS = {key: definition.name for key, definition in ITEM_DEFINITIONS.items()}
@@ -187,7 +252,7 @@ def bound_order_duration_multiplier_bp(
     several arrays are held. Returns ``None`` when no array declares one.
     """
 
-    records = item_records(content)
+    records = _item_catalogue(content).records
     best: int | None = None
     for raw_key, raw_quantity in inventory.items():
         try:
@@ -214,8 +279,9 @@ def bound_order_duration_multiplier_bp(
 
 
 def resolve_item(value: str, content: ContentBundle | None = None) -> ItemDefinition:
-    definitions = _content_item_definitions(content)
-    aliases = item_aliases(content)
+    catalogue = _item_catalogue(content)
+    definitions = catalogue.definitions
+    aliases = catalogue.aliases
     key = aliases.get((value or "").strip(), (value or "").strip())
     try:
         return definitions[key]
@@ -224,8 +290,9 @@ def resolve_item(value: str, content: ContentBundle | None = None) -> ItemDefini
 
 
 def resolve_item_record(value: str, content: ContentBundle | None = None) -> ItemRecord:
-    records = item_records(content)
-    aliases = item_aliases(content)
+    catalogue = _item_catalogue(content)
+    records = catalogue.records
+    aliases = catalogue.aliases
     key = aliases.get((value or "").strip(), (value or "").strip())
     try:
         return records[key]

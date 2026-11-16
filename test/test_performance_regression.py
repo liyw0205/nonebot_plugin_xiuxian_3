@@ -115,6 +115,35 @@ def test_profiled_benchmark_reports_executor_queue_and_workers() -> None:
     )
 
 
+def test_item_use_catalogue_comparison_reuses_bundle_and_cleans_fixture() -> None:
+    import asyncio
+
+    from scripts.performance_benchmark import _run_item_use_catalogue_comparison
+
+    report = asyncio.run(
+        _run_item_use_catalogue_comparison(
+            users=8,
+            batch_size=8,
+            total_requests=4,
+            levels=(1,),
+            profile_sql=True,
+            commands=("使用 灵米饭 精力",),
+        )
+    )
+    before = report["comparison"]["before_rebuild_item_catalogue"]["levels"][0]
+    after = report["comparison"]["after_bundle_item_catalogue_cache"]["levels"][0]
+    assert report["errors"] == 0
+    assert report["item_use_outputs_equivalent"] is True
+    assert report["item_catalogue_build_count"] == 1
+    assert before["errors"] == after["errors"] == 0
+    assert before["sql_queries"] == after["sql_queries"]
+    assert after["latency_ms"]["p50_ms"] < before["latency_ms"]["p50_ms"]
+    assert all(
+        result["temporary_database_cleaned"] is True
+        for result in report["comparison"].values()
+    )
+
+
 def test_mainline_prerequisite_comparison_reuses_and_cleans_one_fixture() -> None:
     import asyncio
 
