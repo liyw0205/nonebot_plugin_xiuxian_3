@@ -232,6 +232,7 @@ def build_stat_preview(
     constitution_effect: Mapping[str, Any] | None = None,
     manual_effects: Mapping[str, Any] | None = None,
     _formula: StatsFormula | None = None,
+    _normalized: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     base = _qualification(row)
     permanent = {
@@ -239,7 +240,7 @@ def build_stat_preview(
         for source, target in _PERMANENT_STATS.items()
     }
     _nonnegative_integer(player_field(row, "realm_layer", 0), "realm_layer")
-    row = player_values(row)
+    row = dict(_normalized) if _normalized is not None else player_values(row)
     bundle = _content(content)
     formula = _formula if _formula is not None else stats_formula(bundle)
     realm_key, realm_index, layer_tail = _realm_index(row, bundle)

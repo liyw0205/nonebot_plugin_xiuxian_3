@@ -2069,6 +2069,162 @@ async def _run_player_stats_formula_cache_comparison(
     return payload
 
 
+async def _run_player_profile_projection_comparison(
+    users: int,
+    batch_size: int,
+    total_requests: int,
+    levels: tuple[int, ...],
+    *,
+    profile_sql: bool | None = None,
+    commands: tuple[str, ...] | None = None,
+) -> dict[str, Any]:
+    """Compare the previous duplicate profile normalization with reuse."""
+
+    selected_commands = commands or ("我的状态",)
+    if selected_commands != ("我的状态",):
+        raise ValueError("player profile projection comparison only supports 我的状态")
+
+    from nonebot_plugin_xiuxian_3.xiuxian.player import repository as player_repository_module
+
+    temporary_path: Path
+    with tempfile.TemporaryDirectory(prefix="xiuxian-perf-") as data_dir:
+        temporary_path = Path(data_dir)
+        runtime = create_runtime(data_dir=data_dir, adapters=("onebot.v11", "qq.official"))
+        await runtime.initialize()
+        seed = _seed_database(runtime, users, batch_size)
+        database_path = runtime.settings.database_path
+        explain = _explain(database_path, 1)
+        metrics = _instrument_repository(runtime, enabled=profile_sql)
+        restore_executor = _instrument_executor(metrics) if metrics is not None else None
+        restore_stat_helpers = _instrument_stat_helpers(metrics) if metrics is not None else None
+        original_player_values = player_repository_module.player_values
+        calls = 0
+
+        def profile_values(row: Any, *, duplicate: bool) -> Any:
+            nonlocal calls
+            calls += 1
+            values = original_player_values(row)
+            if duplicate:
+                calls += 1
+                values = original_player_values(row)
+            return values
+
+        def set_variant(duplicate: bool) -> None:
+            player_repository_module.player_values = lambda row: profile_values(
+                row, duplicate=duplicate
+            )
+
+        def response_contract(result: Any) -> tuple[Any, ...]:
+            return (
+                result.ok,
+                result.code,
+                result.message,
+                result.operation_id,
+                result.data,
+                result.retryable,
+                result.actions,
+            )
+
+        async def profile_pair(duplicate: bool) -> list[Any]:
+            set_variant(duplicate)
+            results = []
+            for request_number, adapter in enumerate(("onebot.v11", "qq.official")):
+                normalized = _normalize(adapter, "perf-0000000", request_number, "我的状态")
+                results.append(
+                    await runtime.adapters.dispatch(adapter, normalized.context, normalized.text)
+                )
+            return results
+
+        try:
+            before_equivalence = await profile_pair(True)
+            after_equivalence = await profile_pair(False)
+            profile_results_equivalent = tuple(map(response_contract, before_equivalence)) == tuple(
+                map(response_contract, after_equivalence)
+            )
+            if not profile_results_equivalent:
+                raise AssertionError("player profile differs between duplicate and reused projections")
+
+            variants: dict[str, list[dict[str, Any]]] = {
+                "before_repeated_profile_projection": [],
+                "after_shared_profile_projection": [],
+            }
+            for level_index, concurrency in enumerate(levels):
+                for repetition in range(4):
+                    before_first = (level_index + repetition) % 2 == 0
+                    order = (
+                        (
+                            ("before_repeated_profile_projection", True),
+                            ("after_shared_profile_projection", False),
+                        )
+                        if before_first
+                        else (
+                            ("after_shared_profile_projection", False),
+                            ("before_repeated_profile_projection", True),
+                        )
+                    )
+                    for label, duplicate in order:
+                        set_variant(duplicate)
+                        # Equalize executor/thread creation before comparing the
+                        # steady-state command path; warmup samples are discarded.
+                        await _measure(
+                            runtime,
+                            users,
+                            concurrency,
+                            max(1, min(8, total_requests // 4)),
+                            metrics,
+                            selected_commands,
+                        )
+                        calls = 0
+                        result = asdict(
+                            await _measure(
+                                runtime,
+                                users,
+                                concurrency,
+                                total_requests,
+                                metrics,
+                                selected_commands,
+                            )
+                        )
+                        result["repeat"] = repetition + 1
+                        result["player_value_normalization_calls"] = calls
+                        variants[label].append(result)
+        finally:
+            player_repository_module.player_values = original_player_values
+            if restore_executor is not None:
+                restore_executor()
+            if restore_stat_helpers is not None:
+                restore_stat_helpers()
+            await runtime.close()
+
+        db_bytes = _db_size(database_path)
+
+        def report(results: list[dict[str, Any]]) -> dict[str, Any]:
+            return {
+                "users": users,
+                "seed": seed,
+                "database_bytes_after_benchmark": db_bytes,
+                "sql_profile_enabled": metrics is not None,
+                "sql_profile_status": "collected" if metrics is not None else "not_collected",
+                "explain_query_plan": explain,
+                "levels": results,
+                "errors": sum(int(item["errors"]) for item in results),
+            }
+
+        payload = {
+            "comparison": {label: report(results) for label, results in variants.items()},
+            "profile_results_equivalent": profile_results_equivalent,
+            "errors": sum(
+                int(item["errors"])
+                for results in variants.values()
+                for item in results
+            ),
+        }
+    cleaned = not temporary_path.exists()
+    for result in payload["comparison"].values():
+        result["temporary_database_cleaned"] = cleaned
+    return payload
+
+
 async def _run_equipment_definition_cache_comparison(
     users: int,
     batch_size: int,
@@ -2595,6 +2751,11 @@ def main() -> int:
         help="compare uncached and repository-scoped stats formula reuse on one fixture",
     )
     compare.add_argument(
+        "--compare-player-profile-projection",
+        action="store_true",
+        help="compare repeated versus shared player normalization on one profile fixture",
+    )
+    compare.add_argument(
         "--compare-equipment-definition-cache",
         action="store_true",
         help="compare repeated equipment catalogue validation with bundle reuse",
@@ -2671,6 +2832,17 @@ def main() -> int:
     elif args.compare_player_stats_formula_cache:
         payload = asyncio.run(
             _run_player_stats_formula_cache_comparison(
+                args.users,
+                args.batch_size,
+                args.requests,
+                levels,
+                profile_sql=profile_sql,
+                commands=commands,
+            )
+        )
+    elif args.compare_player_profile_projection:
+        payload = asyncio.run(
+            _run_player_profile_projection_comparison(
                 args.users,
                 args.batch_size,
                 args.requests,

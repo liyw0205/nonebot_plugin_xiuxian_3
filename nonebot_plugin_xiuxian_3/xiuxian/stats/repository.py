@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+from collections.abc import Mapping
 from dataclasses import replace
 from typing import Any
 
@@ -15,12 +16,33 @@ from ..items.manual_rules import manual_effect_totals
 from ..utils.equipment import equipment_instance_rows
 from ..utils.json_cache import decode_json_strict
 from ..utils.operations import operation_replay, record_operation
-from ..utils.player import player_inventory
 from .models import StatSnapshot
 from .rules import StatsFormula, StatError, build_stat_preview, explain_stat, stats_formula
 
 
 class StatsRepositoryMixin:
+    @staticmethod
+    def _prepare_stat_player(player: Any) -> dict[str, Any]:
+        """Strictly decode the two JSON inputs shared by stat and profile reads."""
+
+        prepared = dict(player)
+        for field in ("qualification_json", "inventory_json"):
+            raw = prepared[field]
+            decoded = decode_json_strict(raw) if isinstance(raw, str) else raw
+            if not isinstance(decoded, dict):
+                raise ValueError(f"player {field} must be an object")
+            prepared[field] = decoded
+        if any(
+            type(value) is not int or value < 0
+            for value in prepared["inventory_json"].values()
+        ):
+            raise ValueError("stat build inventory amounts must be non-negative integers")
+        # The strict copies let the shared projection avoid decoding the same
+        # JSON strings again while preserving the existing validation boundary.
+        prepared["qualification"] = prepared["qualification_json"]
+        prepared["inventory"] = prepared["inventory_json"]
+        return prepared
+
     def _stats_formula_for_snapshot(self, content: ContentBundle) -> StatsFormula:
         cached: tuple[ContentBundle, StatsFormula] | None = getattr(
             self, "_player_stats_formula_cache", None
@@ -42,15 +64,20 @@ class StatsRepositoryMixin:
             player = self._require_player(connection, platform, platform_user_id, writable=False)
             return self._build_player_stat_snapshot(connection, player)
 
-    def _build_player_stat_snapshot(self, connection: Any, player: Any) -> dict[str, Any]:
+    def _build_player_stat_snapshot(
+        self,
+        connection: Any,
+        player: Any,
+        *,
+        normalized: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Read one consistent build without creating a snapshot or changing assets."""
-        player = dict(player)
-        for field in ("qualification_json", "inventory_json"):
-            player[field] = decode_json_strict(player[field])
-            if not isinstance(player[field], dict):
-                raise ValueError(f"player {field} must be an object")
-        if any(type(value) is not int or value < 0 for value in player["inventory_json"].values()):
-            raise ValueError("stat build inventory amounts must be non-negative integers")
+        player = self._prepare_stat_player(player)
+        normalized = dict(normalized) if normalized is not None else None
+        if normalized is None:
+            from ..utils.player import player_values
+
+            normalized = player_values(player)
         player_id = int(player["id"])
         content = self.content or bundled_content()
         equipment = self._battle_equipment_snapshot(
@@ -59,7 +86,7 @@ class StatsRepositoryMixin:
             player_path_key=str(player.get("path_key") or ""),
         )
         constitution = constitution_effect_snapshot(connection, player_id)
-        manuals = manual_effect_totals(player_inventory(player), content)
+        manuals = manual_effect_totals(normalized["inventory"], content)
         preview = build_stat_preview(
             player,
             content,
@@ -67,6 +94,7 @@ class StatsRepositoryMixin:
             constitution_effect=constitution,
             manual_effects=manuals,
             _formula=self._stats_formula_for_snapshot(content),
+            _normalized=normalized,
         )
         for gear in self.companion_carry_snapshot(connection, player_id):
             value = int(gear["carry_capacity"])

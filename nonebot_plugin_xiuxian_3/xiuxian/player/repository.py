@@ -8,7 +8,7 @@ import json
 import sqlite3
 import time
 from datetime import date, datetime, timedelta, timezone
-from typing import Any, Callable
+from typing import Any, Callable, Mapping
 from uuid import uuid4
 
 from ...contracts import PlayerView, serialize_datetime
@@ -1041,8 +1041,15 @@ class PlayerRepositoryMixin:
             )
             if row is None:
                 return None, {}
-            stats = {} if row["stage"] == STAGE_NEW_USER else self._build_player_stat_snapshot(connection, row)
-            return self._row_to_player(row), stats
+            if row["stage"] == STAGE_NEW_USER:
+                return self._row_to_player(row), {}
+            normalized = player_values(row)
+            stats = self._build_player_stat_snapshot(
+                connection,
+                row,
+                normalized=normalized,
+            )
+            return self._row_to_player(row, normalized=normalized), stats
 
     def _profile_player_row(
         self,
@@ -1088,8 +1095,12 @@ class PlayerRepositoryMixin:
         return row
 
     @staticmethod
-    def _row_to_player(row: sqlite3.Row | dict[str, Any]) -> PlayerView:
-        normalized = player_values(row)
+    def _row_to_player(
+        row: sqlite3.Row | dict[str, Any],
+        *,
+        normalized: Mapping[str, Any] | None = None,
+    ) -> PlayerView:
+        normalized = normalized or player_values(row)
         qualification = normalized["qualification"]
         inventory = normalized["inventory"]
         intro_state = {"flags": normalized["intro_flags"]}
