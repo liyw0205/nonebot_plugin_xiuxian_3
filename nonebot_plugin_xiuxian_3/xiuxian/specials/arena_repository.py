@@ -351,6 +351,18 @@ class ArenaRepositoryMixin:
             )
             return self._snapshot_from_payload(payload)
 
+    @staticmethod
+    def _expire_arena_snapshots(
+        connection: sqlite3.Connection, *, mode_key: str, now_text: str
+    ) -> None:
+        """Expire only the mode whose public pool is being read."""
+
+        connection.execute(
+            "UPDATE arena_snapshots SET status = 'expired', updated_at = ? "
+            "WHERE status = 'published' AND arena_mode_key = ? AND expires_at <= ?",
+            (now_text, mode_key, now_text),
+        )
+
     def _list_arena_snapshots_once(
         self, platform: str, platform_user_id: str, mode_key: str
     ) -> tuple[ArenaSnapshotRecord, ...]:
@@ -358,13 +370,9 @@ class ArenaRepositoryMixin:
         now_text = serialize_datetime(now)
         with self._connect() as connection:
             player = self._arena_require_player(connection, platform, platform_user_id, writable=False)
-            connection.execute(
-                "UPDATE arena_snapshots SET status = 'expired', updated_at = ? "
-                "WHERE status = 'published' AND expires_at <= ?",
-                (now_text, now_text),
-            )
             if mode_key not in {ARENA_MODE_KEY, THREE_REALMS_ARENA_MODE_KEY}:
                 raise ArenaMatchRequirementError("unsupported arena snapshot mode")
+            self._expire_arena_snapshots(connection, mode_key=mode_key, now_text=now_text)
             rows = connection.execute(
                 "SELECT * FROM arena_snapshots WHERE status = 'published' AND arena_mode_key = ? AND player_id <> ? "
                 "ORDER BY ABS(rating - ?), created_at, id LIMIT 50",

@@ -380,6 +380,15 @@ class SQLitePlayerRepository(
             )
             if connection.execute(
                 "SELECT 1 FROM schema_migrations WHERE migration_key=?",
+                ("arena.snapshot_status_mode_expiry_index",),
+            ).fetchone() is None:
+                self._migrate_arena_snapshot_expiry_index(connection)
+                connection.execute(
+                    "INSERT INTO schema_migrations(migration_key, applied_at) VALUES (?, ?)",
+                    ("arena.snapshot_status_mode_expiry_index", serialize_datetime(self._now())),
+                )
+            if connection.execute(
+                "SELECT 1 FROM schema_migrations WHERE migration_key=?",
                 ("world.travel_requirement_indexes",),
             ).fetchone() is None:
                 self._migrate_travel_requirement_indexes(connection)
@@ -456,6 +465,13 @@ class SQLitePlayerRepository(
                 "CREATE UNIQUE INDEX IF NOT EXISTS idx_players_dao_name "
                 "ON players(dao_name) WHERE dao_name <> ''"
             )
+
+    @staticmethod
+    def _migrate_arena_snapshot_expiry_index(connection: sqlite3.Connection) -> None:
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_arena_snapshots_status_mode_expiry "
+            "ON arena_snapshots(status, arena_mode_key, expires_at)"
+        )
 
     @staticmethod
     def _migrate_travel_requirement_indexes(connection: sqlite3.Connection) -> None:

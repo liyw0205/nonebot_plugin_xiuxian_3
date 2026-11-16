@@ -2176,6 +2176,8 @@ CREATE TABLE IF NOT EXISTS arena_snapshots (
 
 CREATE INDEX IF NOT EXISTS idx_arena_snapshots_pool
     ON arena_snapshots(status, rating, matchable_at, expires_at);
+CREATE INDEX IF NOT EXISTS idx_arena_snapshots_status_mode_expiry
+    ON arena_snapshots(status, arena_mode_key, expires_at);
 CREATE INDEX IF NOT EXISTS idx_arena_snapshots_player
     ON arena_snapshots(player_id, status, created_at);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_arena_snapshots_active_player

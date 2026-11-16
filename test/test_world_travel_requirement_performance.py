@@ -4,19 +4,22 @@ import asyncio
 import sqlite3
 from datetime import datetime, timedelta, timezone
 
+import pytest
+
 from nonebot_plugin_xiuxian_3.contracts import CommandContext, serialize_datetime
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 
 
-def test_travel_requirement_state_uses_one_indexed_gate_read(tmp_path) -> None:
+@pytest.mark.parametrize("adapter", ("onebot.v11", "qq.official"))
+def test_travel_requirement_state_uses_one_indexed_gate_read(tmp_path, adapter: str) -> None:
     async def run() -> None:
-        runtime = create_runtime(data_dir=tmp_path / "data", adapters=("onebot.v11",))
+        runtime = create_runtime(data_dir=tmp_path / adapter / "data", adapters=(adapter,))
         now = datetime(2026, 11, 15, 12, tzinfo=timezone.utc)
         try:
             for user in ("travel-apprentice", "travel-master"):
                 result = await runtime.adapters.dispatch(
-                    "onebot.v11",
-                    CommandContext(adapter="onebot.v11", user_id=user, request_id=f"create-{user}"),
+                    adapter,
+                    CommandContext(adapter=adapter, user_id=user, request_id=f"create-{user}"),
                     "开始修仙",
                 )
                 assert result.code == "PLAYER_CREATED"
@@ -24,11 +27,11 @@ def test_travel_requirement_state_uses_one_indexed_gate_read(tmp_path) -> None:
                 connection.row_factory = sqlite3.Row
                 apprentice = connection.execute(
                     "SELECT * FROM players WHERE platform=? AND platform_user_id=?",
-                    ("onebot.v11", "travel-apprentice"),
+                    (adapter, "travel-apprentice"),
                 ).fetchone()
                 master = connection.execute(
                     "SELECT id FROM players WHERE platform=? AND platform_user_id=?",
-                    ("onebot.v11", "travel-master"),
+                    (adapter, "travel-master"),
                 ).fetchone()
                 assert apprentice is not None and master is not None
                 timestamp = serialize_datetime(now)

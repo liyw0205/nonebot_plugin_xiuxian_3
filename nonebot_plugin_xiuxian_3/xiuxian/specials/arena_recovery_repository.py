@@ -314,6 +314,13 @@ class ArenaRecoveryRepositoryMixin:
                 for suffix in ("-wal", "-shm"):
                     database_path.with_name(database_path.name + suffix).unlink(missing_ok=True)
                 os.replace(temporary_path, database_path)
+                # The repository keeps one SQLite connection per executor
+                # thread.  Reopen it after replacing the database inode so
+                # completion events land in the restored file.
+                current_connection = getattr(self._connection_local, "connection", None)
+                if current_connection is not None:
+                    current_connection.close()
+                    self._connection_local.connection = None
                 checks = self._inspect_arena_database(database_path)
             finally:
                 temporary_path.unlink(missing_ok=True)

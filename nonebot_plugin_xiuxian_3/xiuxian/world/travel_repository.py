@@ -7,6 +7,7 @@ import hashlib
 import json
 import sqlite3
 import time
+from collections.abc import Mapping
 from dataclasses import replace
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Callable
@@ -157,6 +158,7 @@ from ..utils.player import (
     player_integer,
     player_inventory,
     player_reputation,
+    player_values,
     spend_player_state,
 )
 
@@ -376,11 +378,39 @@ class TravelRepositoryMixin:
 
     @classmethod
     def _travel_requirement_state_in(
-        cls, connection: sqlite3.Connection, row: sqlite3.Row, now: datetime
+        cls,
+        connection: sqlite3.Connection,
+        row: sqlite3.Row,
+        now: datetime,
+        *,
+        normalized: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
-        intro = cls._json_object(row["intro_json"], {})
-        flags = intro.get("flags", [])
-        intro_flags = {item for item in flags if isinstance(item, str)} if isinstance(flags, list) else set()
+        if normalized is None:
+            intro = cls._json_object(row["intro_json"], {})
+            flags = intro.get("flags", [])
+            intro_flags = (
+                {item for item in flags if isinstance(item, str)}
+                if isinstance(flags, list)
+                else set()
+            )
+            inventory = player_inventory(row)
+            faction_reputation = player_reputation(row)
+            realm_key = str(row["realm_key"])
+            realm_layer = player_integer(row, "realm_layer")
+            stage = str(row["stage"])
+            endgame_status = str(row["endgame_status"] or "none")
+            domain_key = str(row["domain_key"]) if row["domain_key"] else None
+            dao_fruit_progress = player_integer(row, "dao_fruit_progress")
+        else:
+            intro_flags = set(normalized["intro_flags"])
+            inventory = dict(normalized["inventory"])
+            faction_reputation = dict(normalized["faction_reputation"])
+            realm_key = str(normalized["realm_key"])
+            realm_layer = int(normalized["realm_layer"])
+            stage = str(normalized["stage"])
+            endgame_status = str(normalized["endgame_status"] or "none")
+            domain_key = normalized["domain_key"]
+            dao_fruit_progress = int(normalized["dao_fruit_progress"])
         # The preview and start paths need the same two gate sets. Keep them in one
         # bounded read so a hot location command does not open two cursors and repeat
         # player-scoped lookups while preserving the mentor expiry predicate.
@@ -408,17 +438,17 @@ class TravelRepositoryMixin:
         }
         mentor_invitation = any(bool(item["mentor"]) for item in requirement_rows)
         return {
-            "realm_key": str(row["realm_key"]),
-            "realm_layer": player_integer(row, "realm_layer"),
-            "stage": str(row["stage"]),
+            "realm_key": realm_key,
+            "realm_layer": realm_layer,
+            "stage": stage,
             "intro_flags": intro_flags,
-            "inventory": player_inventory(row),
-            "faction_reputation": player_reputation(row),
+            "inventory": inventory,
+            "faction_reputation": faction_reputation,
             "completed_quests": completed_quests,
             "mentor_invitation": mentor_invitation,
-            "endgame_status": str(row["endgame_status"] or "none"),
-            "domain_key": str(row["domain_key"]) if row["domain_key"] else None,
-            "dao_fruit_progress": player_integer(row, "dao_fruit_progress"),
+            "endgame_status": endgame_status,
+            "domain_key": domain_key,
+            "dao_fruit_progress": dao_fruit_progress,
         }
 
     def _travel_requirement_state(
@@ -434,8 +464,8 @@ class TravelRepositoryMixin:
         platform_user_id: str,
         destination: str,
         now: datetime,
-    ) -> tuple[PlayerView, dict[str, Any], int | None]:
-        """Read the preview identity, gates, and quota in one connection."""
+    ) -> tuple[PlayerView, dict[str, Any], int | None, Any, bool]:
+        """Read all preview state once, including the immutable route definition."""
 
         with self._connect() as connection:
             row = self._profile_player_row(connection, platform, platform_user_id)
@@ -443,9 +473,13 @@ class TravelRepositoryMixin:
                 raise PlayerNotFoundError("player does not exist")
             if row["status"] != "active":
                 raise PlayerSuspendedError("player is not readable")
-            requirement_state = self._travel_requirement_state_in(connection, row, now)
             content = self.content or bundled_content()
             definition = destination_definition(destination, content, source=str(row["location_key"]))
+            normalized = player_values(row)
+            player = self._row_to_player(row, normalized=normalized)
+            requirement_state = self._travel_requirement_state_in(
+                connection, row, now, normalized=normalized
+            )
             starts_today = None
             if definition.daily_start_limit:
                 starts_today = self._count_destination_starts_today_in(
@@ -454,7 +488,13 @@ class TravelRepositoryMixin:
                     destination=destination,
                     now=now,
                 )
-            return self._row_to_player(row), requirement_state, starts_today
+            return (
+                player,
+                requirement_state,
+                starts_today,
+                definition,
+                destination_location_is_open(destination, content),
+            )
 
     async def preview_travel(
         self,
@@ -467,16 +507,15 @@ class TravelRepositoryMixin:
         now = self._now()
         travel_content = self.content or bundled_content()
         async with self._inflight:
-            player, requirement_state, starts_today = await asyncio.to_thread(
+            player, requirement_state, starts_today, definition, location_open = await asyncio.to_thread(
                 self._preview_travel_database_state,
                 platform,
                 platform_user_id,
                 destination,
                 now,
             )
-        definition = destination_definition(destination, travel_content, source=player.location_key)
         missing: list[str] = []
-        if not destination_location_is_open(destination, travel_content):
+        if not location_open:
             missing.append("此地尚未开放")
         if not definition.route_available:
             missing.append("来源地点")
