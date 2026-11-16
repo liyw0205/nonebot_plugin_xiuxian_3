@@ -104,6 +104,7 @@ from ..adventures.mainline import (
     mainline_definitions,
     mainline_first_clear_key,
     mainline_prerequisites_met,
+    mainline_prerequisites_met_many,
     mainline_reward,
     mainline_stage_status,
     resolve_mainline,
@@ -1641,22 +1642,37 @@ class AdventuresRepositoryMixin:
             mainline_rows=all_runs,
         )
         views: list[MainlineStageView] = []
-        for current_definition in mainline_definitions(content, story_key=story_key, validate_sources=False):
+        definitions = mainline_definitions(
+            content, story_key=story_key, validate_sources=False
+        )
+        effective_definitions: list[MainlineStageDefinition] = []
+        runs_by_key: dict[str, Any] = {}
+        for current_definition in definitions:
             run = runs.get(current_definition.key)
-            definition = (
-                AdventuresRepositoryMixin._mainline_definition_from_snapshot(run, current_definition)
-                if run is not None
-                else None
-            ) or current_definition
-            prerequisites_met = mainline_prerequisites_met(
-                definition,
-                completed_stages=completed_stages,
-                completed_events=completed_events,
-                flags=completed_events,
-                realm_key=str(player["realm_key"]),
-                realm_layer=player_integer(player, "realm_layer"),
-                content=content,
+            runs_by_key[current_definition.key] = run
+            effective_definitions.append(
+                (
+                    AdventuresRepositoryMixin._mainline_definition_from_snapshot(
+                        run, current_definition
+                    )
+                    if run is not None
+                    else None
+                )
+                or current_definition
             )
+        prerequisite_results = mainline_prerequisites_met_many(
+            effective_definitions,
+            completed_stages=completed_stages,
+            completed_events=completed_events,
+            flags=completed_events,
+            realm_key=str(player["realm_key"]),
+            realm_layer=player_integer(player, "realm_layer"),
+            content=content,
+        )
+        for current_definition, definition, prerequisites_met in zip(
+            definitions, effective_definitions, prerequisite_results, strict=True
+        ):
+            run = runs_by_key[current_definition.key]
             run_status = str(run["status"]) if run is not None else ""
             status = mainline_stage_status(
                 definition,

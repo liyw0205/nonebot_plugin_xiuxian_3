@@ -1158,6 +1158,116 @@ def mainline_prerequisites_met(
     return definition.runtime_status == "open"
 
 
+def mainline_prerequisites_met_many(
+    definitions: Iterable[MainlineStageDefinition],
+    *,
+    completed_stages: Iterable[str] = (),
+    completed_events: Iterable[str] = (),
+    flags: Iterable[str] = (),
+    realm_key: str | None = None,
+    realm_layer: int = 0,
+    content: ContentBundle | None = None,
+) -> tuple[bool, ...]:
+    """Evaluate many stages while preparing shared prerequisite state once."""
+
+    requested = tuple(definitions)
+    if not requested:
+        return ()
+    bundle = _content(content)
+    all_definitions = mainline_definitions(
+        bundle, story_key=None, validate_sources=False
+    )
+    aliases = {
+        alias: definition.key
+        for definition in all_definitions
+        for alias in definition.aliases
+    }
+    labels: dict[str, list[str]] = {}
+    stage_keys_by_story: dict[str, set[str]] = {}
+    for definition in all_definitions:
+        labels.setdefault(definition.label, []).append(definition.key)
+        stage_keys_by_story.setdefault(definition.story_key, set()).add(definition.key)
+
+    def normalize_stage(value: object) -> str:
+        if isinstance(value, bool):
+            raise ValueError("mainline stage must be an integer or stable key")
+        if isinstance(value, int):
+            return f"chapter.1.stage.{value}"
+        candidate = str(value).strip()
+        if candidate in aliases:
+            return aliases[candidate]
+        named = labels.get(candidate, ())
+        if len(named) == 1:
+            return named[0]
+        if candidate.isdigit():
+            return f"chapter.1.stage.{int(candidate)}"
+        return candidate
+
+    completed_stage_keys = {
+        normalize_stage(str(value)) for value in completed_stages
+    }
+    events = {str(value) for value in completed_events}
+    events.update(str(value) for value in flags)
+
+    prepared: list[tuple[MainlineStageDefinition, tuple[tuple[bool, str], ...]]] = []
+    for definition in requested:
+        stage_keys = stage_keys_by_story.get(definition.story_key)
+        if stage_keys is None:
+            stage_keys = {
+                item.key
+                for item in mainline_definitions(
+                    bundle,
+                    story_key=definition.story_key,
+                    validate_sources=False,
+                )
+            }
+            stage_keys_by_story[definition.story_key] = stage_keys
+        requirements = tuple(
+            (
+                True,
+                normalize_stage(prerequisite),
+            )
+            if prerequisite.startswith("chapter.") or prerequisite in stage_keys
+            else (False, prerequisite)
+            for prerequisite in definition.prerequisites
+        )
+        prepared.append((definition, requirements))
+
+    current_rank: int | None = None
+    required_ranks: dict[str, int] = {}
+
+    def meets_required_realm(definition: MainlineStageDefinition) -> bool:
+        nonlocal current_rank
+        if definition.required_realm is None:
+            return True
+        if current_rank is None:
+            current_rank = realm_rank(str(realm_key), bundle)
+        required_rank = required_ranks.get(definition.required_realm)
+        if required_rank is None:
+            required_rank = realm_rank(definition.required_realm, bundle)
+            required_ranks[definition.required_realm] = required_rank
+        return (current_rank, int(realm_layer)) >= (
+            required_rank,
+            int(definition.required_layer),
+        )
+
+    results: list[bool] = []
+    for definition, requirements in prepared:
+        satisfied = all(
+            key in completed_stage_keys if is_stage else key in events
+            for is_stage, key in requirements
+        )
+        if satisfied and definition.alternative_prerequisites:
+            has_alternative_event = any(
+                item in events for item in definition.alternative_prerequisites
+            )
+            satisfied = has_alternative_event or meets_required_realm(definition)
+        elif satisfied:
+            satisfied = meets_required_realm(definition)
+        results.append(satisfied and definition.runtime_status == "open")
+    return tuple(results)
+
+
 def mainline_stage_status(
     value: str | int | MainlineStageDefinition,
     *,
@@ -1253,6 +1363,7 @@ __all__ = [
     "mainline_first_clear_reward",
     "mainline_prerequisite_met",
     "mainline_prerequisites_met",
+    "mainline_prerequisites_met_many",
     "mainline_repeat_reward",
     "mainline_reward",
     "mainline_stage",

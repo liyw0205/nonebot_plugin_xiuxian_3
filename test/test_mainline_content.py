@@ -11,7 +11,12 @@ import pytest
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
-from nonebot_plugin_xiuxian_3.xiuxian.adventures.mainline import MAINLINE_STORY_KEY, mainline_definitions
+from nonebot_plugin_xiuxian_3.xiuxian.adventures.mainline import (
+    MAINLINE_STORY_KEY,
+    mainline_definitions,
+    mainline_prerequisites_met,
+    mainline_prerequisites_met_many,
+)
 from nonebot_plugin_xiuxian_3.xiuxian.content import ContentBundle, ContentError
 from mainline_fixtures import (
     grant_blood_grass,
@@ -603,3 +608,50 @@ def test_mainline_operation_input_conflict_does_not_create_second_run() -> None:
             await runtime.close()
 
     asyncio.run(run())
+
+
+def test_mainline_batch_prerequisites_match_single_stage_evaluation() -> None:
+    definitions = mainline_definitions(validate_sources=False)
+    all_keys = {definition.key for definition in definitions}
+    events = {
+        prerequisite
+        for definition in definitions
+        for prerequisite in (*definition.prerequisites, *definition.alternative_prerequisites)
+        if not prerequisite.startswith("chapter.") and prerequisite not in all_keys
+    }
+    first = definitions[:8]
+    scenarios = (
+        ((), (), "mortal", 1),
+        (
+            tuple(definition.key for definition in first),
+            (),
+            "foundation",
+            3,
+        ),
+        (
+            tuple(definition.label for definition in first[:3]),
+            tuple(sorted(events)),
+            "golden_core",
+            8,
+        ),
+        (
+            tuple(definition.key for definition in definitions),
+            tuple(sorted(events)),
+            "void_refining",
+            9,
+        ),
+    )
+
+    for completed_stages, completed_events, realm_key, realm_layer in scenarios:
+        arguments = {
+            "completed_stages": completed_stages,
+            "completed_events": completed_events,
+            "flags": completed_events[:5],
+            "realm_key": realm_key,
+            "realm_layer": realm_layer,
+        }
+        expected = tuple(
+            mainline_prerequisites_met(definition, **arguments)
+            for definition in definitions
+        )
+        assert mainline_prerequisites_met_many(definitions, **arguments) == expected

@@ -771,6 +771,102 @@ async def _run_domain_front_index_comparison(
     return payload
 
 
+async def _run_mainline_prerequisite_comparison(
+    users: int,
+    batch_size: int,
+    total_requests: int,
+    levels: tuple[int, ...],
+    *,
+    profile_sql: bool | None = None,
+    commands: tuple[str, ...] | None = None,
+) -> dict[str, Any]:
+    """Compare per-stage and shared mainline prerequisite preparation once seeded."""
+
+    import importlib
+
+    repository_module = importlib.import_module(
+        "nonebot_plugin_xiuxian_3.xiuxian.adventures.repository"
+    )
+    optimized = repository_module.mainline_prerequisites_met_many
+
+    def per_stage(definitions: Iterable[Any], **kwargs: Any) -> tuple[bool, ...]:
+        return tuple(
+            repository_module.mainline_prerequisites_met(definition, **kwargs)
+            for definition in definitions
+        )
+
+    temporary_path: Path
+    with tempfile.TemporaryDirectory(prefix="xiuxian-perf-") as data_dir:
+        temporary_path = Path(data_dir)
+        runtime = create_runtime(data_dir=data_dir, adapters=("onebot.v11", "qq.official"))
+        await runtime.initialize()
+        seed = _seed_database(runtime, users, batch_size)
+        explain = _explain(runtime.settings.database_path, 1)
+        metrics = _instrument_repository(runtime, enabled=profile_sql)
+        variants: dict[str, list[dict[str, Any]]] = {
+            "before_per_stage_preparation": [],
+            "after_shared_preparation": [],
+        }
+        try:
+            for index, concurrency in enumerate(levels):
+                for repetition in range(2):
+                    before_first = (index + repetition) % 2 == 0
+                    order = (
+                        (
+                            ("before_per_stage_preparation", per_stage),
+                            ("after_shared_preparation", optimized),
+                        )
+                        if before_first
+                        else (
+                            ("after_shared_preparation", optimized),
+                            ("before_per_stage_preparation", per_stage),
+                        )
+                    )
+                    for label, evaluator in order:
+                        repository_module.mainline_prerequisites_met_many = evaluator
+                        result = asdict(
+                            await _measure(
+                                runtime,
+                                users,
+                                concurrency,
+                                total_requests,
+                                metrics,
+                                commands,
+                            )
+                        )
+                        result["repeat"] = repetition + 1
+                        variants[label].append(result)
+        finally:
+            repository_module.mainline_prerequisites_met_many = optimized
+            await runtime.close()
+        db_bytes = _db_size(runtime.settings.database_path)
+
+        def report(results: list[dict[str, Any]]) -> dict[str, Any]:
+            return {
+                "users": users,
+                "seed": seed,
+                "database_bytes_after_benchmark": db_bytes,
+                "sql_profile_enabled": metrics is not None,
+                "sql_profile_status": "collected" if metrics is not None else "not_collected",
+                "explain_query_plan": explain,
+                "levels": results,
+                "errors": sum(int(item["errors"]) for item in results),
+            }
+
+        payload = {
+            "comparison": {label: report(results) for label, results in variants.items()},
+            "errors": sum(
+                int(item["errors"])
+                for results in variants.values()
+                for item in results
+            ),
+        }
+    cleaned = not temporary_path.exists()
+    for result in payload["comparison"].values():
+        result["temporary_database_cleaned"] = cleaned
+    return payload
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--users", type=int, default=int(os.getenv("XIUXIAN_PERF_USERS", "1000000")))
@@ -783,6 +879,11 @@ def main() -> int:
         "--compare-domain-front-indexes",
         action="store_true",
         help="run before/after on the same deterministic domain-front dataset",
+    )
+    compare.add_argument(
+        "--compare-mainline-prerequisites",
+        action="store_true",
+        help="compare shared vs per-stage mainline prerequisite preparation",
     )
     compare.add_argument(
         "--compare-connection-probe",
@@ -841,6 +942,17 @@ def main() -> int:
     elif args.compare_domain_front_indexes:
         payload = asyncio.run(
             _run_domain_front_index_comparison(
+                args.users,
+                args.batch_size,
+                args.requests,
+                levels,
+                profile_sql=profile_sql,
+                commands=commands,
+            )
+        )
+    elif args.compare_mainline_prerequisites:
+        payload = asyncio.run(
+            _run_mainline_prerequisite_comparison(
                 args.users,
                 args.batch_size,
                 args.requests,

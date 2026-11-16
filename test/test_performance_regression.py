@@ -78,6 +78,35 @@ def test_unprofiled_benchmark_does_not_report_zero_sql_queries() -> None:
     assert report["errors"] == 0
 
 
+def test_mainline_prerequisite_comparison_reuses_and_cleans_one_fixture() -> None:
+    import asyncio
+
+    from scripts.performance_benchmark import _run_mainline_prerequisite_comparison
+
+    report = asyncio.run(
+        _run_mainline_prerequisite_comparison(
+            users=8,
+            batch_size=8,
+            total_requests=8,
+            levels=(1,),
+            profile_sql=True,
+            commands=("主线状态",),
+        )
+    )
+    before = report["comparison"]["before_per_stage_preparation"]
+    after = report["comparison"]["after_shared_preparation"]
+    assert report["errors"] == 0
+    assert before["seed"] == after["seed"]
+    assert before["database_bytes_after_benchmark"] == after["database_bytes_after_benchmark"]
+    assert before["temporary_database_cleaned"] is True
+    assert after["temporary_database_cleaned"] is True
+    assert before["sql_profile_enabled"] is True
+    assert after["sql_profile_enabled"] is True
+    assert len(before["levels"]) == len(after["levels"]) == 2
+    assert all(item["sql_queries"] > 0 and item["errors"] == 0 for item in before["levels"])
+    assert all(item["sql_queries"] > 0 and item["errors"] == 0 for item in after["levels"])
+
+
 def test_thread_local_connection_reuse_skips_health_probe(tmp_path) -> None:
     import asyncio
 
