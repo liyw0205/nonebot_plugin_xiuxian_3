@@ -115,6 +115,15 @@ class ArenaSeasonRepositoryMixin:
                 )
         return events
 
+    def _arena_season_events_for_board_windows(
+        self, connection: sqlite3.Connection, ends: tuple[Any, ...]
+    ) -> dict[Any, list[MatchEvent]]:
+        windows = tuple(dict.fromkeys(ends))
+        if not windows:
+            return {}
+        events = self._season_events(connection, max(windows))
+        return {end: events for end in windows}
+
     def _frozen_rows(self, connection: sqlite3.Connection, key: str) -> list[sqlite3.Row]:
         return connection.execute(
             "SELECT * FROM arena_season_settlements WHERE week_key = ? ORDER BY rank",
@@ -201,15 +210,27 @@ class ArenaSeasonRepositoryMixin:
         now = self._now()
         key, start, end = self._season_week(record, week, now)
         closed = week_is_closed(key, record["week_anchor"], now)
+        previous_key, previous_start, previous_end = self._season_week(
+            record, None, now, default_previous=True
+        )
         with self._connect() as connection:
             player = self._arena_require_player(connection, platform, platform_user_id, writable=False)
             player_id = int(player["id"])
             rows = self._frozen_rows(connection, key)
+            previous_rows = self._frozen_rows(connection, previous_key)
+            missing_ends = tuple(
+                board_end
+                for board_rows, board_end in ((rows, end), (previous_rows, previous_end))
+                if not board_rows
+            )
+            events_by_end = self._arena_season_events_for_board_windows(
+                connection, missing_ends
+            )
             if not rows:
                 # A live week shows its current standing; a closed-but-unfrozen
-                # week shows exactly what settlement will freeze.  Either way the
+                # week shows exactly what settlement will freeze. Either way the
                 # read writes nothing.
-                board = build_board(self._season_events(connection, end), start=start, end=end)
+                board = build_board(events_by_end[end], start=start, end=end)
                 rows = [
                     {
                         "player_id": entry.player_id,
@@ -231,13 +252,9 @@ class ArenaSeasonRepositoryMixin:
                 "SELECT 1 FROM arena_season_claims WHERE week_key = ? AND player_id = ?",
                 (key, player_id),
             ).fetchone() is not None
-            previous_key, previous_start, previous_end = self._season_week(
-                record, None, now, default_previous=True
-            )
-            previous_rows = self._frozen_rows(connection, previous_key)
             if not previous_rows:
                 previous_board = build_board(
-                    self._season_events(connection, previous_end),
+                    events_by_end[previous_end],
                     start=previous_start,
                     end=previous_end,
                 )

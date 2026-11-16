@@ -109,6 +109,35 @@ def test_the_board_orders_by_rating_then_wins_and_breaks_ties_stably() -> None:
     assert board[0].rating == 1050 and board[0].wins == 1 and board[0].losses == 1
 
 
+def test_season_board_reuses_one_history_read_for_current_and_previous_weeks() -> None:
+    async def run() -> None:
+        clock = MutableClock(datetime(2026, 9, 24, 12, tzinfo=timezone.utc))
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir, clock=clock)
+            challenger, defender = "arena-history-a", "arena-history-b"
+            await _prepare_pair(runtime, challenger, defender)
+            await _ranked_match(runtime, challenger, defender, prefix="history", clock=clock)
+
+            original = runtime.repository._season_events
+            reads: list[datetime] = []
+
+            def counted_read(connection: sqlite3.Connection, end: datetime):
+                reads.append(end)
+                return original(connection, end)
+
+            runtime.repository._season_events = counted_read
+            board = await runtime.repository.arena_season_board(
+                platform="web", platform_user_id=challenger, week=None
+            )
+            assert len(reads) == 1
+            assert board["mine"] is not None
+            assert sum(board["mine"][key] for key in ("wins", "losses", "draws")) == 1
+            assert board["previous"]["mine"] is None
+            await runtime.close()
+
+    asyncio.run(run())
+
+
 def test_practice_and_uncounted_matches_never_enter_the_board() -> None:
     anchor = datetime(2026, 1, 5, tzinfo=timezone.utc)
     start, end, _key = week_window(datetime(2026, 1, 7, tzinfo=timezone.utc), anchor)

@@ -30,6 +30,7 @@ def test_opt_in_performance_benchmark_contract(monkeypatch: pytest.MonkeyPatch) 
     assert report["sql_profile_enabled"] is True
     assert report["sql_profile_status"] == "collected"
     assert report["seed"]["domain_front_rows"] == report["users"]
+    assert report["seed"]["arena_matches"] == report["users"]
     assert report["temporary_database_cleaned"] is True
     assert not any("TEMP B-TREE" in detail for detail in report["explain_query_plan"]["idle_status"])
     evidence_plan = " ".join(report["explain_query_plan"]["mainline_evidence"]).upper()
@@ -49,11 +50,16 @@ def test_opt_in_performance_benchmark_contract(monkeypatch: pytest.MonkeyPatch) 
     assert not any("SCAN MENTOR_RELATIONS" in detail.upper() for detail in report["explain_query_plan"]["location_requirement_state"])
     assert all(item["latency_ms"]["p99_ms"] >= item["latency_ms"]["p50_ms"] for item in report["levels"])
     assert all(
-        set(item["command_errors"]) == {"我的状态", "挂机状态", "主线状态", "移动预览 玄天近郊"}
+        set(item["command_errors"])
+        == {"我的状态", "挂机状态", "主线状态", "移动预览 玄天近郊", "竞技场赛季"}
         and not any(item["command_errors"].values())
         for item in report["levels"]
     )
     assert all(item["sql_queries"] > 0 for item in report["levels"])
+    assert all(
+        item["stage_latency_ms"]["arena_season_board"]["count"] > 0
+        for item in report["levels"]
+    )
 
 
 def test_unprofiled_benchmark_does_not_report_zero_sql_queries() -> None:
@@ -105,6 +111,37 @@ def test_mainline_prerequisite_comparison_reuses_and_cleans_one_fixture() -> Non
     assert len(before["levels"]) == len(after["levels"]) == 2
     assert all(item["sql_queries"] > 0 and item["errors"] == 0 for item in before["levels"])
     assert all(item["sql_queries"] > 0 and item["errors"] == 0 for item in after["levels"])
+
+
+def test_arena_season_comparison_reuses_one_fixture_and_removes_one_history_query() -> None:
+    import asyncio
+
+    from scripts.performance_benchmark import _run_arena_season_event_comparison
+
+    report = asyncio.run(
+        _run_arena_season_event_comparison(
+            users=8,
+            batch_size=8,
+            total_requests=8,
+            levels=(1,),
+            profile_sql=True,
+            commands=("竞技场赛季",),
+        )
+    )
+    before = report["comparison"]["before_separate_window_history_reads"]
+    after = report["comparison"]["after_shared_history_read"]
+    assert report["errors"] == 0
+    assert before["seed"] == after["seed"]
+    assert before["seed"]["arena_matches"] == 8
+    assert before["database_bytes_after_benchmark"] == after["database_bytes_after_benchmark"]
+    assert before["temporary_database_cleaned"] is True
+    assert after["temporary_database_cleaned"] is True
+    assert before["sql_profile_enabled"] is after["sql_profile_enabled"] is True
+    assert len(before["levels"]) == len(after["levels"]) == 2
+    for old, new in zip(before["levels"], after["levels"], strict=True):
+        assert old["sql_queries"] - new["sql_queries"] >= old["requests"]
+        assert old["errors"] == new["errors"] == 0
+        assert old["command_errors"]["竞技场赛季"] == new["command_errors"]["竞技场赛季"] == 0
 
 
 def test_thread_local_connection_reuse_skips_health_probe(tmp_path) -> None:

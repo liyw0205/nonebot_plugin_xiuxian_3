@@ -63,6 +63,20 @@ INSERT INTO idle_assignments(
           '{"stamina": 8, "energy": 2}',
           '{"label": "百草坡采药"}', '{}', ?, ?)
 """
+ARENA_SNAPSHOT_INSERT = """
+INSERT INTO arena_snapshots(
+    snapshot_id, player_id, status, arena_mode_key, rating, matchable_at,
+    expires_at, snapshot_json, public_json, created_at, updated_at
+) VALUES (?, ?, 'expired', 'arena.rank', 1000, ?, ?, ?, ?, ?, ?)
+"""
+ARENA_MATCH_INSERT = """
+INSERT INTO arena_matches(
+    match_id, challenger_id, defender_id, challenger_snapshot_id,
+    defender_snapshot_id, arena_mode_key, status, outcome, rounds,
+    score_counted, challenger_rating_delta, defender_rating_delta,
+    snapshot_json, result_json, operation_id, created_at, settled_at
+) VALUES (?, ?, ?, ?, ?, 'arena.rank', 'settled', ?, 3, 1, ?, ?, ?, ?, ?, ?, ?)
+"""
 
 
 @dataclass(frozen=True, slots=True)
@@ -115,6 +129,7 @@ def _instrument_repository(runtime: Any, *, enabled: bool | None = None) -> dict
         "idle_status_ms": [],
         "mainline_status_ms": [],
         "travel_preview_ms": [],
+        "arena_season_board_ms": [],
         "sql_queries": [],
     }
     repository = runtime.repository
@@ -136,6 +151,7 @@ def _instrument_repository(runtime: Any, *, enabled: bool | None = None) -> dict
     timed_method("_get_idle_status_once", "idle_status_ms")
     timed_method("_get_mainline_status_sync", "mainline_status_ms")
     timed_method("_preview_travel_database_state", "travel_preview_ms")
+    timed_method("_arena_season_board_once", "arena_season_board_ms")
     original_connect = repository._connect
 
     def timed_connect() -> sqlite3.Connection:
@@ -250,12 +266,102 @@ def _seed_database(runtime: Any, users: int, batch_size: int) -> dict[str, float
         )
         connection.commit()
         connection.execute("PRAGMA synchronous=NORMAL")
+    arena_matches = _seed_arena_history(runtime, path, users, now)
     return {
         "users": users,
         "domain_front_rows": users,
+        "arena_matches": arena_matches,
         "seed_seconds": round(time.perf_counter() - started, 3),
         "db_bytes": _db_size(path),
     }
+
+
+def _seed_arena_history(runtime: Any, path: Path, users: int, now: str) -> int:
+    if users < 2:
+        return 0
+    with sqlite3.connect(path) as connection:
+        connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA foreign_keys=ON")
+        connection.execute("BEGIN")
+        profiles: dict[int, dict[str, Any]] = {}
+        for player_id in (1, 2):
+            player = connection.execute(
+                "SELECT * FROM players WHERE id = ?", (player_id,)
+            ).fetchone()
+            if player is None:
+                raise RuntimeError("arena benchmark player seed is missing")
+            profiles[player_id] = runtime.repository._arena_player_snapshot(
+                connection, player, f"perf-arena-snapshot-{player_id:07d}"
+            )
+
+        snapshots = []
+        matches = []
+        for number in range(users):
+            challenger_id = number + 1
+            defender_id = (number + 1) % users + 1
+            challenger_snapshot_id = f"perf-arena-snapshot-{challenger_id:07d}"
+            defender_snapshot_id = f"perf-arena-snapshot-{defender_id:07d}"
+            challenger_profile = dict(profiles[(challenger_id - 1) % 2 + 1])
+            defender_profile = dict(profiles[(defender_id - 1) % 2 + 1])
+            challenger_profile["snapshot_id"] = challenger_snapshot_id
+            defender_profile["snapshot_id"] = defender_snapshot_id
+            snapshots.append(
+                (
+                    challenger_snapshot_id,
+                    challenger_id,
+                    now,
+                    now,
+                    json.dumps(challenger_profile, ensure_ascii=False, sort_keys=True),
+                    json.dumps(
+                        {"snapshot_id": challenger_snapshot_id, "rating": 1000},
+                        sort_keys=True,
+                    ),
+                    now,
+                    now,
+                )
+            )
+            outcome = "challenger_won" if number % 2 == 0 else "defender_won"
+            challenger_delta = 5 if outcome == "challenger_won" else -5
+            defender_delta = -challenger_delta
+            operation_id = f"perf-arena-op-{number:07d}"
+            snapshot = {
+                "challenger": challenger_profile,
+                "defender": defender_profile,
+                "arena_mode_key": "arena.rank",
+                "tactical_environment": {},
+            }
+            result = {
+                "outcome": outcome,
+                "rounds": 3,
+                "score_counted": True,
+                "challenger_rating_delta": challenger_delta,
+                "defender_rating_delta": defender_delta,
+                "mode_key": "arena.rank",
+                "request_id": f"perf-arena-request-{number:07d}",
+                "operation_id": operation_id,
+                "tactical_environment": {},
+            }
+            matches.append(
+                (
+                    f"perf-arena-match-{number:07d}",
+                    challenger_id,
+                    defender_id,
+                    challenger_snapshot_id,
+                    defender_snapshot_id,
+                    outcome,
+                    challenger_delta,
+                    defender_delta,
+                    json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
+                    json.dumps(result, ensure_ascii=False, sort_keys=True),
+                    operation_id,
+                    now,
+                    now,
+                )
+            )
+        connection.executemany(ARENA_SNAPSHOT_INSERT, snapshots)
+        connection.executemany(ARENA_MATCH_INSERT, matches)
+        connection.commit()
+    return len(matches)
 
 
 def _onebot_event(user_id: str, request_number: int, text: str) -> Any:
@@ -321,7 +427,13 @@ async def _measure(
     # Keep each level's request population stable so concurrency is the only
     # variable in the comparison.
     adapters = ("onebot.v11", "qq.official")
-    commands = commands or ("我的状态", "挂机状态", "主线状态", "移动预览 玄天近郊")
+    commands = commands or (
+        "我的状态",
+        "挂机状态",
+        "主线状态",
+        "移动预览 玄天近郊",
+        "竞技场赛季",
+    )
     samples = tuple(
         (adapters[number % 2], f"perf-{number % users:07d}", commands[number % len(commands)])
         for number in range(total_requests)
@@ -450,6 +562,7 @@ def _explain(path: Path, player_id: int) -> dict[str, list[str]]:
                    ) AS mentor
         """,
         "location_daily_travel": "SELECT COUNT(*) AS count FROM travel_sessions WHERE player_id = ? AND destination = ? AND starts_at >= ? AND starts_at < ?",
+        "arena_season_events": "SELECT challenger_id, defender_id, outcome, score_counted, settled_at, challenger_rating_delta, defender_rating_delta FROM arena_matches WHERE settled_at < ?",
     }
     params = {
         "player_lookup": ("onebot.v11", f"perf-{player_id - 1:07d}"),
@@ -470,6 +583,7 @@ def _explain(path: Path, player_id: int) -> dict[str, list[str]]:
         "location_mentor_relation": (player_id, "2026-11-15T00:00:00+00:00"),
         "location_requirement_state": (player_id, player_id, "2026-11-15T00:00:00+00:00"),
         "location_daily_travel": (player_id, "xuantian.suburb", "2026-11-15T00:00:00+00:00", "2026-11-16T00:00:00+00:00"),
+        "arena_season_events": ("2026-11-16T00:00:00+00:00",),
     }
     with sqlite3.connect(path) as connection:
         return {
@@ -867,6 +981,102 @@ async def _run_mainline_prerequisite_comparison(
     return payload
 
 
+async def _run_arena_season_event_comparison(
+    users: int,
+    batch_size: int,
+    total_requests: int,
+    levels: tuple[int, ...],
+    *,
+    profile_sql: bool | None = None,
+    commands: tuple[str, ...] | None = None,
+) -> dict[str, Any]:
+    """Compare per-window and shared match-history reads on one fixture."""
+
+    selected_commands = commands or ("竞技场赛季",)
+    if selected_commands != ("竞技场赛季",):
+        raise ValueError("arena season comparison only supports the season-board command")
+
+    temporary_path: Path
+    with tempfile.TemporaryDirectory(prefix="xiuxian-perf-") as data_dir:
+        temporary_path = Path(data_dir)
+        runtime = create_runtime(data_dir=data_dir, adapters=("onebot.v11", "qq.official"))
+        await runtime.initialize()
+        seed = _seed_database(runtime, users, batch_size)
+        explain = _explain(runtime.settings.database_path, 1)
+        metrics = _instrument_repository(runtime, enabled=profile_sql)
+        repository = runtime.repository
+        shared_reader = repository._arena_season_events_for_board_windows
+
+        def separate_readers(connection: sqlite3.Connection, ends: tuple[Any, ...]):
+            return {
+                end: repository._season_events(connection, end)
+                for end in dict.fromkeys(ends)
+            }
+
+        variants: dict[str, list[dict[str, Any]]] = {
+            "before_separate_window_history_reads": [],
+            "after_shared_history_read": [],
+        }
+        try:
+            for index, concurrency in enumerate(levels):
+                for repetition in range(2):
+                    before_first = (index + repetition) % 2 == 0
+                    order = (
+                        (
+                            ("before_separate_window_history_reads", separate_readers),
+                            ("after_shared_history_read", shared_reader),
+                        )
+                        if before_first
+                        else (
+                            ("after_shared_history_read", shared_reader),
+                            ("before_separate_window_history_reads", separate_readers),
+                        )
+                    )
+                    for label, reader in order:
+                        repository._arena_season_events_for_board_windows = reader
+                        result = asdict(
+                            await _measure(
+                                runtime,
+                                users,
+                                concurrency,
+                                total_requests,
+                                metrics,
+                                selected_commands,
+                            )
+                        )
+                        result["repeat"] = repetition + 1
+                        variants[label].append(result)
+        finally:
+            repository._arena_season_events_for_board_windows = shared_reader
+            await runtime.close()
+        db_bytes = _db_size(runtime.settings.database_path)
+
+        def report(results: list[dict[str, Any]]) -> dict[str, Any]:
+            return {
+                "users": users,
+                "seed": seed,
+                "database_bytes_after_benchmark": db_bytes,
+                "sql_profile_enabled": metrics is not None,
+                "sql_profile_status": "collected" if metrics is not None else "not_collected",
+                "explain_query_plan": explain,
+                "levels": results,
+                "errors": sum(int(item["errors"]) for item in results),
+            }
+
+        payload = {
+            "comparison": {label: report(results) for label, results in variants.items()},
+            "errors": sum(
+                int(item["errors"])
+                for results in variants.values()
+                for item in results
+            ),
+        }
+    cleaned = not temporary_path.exists()
+    for result in payload["comparison"].values():
+        result["temporary_database_cleaned"] = cleaned
+    return payload
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--users", type=int, default=int(os.getenv("XIUXIAN_PERF_USERS", "1000000")))
@@ -886,6 +1096,11 @@ def main() -> int:
         help="compare shared vs per-stage mainline prerequisite preparation",
     )
     compare.add_argument(
+        "--compare-arena-season-events",
+        action="store_true",
+        help="compare separate vs shared season history reads on one fixture",
+    )
+    compare.add_argument(
         "--compare-connection-probe",
         action="store_true",
         help="compare the removed connection health probe without reseeding the fixture",
@@ -902,7 +1117,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--command",
-        choices=("我的状态", "挂机状态", "主线状态", "移动预览 玄天近郊"),
+        choices=("我的状态", "挂机状态", "主线状态", "移动预览 玄天近郊", "竞技场赛季"),
         help="measure one real command with all requests assigned to it",
     )
     args = parser.parse_args()
@@ -917,7 +1132,18 @@ def main() -> int:
         parser.error("--concurrency values must be between 1 and 50")
     commands = (args.command,) if args.command else None
     profile_sql = True if args.profile_sql else None
-    if args.compare_connection_probe:
+    if args.compare_arena_season_events:
+        payload = asyncio.run(
+            _run_arena_season_event_comparison(
+                args.users,
+                args.batch_size,
+                args.requests,
+                levels,
+                profile_sql=profile_sql,
+                commands=commands,
+            )
+        )
+    elif args.compare_connection_probe:
         payload = asyncio.run(
             _run_connection_probe_comparison(
                 args.users,
