@@ -138,6 +138,55 @@ def test_season_board_reuses_one_history_read_for_current_and_previous_weeks() -
     asyncio.run(run())
 
 
+def test_existing_arena_history_gets_season_index_on_restart_without_row_changes() -> None:
+    async def run() -> None:
+        clock = MutableClock(datetime(2026, 9, 24, 12, tzinfo=timezone.utc))
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir, clock=clock)
+            await _prepare_pair(runtime, "index-history-a", "index-history-b")
+            await _ranked_match(
+                runtime,
+                "index-history-a",
+                "index-history-b",
+                prefix="index-history",
+                clock=clock,
+            )
+            database_path = runtime.settings.database_path
+            with sqlite3.connect(database_path) as db:
+                matches_before = db.execute(
+                    "SELECT match_id, challenger_id, defender_id, outcome, score_counted, "
+                    "challenger_rating_delta, defender_rating_delta, settled_at "
+                    "FROM arena_matches ORDER BY id"
+                ).fetchall()
+                db.execute("DROP INDEX idx_arena_matches_settled_events")
+            await runtime.close()
+
+            restarted = create_runtime(data_dir=data_dir, clock=clock)
+            await restarted.initialize()
+            with sqlite3.connect(database_path) as db:
+                matches_after = db.execute(
+                    "SELECT match_id, challenger_id, defender_id, outcome, score_counted, "
+                    "challenger_rating_delta, defender_rating_delta, settled_at "
+                    "FROM arena_matches ORDER BY id"
+                ).fetchall()
+                index = db.execute(
+                    "SELECT 1 FROM sqlite_master WHERE type='index' "
+                    "AND name='idx_arena_matches_settled_events'"
+                ).fetchone()
+                plan = db.execute(
+                    "EXPLAIN QUERY PLAN SELECT challenger_id, defender_id, outcome, "
+                    "score_counted, settled_at, challenger_rating_delta, defender_rating_delta "
+                    "FROM arena_matches WHERE settled_at < ?",
+                    ("2026-10-01T00:00:00+00:00",),
+                ).fetchall()
+            assert matches_after == matches_before
+            assert index is not None
+            assert any("COVERING INDEX IDX_ARENA_MATCHES_SETTLED_EVENTS" in row[3].upper() for row in plan)
+            await restarted.close()
+
+    asyncio.run(run())
+
+
 def test_practice_and_uncounted_matches_never_enter_the_board() -> None:
     anchor = datetime(2026, 1, 5, tzinfo=timezone.utc)
     start, end, _key = week_window(datetime(2026, 1, 7, tzinfo=timezone.utc), anchor)

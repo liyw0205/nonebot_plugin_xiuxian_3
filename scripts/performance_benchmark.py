@@ -16,6 +16,7 @@ import shutil
 import sqlite3
 import sys
 import tempfile
+import threading
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -77,6 +78,11 @@ INSERT INTO arena_matches(
     snapshot_json, result_json, operation_id, created_at, settled_at
 ) VALUES (?, ?, ?, ?, ?, 'arena.rank', 'settled', ?, 3, 1, ?, ?, ?, ?, ?, ?, ?)
 """
+ARENA_SEASON_INDEX_SQL = (
+    "CREATE INDEX IF NOT EXISTS idx_arena_matches_settled_events "
+    "ON arena_matches(settled_at, challenger_id, defender_id, outcome, "
+    "score_counted, challenger_rating_delta, defender_rating_delta)"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -100,6 +106,9 @@ class LevelResult:
     command_errors: dict[str, int]
     stage_latency_ms: dict[str, Percentiles]
     inflight_wait_ms: Percentiles
+    executor_queue_wait_ms: Percentiles
+    executor_worker_count: int
+    executor_max_active_workers: int
     connection_open_ms: Percentiles
     sql_queries: int | None
 
@@ -131,6 +140,9 @@ def _instrument_repository(runtime: Any, *, enabled: bool | None = None) -> dict
         "travel_preview_ms": [],
         "arena_season_board_ms": [],
         "sql_queries": [],
+        "executor_queue_wait_ms": [],
+        "executor_worker_count": [],
+        "executor_active_workers": [],
     }
     repository = runtime.repository
     repository._inflight = _TimedSemaphore(runtime.settings.max_inflight, metrics["inflight_wait_ms"])
@@ -171,6 +183,45 @@ def _instrument_repository(runtime: Any, *, enabled: bool | None = None) -> dict
     return metrics
 
 
+def _instrument_executor(metrics: dict[str, list[float]]) -> Any:
+    loop = asyncio.get_running_loop()
+    original = loop.run_in_executor
+    lock = threading.Lock()
+    workers: set[int] = set()
+    active = 0
+
+    def measured_run_in_executor(executor: Any, function: Any, *args: Any) -> Any:
+        if executor is not None:
+            return original(executor, function, *args)
+        submitted_at = time.perf_counter()
+
+        def measured_function(*function_args: Any) -> Any:
+            nonlocal active
+            started_at = time.perf_counter()
+            with lock:
+                active += 1
+                if not metrics["executor_worker_count"]:
+                    workers.clear()
+                workers.add(threading.get_ident())
+                metrics["executor_queue_wait_ms"].append((started_at - submitted_at) * 1000)
+                metrics["executor_worker_count"].append(float(len(workers)))
+                metrics["executor_active_workers"].append(float(active))
+            try:
+                return function(*function_args)
+            finally:
+                with lock:
+                    active -= 1
+
+        return original(executor, measured_function, *args)
+
+    loop.run_in_executor = measured_run_in_executor
+
+    def restore() -> None:
+        loop.run_in_executor = original
+
+    return restore
+
+
 def _percentiles(values: Iterable[float]) -> Percentiles:
     ordered = sorted(values)
     if not ordered:
@@ -189,6 +240,19 @@ def _rss_mb() -> float:
 
 def _db_size(path: Path) -> int:
     return sum(item.stat().st_size for item in path.parent.glob(path.name + "*") if item.exists())
+
+
+def _index_size(path: Path, name: str) -> int | None:
+    connection = sqlite3.connect(path)
+    try:
+        row = connection.execute(
+            "SELECT COALESCE(SUM(pgsize), 0) FROM dbstat WHERE name = ?", (name,)
+        ).fetchone()
+        return int(row[0])
+    except sqlite3.OperationalError:
+        return None
+    finally:
+        connection.close()
 
 
 def _seed_database(runtime: Any, users: int, batch_size: int) -> dict[str, float | int]:
@@ -476,9 +540,19 @@ async def _measure(
         stage_latency_ms={
             key.removesuffix("_ms"): _percentiles(values)
             for key, values in (metrics or {}).items()
-            if key not in {"inflight_wait_ms", "connection_open_ms", "sql_queries"}
+            if key not in {
+                "inflight_wait_ms",
+                "connection_open_ms",
+                "sql_queries",
+                "executor_queue_wait_ms",
+                "executor_worker_count",
+                "executor_active_workers",
+            }
         },
         inflight_wait_ms=_percentiles((metrics or {}).get("inflight_wait_ms", ())),
+        executor_queue_wait_ms=_percentiles((metrics or {}).get("executor_queue_wait_ms", ())),
+        executor_worker_count=int(max((metrics or {}).get("executor_worker_count", ()), default=0)),
+        executor_max_active_workers=int(max((metrics or {}).get("executor_active_workers", ()), default=0)),
         connection_open_ms=_percentiles((metrics or {}).get("connection_open_ms", ())),
         sql_queries=(len(metrics["sql_queries"]) if metrics is not None else None),
     )
@@ -618,10 +692,15 @@ async def _run(
                     connection.execute(f"DROP INDEX IF EXISTS {index}")
         explain = _explain(runtime.settings.database_path, 1)
         metrics = _instrument_repository(runtime, enabled=profile_sql)
-        results = [
-            asdict(await _measure(runtime, users, concurrency, total_requests, metrics, commands))
-            for concurrency in levels
-        ]
+        restore_executor = _instrument_executor(metrics) if metrics is not None else None
+        try:
+            results = [
+                asdict(await _measure(runtime, users, concurrency, total_requests, metrics, commands))
+                for concurrency in levels
+            ]
+        finally:
+            if restore_executor is not None:
+                restore_executor()
         await runtime.close()
         db_bytes = _db_size(runtime.settings.database_path)
         payload = {
@@ -1077,6 +1156,127 @@ async def _run_arena_season_event_comparison(
     return payload
 
 
+async def _run_arena_season_index_comparison(
+    users: int,
+    batch_size: int,
+    total_requests: int,
+    levels: tuple[int, ...],
+    *,
+    profile_sql: bool | None = None,
+    commands: tuple[str, ...] | None = None,
+) -> dict[str, Any]:
+    """Compare the covering history index on one seeded arena fixture."""
+
+    selected_commands = commands or ("竞技场赛季",)
+    if selected_commands != ("竞技场赛季",):
+        raise ValueError("arena season index comparison only supports the season-board command")
+
+    temporary_path: Path
+    with tempfile.TemporaryDirectory(prefix="xiuxian-perf-") as data_dir:
+        temporary_path = Path(data_dir)
+        runtime = create_runtime(data_dir=data_dir, adapters=("onebot.v11", "qq.official"))
+        await runtime.initialize()
+        seed = _seed_database(runtime, users, batch_size)
+        database_path = runtime.settings.database_path
+        metrics = _instrument_repository(runtime, enabled=profile_sql)
+        with sqlite3.connect(database_path) as connection:
+            connection.execute("DROP INDEX IF EXISTS idx_arena_matches_settled_events")
+        explain_before = _explain(database_path, 1)
+        variants: dict[str, list[dict[str, Any]]] = {
+            "before_without_covering_index": [],
+            "after_with_covering_index": [],
+        }
+        index_build_ms: list[float] = []
+        restore_executor = _instrument_executor(metrics) if metrics is not None else None
+        try:
+            for index, concurrency in enumerate(levels):
+                for repetition in range(2):
+                    before_first = (index + repetition) % 2 == 0
+                    order = (
+                        ("before_without_covering_index", "after_with_covering_index")
+                        if before_first
+                        else ("after_with_covering_index", "before_without_covering_index")
+                    )
+                    for label in order:
+                        connection = sqlite3.connect(database_path)
+                        try:
+                            if label == "after_with_covering_index":
+                                started = time.perf_counter()
+                                connection.execute(ARENA_SEASON_INDEX_SQL)
+                                connection.commit()
+                                index_build_ms.append((time.perf_counter() - started) * 1000)
+                            else:
+                                connection.execute(
+                                    "DROP INDEX IF EXISTS idx_arena_matches_settled_events"
+                                )
+                                connection.commit()
+                        finally:
+                            connection.close()
+                        result = asdict(
+                            await _measure(
+                                runtime,
+                                users,
+                                concurrency,
+                                total_requests,
+                                metrics,
+                                selected_commands,
+                            )
+                        )
+                        result["repeat"] = repetition + 1
+                        variants[label].append(result)
+        finally:
+            if restore_executor is not None:
+                restore_executor()
+            await runtime.close()
+        connection = sqlite3.connect(database_path)
+        try:
+            started = time.perf_counter()
+            connection.execute(ARENA_SEASON_INDEX_SQL)
+            connection.commit()
+            index_build_ms.append((time.perf_counter() - started) * 1000)
+        finally:
+            connection.close()
+        explain_after = _explain(database_path, 1)
+        db_bytes = _db_size(database_path)
+        index_bytes = _index_size(database_path, "idx_arena_matches_settled_events")
+
+        def report(
+            results: list[dict[str, Any]], explain: dict[str, list[str]], *, indexed: bool
+        ) -> dict[str, Any]:
+            return {
+                "users": users,
+                "seed": seed,
+                "database_bytes_after_benchmark": db_bytes,
+                "index_bytes": index_bytes if indexed else 0,
+                "index_build_ms": index_build_ms if indexed else [],
+                "sql_profile_enabled": metrics is not None,
+                "sql_profile_status": "collected" if metrics is not None else "not_collected",
+                "explain_query_plan": explain,
+                "levels": results,
+                "errors": sum(int(item["errors"]) for item in results),
+            }
+
+        payload = {
+            "comparison": {
+                "before_without_covering_index": report(
+                    variants["before_without_covering_index"], explain_before, indexed=False
+                ),
+                "after_with_covering_index": report(
+                    variants["after_with_covering_index"], explain_after, indexed=True
+                ),
+            },
+            "errors": sum(
+                int(item["errors"])
+                for results in variants.values()
+                for item in results
+            ),
+        }
+    cleaned = not temporary_path.exists()
+    for result in payload["comparison"].values():
+        result["temporary_database_cleaned"] = cleaned
+    return payload
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--users", type=int, default=int(os.getenv("XIUXIAN_PERF_USERS", "1000000")))
@@ -1099,6 +1299,11 @@ def main() -> int:
         "--compare-arena-season-events",
         action="store_true",
         help="compare separate vs shared season history reads on one fixture",
+    )
+    compare.add_argument(
+        "--compare-arena-season-index",
+        action="store_true",
+        help="compare a covering season-history index on one fixture",
     )
     compare.add_argument(
         "--compare-connection-probe",
@@ -1132,7 +1337,18 @@ def main() -> int:
         parser.error("--concurrency values must be between 1 and 50")
     commands = (args.command,) if args.command else None
     profile_sql = True if args.profile_sql else None
-    if args.compare_arena_season_events:
+    if args.compare_arena_season_index:
+        payload = asyncio.run(
+            _run_arena_season_index_comparison(
+                args.users,
+                args.batch_size,
+                args.requests,
+                levels,
+                profile_sql=profile_sql,
+                commands=commands,
+            )
+        )
+    elif args.compare_arena_season_events:
         payload = asyncio.run(
             _run_arena_season_event_comparison(
                 args.users,

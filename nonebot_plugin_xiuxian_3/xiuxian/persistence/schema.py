@@ -2207,6 +2207,16 @@ CREATE INDEX IF NOT EXISTS idx_arena_matches_challenger
     ON arena_matches(challenger_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_arena_matches_defender_snapshot
     ON arena_matches(challenger_id, defender_snapshot_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_arena_matches_settled_events
+    ON arena_matches(
+        settled_at,
+        challenger_id,
+        defender_id,
+        outcome,
+        score_counted,
+        challenger_rating_delta,
+        defender_rating_delta
+    );
 
 CREATE TABLE IF NOT EXISTS arena_actions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

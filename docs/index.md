@@ -31,4 +31,8 @@
 - [运行框架](runtime-framework.md)：宿主生命周期、命令路由和持久化流程。
 - [适配器与 Web 契约](adapters-and-web.md)：事件归一化、消息投递、管理接口与安全约束。
 
+## 性能记录
+
+- [竞技场赛季历史查询](performance/arena-season-history-index-2026-11-16.md)：同一临时 SQLite fixture 的覆盖索引前后对照。
+
 各领域 README 是该领域的阅读入口；`model.md`、`workflow.md`、`use-cases.md` 与内容快照分别描述实体、行为和具体数据。玩家是否能使用某项能力以[当前可用能力](availability.md)及实际公开入口为准，配置记录存在不等同于入口已开放。

@@ -84,6 +84,32 @@ def test_unprofiled_benchmark_does_not_report_zero_sql_queries() -> None:
     assert report["errors"] == 0
 
 
+def test_profiled_benchmark_reports_executor_queue_and_workers() -> None:
+    import asyncio
+
+    from scripts.performance_benchmark import _run
+
+    report = asyncio.run(
+        _run(
+            users=8,
+            batch_size=8,
+            total_requests=12,
+            levels=(1, 10),
+            profile_sql=True,
+            commands=("我的状态",),
+        )
+    )
+    assert report["errors"] == 0
+    assert report["temporary_database_cleaned"] is True
+    assert all(
+        item["executor_queue_wait_ms"]["count"] > 0
+        and 1 <= item["executor_worker_count"] <= 8
+        and 1 <= item["executor_max_active_workers"] <= item["executor_worker_count"]
+        and item["errors"] == 0
+        for item in report["levels"]
+    )
+
+
 def test_mainline_prerequisite_comparison_reuses_and_cleans_one_fixture() -> None:
     import asyncio
 
@@ -142,6 +168,42 @@ def test_arena_season_comparison_reuses_one_fixture_and_removes_one_history_quer
         assert old["sql_queries"] - new["sql_queries"] >= old["requests"]
         assert old["errors"] == new["errors"] == 0
         assert old["command_errors"]["竞技场赛季"] == new["command_errors"]["竞技场赛季"] == 0
+
+
+def test_arena_season_index_comparison_uses_one_clean_fixture() -> None:
+    import asyncio
+
+    from scripts.performance_benchmark import _run_arena_season_index_comparison
+
+    report = asyncio.run(
+        _run_arena_season_index_comparison(
+            users=8,
+            batch_size=8,
+            total_requests=6,
+            levels=(1,),
+            profile_sql=True,
+            commands=("竞技场赛季",),
+        )
+    )
+    before = report["comparison"]["before_without_covering_index"]
+    after = report["comparison"]["after_with_covering_index"]
+    assert report["errors"] == 0
+    assert before["seed"] == after["seed"]
+    assert before["database_bytes_after_benchmark"] == after["database_bytes_after_benchmark"]
+    assert before["temporary_database_cleaned"] is after["temporary_database_cleaned"] is True
+    assert before["index_bytes"] == 0
+    assert after["index_bytes"] > 0
+    assert after["index_build_ms"]
+    assert any("SCAN arena_matches" in plan for plan in before["explain_query_plan"]["arena_season_events"])
+    assert any(
+        "COVERING INDEX IDX_ARENA_MATCHES_SETTLED_EVENTS" in plan.upper()
+        for plan in after["explain_query_plan"]["arena_season_events"]
+    )
+    assert all(
+        item["sql_queries"] > 0 and item["errors"] == 0
+        for variant in (before, after)
+        for item in variant["levels"]
+    )
 
 
 def test_thread_local_connection_reuse_skips_health_probe(tmp_path) -> None:
