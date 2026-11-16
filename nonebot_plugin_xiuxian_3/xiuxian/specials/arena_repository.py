@@ -38,14 +38,11 @@ from .arena_models import (
     ArenaReplayRecord,
     ArenaSnapshotRecord,
 )
+from .arena_content import spar_record
 from .arena_rules import (
     ARENA_MODE_KEY,
     ARENA_PRACTICE_MODE_KEY,
     ARENA_RANK_MODE_KEY,
-    DAILY_CHALLENGE_LIMIT,
-    DAILY_COUNTED_OPPONENT_LIMIT,
-    SNAPSHOT_MATCH_DELAY_SECONDS,
-    SNAPSHOT_VALID_DAYS,
     compatible_rating,
     mode_attempt_limit,
     mode_period_prefix,
@@ -65,6 +62,11 @@ from .three_realms_arena_rules import (
 
 class ArenaRepositoryMixin:
     """Own immutable defense snapshots, matches, actions and claims."""
+
+    def _arena_spar_record(self) -> dict[str, Any]:
+        """Read the active arena parameters from the runtime content bundle."""
+
+        return spar_record(getattr(self, "content", None))
 
     async def publish_arena_snapshot(
         self,
@@ -192,7 +194,11 @@ class ArenaRepositoryMixin:
             ).fetchone()
             if target is None or int(target["id"]) == int(owner["id"]):
                 raise ArenaMatchRequirementError("practice challenger is not eligible")
-            expires_at = min(datetime.fromisoformat(str(snapshot["expires_at"])), now + timedelta(days=SNAPSHOT_VALID_DAYS))
+            arena = self._arena_spar_record()
+            expires_at = min(
+                datetime.fromisoformat(str(snapshot["expires_at"])),
+                now + timedelta(days=int(arena["snapshot_valid_days"])),
+            )
             connection.execute(
                 "INSERT INTO arena_practice_consents(snapshot_id, owner_id, challenger_id, operation_id, expires_at, created_at) "
                 "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(snapshot_id, challenger_id) DO UPDATE SET operation_id = excluded.operation_id, expires_at = excluded.expires_at, created_at = excluded.created_at",
@@ -271,8 +277,9 @@ class ArenaRepositoryMixin:
             snapshot_id = f"arena.snapshot:{uuid4().hex}"
             snapshot = self._arena_player_snapshot(connection, player, snapshot_id)
             arena_rating = player_integer(player, "arena_rating", 1000)
-            expires_at = now + timedelta(days=SNAPSHOT_VALID_DAYS)
-            matchable_at = now + timedelta(seconds=SNAPSHOT_MATCH_DELAY_SECONDS)
+            arena = self._arena_spar_record()
+            expires_at = now + timedelta(days=int(arena["snapshot_valid_days"]))
+            matchable_at = now + timedelta(seconds=int(arena["match_delay_seconds"]))
             summary = public_summary(
                 snapshot,
                 snapshot_id=snapshot_id,
@@ -453,18 +460,23 @@ class ArenaRepositoryMixin:
                 if mode_key == THREE_REALMS_ARENA_MODE_KEY
                 else {}
             )
+            arena = self._arena_spar_record()
             outcome, rounds, actions = simulate_match(
                 challenger_snapshot,
                 defender_snapshot_data,
                 seed=operation_id,
                 environment=environment,
+                max_rounds=int(arena["max_rounds"]),
             )
             counted_row = connection.execute(
                 "SELECT COUNT(*) AS total FROM arena_matches WHERE challenger_id = ? AND defender_snapshot_id = ? "
                 "AND score_counted = 1 AND created_at LIKE ?",
                 (challenger_id, defender_snapshot["snapshot_id"], now.date().isoformat() + "%"),
             ).fetchone()
-            score_counted = mode_key != ARENA_PRACTICE_MODE_KEY and int(counted_row["total"]) < DAILY_COUNTED_OPPONENT_LIMIT
+            score_counted = (
+                mode_key != ARENA_PRACTICE_MODE_KEY
+                and int(counted_row["total"]) < int(arena["daily_counted_opponent_limit"])
+            )
             challenger_delta = rating_delta(outcome, challenger=True) if score_counted else 0
             defender_delta = rating_delta(outcome, challenger=False) if score_counted else 0
             challenger_rating = max(0, player_integer(challenger, "arena_rating", 1000) + challenger_delta)

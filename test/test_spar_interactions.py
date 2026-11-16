@@ -32,7 +32,8 @@ def test_spar_is_immediate_adapter_neutral_and_read_only() -> None:
             shutil.copytree(Path(__file__).parents[1] / "data", content_dir)
             content_path = content_dir / "社交" / "玩家互动.json"
             content = json.loads(content_path.read_text(encoding="utf-8"))
-            content["records"][0]["max_rounds"] = 1
+            spar = next(row for row in content["records"] if row.get("key") == "social.spar")
+            spar["max_rounds"] = 1
             content_path.write_text(json.dumps(content, ensure_ascii=False, indent=2), encoding="utf-8")
             runtime = create_runtime(data_dir=content_dir)
             await _create(runtime, qq, "qq-create")

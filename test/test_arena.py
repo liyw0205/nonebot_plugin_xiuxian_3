@@ -3,8 +3,10 @@ from __future__ import annotations
 import asyncio
 import json
 import sqlite3
+import shutil
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from nonebot_plugin_xiuxian_3.adapters.onebot import normalize_event as normalize_onebot_event
@@ -183,6 +185,67 @@ def test_arena_async_snapshot_flow_across_qq_and_onebot() -> None:
                 assert connection.execute("SELECT COUNT(*) FROM arena_identity_routes").fetchone()[0] == 2
                 assert connection.execute("SELECT COUNT(*) FROM arena_audit_events").fetchone()[0] == 2
             await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_arena_content_parameters_flow_through_publish_and_settlement() -> None:
+    async def run() -> None:
+        clock = MutableClock(datetime(2026, 9, 25, tzinfo=timezone.utc))
+        qq, onebot = _adapter_contexts()
+        with TemporaryDirectory() as temporary:
+            data_dir = Path(temporary) / "data"
+            shutil.copytree(Path(__file__).parents[1] / "data", data_dir)
+            arena_path = data_dir / "特殊" / "竞技场.json"
+            document = json.loads(arena_path.read_text(encoding="utf-8"))
+            spar = next(row for row in document["records"] if row.get("key") == "arena.spar")
+            spar.update(
+                {
+                    "max_rounds": 1,
+                    "snapshot_valid_days": 1,
+                    "match_delay_seconds": 60,
+                    "daily_counted_opponent_limit": 1,
+                }
+            )
+            arena_path.write_text(json.dumps(document, ensure_ascii=False, indent=2), encoding="utf-8")
+            runtime = create_runtime(data_dir=data_dir, clock=clock)
+            try:
+                qq = replace(qq, user_id="arena-content-qq")
+                onebot = replace(onebot, user_id="arena-content-ob")
+                await _cultivator(runtime, qq, "content-qq")
+                await _cultivator(runtime, onebot, "content-ob")
+                published = await runtime.adapters.dispatch(
+                    onebot.adapter,
+                    replace(onebot, operation_id="content-publish"),
+                    "发布竞技场快照",
+                )
+                assert published.code == "ARENA_SNAPSHOT_PUBLISHED", published.message
+                assert "将在 1 分钟后进入匹配池，有效 1 天" in published.message
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    row = connection.execute(
+                        "SELECT matchable_at, expires_at FROM arena_snapshots WHERE snapshot_id = ?",
+                        (published.data["snapshot_id"],),
+                    ).fetchone()
+                    assert row[0] == "2026-09-25T00:01:00+00:00"
+                    assert row[1] == "2026-09-26T00:00:00+00:00"
+                clock.advance(seconds=61)
+                challenged = await runtime.adapters.dispatch(
+                    qq.adapter,
+                    replace(qq, operation_id="content-challenge"),
+                    f"挑战竞技场 {published.data['snapshot_id']}",
+                )
+                assert challenged.code == "ARENA_MATCH_SETTLED", challenged.message
+                assert challenged.data["rounds"] == 1
+                assert "回合**：1/1" in challenged.message
+                second = await runtime.adapters.dispatch(
+                    qq.adapter,
+                    replace(qq, operation_id="content-challenge-2"),
+                    f"挑战竞技场 {published.data['snapshot_id']}",
+                )
+                assert second.code == "ARENA_MATCH_SETTLED", second.message
+                assert second.data["score_counted"] is False
+            finally:
+                await runtime.close()
 
     asyncio.run(run())
 

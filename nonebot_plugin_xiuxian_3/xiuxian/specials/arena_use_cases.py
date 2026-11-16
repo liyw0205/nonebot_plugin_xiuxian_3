@@ -26,6 +26,7 @@ from ..persistence.errors import (
     RepositoryBusyError,
 )
 from .arena_models import ArenaMatchRecord, ArenaSnapshotRecord
+from .arena_content import spar_record
 from .arena_repository import ArenaRepositoryMixin
 from .arena_rules import ARENA_MODE_KEY, ARENA_PRACTICE_MODE_KEY, ARENA_RANK_MODE_KEY
 from .three_realms_arena_rules import THREE_REALMS_ARENA_MODE_KEY
@@ -55,6 +56,9 @@ class ArenaApplication:
             .replace("_", "\\_")
             .replace("~", "\\~")
         )
+
+    def _spar_record(self) -> dict[str, object]:
+        return spar_record(getattr(self.repository, "content", None))
 
     @staticmethod
     def _error(context: CommandContext, operation_id: str, exc: Exception) -> CommandResult:
@@ -142,10 +146,13 @@ class ArenaApplication:
             )
         except Exception as exc:
             return self._error(context, operation_id, exc)
+        arena = self._spar_record()
+        delay_minutes = int(arena["match_delay_seconds"]) // 60
+        valid_days = int(arena["snapshot_valid_days"])
         return CommandResult(
             True,
             "ARENA_SNAPSHOT_PUBLISHED",
-            f"## {label}防守快照已发布\n\n快照 `{record.snapshot_id}` 将在 30 分钟后进入匹配池，有效 7 天。",
+            f"## {label}防守快照已发布\n\n快照 `{record.snapshot_id}` 将在 {delay_minutes} 分钟后进入匹配池，有效 {valid_days} 天。",
             context.request_id,
             operation_id,
             data=self._snapshot_data(record),
@@ -218,6 +225,7 @@ class ArenaApplication:
             )
         except Exception as exc:
             return self._error(context, operation_id, exc)
+        max_rounds = int(self._spar_record()["max_rounds"])
         outcome = {
             "challenger_won": "胜利",
             "defender_won": "落败",
@@ -233,7 +241,7 @@ class ArenaApplication:
         return CommandResult(
             True,
             "ARENA_MATCH_SETTLED",
-            f"## 竞技场{mode_label}结束\n\n- **结果**：{outcome}\n- **回合**：{record.rounds}/15\n- **积分**：{count_text}\n- **对手**：{self._display(record.opponent_summary.get('display_name'))}\n\n服务器已固定双方快照并保存完整行动回放。",
+            f"## 竞技场{mode_label}结束\n\n- **结果**：{outcome}\n- **回合**：{record.rounds}/{max_rounds}\n- **积分**：{count_text}\n- **对手**：{self._display(record.opponent_summary.get('display_name'))}\n\n服务器已固定双方快照并保存完整行动回放。",
             context.request_id,
             operation_id,
             data=self._match_data(record),
@@ -287,8 +295,9 @@ class ArenaApplication:
             )
         except Exception as exc:
             return self._error(context, "", exc)
+        max_rounds = int(self._spar_record()["max_rounds"])
         outcome = {"challenger_won": "挑战者胜", "defender_won": "防守者胜", "draw": "平局"}.get(record.outcome, record.outcome)
-        lines = ["## 竞技场行动回放", "", f"- **对局**：`{record.match_id}`", f"- **结果**：{outcome}", f"- **回合**：{record.rounds}/15", ""]
+        lines = ["## 竞技场行动回放", "", f"- **对局**：`{record.match_id}`", f"- **结果**：{outcome}", f"- **回合**：{record.rounds}/{max_rounds}", ""]
         for action in record.actions:
             actor = "挑战者" if action["actor_key"] == "challenger" else "防守者"
             target = "挑战者" if action["target_key"] == "challenger" else "防守者"
