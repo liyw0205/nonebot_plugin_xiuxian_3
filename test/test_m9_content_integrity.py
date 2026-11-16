@@ -40,11 +40,11 @@ def test_m9_content_references_are_closed() -> None:
     summary = validate_content_references(ContentBundle.load(DATA))
     # These counts pin the shipped content inventory.
     assert summary["locations"] == 34
-    assert summary["mainline_stages"] == 157
+    assert summary["mainline_stages"] == 166
     assert summary["exploration_modes"] == 27
     assert summary["bounties"] == 54
-    assert summary["recipes"] == 37
-    assert summary["sources"] == 19
+    assert summary["recipes"] == 38
+    assert summary["sources"] == 20
     assert summary["combat_enemies"] == 69
 
 

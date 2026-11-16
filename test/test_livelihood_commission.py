@@ -496,7 +496,7 @@ def test_commission_rejects_duplicate_snapshot_keys_before_asset_settlement(
 ) -> None:
     async def run() -> None:
         data_dir = _content(tmp_path)
-        runtime = create_runtime(data_dir=data_dir)
+        runtime = create_runtime(data_dir=data_dir, clock=MutableClock())
         base = CommandContext(adapter=adapter, user_id="duplicate-commission-json")
 
         async def send(operation: str, text: str):
@@ -591,7 +591,7 @@ def test_commission_rejects_invalid_snapshot_fields_before_asset_settlement(
 ) -> None:
     async def run() -> None:
         data_dir = _content(tmp_path)
-        runtime = create_runtime(data_dir=data_dir)
+        runtime = create_runtime(data_dir=data_dir, clock=MutableClock())
         base = CommandContext(adapter=adapter, user_id=f"invalid-commission-{variant}")
 
         async def send(operation: str, text: str):

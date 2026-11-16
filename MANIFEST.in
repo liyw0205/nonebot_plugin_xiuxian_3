@@ -2,3 +2,4 @@ include README.md LICENSE CHANGELOG.md
 recursive-include data *.json
 recursive-include docs *.md
 prune docs/goals
+global-exclude .codex-*

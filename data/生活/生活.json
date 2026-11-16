@@ -2181,6 +2181,113 @@
       "key": "idle.beast_hills_watch",
       "record_type": "idle_route",
       "status": "active"
+    },
+    {
+      "key": "town_commission.shelter_medicine",
+      "record_type": "commission",
+      "status": "active",
+      "name": "药棚救治",
+      "desc": "姜婆请青石镇药铺收下一枚低阶疗伤丹，送给坡上受伤的采药人。药铺验收实物后记账付酬。",
+      "aliases": ["药棚送丹"],
+      "inputs": [{"item_key": "item.pill.healing_low", "quantity": 1}],
+      "reward": {
+        "currency_key": "currency.spirit_stone", "amount": 24,
+        "reputation_key": "local.xuantian.new_town", "reputation": 3,
+        "service_reputation": 2
+      },
+      "stock": 200,
+      "stock_bonus_key": "town_commission.stock_bonus",
+      "reward_bonus_key": "town_commission.herb_reward_bonus",
+      "duration_seconds": 43200
+    },
+    {
+      "key": "idle.mist_lamp_watch", "record_type": "idle_route", "status": "active",
+      "name": "雾隐洞天守灯", "aliases": ["洞天守灯"],
+      "desc": "守洞人陆灯请你清理灯阵旁的旧砂，或沿苔壁辨取灵叶，把雾中六小时记进守灯簿。",
+      "duration_seconds": 21600, "cost": {"stamina": 4, "energy": 2}, "daily_limit": 1,
+      "requirements": {"stage": "cultivator", "realm": {"key": "qi_gathering", "min_layer": 4}, "location_key": "cave.mist_grotto"},
+      "reward_pool_key": "reward_pool.idle.mist_lamp",
+      "fallback_reward_pool_key": "reward_pool.idle.mist_lamp.fallback", "durability_cost_bp": 0,
+      "gathering_journal": {
+        "start_text": "陆灯把油盏搁在石阶边，你沿旧灯阵筛去碎石，留下可重新布阵的干砂。",
+        "complete_text": "雾色退去一线，你收回干砂，陆灯把这次完整守夜记入灯簿。砂能在灵泉谷制成聚灵阵。",
+        "expired_text": "潮雾漫过石阶，未收的砂已结块，陆灯只留下少量干砂，未记完整守灯。",
+        "recipe_keys": ["recipe.array.gathering_basic"]
+      },
+      "wilderness_event": {
+        "scene": "旧灯芯忽明忽暗，阵脚的砂已散开，苔壁的灵叶也到了剪取时辰。陆灯请你择一处照应。",
+        "choices": [
+          {
+            "key": "sand", "name": "固灯筛砂", "cost": {"stamina": 2, "energy": 0},
+            "reward_pool_key": "reward_pool.idle.mist_lamp.sand",
+            "start_text": "你搬开潮石，扶住阵脚，把散开的阵砂重新筛净。",
+            "complete_text": "灯影终于稳住，你收下较多干砂，却错过了壁上灵叶的采期。",
+            "expired_text": "迟来的潮雾浸坏了大半阵砂，陆灯只留下原定的一份干砂。",
+            "recipe_keys": ["recipe.array.gathering_basic"]
+          },
+          {
+            "key": "leaf", "name": "照壁辨叶", "cost": {"stamina": 0, "energy": 2},
+            "reward_pool_key": "reward_pool.idle.mist_lamp.leaf",
+            "start_text": "你借灯光辨清叶脉，只剪成熟灵叶，也从壁脚捡回少量干砂。",
+            "complete_text": "陆灯验过灵叶，托你分开封存。阵砂虽少仍够布一座基础聚灵阵。",
+            "expired_text": "灵叶在雾中失去药性，陆灯没有装入你的篓，只留下原定的一份干砂。",
+            "recipe_keys": ["recipe.pill.focus_low", "recipe.array.gathering_basic"]
+          }
+        ]
+      }
+    },
+    {
+      "key": "town_commission.lamp_array", "record_type": "commission", "status": "active",
+      "name": "灯阵续灵", "aliases": ["守灯交阵"],
+      "desc": "青石镇替守洞人陆灯收一座基础聚灵阵，给洞口旧灯续上灵机。",
+      "inputs": [{"item_key": "item.array.gathering_basic", "quantity": 1}],
+      "reward": {"currency_key": "currency.spirit_stone", "amount": 55, "reputation_key": "local.xuantian.new_town", "reputation": 4, "service_reputation": 3},
+      "stock": 120, "duration_seconds": 43200
+    },
+    {
+      "key": "idle.cloud_dock_tide", "record_type": "idle_route", "status": "active",
+      "name": "云舟渡口候潮", "aliases": ["渡口候潮"],
+      "desc": "在云舟渡口替舟匠晏潮检视压舱铁与阵砂，选择搬铁还是护砂，等八小时潮汐归稳后交班。",
+      "duration_seconds": 28800, "cost": {"stamina": 5, "energy": 2}, "daily_limit": 1,
+      "requirements": {"stage": "cultivator", "realm": {"key": "golden_core", "min_layer": 1}, "location_key": "xuantian.floating_boat"},
+      "reward_pool_key": "reward_pool.idle.cloud_dock",
+      "fallback_reward_pool_key": "reward_pool.idle.cloud_dock.fallback", "durability_cost_bp": 0,
+      "gathering_journal": {
+        "start_text": "晏潮递来一块记潮木牌，请你照看船边的压舱铁与封舱砂。",
+        "complete_text": "潮水归稳，你从报废压舱件中取回云铁和干砂，晏潮把完整交班记进航簿。",
+        "expired_text": "晏潮已代为交班，散砂随潮流失，只留下少量云铁，不记完整航簿。",
+        "recipe_keys": ["recipe.weapon.cloud_sword", "recipe.array.gathering_basic"]
+      },
+      "wilderness_event": {
+        "scene": "一阵侧风抬起舱盖，压舱铁松了绑绳，砂袋也漏了一角。晏潮让你决定先稳住哪头。",
+        "choices": [
+          {
+            "key": "iron", "name": "扶舷搬铁", "cost": {"stamina": 3, "energy": 0},
+            "reward_pool_key": "reward_pool.idle.cloud_dock.iron",
+            "start_text": "你顶住侧风重绑压舱件，把可用云铁一块块收好。",
+            "complete_text": "船舷稳住了，晏潮分给你较多云铁和一份封舱砂，足够交一份候潮备材。",
+            "expired_text": "换班舟工先收走了散铁，只留下原定的一份云铁。",
+            "recipe_keys": ["recipe.weapon.cloud_sword"]
+          },
+          {
+            "key": "sand", "name": "护袋理砂", "cost": {"stamina": 0, "energy": 3},
+            "reward_pool_key": "reward_pool.idle.cloud_dock.sand",
+            "start_text": "你逐袋清理潮砂，以阵纹重新封口，留下干燥的阵砂和少量云铁。",
+            "complete_text": "封舱砂安然收妥，晏潮给你较多阵砂和两份云铁，足够交一份候潮备材。",
+            "expired_text": "未领走的砂袋被用于下一班船，只留下原定的一份云铁。",
+            "recipe_keys": ["recipe.array.gathering_basic", "recipe.weapon.cloud_sword"]
+          }
+        ]
+      }
+    },
+    {
+      "key": "town_commission.tide_supplies", "record_type": "commission", "status": "active",
+      "name": "候潮备材", "aliases": ["渡口备材"],
+      "desc": "青石镇航铺验收两份云铁与一份阵砂，为下一班云舟备妥封舱物资。",
+      "inputs": [{"item_key": "item.material.cloud_iron", "quantity": 2}, {"item_key": "item.mat.array_sand", "quantity": 1}],
+      "reward": {"currency_key": "currency.spirit_stone", "amount": 65, "reputation_key": "local.xuantian.new_town", "reputation": 5, "service_reputation": 3},
+      "stock": 100, "duration_seconds": 43200,
+      "requirements_any": [{"type": "realm", "realm_key": "golden_core", "min_layer": 1}]
     }
   ],
   "schema": "xiuxian.content"

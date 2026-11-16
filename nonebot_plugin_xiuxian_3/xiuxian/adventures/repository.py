@@ -2549,8 +2549,9 @@ class AdventuresRepositoryMixin:
                     )
                 if objective["type"] in {"production_complete", "item_use"}:
                     extra = "route_key" if objective["type"] == "production_complete" else "resources"
+                    optional = {"additional_route_keys"} if extra == "route_key" else set()
                     if (
-                        set(objective) != {"key", "type", "label", "recipe_key", "item_key", extra}
+                        set(objective) - optional != {"key", "type", "label", "recipe_key", "item_key", extra}
                         or not all(
                             isinstance(objective.get(field), str) and objective[field].strip()
                             for field in ("recipe_key", "item_key")
@@ -2559,7 +2560,15 @@ class AdventuresRepositoryMixin:
                         return False
                     value = objective[extra]
                     if extra == "route_key":
-                        return isinstance(value, str) and bool(value.strip())
+                        additional = objective.get("additional_route_keys", [])
+                        return (
+                            isinstance(value, str) and bool(value.strip())
+                            and isinstance(additional, list)
+                            and ("additional_route_keys" not in objective or bool(additional))
+                            and all(isinstance(item, str) and item.strip() for item in additional)
+                            and len(set(additional)) == len(additional)
+                            and value not in additional
+                        )
                     return (
                         isinstance(value, list) and bool(value)
                         and all(isinstance(item, str) and item.strip() for item in value)

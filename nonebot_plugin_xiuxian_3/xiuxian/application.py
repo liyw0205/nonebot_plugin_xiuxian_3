@@ -30,6 +30,9 @@ from .adventures.mainline import (
     SPRING_SUPPER_STORY_KEY,
     IRONWOOD_CRAFT_STORY_KEY,
     BASALT_WAYMARKER_STORY_KEY,
+    HERB_SHELTER_STORY_KEY,
+    MIST_LAMP_STORY_KEY,
+    CLOUD_TIDE_STORY_KEY,
     DAO_SETTLEMENT_STORY_KEY,
     DOMAIN_FRONTIER_STORY_KEY,
     VOID_ARCHIVE_STORY_KEY,
@@ -108,6 +111,39 @@ _HELP_OVERVIEW = (
     f"- {command_link('生活', '修仙帮助 生活')}：生产、灵田、灵兽与日常收支。\n"
     f"- {command_link('社交', '修仙帮助 社交')}：宗门、道侣与道友切磋。"
 )
+_HERB_SHELTER_HELP = (
+    "\n\n感气二层后，可接"
+    f"{command_link('百草坡药棚主线', '百草坡药棚主线')}，先"
+    f"{command_link('开始百草坡药棚主线 雨棚辨药', '开始百草坡药棚主线 雨棚辨药')}；"
+    f"在百草坡{command_link('挂机预览 百草坡采药', '挂机预览 百草坡采药')}，"
+    "选择扶徒归棚或辨叶上坡并完整领取四小时采药。下一关由炼丹辅修用两草一米新开炉，"
+    f"{command_link('生产预览 低阶疗伤丹', '生产预览 低阶疗伤丹')}后成功收丹；"
+    "缺米可到灵泉谷拾穗，缺药可另日再采。回青石镇"
+    f"{command_link('接取委托 药棚救治', '接取委托 药棚救治')}并"
+    f"{command_link('交付委托 药棚救治', '交付委托 药棚救治')}，最后交三份止血草供应。"
+    "旧安排、失败炼制、逾时保底和旧交单都不计；先备材料再接公示委托，重启后进度保留。"
+)
+_MIST_LAMP_HELP = (
+    "\n\n聚气境达到四层时，用"
+    f"{command_link('雾隐守灯主线', '雾隐守灯主线')}查看三页灯簿。先"
+    f"{command_link('生产预览 洞天验行牌', '生产预览 洞天验行牌')}，"
+    "以铁木林木材和百草坡止血草在青石镇或灵泉谷制牌，入洞会消耗凭证。"
+    "本关新制领牌、抵达一层并探索取得阵砂后，安排"
+    f"{command_link('挂机预览 雾隐洞天守灯', '挂机预览 雾隐洞天守灯')}，"
+    "选择固灯筛砂或照壁辨叶，六小时完整领取。最后用布阵辅修在灵泉谷新制基础聚灵阵，"
+    f"回镇{command_link('交付委托 灯阵续灵', '交付委托 灯阵续灵')}。"
+    "旧炉、旧行程、未结算、战败、取消、逾时保底和旧交单不替代相应目标；按原日限补料重试，重启保留进度。"
+)
+_CLOUD_TIDE_HELP = (
+    "\n\n金丹一层后，用"
+    f"{command_link('云舟候潮主线', '云舟候潮主线')}开始问潮登舟，"
+    "先真实抵达云舟渡口并完成云舟试炼取得新碎票，再"
+    f"{command_link('挂机预览 云舟渡口候潮', '挂机预览 云舟渡口候潮')}，"
+    "选择扶舷搬铁或护袋理砂，八小时完整领取；两种选择的云铁与阵砂比例不同。"
+    "最后本关经云城返回青石镇，先看当日公示再接取并"
+    f"{command_link('交付委托 候潮备材', '交付委托 候潮备材')}，实际交两云铁一阵砂。"
+    "旧行程、未结算、风暴无票、取消、逾时保底和旧交单不算相应目标，重启后用主线与挂机状态继续。"
+)
 _HELP_PAGES = {
     "启程": (
         "**启程**\n\n"
@@ -178,6 +214,9 @@ _HELP_PAGES = {
         f"{command_link('派遣预览 玄武岩径水标勘务', '派遣预览 玄武岩径水标勘务')}选择踏勘或整治，"
         "只以本关开始后的本人成功派遣回执交卷；取消、部分、失败、延误、逾时保底、旧记录或他人记录不推进，"
         "重启后可用挂机状态、派遣状态继续。"
+        + _HERB_SHELTER_HELP
+        + _MIST_LAMP_HELP
+        + _CLOUD_TIDE_HELP
     ),
     "悬赏": (
         "**悬赏**\n\n"
@@ -311,6 +350,9 @@ _HELP_PAGES = {
         f"已结缘的灵兽可在玄天近郊参与{command_link('挂机预览 灵兽栖地巡护', '挂机预览 灵兽栖地巡护')}；"
         f"安排时填写灵兽编号，完整领取会让它获得经验与亲和，逾时只收保底物资。\n\n"
         f"买卖所需物资时，先看{command_link('摆摊列表', '摆摊列表')}了解货物与标价。"
+        + _HERB_SHELTER_HELP
+        + _MIST_LAMP_HELP
+        + _CLOUD_TIDE_HELP
     ),
     "社交": (
         "**社交**\n\n"
@@ -438,6 +480,21 @@ class XiuxianApplication:
             claim_command="领取玄武岩径水标回响主线奖励",
         )
         self.dao_echoes = DaoEchoesApplication(repository)
+        self.herb_shelter_mainline = AdventuresMainlineApplication(
+            repository,
+            story_key=HERB_SHELTER_STORY_KEY,
+            title="百草坡药棚主线",
+            start_command="开始百草坡药棚主线",
+            claim_command="领取百草坡药棚主线奖励",
+        )
+        self.mist_lamp_mainline = AdventuresMainlineApplication(
+            repository, story_key=MIST_LAMP_STORY_KEY, title="雾隐守灯主线",
+            start_command="开始雾隐守灯主线", claim_command="领取雾隐守灯主线奖励",
+        )
+        self.cloud_tide_mainline = AdventuresMainlineApplication(
+            repository, story_key=CLOUD_TIDE_STORY_KEY, title="云舟候潮主线",
+            start_command="开始云舟候潮主线", claim_command="领取云舟候潮主线奖励",
+        )
         self.three_realms = ThreeRealmsApplication(repository)
         self.secret_realms = SecretRealmApplication(repository)
         self.legacy_manor = LegacyManorApplication(repository)
@@ -1827,6 +1884,51 @@ class XiuxianApplication:
         return await self._invoke(
             context, lambda: self.basalt_waymarker_mainline.claim_reward(context),
             write_message="此刻无法领取玄武岩径水标回响所得。",
+        )
+
+    async def get_herb_shelter_mainline_status(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.herb_shelter_mainline.get_status(context), require_write=False)
+
+    async def start_herb_shelter_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context, lambda: self.herb_shelter_mainline.start_stage(context),
+            write_message="此刻无法开始百草坡药棚之约。",
+        )
+
+    async def claim_herb_shelter_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context, lambda: self.herb_shelter_mainline.claim_reward(context),
+            write_message="此刻无法领取百草坡药棚所得。",
+        )
+
+    async def get_mist_lamp_mainline_status(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.mist_lamp_mainline.get_status(context), require_write=False)
+
+    async def start_mist_lamp_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context, lambda: self.mist_lamp_mainline.start_stage(context),
+            write_message="此刻无法开始雾隐守灯。",
+        )
+
+    async def claim_mist_lamp_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context, lambda: self.mist_lamp_mainline.claim_reward(context),
+            write_message="此刻无法领取雾隐守灯所得。",
+        )
+
+    async def get_cloud_tide_mainline_status(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.cloud_tide_mainline.get_status(context), require_write=False)
+
+    async def start_cloud_tide_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context, lambda: self.cloud_tide_mainline.start_stage(context),
+            write_message="此刻无法开始云舟候潮。",
+        )
+
+    async def claim_cloud_tide_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context, lambda: self.cloud_tide_mainline.claim_reward(context),
+            write_message="此刻无法领取云舟候潮所得。",
         )
 
     async def preview_final_arena(self, context: CommandContext) -> CommandResult:

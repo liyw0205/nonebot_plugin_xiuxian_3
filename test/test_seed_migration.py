@@ -1006,6 +1006,8 @@ RECIPE_FILE = Path("生产/配方.json")
 
 PLACE_CODEX_ADDED = frozenset(
     {
+        "codex.story.mist_lamp",
+        "codex.story.cloud_tide",
         "codex.story.herb_vale_gather",
         "codex.story.ironwood_gather",
         "codex.story.basalt_sifting",
@@ -1332,6 +1334,11 @@ def test_companion_old_trail_seeds_upgrade_together_and_preserve_custom(host: Pa
     assert hashlib.sha256(old_mainline).hexdigest() == "ad6aae6f0a4037c52c17ea17e902188bcca190676d455bca6a49fa178c4ed473"
     codex_file = Path("图鉴/条目.json")
     codex = (ROOT / "data" / codex_file).read_text(encoding="utf-8")
+    codex, count = re.subn(
+        r'^    \{"key": "codex\.story\.(?:mist_lamp|cloud_tide)",[^\n]*\n',
+        "", codex, flags=re.M,
+    )
+    assert count == 2
     old_codex, count = re.subn(
         r'    \{\n      "key": "codex\.story\.companion_old_trail\.[123]",.*?\n    \},\n',
         "", codex, flags=re.S,

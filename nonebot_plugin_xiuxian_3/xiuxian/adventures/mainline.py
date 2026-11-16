@@ -24,6 +24,9 @@ COMPANION_OLD_TRAIL_STORY_KEY = "story.mainline.companion_old_trail"
 SPRING_SUPPER_STORY_KEY = "story.mainline.spring_supper"
 IRONWOOD_CRAFT_STORY_KEY = "story.mainline.ironwood_craft"
 BASALT_WAYMARKER_STORY_KEY = "story.mainline.basalt_waymarker"
+HERB_SHELTER_STORY_KEY = "story.mainline.herb_shelter"
+MIST_LAMP_STORY_KEY = "story.mainline.mist_lamp"
+CLOUD_TIDE_STORY_KEY = "story.mainline.cloud_tide"
 MAINLINE_TOWN_COMMISSION_DELIVERED = "livelihood.town_commission.delivered"
 
 MAINLINE_LOCKED = "locked"
@@ -237,6 +240,15 @@ _VERTICAL_SLICE_STAGES = frozenset(
         "basalt_waymarker.1",
         "basalt_waymarker.2",
         "basalt_waymarker.3",
+        "herb_shelter.1",
+        "herb_shelter.2",
+        "herb_shelter.3",
+        "mist_lamp.1",
+        "mist_lamp.2",
+        "mist_lamp.3",
+        "cloud_tide.1",
+        "cloud_tide.2",
+        "cloud_tide.3",
         "lane.builder.chapter.01",
         "lane.builder.chapter.02",
         "lane.builder.chapter.03",
@@ -453,8 +465,9 @@ def _story_objectives(
             if not isinstance(commission_key, str) or not commission_key.strip():
                 raise ContentError(f"mainline {key} objective {objective_key} requires commission_key")
             if bundle is not None:
-                commission = bundle.get("livelihood", commission_key, include_locked=False)
-                if commission is None or commission.get("record_type") != "commission":
+                from ..livelihood.rules import town_commission_definitions
+
+                if commission_key not in town_commission_definitions(bundle):
                     raise ContentError(f"mainline {key} objective {objective_key} references unknown commission")
             normalized = {
                 "key": str(objective_key), "type": kind, "label": label.strip(),
@@ -582,7 +595,8 @@ def _story_objectives(
             }
         elif kind in {"production_complete", "item_use"}:
             extra = "route_key" if kind == "production_complete" else "resources"
-            if set(objective) != {"key", "type", "label", "recipe_key", "item_key", extra}:
+            optional = {"additional_route_keys"} if kind == "production_complete" else set()
+            if set(objective) - optional != {"key", "type", "label", "recipe_key", "item_key", extra}:
                 raise ContentError(f"mainline {key} objective {objective_key} has an invalid {kind} shape")
             recipe_key, item_key = objective.get("recipe_key"), objective.get("item_key")
             if any(not isinstance(item, str) or not item.strip() for item in (recipe_key, item_key)):
@@ -590,6 +604,15 @@ def _story_objectives(
             if kind == "production_complete":
                 if not isinstance(objective[extra], str) or not objective[extra].strip():
                     raise ContentError(f"mainline {key} objective {objective_key} requires route_key")
+                additional_routes = objective.get("additional_route_keys", [])
+                if (
+                    not isinstance(additional_routes, list)
+                    or ("additional_route_keys" in objective and not additional_routes)
+                    or any(not isinstance(item, str) or not item.strip() for item in additional_routes)
+                    or len(set(additional_routes)) != len(additional_routes)
+                    or objective[extra] in additional_routes
+                ):
+                    raise ContentError(f"mainline {key} objective {objective_key} has invalid additional routes")
             else:
                 resources = objective[extra]
                 if (
@@ -608,20 +631,25 @@ def _story_objectives(
                 if recipe.outputs.get(item_key, 0) < 1:
                     raise ContentError(f"mainline {key} objective {objective_key} recipe does not produce its item")
                 if kind == "production_complete":
-                    route = bundle.get("livelihood", objective[extra], include_locked=False)
-                    if route is None or route.get("record_type") != "idle_route":
-                        raise ContentError(f"mainline {key} objective {objective_key} references an unknown idle source")
-                    pool = bundle.get("reward", str(route.get("reward_pool_key", "")), include_locked=False)
-                    outcomes = pool.get("outcomes") if pool is not None else None
-                    if not isinstance(outcomes, list) or not outcomes or any(
-                        not isinstance(outcome, dict) or not isinstance(outcome.get("rewards"), dict)
-                        or any(
-                            type(outcome["rewards"].get(asset)) is not int
-                            or outcome["rewards"][asset] < quantity
-                            for asset, quantity in recipe.inputs.items()
-                        )
-                        for outcome in outcomes
-                    ):
+                    from ..specials.idle_rules import idle_route_definitions
+                    from ..rewards.rules import reward_pool_outcomes
+
+                    routes = idle_route_definitions(bundle)
+                    guaranteed: dict[str, int] = {}
+                    for route_key in (objective[extra], *additional_routes):
+                        route = routes.get(route_key)
+                        if route is None:
+                            raise ContentError(f"mainline {key} objective {objective_key} references an unknown idle source")
+                        outcomes = reward_pool_outcomes(route.pool_key, bundle)
+                        minimums = {
+                            asset: min(reward.get(asset, 0) for _, reward in outcomes)
+                            for asset in recipe.inputs
+                        }
+                        if not any(minimums.values()):
+                            raise ContentError(f"mainline {key} objective {objective_key} has an unrelated ingredient source")
+                        for asset, amount in minimums.items():
+                            guaranteed[asset] = guaranteed.get(asset, 0) + amount
+                    if any(guaranteed.get(asset, 0) < quantity for asset, quantity in recipe.inputs.items()):
                         raise ContentError(f"mainline {key} objective {objective_key} ingredients are not guaranteed")
                 else:
                     from ..items.rules import resolve_item
@@ -637,6 +665,8 @@ def _story_objectives(
                 "recipe_key": recipe_key, "item_key": item_key,
                 extra: list(objective[extra]) if kind == "item_use" else objective[extra],
             }
+            if "additional_route_keys" in objective:
+                normalized["additional_route_keys"] = list(additional_routes)
         elif kind == "dispatch_success":
             if set(objective) != {"key", "type", "label", "dispatch_key"}:
                 raise ContentError(f"mainline {key} objective {objective_key} has an invalid dispatch shape")
@@ -1354,6 +1384,9 @@ __all__ = [
     "SPRING_SUPPER_STORY_KEY",
     "IRONWOOD_CRAFT_STORY_KEY",
     "BASALT_WAYMARKER_STORY_KEY",
+    "HERB_SHELTER_STORY_KEY",
+    "MIST_LAMP_STORY_KEY",
+    "CLOUD_TIDE_STORY_KEY",
     "MAINLINE_TOWN_COMMISSION_DELIVERED",
     "MainlineDefinition",
     "MainlineStageDefinition",

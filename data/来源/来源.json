@@ -17,11 +17,12 @@
     {
       "key": "source.item.herb.spirit_leaf",
       "name": "灵叶来源",
-      "desc": "灵泉采集、百草坡与灵圃看护提供公开取得路径。",
+      "desc": "灵泉采集、百草坡、灵圃看护与洞天照壁辨叶提供公开取得路径。",
       "asset_keys": ["item.herb.spirit_leaf"],
       "channels": [
         {"operation": "exploration.settle", "reference": "reward_pool.exploration.spring_gather"},
         {"operation": "livelihood.settle", "reference": "reward_pool.idle.herb_watch"},
+        {"operation": "specials.claim_idle", "reference": "reward_pool.idle.mist_lamp.leaf"},
         {"operation": "bounty.claim", "reference": "reward_pool.bounty.herb_supply"}
       ],
       "status": "active"
@@ -29,12 +30,16 @@
     {
       "key": "source.item.common_materials",
       "name": "基础材料来源",
-      "desc": "铁木林、玄武岩径和作坊生活路线提供木材、铁石与阵砂。",
+      "desc": "铁木林、玄武岩径和作坊生活路线提供木材、铁石与阵砂；洞天守灯与渡口候潮也可收取阵砂。",
       "asset_keys": ["item.mat.wood", "item.ore.ironstone", "item.mat.array_sand"],
       "channels": [
         {"operation": "exploration.settle", "reference": "reward_pool.exploration.ironwood"},
         {"operation": "exploration.settle", "reference": "reward_pool.exploration.basalt_pass"},
         {"operation": "livelihood.settle", "reference": "reward_pool.idle.workshop_care"},
+        {"operation": "specials.claim_idle", "reference": "reward_pool.idle.mist_lamp.sand"},
+        {"operation": "specials.claim_idle", "reference": "reward_pool.idle.mist_lamp.leaf"},
+        {"operation": "specials.claim_idle", "reference": "reward_pool.idle.cloud_dock.iron"},
+        {"operation": "specials.claim_idle", "reference": "reward_pool.idle.cloud_dock.sand"},
         {"operation": "livelihood.settle_route", "reference": "route.town_ironwood_grove"}
       ],
       "status": "active"
@@ -53,12 +58,24 @@
     {
       "key": "source.item.cloud_iron",
       "name": "云铁来源",
-      "desc": "云铁矿区采集、矿区守卫掉落和云城公开悬赏。",
+      "desc": "云铁矿区采集、矿区守卫掉落、云城公开悬赏和云舟渡口候潮。",
       "asset_keys": ["item.material.cloud_iron"],
       "channels": [
         {"operation": "exploration.settle", "reference": "reward_pool.exploration.cloud_mine"},
         {"operation": "battle.claim", "reference": "reward_pool.enemy.cloud_mine"},
-        {"operation": "bounty.claim", "reference": "reward_pool.bounty.cloud_mine"}
+        {"operation": "bounty.claim", "reference": "reward_pool.bounty.cloud_mine"},
+        {"operation": "specials.claim_idle", "reference": "reward_pool.idle.cloud_dock.iron"},
+        {"operation": "specials.claim_idle", "reference": "reward_pool.idle.cloud_dock.sand"}
+      ],
+      "status": "active"
+    },
+    {
+      "key": "source.item.cave_pass_basic",
+      "name": "基础洞天凭证来源",
+      "desc": "在青石镇或灵泉谷以木材、止血草与灵石制作洞天验行牌，成功领取后可用于一次入洞移动。",
+      "asset_keys": ["item.cave_pass_basic"],
+      "channels": [
+        {"operation": "production.complete", "reference": "recipe.permit.mist_grotto"}
       ],
       "status": "active"
     },

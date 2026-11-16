@@ -82,3 +82,6 @@ def test_published_docs_do_not_link_to_local_support_files() -> None:
 def test_source_distribution_excludes_local_goals() -> None:
     manifest = (ROOT / "MANIFEST.in").read_text(encoding="utf-8")
     assert "prune docs/goals" in manifest
+    assert "global-exclude .codex-*" in manifest
+    release = (ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8")
+    assert "--exclude='.codex-*'" in release
