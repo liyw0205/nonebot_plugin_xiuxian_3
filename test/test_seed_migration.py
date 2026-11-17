@@ -1015,9 +1015,28 @@ def test_pre_refuge_mainline_migrates_with_real_official_fixture(host: Path) -> 
 def test_custom_pre_refuge_mainline_is_preserved(host: Path) -> None:
     custom = (SEED_FIXTURES / "mainline_pre_refuge.json").read_bytes() + b"\n"
     (host / "data" / MAINLINE).write_bytes(custom)
+    source = host / "src/plugins/nonebot_plugin_xiuxian_3/__init__.py"
+    previous_source = source.read_bytes()
+    previous_toml = (host / "pyproject.toml").read_bytes()
+    result = deploy(host)
+    assert result.returncode != 0
+    assert "idle.leaf_nursery_watch references inactive mainline leaf_watch.2" in result.stdout + result.stderr
+    assert "leaf_watch.2" in result.stdout + result.stderr
+    assert "已回退" in result.stderr
+    assert (host / "data" / MAINLINE).read_bytes() == custom
+    assert source.read_bytes() == previous_source
+    assert (host / "pyproject.toml").read_bytes() == previous_toml
+    preserved(host)
+    # Merge the new stages explicitly while retaining the customized old story.
+    document = json.loads(custom)
+    current = json.loads((ROOT / "data" / MAINLINE).read_bytes())
+    keys = {row["key"] for row in document["records"]}
+    document["records"].extend(row for row in current["records"] if row["key"] not in keys)
+    merged = (json.dumps(document, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+    (host / "data" / MAINLINE).write_bytes(merged)
     result = deploy(host)
     assert result.returncode == 0, result.stdout + result.stderr
-    assert (host / "data" / MAINLINE).read_bytes() == custom
+    assert (host / "data" / MAINLINE).read_bytes() == merged
     preserved(host)
 
 
@@ -1035,6 +1054,7 @@ RECIPE_FILE = Path("生产/配方.json")
 
 PLACE_CODEX_ADDED = frozenset(
     {
+        "codex.story.leaf_watch",
         "codex.story.mist_lamp",
         "codex.story.cloud_tide",
         "codex.story.herb_vale_gather",
@@ -1364,10 +1384,10 @@ def test_companion_old_trail_seeds_upgrade_together_and_preserve_custom(host: Pa
     codex_file = Path("图鉴/条目.json")
     codex = (ROOT / "data" / codex_file).read_text(encoding="utf-8")
     codex, count = re.subn(
-        r'^    \{"key": "codex\.story\.(?:mist_lamp|cloud_tide)",[^\n]*\n',
+        r'^    \{"key": "codex\.story\.(?:mist_lamp|cloud_tide|leaf_watch)",[^\n]*\n',
         "", codex, flags=re.M,
     )
-    assert count == 2
+    assert count == 3
     old_codex, count = re.subn(
         r'    \{\n      "key": "codex\.story\.companion_old_trail\.[123]",.*?\n    \},\n',
         "", codex, flags=re.S,

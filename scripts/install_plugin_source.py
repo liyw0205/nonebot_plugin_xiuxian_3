@@ -359,6 +359,9 @@ def validate(target: Path) -> None:
             mainline.mainline_definitions(story_key=story)
         livelihood = importlib.import_module(f"{expected_module}.xiuxian.livelihood.rules")
         livelihood.public_project_definitions()
+        # Old custom stories may never invoke the lazy idle-source validator.
+        idle = importlib.import_module(f"{expected_module}.xiuxian.specials.idle_rules")
+        idle.idle_route_definitions()
     print(
         f"NoneBot 已加载 {expected_module} "
         f"module_file={module_file} matchers={len(plugin.matcher)} handlers={handlers}"
