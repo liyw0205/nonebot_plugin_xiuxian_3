@@ -30,6 +30,10 @@ def old_field_journey_seeds() -> dict[str, bytes]:
             marker = text.index('    {\n      "key": "idle.herb_vale_gather"') if relative == "生活/生活.json" else text.index('    {"key": "reward_pool.idle.mist_lamp"')
             text = text[:first] + text[marker:]
         else:
+            if relative == "来源/来源.json":
+                first = text.index('  "records": [\n') + len('  "records": [\n')
+                marker = text.index('    {\n      "key": "source.item.herb.blood_grass"')
+                text = text[:first] + text[marker:]
             text = "".join(line for line in text.splitlines(keepends=True)
                            if "leaf_watch" not in line)
         blob = text.encode("utf-8")

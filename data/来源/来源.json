@@ -3,6 +3,114 @@
   "kind": "source",
   "records": [
     {
+      "key": "source.patrol.outskirts",
+      "name": "近郊巡路材料",
+      "desc": "稳行或追迹完成巡查、遇战获胜后发放；材料供公开炼器、炼丹或布阵配方消费。",
+      "asset_keys": [
+        "item.mat.wood",
+        "item.herb.blood_grass"
+      ],
+      "channels": [
+        {
+          "operation": "exploration.settle",
+          "reference": "reward_pool.patrol.outskirts.cart.careful"
+        },
+        {
+          "operation": "exploration.settle",
+          "reference": "reward_pool.patrol.outskirts.cart.pursuit"
+        },
+        {
+          "operation": "exploration.settle",
+          "reference": "reward_pool.patrol.outskirts.herbs.careful"
+        },
+        {
+          "operation": "exploration.settle",
+          "reference": "reward_pool.patrol.outskirts.herbs.pursuit"
+        },
+        {
+          "operation": "exploration.settle",
+          "reference": "reward_pool.patrol.outskirts.tracks.careful"
+        },
+        {
+          "operation": "exploration.settle",
+          "reference": "reward_pool.patrol.outskirts.tracks.pursuit"
+        }
+      ],
+      "status": "active"
+    },
+    {
+      "key": "source.patrol.ironwood",
+      "name": "铁木巡林材料",
+      "desc": "稳行或追迹完成巡查、遇战获胜后发放；材料供公开炼器、炼丹或布阵配方消费。",
+      "asset_keys": [
+        "item.mat.wood",
+        "item.ore.ironstone"
+      ],
+      "channels": [
+        {
+          "operation": "exploration.settle",
+          "reference": "reward_pool.patrol.ironwood.bridge.careful"
+        },
+        {
+          "operation": "exploration.settle",
+          "reference": "reward_pool.patrol.ironwood.bridge.pursuit"
+        },
+        {
+          "operation": "exploration.settle",
+          "reference": "reward_pool.patrol.ironwood.gully.careful"
+        },
+        {
+          "operation": "exploration.settle",
+          "reference": "reward_pool.patrol.ironwood.gully.pursuit"
+        },
+        {
+          "operation": "exploration.settle",
+          "reference": "reward_pool.patrol.ironwood.wind.careful"
+        },
+        {
+          "operation": "exploration.settle",
+          "reference": "reward_pool.patrol.ironwood.wind.pursuit"
+        }
+      ],
+      "status": "active"
+    },
+    {
+      "key": "source.patrol.basalt",
+      "name": "岩径巡标材料",
+      "desc": "稳行或追迹完成巡查、遇战获胜后发放；材料供公开炼器、炼丹或布阵配方消费。",
+      "asset_keys": [
+        "item.mat.array_sand",
+        "item.ore.ironstone"
+      ],
+      "channels": [
+        {
+          "operation": "exploration.settle",
+          "reference": "reward_pool.patrol.basalt.water.careful"
+        },
+        {
+          "operation": "exploration.settle",
+          "reference": "reward_pool.patrol.basalt.water.pursuit"
+        },
+        {
+          "operation": "exploration.settle",
+          "reference": "reward_pool.patrol.basalt.rune.careful"
+        },
+        {
+          "operation": "exploration.settle",
+          "reference": "reward_pool.patrol.basalt.rune.pursuit"
+        },
+        {
+          "operation": "exploration.settle",
+          "reference": "reward_pool.patrol.basalt.scree.careful"
+        },
+        {
+          "operation": "exploration.settle",
+          "reference": "reward_pool.patrol.basalt.scree.pursuit"
+        }
+      ],
+      "status": "active"
+    },
+    {
       "key": "source.item.herb.blood_grass",
       "name": "止血草来源",
       "desc": "近郊与百草坡采集、灵圃看护和公开悬赏均可取得。",

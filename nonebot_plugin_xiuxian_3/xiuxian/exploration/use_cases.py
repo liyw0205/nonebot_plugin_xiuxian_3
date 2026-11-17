@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import logging
+import sqlite3
+from types import SimpleNamespace
 
-from ...contracts import CommandContext, CommandResult
-from ..content import bundled_content
+from ...contracts import CommandAction, CommandContext, CommandResult
+from ..utils.text import command_link
+from ..content import ContentError, bundled_content
 from ..repository import (
     CurrencyInsufficientError,
     ExplorationBusyError,
@@ -31,6 +34,7 @@ from ..player.rules import LOCATION_LABELS
 from ..utils.assets import is_currency_asset_key
 from ..rewards.rules import RewardContentError
 from .rules import exploration_definition, resolve_exploration_mode
+from .patrol_rules import patrol_definition
 
 logger = logging.getLogger(__name__)
 
@@ -60,9 +64,51 @@ class ExplorationApplication:
         )
 
     def _mode(self, args: tuple[str, ...]) -> str | None:
-        if len(args) != 1:
+        if len(args) not in {1, 2}:
             return None
-        return resolve_exploration_mode(args[0], self.repository.content)
+        resolved = resolve_exploration_mode(args[0], self.repository.content)
+        if resolved is not None:
+            return resolved
+        bundle = self.repository.content or bundled_content()
+        return next((row["key"] for row in bundle.list("exploration_mode")
+                     if row.get("patrol") and args[0] in {row["key"], row["name"], *row.get("aliases", [])}), None)
+
+    async def preview_patrol(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) > 1:
+            return CommandResult(False, "INVALID_PATROL_COMMAND", "请使用 `巡查预览` 或 `巡查预览 巡查名称`。", context.request_id)
+        bundle = self.repository.content or bundled_content()
+        selected = resolve_exploration_mode(context.command_args[0], bundle) if context.command_args else None
+        if context.command_args and selected is None:
+            return CommandResult(False, "INVALID_PATROL_COMMAND", "没有这项巡查，可用 `巡查预览` 查看路线。", context.request_id)
+        rows = []
+        lines = ["**山路巡查**"]
+        try:
+            for row in bundle.list("exploration_mode", include_locked=False):
+                if selected and row["key"] != selected:
+                    continue
+                patrol = patrol_definition(row, bundle)
+                if not patrol:
+                    continue
+                rows.append({"key": row["key"], "name": row["name"], **patrol})
+                lines.append(f"\n**{row['name']}** · {bundle.label('location', row['location_key'])} · {bundle.label('realm', row['required_realm'])}{row['required_layer']}层 · 每日{row['daily_limit']}次\n{patrol['scene']}")
+                for a in patrol["approaches"]:
+                    command = f"开始探索 {row['name']} {a['name']}"
+                    lines.append(f"- {command_link(a['name'], command)}：{a['desc']}；{a['duration_seconds']}秒，体力{a['stamina_cost']}、精力{a['energy_cost']}，遇战{a['battle_chance_bp'] / 100:g}%")
+                lines.append("沿途可能遇到：" + "、".join(e["name"] for e in patrol["events"]) + "。实际事件出发时确定，战败无巡查收成，超过完成后24小时无奖励。")
+        except (ValueError, KeyError):
+            return CommandResult(False, "CONTENT_UNAVAILABLE", "巡查内容暂不可用，请稍后再试。", context.request_id)
+        return CommandResult(bool(rows), "PATROL_PREVIEW", "\n".join(lines), context.request_id, data={"routes": rows})
+
+    @staticmethod
+    def _patrol_text(record, phase):
+        if not record.patrol:
+            return ""
+        p = record.patrol
+        ending = "expired_text" if getattr(record, "expired", False) else "defeat_text" if getattr(record, "battle_outcome", None) not in {None, "won"} else "complete_text"
+        text = p["event"]["start_text" if phase == "start" else ending]
+        return f"\n\n**{p['event']['name']} · {p['approach']['name']}**\n{text}\n" + (
+            "\n材料可用于：" + "、".join(command_link(u["name"], u["command"]) for u in p["uses"])
+            + "。也可查看" + command_link("悬赏榜", "悬赏榜") + "，下次出发前先接单。" if phase != "start" else "")
 
     @staticmethod
     def _location_text(location_key: str) -> str:
@@ -115,6 +161,7 @@ class ExplorationApplication:
                 platform_user_id=context.user_id,
                 mode_key=mode_key,
                 operation_id=operation_id,
+                approach=context.command_args[1] if len(context.command_args) == 2 else "",
             )
         except PlayerNotFoundError:
             return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
@@ -149,11 +196,20 @@ class ExplorationApplication:
             )
         except RepositoryBusyError:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
+        except ContentError:
+            return CommandResult(False, "PERSISTENCE_ERROR", "巡查内容暂不可用，未扣资源，请稍后重试。", context.request_id, operation_id, retryable=True)
+        except ValueError:
+            return CommandResult(False, "INVALID_PATROL_APPROACH", "行进方案不可用，未扣资源；用 `巡查预览 巡查名称` 查看可选方案。", context.request_id, operation_id)
+        except sqlite3.Error:
+            logger.exception("exploration start transaction failed operation=%s", operation_id)
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂不可用，未扣资源，请稍后重试。", context.request_id, operation_id, retryable=True)
         except Exception:
             logger.exception("exploration command failed command=开始探索 adapter=%s request=%s operation=%s args=%r",
                              context.adapter, context.request_id, operation_id, context.command_args)
             raise
-        definition = exploration_definition(record.mode_key, self.repository.content)
+        definition = (SimpleNamespace(label=record.patrol["mode_label"], location_key=record.location_key,
+                      duration_seconds=record.patrol["approach"]["duration_seconds"], daily_limit=record.daily_limit)
+                      if record.patrol else exploration_definition(record.mode_key, self.repository.content))
         return CommandResult(
             True,
             "EXPLORATION_STARTED",
@@ -166,7 +222,8 @@ class ExplorationApplication:
                 f"- **精力**：{record.player.energy}/{record.player.energy_max}（消耗 {record.energy_cost}）\n"
                 f"- **今日上限**：{definition.daily_limit} 次\n\n"
                 + (f"- **迷雾屏障**：遇险几率降低 {record.risk_reduction_bp / 100:g}%\n\n" if record.risk_reduction_bp else "")
-                + "> 完成后发送 `结算探索`；准备期间不能移动、修炼、生产、突破或再次探索。"
+                + ("> 巡查期间不能移动、修炼、生产、突破或再次探索。" if record.patrol else "> 完成后发送 `结算探索`；准备期间不能移动、修炼、生产、突破或再次探索。")
+                + self._patrol_text(record, "start")
             ),
             context.request_id,
             operation_id,
@@ -184,7 +241,9 @@ class ExplorationApplication:
                 "bloodline_stability_before": record.bloodline_stability_before,
                 "bloodline_stability_after": record.bloodline_stability_after,
                 "idempotent_replay": record.already_completed,
+                "patrol": record.patrol,
             },
+            actions=(CommandAction(label="结算巡查", command="结算探索", enter=True),) if record.patrol else (),
         )
 
     async def settle_exploration(self, context: CommandContext) -> CommandResult:
@@ -220,7 +279,8 @@ class ExplorationApplication:
             return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
         except Exception:
             return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
-        definition = exploration_definition(record.mode_key, self.repository.content)
+        definition = (SimpleNamespace(label=record.patrol["mode_label"]) if record.patrol
+                      else exploration_definition(record.mode_key, self.repository.content))
         if record.status == "combat_pending":
             return CommandResult(
                 False,
@@ -276,7 +336,7 @@ class ExplorationApplication:
             return CommandResult(
                 False,
                 "EXPLORATION_EXPIRED",
-                f"## 探索已过期\n\n**{self._display_name(record.player)}**的 **{definition.label}** 超过了结算窗口，本次不发放奖励。",
+                f"## 探索已过期\n\n**{self._display_name(record.player)}**的 **{definition.label}** 超过了结算窗口，本次不发放奖励。" + self._patrol_text(record, "settled"),
                 context.request_id,
                 operation_id,
                 data={"exploration_id": record.exploration_id, "status": record.status, "idempotent_replay": record.already_completed},
@@ -308,6 +368,7 @@ class ExplorationApplication:
                 + f"- **污染**：{record.pollution_after}\n"
                 + (f"- **血脉稳定**：{record.bloodline_stability_after}\n" if record.mode_key in {"explore.beast_hunt", "explore.ancestral_lake"} else "")
                 + (f"- **神魂损失**：{record.soul_power_loss}\n" if record.soul_power_loss else "")
+                + self._patrol_text(record, "settled")
             ),
             context.request_id,
             operation_id,
@@ -318,6 +379,7 @@ class ExplorationApplication:
                 "result": record.result,
                 "battle_id": record.battle_id,
                 "battle_outcome": record.battle_outcome,
+                "patrol": record.patrol,
                 "energy_cost": record.energy_cost,
                 "pollution_before": record.pollution_before,
                 "pollution_after": record.pollution_after,

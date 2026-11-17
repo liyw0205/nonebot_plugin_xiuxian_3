@@ -551,6 +551,9 @@ def old_official_locations() -> bytes:
         "sect_gate", "time_garden", "trade_port", "void_portal", "war_front",
     )
     text = (ROOT / "data" / LOCATION_FILE).read_text(encoding="utf-8")
+    text = text.replace('        "explore.patrol_outskirts",\n', "")
+    for slug in ("ironwood", "basalt"):
+        text = text.replace(', "explore.patrol_' + slug + '"', "")
     # The discoverability slice rewrote exploration actions on existing records.
     action_reverts = (
         ('      "actions": ["read_entry_requirements", "explore.cloud_city_patrol", "explore.cloud_city_escort"]', '      "actions": [\n        "read_entry_requirements"\n      ]'),

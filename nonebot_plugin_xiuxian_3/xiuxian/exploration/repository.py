@@ -84,6 +84,7 @@ from ..world.rules import destination_definition, meets_realm
 from ..world.cloud_rules import DEMON_INTRO_FLAG
 from ..events.contribution_projection import record_spirit_spring_contribution
 from ..exploration.models import ExplorationSettlementRecord, ExplorationStartRecord
+from .patrol_rules import freeze_patrol, frozen_patrol
 from ..exploration.rules import (
     CLOUD_BOAT_STORM_CHANCE_BP,
     CLOUD_BOAT_STORM_CHOICES,
@@ -181,6 +182,25 @@ from ..rewards.rules import RewardContentError
 
 
 class ExplorationRepositoryMixin:
+    def _validate_patrol_snapshot(self, connection, session, snapshot):
+        receipt = connection.execute(
+            "SELECT result_json FROM operations WHERE operation_id=? AND player_id=? "
+            "AND operation_name='exploration.start'",
+            (session["operation_id"], session["player_id"]),
+        ).fetchone()
+        saved = decode_json_strict(receipt["result_json"]) if receipt else {}
+        if "patrol" not in snapshot and not saved.get("patrol"):
+            return {}
+        patrol = frozen_patrol(snapshot.get("patrol"))
+        if (saved.get("patrol") != patrol
+                or snapshot.get("frozen_result") != patrol["reward"]
+                or snapshot.get("reward_pool_key") != patrol["pool_key"]
+                or snapshot.get("stamina_cost") != patrol["approach"]["stamina_cost"]
+                or snapshot.get("energy_cost") != patrol["approach"]["energy_cost"]
+                or snapshot.get("base_battle_chance_bp") != patrol["approach"]["battle_chance_bp"]):
+            raise RewardContentError("patrol snapshot disagrees with its start operation")
+        return patrol
+
     @staticmethod
     def _strict_exploration_object(value: Any, label: str) -> dict[str, Any]:
         try:
@@ -310,6 +330,7 @@ class ExplorationRepositoryMixin:
         platform_user_id: str,
         mode_key: str,
         operation_id: str,
+        approach: str = "",
     ) -> ExplorationStartRecord:
         await self.initialize()
         async with self._inflight:
@@ -319,13 +340,14 @@ class ExplorationRepositoryMixin:
                 platform_user_id,
                 mode_key,
                 operation_id,
+                approach,
             )
 
-    def _start_exploration_sync(self, platform: str, platform_user_id: str, mode_key: str, operation_id: str) -> ExplorationStartRecord:
+    def _start_exploration_sync(self, platform: str, platform_user_id: str, mode_key: str, operation_id: str, approach: str = "") -> ExplorationStartRecord:
         last_error: Exception | None = None
         for attempt in range(5):
             try:
-                return self._start_exploration_once(platform, platform_user_id, mode_key, operation_id)
+                return self._start_exploration_once(platform, platform_user_id, mode_key, operation_id, approach)
             except sqlite3.OperationalError as exc:
                 if "locked" not in str(exc).lower():
                     raise
@@ -335,15 +357,13 @@ class ExplorationRepositoryMixin:
                 time.sleep(0.01 * (2**attempt))
         raise RepositoryBusyError("database remained locked") from last_error
 
-    def _start_exploration_once(self, platform: str, platform_user_id: str, mode_key: str, operation_id: str) -> ExplorationStartRecord:
-        definition = exploration_definition(mode_key, self.content)
+    def _start_exploration_once(self, platform: str, platform_user_id: str, mode_key: str, operation_id: str, approach: str = "") -> ExplorationStartRecord:
         operation_name = "exploration.start"
         request_payload = {
             "platform": platform,
             "platform_user_id": platform_user_id,
-            "mode_key": definition.key,
+            "mode_key": mode_key,
         }
-        request_hash = self._request_hash(operation_name, request_payload)
         now = self._now()
         business_date = now.date().isoformat()
         with self._connect() as connection:
@@ -353,9 +373,28 @@ class ExplorationRepositoryMixin:
                 (operation_id,),
             ).fetchone()
             if existing is not None:
+                payload = decode_json_strict(existing["result_json"])
+                if payload.get("patrol"):
+                    saved = frozen_patrol(payload["patrol"])["approach"]
+                    if approach and approach not in {saved["key"], saved["name"]}:
+                        raise OperationConflictError("patrol approach differs from its original request")
+                    request_payload["approach"] = saved["key"]
+                elif approach:
+                    raise OperationConflictError("exploration approach differs from its original request")
+                request_hash = self._request_hash(operation_name, request_payload)
                 if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
                     raise OperationConflictError("operation input differs from its original request")
-                return self._exploration_start_from_payload(decode_json_strict(existing["result_json"]), replay=True)
+                return self._exploration_start_from_payload(payload, replay=True)
+
+            definition = exploration_definition(mode_key, self.content)
+            bundle = self.content or bundled_content()
+            patrol = freeze_patrol(bundle.require("exploration_mode", mode_key, include_locked=False), bundle, approach, operation_id)
+            if patrol:
+                selected = patrol["approach"]
+                definition = replace(definition, **{key: selected[key] for key in
+                    ("duration_seconds", "stamina_cost", "energy_cost", "battle_chance_bp")})
+                request_payload["approach"] = selected["key"]
+            request_hash = self._request_hash(operation_name, request_payload)
 
             row = self._require_player(connection, platform, platform_user_id)
             if row["stage"] not in {STAGE_MORTAL, "seeker", "cultivator"}:
@@ -549,6 +588,10 @@ class ExplorationRepositoryMixin:
                 )
                 if battle_failure_result:
                     snapshot["battle_failure_result"] = battle_failure_result
+            if patrol:
+                snapshot["patrol"] = patrol
+                snapshot["reward_pool_key"] = patrol["pool_key"]
+                snapshot["frozen_result"] = patrol["reward"]
             change_player_state(
                 connection,
                 row,
@@ -610,6 +653,7 @@ class ExplorationRepositoryMixin:
                 "random_seed": snapshot.get("random_seed"),
                 "encounter_enemy_key": snapshot.get("encounter_enemy_key"),
                 "frozen_result": dict(snapshot.get("frozen_result", {})),
+                "patrol": patrol,
             }
             connection.execute(
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -643,6 +687,7 @@ class ExplorationRepositoryMixin:
             cross_realm_penalty_bp=int(payload.get("cross_realm_penalty_bp", 0)),
             bloodline_stability_before=int(payload.get("bloodline_stability_before", 0)),
             bloodline_stability_after=int(payload.get("bloodline_stability_after", 0)),
+            patrol=frozen_patrol(payload["patrol"]) if payload.get("patrol") else {},
             already_completed=replay,
         )
 
@@ -795,6 +840,7 @@ class ExplorationRepositoryMixin:
             if battle is None or str(battle["status"]) != "settled":
                 raise ExplorationCombatPendingError("exploration battle is not settled")
             snapshot, frozen, frozen_result, failure_result = self._pending_exploration_rewards(session)
+            self._validate_patrol_snapshot(connection, session, snapshot)
             if frozen.get("battle_id") != battle_id:
                 raise RewardContentError("exploration reward snapshot does not match its session")
 
@@ -808,6 +854,7 @@ class ExplorationRepositoryMixin:
                         "platform": platform,
                         "platform_user_id": platform_user_id,
                         "mode_key": str(session["mode_key"]),
+                        **({"approach": snapshot["patrol"]["approach"]["key"]} if snapshot.get("patrol") else {}),
                     },
                 ),
                 player_id=int(row["id"]),
@@ -995,6 +1042,7 @@ class ExplorationRepositoryMixin:
                 "battle_id": battle_id,
                 "battle_outcome": battle_outcome,
                 "pollution_before": int(snapshot.get("pollution_before", 0)),
+                "patrol": snapshot.get("patrol", {}),
                 "pollution_after": int(snapshot.get("pollution_after", 0)),
                 "bloodline_stability_before": int(snapshot.get("bloodline_stability_before", 0)),
                 "bloodline_stability_after": int(snapshot.get("bloodline_stability_after", 0)),
@@ -1072,6 +1120,7 @@ class ExplorationRepositoryMixin:
             ).fetchone()
             if session is None:
                 raise ExplorationNotFoundError("no active exploration")
+            self._validate_patrol_snapshot(connection, session, decode_json_strict(session["snapshot_json"]))
             if session["status"] == "combat_pending":
                 snapshot, stored_result, frozen_result, _ = self._pending_exploration_rewards(session)
                 payload = {
@@ -1187,7 +1236,7 @@ class ExplorationRepositoryMixin:
                     else 0
                 )
                 reward_pool_key = exploration_reward_pool(str(session["mode_key"]), self.content)
-                if reward_pool_key is not None:
+                if reward_pool_key is not None or snapshot.get("patrol"):
                     frozen_result = snapshot.get("frozen_result")
                     if not isinstance(frozen_result, dict):
                         raise RewardContentError("exploration reward snapshot is missing")
@@ -1310,6 +1359,7 @@ class ExplorationRepositoryMixin:
                 "reward_pool_key": snapshot.get("reward_pool_key"),
                 "random_seed": snapshot.get("random_seed"),
                 "frozen_result": dict(result),
+                "patrol": snapshot.get("patrol", {}),
             }
             connection.execute(
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -1373,6 +1423,7 @@ class ExplorationRepositoryMixin:
             storm_options=tuple(str(item) for item in payload.get("storm_options", ())),
             storm_deadline=str(payload["storm_deadline"]) if payload.get("storm_deadline") else None,
             storm_choice=str(payload["storm_choice"]) if payload.get("storm_choice") else None,
+            patrol=frozen_patrol(payload["patrol"]) if payload.get("patrol") else {},
             pollution_before=int(payload.get("pollution_before", 0)),
             pollution_after=int(payload.get("pollution_after", 0)),
             soul_power_loss=int(payload.get("soul_power_loss", 0)),

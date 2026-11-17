@@ -46,6 +46,7 @@
       "actions": [
         "explore.gather_outskirts",
         "explore.trial_outskirts",
+        "explore.patrol_outskirts",
         "battle.training_dummy",
         "battle.wood_rat"
       ],
@@ -464,7 +465,7 @@
       "status": "open",
       "requirements": [{"type": "realm", "realm_key": "qi_sensing", "min_layer": 1}],
       "environment": {"risk": "low", "gather_pool_key": "gather.xuantian.ironwood", "encounter_pool_key": "encounter.xuantian.ironwood"},
-      "actions": ["explore.gather_ironwood", "explore.trial_ironwood"],
+      "actions": ["explore.gather_ironwood", "explore.trial_ironwood", "explore.patrol_ironwood"],
       "codex_entry_key": "codex.place.ironwood_grove",
       "key": "xuantian.ironwood_grove"
     },
@@ -475,7 +476,7 @@
       "status": "open",
       "requirements": [{"type": "realm", "realm_key": "qi_gathering", "min_layer": 1}],
       "environment": {"risk": "medium", "gather_pool_key": "gather.xuantian.basalt_pass", "encounter_pool_key": "encounter.xuantian.basalt_pass"},
-      "actions": ["explore.gather_basalt_pass", "explore.trial_basalt_pass"],
+      "actions": ["explore.gather_basalt_pass", "explore.trial_basalt_pass", "explore.patrol_basalt"],
       "codex_entry_key": "codex.place.basalt_pass",
       "key": "xuantian.basalt_pass"
     },

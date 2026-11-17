@@ -3,6 +3,272 @@
   "kind": "exploration_mode",
   "records": [
     {
+      "key": "explore.patrol_outskirts",
+      "name": "近郊巡路",
+      "desc": "镇外的路并非每天一样。行脚人会留下松脱的车辙、被雨压倒的药丛和夜兽足迹。巡路者先选稳行或追迹，再带回当日真实见闻与可用材料。",
+      "aliases": [
+        "近郊巡路"
+      ],
+      "location_key": "xuantian.outskirts",
+      "required_realm": "qi_sensing",
+      "required_layer": 2,
+      "duration_seconds": 180,
+      "stamina_cost": 4,
+      "energy_cost": 1,
+      "battle_chance_bp": 1500,
+      "daily_limit": 4,
+      "random_pool": "patrol.outskirts",
+      "reward_pool_key": "reward_pool.patrol.outskirts.cart.careful",
+      "enemy_pool_key": "encounter.xuantian.outskirts",
+      "access_any": [],
+      "status": "open",
+      "patrol": {
+        "scene": "镇外的路并非每天一样。行脚人会留下松脱的车辙、被雨压倒的药丛和夜兽足迹。巡路者先选稳行或追迹，再带回当日真实见闻与可用材料。",
+        "approaches": [
+          {
+            "key": "careful",
+            "name": "稳行",
+            "desc": "细看路况，花更多时间辨物，少耗体力并降低遇战",
+            "duration_seconds": 180,
+            "stamina_cost": 4,
+            "energy_cost": 1,
+            "battle_chance_bp": 1500
+          },
+          {
+            "key": "pursuit",
+            "name": "追迹",
+            "desc": "沿新痕快速推进，更多体力与风险换取较多材料",
+            "duration_seconds": 90,
+            "stamina_cost": 7,
+            "energy_cost": 0,
+            "battle_chance_bp": 6500
+          }
+        ],
+        "events": [
+          {
+            "key": "cart",
+            "name": "断辕旧车",
+            "weight": 5,
+            "start_text": "路旁一辆药车陷在浅沟，车夫请你检查断辕，别让后来的人再踩进泥里。",
+            "complete_text": "你垫稳车轮，拆下能用的木料，也从车夫分出的药篓里取得报酬。",
+            "defeat_text": "遇险后你退回路口，巡查收成未能带出。这次没有巡查奖励，可先恢复状态、检查装备，再按剩余日限重来。",
+            "expired_text": "你错过了交班窗口，巡线已由别人接手，路旁材料也被雨露浸坏。本次无奖励，按每日名额重新出发即可。",
+            "pools": {
+              "careful": "reward_pool.patrol.outskirts.cart.careful",
+              "pursuit": "reward_pool.patrol.outskirts.cart.pursuit"
+            }
+          },
+          {
+            "key": "herbs",
+            "name": "雨后药丛",
+            "weight": 3,
+            "start_text": "骤雨冲开一处草坡，露出的根须旁还有新鲜兽印。你要辨清药叶，再找能承重的落枝。",
+            "complete_text": "药根留在土里，可用的叶与干枝分别收好，山路终于没有被采成一片空地。",
+            "defeat_text": "遇险后你退回路口，巡查收成未能带出。这次没有巡查奖励，可先恢复状态、检查装备，再按剩余日限重来。",
+            "expired_text": "你错过了交班窗口，巡线已由别人接手，路旁材料也被雨露浸坏。本次无奖励，按每日名额重新出发即可。",
+            "pools": {
+              "careful": "reward_pool.patrol.outskirts.herbs.careful",
+              "pursuit": "reward_pool.patrol.outskirts.herbs.pursuit"
+            }
+          },
+          {
+            "key": "tracks",
+            "name": "夜兽留痕",
+            "weight": 2,
+            "start_text": "转弯处传来碎石滚动的声响，灌木下留下新兽印。你循着脚印检查通往镇门的路。",
+            "complete_text": "你沿途收走妨碍通行的断枝与药叶，确认岔路后把新的痕迹记给守门人。",
+            "defeat_text": "遇险后你退回路口，巡查收成未能带出。这次没有巡查奖励，可先恢复状态、检查装备，再按剩余日限重来。",
+            "expired_text": "你错过了交班窗口，巡线已由别人接手，路旁材料也被雨露浸坏。本次无奖励，按每日名额重新出发即可。",
+            "pools": {
+              "careful": "reward_pool.patrol.outskirts.tracks.careful",
+              "pursuit": "reward_pool.patrol.outskirts.tracks.pursuit"
+            }
+          }
+        ],
+        "recipe_keys": [
+          "recipe.weapon.wood_sword",
+          "recipe.pill.healing_low"
+        ]
+      }
+    },
+    {
+      "key": "explore.patrol_ironwood",
+      "name": "铁木巡林",
+      "desc": "林务师在树皮上划出三条巡线：雨沟、旧桥和风口。巡林既要找回器坊能用的铁石木料，也要避开尚未长成的新树；遇到妖兽仍由真实战斗决定能否带回收成。",
+      "aliases": [
+        "铁木巡林"
+      ],
+      "location_key": "xuantian.ironwood_grove",
+      "required_realm": "qi_sensing",
+      "required_layer": 4,
+      "duration_seconds": 180,
+      "stamina_cost": 4,
+      "energy_cost": 1,
+      "battle_chance_bp": 1500,
+      "daily_limit": 4,
+      "random_pool": "patrol.ironwood",
+      "reward_pool_key": "reward_pool.patrol.ironwood.bridge.careful",
+      "enemy_pool_key": "encounter.xuantian.ironwood",
+      "access_any": [],
+      "status": "open",
+      "patrol": {
+        "scene": "林务师在树皮上划出三条巡线：雨沟、旧桥和风口。巡林既要找回器坊能用的铁石木料，也要避开尚未长成的新树；遇到妖兽仍由真实战斗决定能否带回收成。",
+        "approaches": [
+          {
+            "key": "careful",
+            "name": "稳行",
+            "desc": "细看路况，花更多时间辨物，少耗体力并降低遇战",
+            "duration_seconds": 180,
+            "stamina_cost": 4,
+            "energy_cost": 1,
+            "battle_chance_bp": 1500
+          },
+          {
+            "key": "pursuit",
+            "name": "追迹",
+            "desc": "沿新痕快速推进，更多体力与风险换取较多材料",
+            "duration_seconds": 90,
+            "stamina_cost": 7,
+            "energy_cost": 0,
+            "battle_chance_bp": 6500
+          }
+        ],
+        "events": [
+          {
+            "key": "bridge",
+            "name": "旧桥松钉",
+            "weight": 5,
+            "start_text": "溪上的木桥发出轻响，桥脚散着旧铁钉。林务师请你先辨清哪些梁木还能承重。",
+            "complete_text": "你稳住桥脚，把散落的铁石和替下的干木分装，留下新枝继续生长。",
+            "defeat_text": "遇险后你退回路口，巡查收成未能带出。这次没有巡查奖励，可先恢复状态、检查装备，再按剩余日限重来。",
+            "expired_text": "你错过了交班窗口，巡线已由别人接手，路旁材料也被雨露浸坏。本次无奖励，按每日名额重新出发即可。",
+            "pools": {
+              "careful": "reward_pool.patrol.ironwood.bridge.careful",
+              "pursuit": "reward_pool.patrol.ironwood.bridge.pursuit"
+            }
+          },
+          {
+            "key": "gully",
+            "name": "雨沟积木",
+            "weight": 3,
+            "start_text": "雨水把木料和矿石推到狭沟，坡上仍有新落石。你得沿树根寻找可以站稳的落脚处。",
+            "complete_text": "水沟重新通畅，干燥木料与完整铁石装进背篓，碎渣则留作护坡。",
+            "defeat_text": "遇险后你退回路口，巡查收成未能带出。这次没有巡查奖励，可先恢复状态、检查装备，再按剩余日限重来。",
+            "expired_text": "你错过了交班窗口，巡线已由别人接手，路旁材料也被雨露浸坏。本次无奖励，按每日名额重新出发即可。",
+            "pools": {
+              "careful": "reward_pool.patrol.ironwood.gully.careful",
+              "pursuit": "reward_pool.patrol.ironwood.gully.pursuit"
+            }
+          },
+          {
+            "key": "wind",
+            "name": "风口折枝",
+            "weight": 2,
+            "start_text": "高处折枝卡在两株铁木之间，下面挂着旧矿篓。风一起，整片林梢都在晃动。",
+            "complete_text": "你避过嫩树收回能用的断枝与矿块，风口的巡线重新显露出来。",
+            "defeat_text": "遇险后你退回路口，巡查收成未能带出。这次没有巡查奖励，可先恢复状态、检查装备，再按剩余日限重来。",
+            "expired_text": "你错过了交班窗口，巡线已由别人接手，路旁材料也被雨露浸坏。本次无奖励，按每日名额重新出发即可。",
+            "pools": {
+              "careful": "reward_pool.patrol.ironwood.wind.careful",
+              "pursuit": "reward_pool.patrol.ironwood.wind.pursuit"
+            }
+          }
+        ],
+        "recipe_keys": [
+          "recipe.weapon.wood_sword"
+        ]
+      }
+    },
+    {
+      "key": "explore.patrol_basalt",
+      "name": "岩径巡标",
+      "desc": "玄武岩径的路标常被山风和兽爪移位。巡标要辨水痕、查阵纹、清落石，灵砂与铁石可用于真实炼器和布阵；稳行更省体力，追迹更快却可能卷入更频繁的交战。",
+      "aliases": [
+        "岩径巡标"
+      ],
+      "location_key": "xuantian.basalt_pass",
+      "required_realm": "qi_gathering",
+      "required_layer": 3,
+      "duration_seconds": 240,
+      "stamina_cost": 6,
+      "energy_cost": 2,
+      "battle_chance_bp": 2500,
+      "daily_limit": 4,
+      "random_pool": "patrol.basalt",
+      "reward_pool_key": "reward_pool.patrol.basalt.water.careful",
+      "enemy_pool_key": "encounter.xuantian.basalt_pass",
+      "access_any": [],
+      "status": "open",
+      "patrol": {
+        "scene": "玄武岩径的路标常被山风和兽爪移位。巡标要辨水痕、查阵纹、清落石，灵砂与铁石可用于真实炼器和布阵；稳行更省体力，追迹更快却可能卷入更频繁的交战。",
+        "approaches": [
+          {
+            "key": "careful",
+            "name": "稳行",
+            "desc": "细看路况，花更多时间辨物，少耗体力并降低遇战",
+            "duration_seconds": 240,
+            "stamina_cost": 6,
+            "energy_cost": 2,
+            "battle_chance_bp": 2500
+          },
+          {
+            "key": "pursuit",
+            "name": "追迹",
+            "desc": "沿新痕快速推进，更多体力与风险换取较多材料",
+            "duration_seconds": 90,
+            "stamina_cost": 9,
+            "energy_cost": 0,
+            "battle_chance_bp": 6500
+          }
+        ],
+        "events": [
+          {
+            "key": "water",
+            "name": "水痕偏标",
+            "weight": 5,
+            "start_text": "旧水标的一侧露出新鲜湿痕，溪流已绕向另一条沟。你须顺水辨认阵砂有没有被冲走。",
+            "complete_text": "你扶正水标，把干砂与矿块分袋，留下清晰刻痕给下一个过路人。",
+            "defeat_text": "遇险后你退回路口，巡查收成未能带出。这次没有巡查奖励，可先恢复状态、检查装备，再按剩余日限重来。",
+            "expired_text": "你错过了交班窗口，巡线已由别人接手，路旁材料也被雨露浸坏。本次无奖励，按每日名额重新出发即可。",
+            "pools": {
+              "careful": "reward_pool.patrol.basalt.water.careful",
+              "pursuit": "reward_pool.patrol.basalt.water.pursuit"
+            }
+          },
+          {
+            "key": "rune",
+            "name": "残纹石台",
+            "weight": 3,
+            "start_text": "石台上残留半圈阵纹，风沙堆在凹槽里，旁边还有守矿妖兽的抓痕。",
+            "complete_text": "你清理阵槽，收回可用灵砂与铁石，把无法辨认的残纹原样留在原处。",
+            "defeat_text": "遇险后你退回路口，巡查收成未能带出。这次没有巡查奖励，可先恢复状态、检查装备，再按剩余日限重来。",
+            "expired_text": "你错过了交班窗口，巡线已由别人接手，路旁材料也被雨露浸坏。本次无奖励，按每日名额重新出发即可。",
+            "pools": {
+              "careful": "reward_pool.patrol.basalt.rune.careful",
+              "pursuit": "reward_pool.patrol.basalt.rune.pursuit"
+            }
+          },
+          {
+            "key": "scree",
+            "name": "碎坡新径",
+            "weight": 2,
+            "start_text": "落石遮住了半截山径，窄坡下露出旧矿脉。你得先辨清滚石方向，再决定沿哪道脚印前行。",
+            "complete_text": "路口重新可见，你把零散矿块和干砂带走，为后来的行人留下稳固落脚处。",
+            "defeat_text": "遇险后你退回路口，巡查收成未能带出。这次没有巡查奖励，可先恢复状态、检查装备，再按剩余日限重来。",
+            "expired_text": "你错过了交班窗口，巡线已由别人接手，路旁材料也被雨露浸坏。本次无奖励，按每日名额重新出发即可。",
+            "pools": {
+              "careful": "reward_pool.patrol.basalt.scree.careful",
+              "pursuit": "reward_pool.patrol.basalt.scree.pursuit"
+            }
+          }
+        ],
+        "recipe_keys": [
+          "recipe.weapon.wood_sword",
+          "recipe.array.gathering_basic"
+        ]
+      }
+    },
+    {
       "key": "explore.gather_outskirts",
       "name": "近郊采集",
       "desc": "沿镇外浅坡采集常见药草与木材。",

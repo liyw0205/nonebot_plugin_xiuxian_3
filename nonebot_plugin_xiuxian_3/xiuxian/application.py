@@ -191,6 +191,8 @@ _HELP_PAGES = {
     ),
     "探索": (
         "**探索**\n\n"
+        f"{command_link('巡查预览', '巡查预览')}可查看近郊巡路、铁木巡林与岩径巡标："
+        "选稳行或追迹，途中随机遇到不同人物与路况，真实战败无收成；完整材料可继续制作。\n\n"
         f"用{command_link('我的状态', '我的状态')}确认所在地，"
         f"再{command_link('开始探索', '开始探索')}；途中所得在{command_link('结算探索', '结算探索')}时领取。\n\n"
         "备下药材、木石或阵砂后，可在山野现场承接勘务，选择踏勘或整治："
@@ -1502,6 +1504,9 @@ class XiuxianApplication:
             lambda: self.exploration.start_exploration(context),
             write_message="当前事件不允许开始探索。",
         )
+
+    async def preview_patrol(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.exploration.preview_patrol(context), require_write=False)
 
     async def settle_exploration(self, context: CommandContext) -> CommandResult:
         return await self._invoke(
