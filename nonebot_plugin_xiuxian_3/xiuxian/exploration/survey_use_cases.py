@@ -42,6 +42,7 @@ class SurveyApplication:
             lines.append("首勘奖励已经入袋，不会重复领取。用途：" + "、".join(
                 command_link(u["name"], u["command"]) for u in site["uses"]))
             lines.append(command_link("查看下一处山野路线", "山野手札"))
+            lines.append(command_link("回访取材与留养", "资源脉预览"))
         elif state["status"] in {"unknown", "resting"}:
             lines.append(command_link("开始查验" if state["status"] == "unknown" else "继续查验", "勘察地貌 " + site["key"]))
         else:

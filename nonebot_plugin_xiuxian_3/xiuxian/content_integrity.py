@@ -158,6 +158,13 @@ def _validate_manifest_files(bundle: ContentBundle) -> None:
 
 
 def _validate_source_reference(bundle: ContentBundle, source_key: str, reference: str) -> None:
+    if reference.startswith("deposit."):
+        from .exploration.deposit_rules import deposit_definitions
+
+        deposit = deposit_definitions(bundle).get(reference)
+        if deposit is None or deposit["status"] not in _OPEN:
+            raise ContentError(f"source {source_key} references unavailable deposit {reference}")
+        return
     if reference.startswith("survey."):
         from .exploration.survey_rules import survey_definitions
 

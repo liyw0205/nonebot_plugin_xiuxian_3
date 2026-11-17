@@ -17,6 +17,7 @@ from .progression.breakthrough.use_cases import BreakthroughApplication
 from .world.use_cases import WorldApplication
 from .exploration.use_cases import ExplorationApplication
 from .exploration.survey_use_cases import SurveyApplication
+from .exploration.deposit_use_cases import DepositApplication
 from .combat.use_cases import CombatApplication
 from .adventures.use_cases import AdventuresApplication
 from .adventures.mainline_use_cases import AdventuresMainlineApplication
@@ -195,6 +196,8 @@ _HELP_PAGES = {
         f"{command_link('山野手札', '山野手札')}记录溪崖石层、铁木根脉和岩径古渠。"
         "抵达现场后勘察地貌，逐处选稳妥观察或省力尝试；每次真实消耗，查验间隔与进度留存。"
         "可暂离再继续，首次查明才发材料，并依次解开下一处地貌。\n\n"
+        f"勘察完成后用{command_link('资源脉预览', '资源脉预览')}回访取材：留养耗一格，强采耗三格且推迟恢复。"
+        "每处储量独立随时间恢复；木材与药草可在青石镇制成护脉木楔，带回现场养护。\n\n"
         f"{command_link('巡查预览', '巡查预览')}可查看近郊巡路、铁木巡林与岩径巡标："
         "选稳行或追迹，途中随机遇到不同人物与路况，真实战败无收成；完整材料可继续制作。\n\n"
         f"用{command_link('我的状态', '我的状态')}确认所在地，"
@@ -430,6 +433,7 @@ class XiuxianApplication:
         self.world = WorldApplication(repository)
         self.exploration = ExplorationApplication(repository)
         self.surveys = SurveyApplication(repository)
+        self.deposits = DepositApplication(repository)
         self.combat = CombatApplication(repository)
         self.adventures = AdventuresApplication(repository)
         self.mainline = AdventuresMainlineApplication(repository)
@@ -1530,6 +1534,15 @@ class XiuxianApplication:
 
     async def rest_survey(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.surveys.execute(context, "rest"))
+
+    async def deposit_preview(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.deposits.execute(context, "preview"), require_write=False)
+
+    async def extract_deposit(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.deposits.execute(context, "extract"))
+
+    async def maintain_deposit(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.deposits.execute(context, "maintain"))
 
     async def settle_exploration(self, context: CommandContext) -> CommandResult:
         return await self._invoke(

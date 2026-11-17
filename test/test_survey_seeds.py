@@ -18,10 +18,10 @@ def old_survey_seeds():
     for relative, expected in BASELINES.items():
         text = (ROOT / "data" / relative).read_text(encoding="utf-8")
         if relative == "内容清单.json":
-            text = text.replace('    "探索/地貌.json",\n', "")
+            text = text.replace('    "探索/地貌.json",\n', "").replace('    "探索/资源脉.json",\n', "")
         else:
             text = "".join(line for line in text.splitlines(keepends=True)
-                           if not line.startswith('    {"key":"source.survey.'))
+                           if not line.startswith(('    {"key":"source.survey.', '    {"key":"source.deposit.')))
         result[relative] = text.encode("utf-8")
         assert hashlib.sha256(result[relative]).hexdigest() == expected
     return result

@@ -70,6 +70,10 @@ class ContentBundle:
             from .exploration.survey_rules import survey_definitions
 
             survey_definitions(bundle)
+        if any(kind == "deposit" for kind, _ in records):
+            from .exploration.deposit_rules import deposit_definitions
+
+            deposit_definitions(bundle)
         return bundle
 
     @classmethod

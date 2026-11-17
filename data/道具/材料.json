@@ -1,6 +1,7 @@
 {
   "kind": "item",
   "records": [
+    {"key":"item.mat.root_wedge","name":"护脉木楔","desc":"以干木和止血草纤维缠成的木楔，用于稳住资源脉的松土、倒木和渠边石片；在养护资源脉时实际消耗。","item_type":"material","quality":"common","stack_limit":99,"instance_mode":"stack","bind_type":"character_bound","tradeable":false,"effects":[],"requirements":[],"source_recipe_key":"recipe.field.root_wedge","status":"active"},
     {
       "key": "item.void_power_crystal",
       "name": "虚空能量晶",

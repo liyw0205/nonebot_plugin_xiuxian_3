@@ -24,7 +24,8 @@ def old_camp_seeds():
     result = {}
     for relative, (expected, prefixes) in BASELINES.items():
         lines = (ROOT / "data" / relative).read_text(encoding="utf-8").splitlines(keepends=True)
-        markers = tuple('    {"key":"' + prefix for prefix in (*prefixes, "source.survey."))
+        markers = tuple('    {"key":"' + prefix for prefix in
+                        (*prefixes, "source.survey.", "source.deposit.", "recipe.field.root_wedge"))
         blob = "".join(line for line in lines if not line.startswith(markers)).encode("utf-8")
         assert hashlib.sha256(blob).hexdigest() == expected, relative
         result[relative] = blob
