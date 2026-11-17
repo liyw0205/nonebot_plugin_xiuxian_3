@@ -23,6 +23,8 @@
         {"operation": "exploration.settle", "reference": "reward_pool.exploration.spring_gather"},
         {"operation": "livelihood.settle", "reference": "reward_pool.idle.herb_watch"},
         {"operation": "specials.claim_idle", "reference": "reward_pool.idle.mist_lamp.leaf"},
+        {"operation": "specials.claim_idle", "reference": "reward_pool.idle.leaf_watch.leaf"},
+        {"operation": "specials.claim_idle", "reference": "reward_pool.idle.leaf_watch.sand"},
         {"operation": "bounty.claim", "reference": "reward_pool.bounty.herb_supply"}
       ],
       "status": "active"
@@ -37,6 +39,8 @@
         {"operation": "exploration.settle", "reference": "reward_pool.exploration.basalt_pass"},
         {"operation": "livelihood.settle", "reference": "reward_pool.idle.workshop_care"},
         {"operation": "specials.claim_idle", "reference": "reward_pool.idle.mist_lamp.sand"},
+        {"operation": "specials.claim_idle", "reference": "reward_pool.idle.leaf_watch.leaf"},
+        {"operation": "specials.claim_idle", "reference": "reward_pool.idle.leaf_watch.sand"},
         {"operation": "specials.claim_idle", "reference": "reward_pool.idle.mist_lamp.leaf"},
         {"operation": "specials.claim_idle", "reference": "reward_pool.idle.cloud_dock.iron"},
         {"operation": "specials.claim_idle", "reference": "reward_pool.idle.cloud_dock.sand"},

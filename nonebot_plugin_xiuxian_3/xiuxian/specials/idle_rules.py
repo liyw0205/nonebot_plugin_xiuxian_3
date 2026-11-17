@@ -51,6 +51,7 @@ class IdleRouteDefinition:
     companion_progress: dict[str, int] = field(default_factory=dict)
     patrol_journal: dict[str, str] = field(default_factory=dict)
     wilderness_event: dict[str, Any] = field(default_factory=dict)
+    required_mainline_stage: str | None = None
 
 
 _STAGE_ORDER = {
@@ -263,6 +264,9 @@ def _parse_route(row: dict[str, Any], bundle: ContentBundle) -> IdleRouteDefinit
         required_realm = str(realm_key)
         required_layer = layer
     required_permit = requirements.get("required_permit")
+    required_mainline_stage = requirements.get("mainline_stage")
+    if "mainline_stage" in requirements:
+        _require_active_record(bundle, "mainline", required_mainline_stage, key, "requirements.mainline_stage")
     if required_permit is not None:
         if not isinstance(required_permit, str) or not required_permit:
             raise ContentError(
@@ -399,6 +403,7 @@ def _parse_route(row: dict[str, Any], bundle: ContentBundle) -> IdleRouteDefinit
         companion_progress=progress,
         patrol_journal=patrol_journal,
         wilderness_event=event,
+        required_mainline_stage=required_mainline_stage,
     )
 
 

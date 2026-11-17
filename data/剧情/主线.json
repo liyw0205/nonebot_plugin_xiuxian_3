@@ -4843,6 +4843,7 @@
         {"command": "灵田预览", "argument": "云纹稻", "description": "保留换来的稻种，积累名望租灵圃小院后继续养稻。"}
       ],
       "state_changes": {"activity_events": ["story.mainline.field_seeds:field_seeds.3"]}, "next_stage_key": null,
+      "completion_actions": [{"command": "云稻炊香主线", "argument": "", "description": "保留稻种，积累六十镇中名望租灵圃小院，接着种稻做饭。"}],
       "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "需要本关的止血草供应交单；旧交单和只接未交不算。缺料不扣物，先补三份止血草，公示过期次日重接。"},
       "status": "open", "aliases": ["药畦入铺"], "prerequisites": ["field_seeds.2"], "required_realm": "qi_sensing", "required_layer": 2,
       "lane": "field_seeds", "lane_name": "药畦换种", "reputation_key": "local.xuantian.new_town",
@@ -4898,10 +4899,69 @@
         {"command": "前往", "argument": "灵泉谷", "description": "交卷后可去灵泉采集、继续养灵叶。"}
       ],
       "state_changes": {"activity_events": ["story.mainline.rice_table:rice_table.3"]}, "next_stage_key": null,
+      "completion_actions": [{"command": "灵叶守圃主线", "argument": "", "description": "下一程到灵泉谷辨叶，再亲自养叶，领取夜灯守护苗圃。"}],
       "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "需本关的云饭待客交单。缺饭不扣物，用生产预览补锅；过期次日重接，已完成田作与用餐记录保留。"},
       "status": "open", "aliases": ["一饭留客"], "prerequisites": ["rice_table.2"], "required_realm": "qi_sensing", "required_layer": 2,
       "lane": "rice_table", "lane_name": "云稻炊香", "reputation_key": "local.xuantian.new_town",
       "first_clear_reward": {"spirit_stones": 28, "local_reputation": 4, "service_reputation": 2}, "repeat_reward": {"spirit_stones": 5}
+    },
+    {
+      "key": "leaf_watch.1", "story_key": "story.mainline.leaf_watch", "chapter": 1, "stage": 1,
+      "name": "泉边识叶", "desc": "到灵泉谷采回一束灵叶，向圃师沈青辨认适合下种的叶脉。",
+      "body": "沈青的苗圃在灵泉谷最靠水的一侧，叶背上有一层细细的银光。他不急着教你引灵，先请你在本页开始后实际完成一次灵泉采集，结算收下一束灵叶，再看清叶脉与草根的区别。只带旧叶来，或还在采集途中，都不能证明你见过泉边的生长处。所得可以留下作种，不必马上交掉。下一页要在带田的庭院或灵圃小院精耕灵叶，先看居所条件、种子和精力。沈青说，知道叶从哪里长出来，才能在夜里分清该护哪一枝，该让哪一条水沟继续流。",
+      "objectives": [{"key": "leaf_source", "type": "exploration_reward", "label": "本关结算灵泉采集并实得灵叶", "mode_key": "explore.spring_gather", "location_key": "xuantian.spirit_field", "item_key": "item.herb.spirit_leaf", "quantity": 1}],
+      "actions": [
+        {"command": "前往", "argument": "灵泉谷", "description": "从青石镇启程，到时结算移动。"},
+        {"command": "开始探索", "argument": "灵泉采集", "description": "本关新采一束灵叶，保留作种。"},
+        {"command": "结算探索", "argument": "", "description": "到时结算，实收灵叶后交卷。"},
+        {"command": "灵田预览", "argument": "灵叶", "description": "确认下一关的居所、精力与精耕条件。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.leaf_watch:leaf_watch.1"]}, "next_stage_key": "leaf_watch.2",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "需要本关真实结算灵泉采集并取得灵叶；库存、旧探索和未结算不算。前往灵泉谷，按探索状态完成行程，保留所得作种。"},
+      "status": "open", "aliases": ["泉边识叶"], "prerequisites": ["player.start_seeking"], "required_realm": "qi_sensing", "required_layer": 2,
+      "lane": "leaf_watch", "lane_name": "灵叶守圃", "first_clear_reward": {"spirit_stones": 12}, "repeat_reward": {"spirit_stones": 2}
+    },
+    {
+      "key": "leaf_watch.2", "story_key": "story.mainline.leaf_watch", "chapter": 1, "stage": 2,
+      "name": "疏枝养叶", "desc": "在新田精耕灵叶，照料三次，收下成熟灵叶后获得守圃资格。",
+      "body": "沈青带来几根细绳，要你先学会顺着枝叶引灵。回青石镇准备有效庭院或灵圃小院，本页开始后新播一畦精耕灵叶，在六小时成熟前照料三次，再于窗口内收下至少三束灵叶。精耕落下的阵砂也归你，可留作以后布阵或护根；缓养虽然更从容，却不能代替这次疏枝练习。旧田、漏照料与枯萎不能交卷，失败时保留能用的种子按日限再来。收成妥当并领取这一页奖励后，沈青才把夜灯交给你，开放灵泉守圃。会收叶还不够，真正守夜的人须先证明自己也能把叶养好。",
+      "objectives": [{"key": "leaf_crop", "type": "field_harvest", "label": "本关精耕新灵叶并充分照料收获至少三束", "crop_key": "crop.spirit_leaf", "plan_keys": ["intensive"], "item_key": "item.herb.spirit_leaf", "quantity": 3}],
+      "actions": [
+        {"command": "前往", "argument": "青石镇", "description": "回镇查看居所；旧租约到期不丢弃已种作物。"},
+        {"command": "居所预览", "argument": "", "description": "庭院或灵圃小院可种灵叶，按名望和租金准备。"},
+        {"command": "灵田播种", "argument": "灵叶 1 精耕", "description": "本关新播，消耗实际灵叶作种。"},
+        {"command": "灵田维护", "argument": "1", "description": "成熟前照料三次，具体次数见我的灵田。"},
+        {"command": "灵田收获", "argument": "1", "description": "六小时后收获，随后领取本关奖励解锁守圃。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.leaf_watch:leaf_watch.2"]}, "next_stage_key": "leaf_watch.3",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "只认本关新播精耕灵叶并充分照料的收成。旧田、缓养、少照料与枯萎都不算；缺种再到灵泉采集，按每日名额重播，领奖后才解锁守圃。"},
+      "status": "open", "aliases": ["疏枝养叶"], "prerequisites": ["leaf_watch.1"], "required_realm": "qi_sensing", "required_layer": 2,
+      "lane": "leaf_watch", "lane_name": "灵叶守圃", "first_clear_reward": {"spirit_stones": 18, "service_reputation": 2}, "repeat_reward": {"spirit_stones": 3}
+    },
+    {
+      "key": "leaf_watch.3", "story_key": "story.mainline.leaf_watch", "chapter": 1, "stage": 3,
+      "name": "圃夜交灯", "desc": "在灵泉谷完整守夜，再把两叶一砂交给镇中苗圃备材公示。",
+      "body": "夜灯亮起，沈青把苗圃的两处缺口指给你看：风口的叶子需要引露，浅沟的水需要理砂。本页开始后到灵泉谷安排六小时守圃，护叶引露多费精力、偏得灵叶，理沟收砂多费体力、偏得阵砂，两种都能备足两叶一砂。你须完整交班，取消、旧安排与逾时保底不算；逾时只留一束叶，沈青会替你照看这一夜，却不会替你写劳作手记。完整收灯后回青石镇，接取并交付圃夜备材，真实交出两束灵叶和一份阵砂。此后守圃继续开放，余料可炼药、布阵或再次支援苗圃，田里的功夫有了每天都能接续的去处。",
+      "objectives": [
+        {"key": "watch", "type": "idle_claim", "label": "本关新安排并完整领取六小时灵泉守圃", "route_key": "idle.leaf_nursery_watch"},
+        {"key": "supply", "type": "commission_delivery", "label": "本关交付圃夜备材，实交两叶一砂", "commission_key": "town_commission.nursery_supplies"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "灵泉谷", "description": "实际抵达，已领取疏枝养叶奖励才可新安排守圃。"},
+        {"command": "挂机预览", "argument": "灵泉守圃", "description": "查看六小时、每日名额、两种选择与逾时窗口。"},
+        {"command": "开始挂机", "argument": "灵泉守圃 护叶引露", "description": "多费精力，多收灵叶。"},
+        {"command": "开始挂机", "argument": "灵泉守圃 理沟收砂", "description": "或多费体力，多收阵砂。"},
+        {"command": "领取挂机", "argument": "", "description": "六小时后完整交班，重启可用挂机状态接续。"},
+        {"command": "前往", "argument": "青石镇", "description": "收好两叶一砂，回镇看公示期限。"},
+        {"command": "接取委托", "argument": "圃夜备材", "description": "备齐材料后接单，过期次日重接。"},
+        {"command": "交付委托", "argument": "圃夜备材", "description": "实交物资，再领取本关奖励；守圃仍可另日继续。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.leaf_watch:leaf_watch.3"]}, "next_stage_key": null,
+      "completion_actions": [{"command": "挂机预览", "argument": "灵泉守圃", "description": "守圃已常驻开放；按每日名额安排下一夜，余料可炼药、布阵或继续圃夜备材。"}],
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "需要本关完整守圃和圃夜备材交付。旧安排、取消、逾时与旧交单不算；按日限重开守圃，先备两叶一砂再接公示，断线不丢进度。"},
+      "status": "open", "aliases": ["圃夜交灯"], "prerequisites": ["leaf_watch.2"], "required_realm": "qi_sensing", "required_layer": 2,
+      "lane": "leaf_watch", "lane_name": "灵叶守圃", "reputation_key": "local.xuantian.new_town",
+      "first_clear_reward": {"spirit_stones": 30, "local_reputation": 4, "service_reputation": 3}, "repeat_reward": {"spirit_stones": 6}
     }
   ]
 }

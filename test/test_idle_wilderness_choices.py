@@ -15,11 +15,11 @@ from test_wilderness_idle import Clock, send, starter, move, state
 from test_wilderness_idle import change_content
 
 
-def test_six_choices_have_distinct_costs_rewards_and_consumers():
+def test_wilderness_choices_have_distinct_costs_rewards_and_consumers():
     routes = [r for r in idle_route_definitions().values() if r.wilderness_event]
     assert {route.key for route in routes} == {
         "idle.herb_vale_gather", "idle.ironwood_gather", "idle.basalt_sifting",
-        "idle.mist_lamp_watch", "idle.cloud_dock_tide",
+        "idle.mist_lamp_watch", "idle.cloud_dock_tide", "idle.leaf_nursery_watch",
     }
     for route in routes:
         choices = [select_wilderness_choice(route, c['name']) for c in route.wilderness_event['choices']]

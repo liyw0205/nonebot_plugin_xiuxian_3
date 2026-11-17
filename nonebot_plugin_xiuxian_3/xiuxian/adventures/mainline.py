@@ -29,6 +29,7 @@ MIST_LAMP_STORY_KEY = "story.mainline.mist_lamp"
 CLOUD_TIDE_STORY_KEY = "story.mainline.cloud_tide"
 FIELD_SEEDS_STORY_KEY = "story.mainline.field_seeds"
 RICE_TABLE_STORY_KEY = "story.mainline.rice_table"
+LEAF_WATCH_STORY_KEY = "story.mainline.leaf_watch"
 MAINLINE_TOWN_COMMISSION_DELIVERED = "livelihood.town_commission.delivered"
 
 MAINLINE_LOCKED = "locked"
@@ -75,6 +76,7 @@ class MainlineStageDefinition:
     state_events: tuple[str, ...] = ()
     next_stage_key: str | None = None
     retry_message: str = ""
+    completion_actions: tuple[Mapping[str, str], ...] = ()
 
     @property
     def codex_flag(self) -> str:
@@ -257,6 +259,9 @@ _VERTICAL_SLICE_STAGES = frozenset(
         "rice_table.1",
         "rice_table.2",
         "rice_table.3",
+        "leaf_watch.1",
+        "leaf_watch.2",
+        "leaf_watch.3",
         "lane.builder.chapter.01",
         "lane.builder.chapter.02",
         "lane.builder.chapter.03",
@@ -834,6 +839,11 @@ def _parse_mainline_definitions(
             required=is_vertical_slice_stage,
         )
         actions = _story_actions(row.get("actions"), key, required=is_vertical_slice_stage)
+        completion_actions = _story_actions(
+            row.get("completion_actions"), key, required="completion_actions" in row,
+        )
+        if len(completion_actions) > 3:
+            raise ContentError(f"mainline {key} completion_actions must contain at most three actions")
         state_changes = row.get("state_changes")
         if state_changes is None and not is_vertical_slice_stage:
             state_events: tuple[str, ...] = ()
@@ -954,6 +964,7 @@ def _parse_mainline_definitions(
                 state_events=state_events,
                 next_stage_key=next_stage_key.strip() if isinstance(next_stage_key, str) else None,
                 retry_message=retry_message,
+                completion_actions=completion_actions,
             )
         )
     definitions.sort(key=lambda item: (item.chapter, item.stage, item.key))
@@ -1410,6 +1421,7 @@ __all__ = [
     "CLOUD_TIDE_STORY_KEY",
     "FIELD_SEEDS_STORY_KEY",
     "RICE_TABLE_STORY_KEY",
+    "LEAF_WATCH_STORY_KEY",
     "MAINLINE_TOWN_COMMISSION_DELIVERED",
     "MainlineDefinition",
     "MainlineStageDefinition",

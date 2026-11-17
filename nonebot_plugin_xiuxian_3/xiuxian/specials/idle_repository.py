@@ -213,6 +213,20 @@ class IdleRepositoryMixin:
             (player["id"], definition.required_permit, serialize_datetime(now)),
         ).fetchone() is None:
             missing.append("需要有效的贸易许可")
+        if definition.required_mainline_stage:
+            completed = connection.execute(
+                "SELECT 1 FROM mainline_runs r JOIN operations o ON o.player_id=r.player_id "
+                "WHERE r.player_id=? AND r.stage_key=? AND r.first_clear_claimed=1 "
+                "AND o.operation_name='mainline.claim_first_clear' "
+                "AND json_extract(o.result_json, '$.stage_key')=r.stage_key "
+                "AND json_extract(o.result_json, '$.story_key')=r.story_key "
+                "AND json_extract(o.result_json, '$.first_clear')=1 "
+                "AND json_extract(o.result_json, '$.status')='claimed' LIMIT 1",
+                (player["id"], definition.required_mainline_stage),
+            ).fetchone()
+            if completed is None:
+                label = (self.content or bundled_content()).label("mainline", definition.required_mainline_stage)
+                missing.append(f"需要完成并领取剧情：{label}")
         if definition.required_project_contribution is not None:
             project_key, min_points = definition.required_project_contribution
             points_row = connection.execute(
@@ -293,6 +307,7 @@ class IdleRepositoryMixin:
                 "required_realm": definition.required_realm,
                 "required_layer": definition.required_layer,
                 "required_permit": definition.required_permit,
+                "required_mainline_stage": definition.required_mainline_stage,
                 "required_project_contribution": (
                     list(definition.required_project_contribution)
                     if definition.required_project_contribution

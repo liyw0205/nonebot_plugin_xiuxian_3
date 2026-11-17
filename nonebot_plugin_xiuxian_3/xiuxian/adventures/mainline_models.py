@@ -66,6 +66,7 @@ class MainlineClaimRecord:
     next_stage_key: str | None = None
     source_operation_id: str | None = None
     already_completed: bool = False
+    completion_actions: tuple[dict[str, str], ...] = ()
 
 
 __all__ = [

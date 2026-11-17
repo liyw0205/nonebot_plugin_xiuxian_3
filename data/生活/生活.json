@@ -2,6 +2,39 @@
   "kind": "livelihood",
   "records": [
     {
+      "key": "idle.leaf_nursery_watch", "record_type": "idle_route", "status": "active",
+      "name": "灵泉守圃", "aliases": ["苗圃守夜"], "desc": "学会疏枝养叶后，替沈青看守灵泉谷苗圃，六小时后交班。",
+      "duration_seconds": 21600, "cost": {"stamina": 2, "energy": 2}, "daily_limit": 1,
+      "requirements": {"stage": "cultivator", "realm": {"key": "qi_sensing", "min_layer": 2}, "location_key": "xuantian.spirit_field", "mainline_stage": "leaf_watch.2"},
+      "reward_pool_key": "reward_pool.idle.leaf_watch", "fallback_reward_pool_key": "reward_pool.idle.leaf_watch.fallback", "durability_cost_bp": 0,
+      "gathering_journal": {
+        "start_text": "沈青把夜灯交给你，苗圃一边要引露护叶，一边要清理积砂的浅沟。你先循着田埂看过一圈。",
+        "complete_text": "六小时过去，灵叶与阵砂分袋收好。沈青在圃夜手记上记下完整交班，留下的苗根还等着明夜的露水。",
+        "expired_text": "夜露散尽，沈青已代为收圃，只为你留下一束灵叶。这次没有记入完整交班。",
+        "recipe_keys": ["recipe.pill.focus_low", "recipe.array.gathering_basic"]
+      },
+      "wilderness_event": {"scene": "夜风压低了叶尖，浅沟的水也慢了下来。沈青请你择一处多花工夫，另一处由他照应。", "choices": [
+        {"key": "leaf", "name": "护叶引露", "cost": {"stamina": 0, "energy": 2}, "reward_pool_key": "reward_pool.idle.leaf_watch.leaf",
+          "start_text": "你沿叶脉引来细露，逐株检查新叶是否受风。沈青在旁边替你清理浅沟。",
+          "complete_text": "新叶保住了药性，你收下较多灵叶和一份干砂，沈青验过苗根后接班。",
+          "expired_text": "灵露早已干去，沈青收走受风的叶片，只留下原定的一束灵叶。",
+          "recipe_keys": ["recipe.pill.focus_low", "recipe.array.gathering_basic"]},
+        {"key": "sand", "name": "理沟收砂", "cost": {"stamina": 2, "energy": 0}, "reward_pool_key": "reward_pool.idle.leaf_watch.sand",
+          "start_text": "你挽起衣袖清开浅沟，把可用的灵砂筛到一旁。沈青替你照看风中的新叶。",
+          "complete_text": "水口重新畅通，你装好较多阵砂与两束灵叶，留下清水继续养根。",
+          "expired_text": "沟底阵砂重新受潮，沈青没有装袋，只保留原定的一束灵叶。",
+          "recipe_keys": ["recipe.pill.focus_low", "recipe.array.gathering_basic"]}
+      ]}
+    },
+    {
+      "key": "town_commission.nursery_supplies", "record_type": "commission", "status": "active",
+      "name": "圃夜备材", "desc": "镇中为沈青收两束灵叶与一份阵砂，留作苗圃下一夜的护根物资。",
+      "inputs": [{"item_key": "item.herb.spirit_leaf", "quantity": 2}, {"item_key": "item.mat.array_sand", "quantity": 1}],
+      "reward": {"currency_key": "currency.spirit_stone", "amount": 26, "reputation_key": "local.xuantian.new_town", "reputation": 3, "service_reputation": 2},
+      "stock": 120, "duration_seconds": 43200,
+      "requirements_any": [{"type": "realm", "realm_key": "qi_sensing", "min_layer": 2}]
+    },
+    {
       "key": "town_commission.rice_hospitality", "record_type": "commission", "status": "active",
       "name": "云饭待客", "desc": "阿禾请你送来一份云纹灵米饭，让赶路的客人吃上热饭。",
       "inputs": [{"item_key": "item.food.cloud_rice_meal", "quantity": 1}],

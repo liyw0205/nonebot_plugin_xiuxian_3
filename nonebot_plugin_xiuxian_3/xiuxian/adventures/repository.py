@@ -1946,6 +1946,7 @@ class AdventuresRepositoryMixin:
                     "body": definition.body,
                     "objectives": [dict(item) for item in definition.objectives],
                     "actions": [dict(item) for item in definition.actions],
+                    "completion_actions": [dict(item) for item in definition.completion_actions],
                     "state_events": list(definition.state_events),
                     "next_stage_key": definition.next_stage_key,
                     "retry_message": definition.retry_message,
@@ -2179,6 +2180,7 @@ class AdventuresRepositoryMixin:
                 "label": definition.label,
                 "next_stage_key": definition.next_stage_key,
                 "source_operation_id": operation_id,
+                "completion_actions": [dict(item) for item in definition.completion_actions],
             }
             connection.execute(
                 """
@@ -2449,6 +2451,7 @@ class AdventuresRepositoryMixin:
             reputation_maximum = payload["local_reputation_maximum"]
             objectives = payload.get("objectives", [])
             actions = payload.get("actions", [])
+            completion_actions = payload.get("completion_actions", [])
             state_events = payload.get("state_events", [])
             next_stage_key = payload.get("next_stage_key")
             retry_message = payload.get("retry_message", "")
@@ -2634,6 +2637,9 @@ class AdventuresRepositoryMixin:
                 or not isinstance(actions, list)
                 or any(not valid_objective(item) for item in objectives)
                 or any(not valid_action(item) for item in actions)
+                or not isinstance(completion_actions, list)
+                or len(completion_actions) > 3
+                or any(not valid_action(item) for item in completion_actions)
                 or not isinstance(state_events, list)
                 or any(not isinstance(item, str) or not item for item in state_events)
                 or (next_stage_key is not None and not isinstance(next_stage_key, str))
@@ -2681,6 +2687,7 @@ class AdventuresRepositoryMixin:
                 body=str(payload.get("body", payload["description"])),
                 objectives=tuple(dict(item) for item in objectives if isinstance(item, dict)),
                 actions=tuple(dict(item) for item in actions if isinstance(item, dict)),
+                completion_actions=tuple(dict(item) for item in completion_actions),
                 state_events=tuple(state_events),
                 next_stage_key=next_stage_key,
                 retry_message=retry_message,
@@ -2828,5 +2835,6 @@ class AdventuresRepositoryMixin:
             label=str(payload.get("label", "")),
             next_stage_key=payload.get("next_stage_key"),
             source_operation_id=payload.get("source_operation_id"),
+            completion_actions=tuple(dict(item) for item in payload.get("completion_actions", [])),
             already_completed=replay,
         )

@@ -282,6 +282,10 @@ class AdventuresMainlineApplication:
                 f"**{self._display_name(record.player)}**完成了第 **{record.stage}** 关，获得 **{reward_kind}**。\n\n"
                 f"- **获得**：{self._reward_text(record.reward)}\n\n"
                 + ("> 继续前行，可查看下一关的要求。\n\n" if record.next_stage_key else "")
+                + ("\n".join(
+                    f"- **接下来**：{self._action_link(item)} · {item['description']}"
+                    for item in record.completion_actions
+                ) + "\n\n" if record.completion_actions else "")
                 + f"> 首通所得只取一次；若再入此关，请重新发送 `{self.start_command} 序号`。"
             ),
             context.request_id,
@@ -294,7 +298,11 @@ class AdventuresMainlineApplication:
                     enter=True,
                 ),)
                 if record.next_stage_key
-                else ()
+                else tuple(CommandAction(
+                    label=item["command"],
+                    command=f"{item['command']} {item['argument']}".strip(),
+                    enter=True,
+                ) for item in record.completion_actions)
             ),
         )
 

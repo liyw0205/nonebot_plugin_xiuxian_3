@@ -16,6 +16,9 @@ from nonebot_plugin_xiuxian_3.runtime import create_runtime
 from nonebot_plugin_xiuxian_3.xiuxian.adventures.mainline import mainline_definitions
 from nonebot_plugin_xiuxian_3.xiuxian.content import ContentError
 from nonebot_plugin_xiuxian_3.xiuxian.production.rules import random_quality_bp
+from nonebot_plugin_xiuxian_3.xiuxian.specials.idle_rules import idle_route_definitions, select_wilderness_choice
+from nonebot_plugin_xiuxian_3.xiuxian.livelihood.rules import town_commission_definitions
+from nonebot_plugin_xiuxian_3.xiuxian.rewards.rules import reward_pool_outcomes
 from test_adapter_simulation import _onebot_group_event, _qq_group_event
 from test_companion_old_trail_mainline import _database_state, _inventory
 from test_mainline_vertical_slice import _copy_content
@@ -118,6 +121,15 @@ def test_field_story_requires_real_sufficient_crop_plans(damage):
             stage["body"] = "只有标题"
         else:
             objective["client_result"] = True
+    with pytest.raises(ContentError):
+        mainline_definitions(change_content(mutate), story_key="story.mainline.field_seeds")
+
+
+@pytest.mark.parametrize("actions", [None, [], [True], [{"command": "", "argument": "", "description": "next"}],
+    [{"command": "主线", "argument": "", "description": "next"}] * 4])
+def test_completion_actions_reject_invalid_content(actions):
+    def mutate(records):
+        records["mainline", "field_seeds.3"]["completion_actions"] = actions
     with pytest.raises(ContentError):
         mainline_definitions(change_content(mutate), story_key="story.mainline.field_seeds")
 
@@ -233,6 +245,16 @@ def test_seed_exchange_public_story_farming_delivery_and_message_contract(tmp_pa
             j.repair()
             assert (await j.send(claim, "claim-2")).ok
             assert (await j.send("开始药畦换种主线 药畦入铺", "stage-3")).ok
+            with j.runtime.repository._connect() as db:
+                saved_tail = db.execute("SELECT snapshot_json FROM mainline_runs WHERE stage_key='field_seeds.3'").fetchone()[0]
+                broken = json.loads(saved_tail)
+                broken["definition"]["completion_actions"] = [True]
+                db.execute("UPDATE mainline_runs SET snapshot_json=? WHERE stage_key='field_seeds.3'", (json.dumps(broken),))
+            before = _database_state(j.runtime)
+            assert (await j.send("领取药畦换种主线奖励 药畦入铺")).code == "PERSISTENCE_ERROR"
+            assert _database_state(j.runtime) == before
+            with j.runtime.repository._connect() as db:
+                db.execute("UPDATE mainline_runs SET snapshot_json=? WHERE stage_key='field_seeds.3'", (saved_tail,))
             await j.next_day()
             assert (await j.send("接取委托 止血草供应", "accept")).ok
             original = _inventory(j.runtime)
@@ -244,13 +266,19 @@ def test_seed_exchange_public_story_farming_delivery_and_message_contract(tmp_pa
             for key, row in list(records.items()):
                 if key[1].startswith("field_seeds."):
                     records[key] = {**row, "status": "locked"}
+            records["mainline", "field_seeds.3"]["completion_actions"] = [
+                {"command": "主线", "argument": "", "description": "changed after start"},
+            ]
             j.runtime.repository.content = replace(content, _records=records)
             final_command = "领取药畦换种主线奖励 药畦入铺"
             results = await asyncio.gather(j.send(final_command, "final-a"), j.send(final_command, "final-b"))
             assert all(result.ok for result in results)
             assert sum(not result.data["idempotent_replay"] for result in results) == 1
+            assert all(result.actions[0].command == "云稻炊香主线" for result in results)
+            await j.render(results[0], "云稻炊香主线", keyboard=True)
             before = _database_state(j.runtime)
-            assert (await j.send(final_command, "final-a")).data["idempotent_replay"]
+            replay = await j.send(final_command, "final-a")
+            assert replay.data["idempotent_replay"] and replay.actions == results[0].actions
             assert _database_state(j.runtime) == before
             j.runtime.repository.content = content
             assert all(row["status"] == "claimed" for row in (await j.send("药畦换种主线")).data["stages"])
@@ -366,11 +394,191 @@ def test_rice_table_public_crop_cooking_recovery_and_delivery(tmp_path, adapter,
             command = "领取云稻炊香主线奖励 一饭留客"
             final = await j.send(command, "rice-final")
             assert final.ok
+            await j.render(final, "灵叶守圃主线", keyboard=True)
             before = _database_state(j.runtime)
             assert (await j.send(command, "rice-final")).data["idempotent_replay"]
             assert (await j.send("交付委托 云饭待客", "rice-deliver")).data["idempotent_replay"]
             assert _database_state(j.runtime) == before
             assert all(row["status"] == "claimed" for row in (await j.send("云稻炊香主线")).data["stages"])
+        finally:
+            await j.runtime.close()
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("damage", ["gate", "null", "locked", "reward", "weight", "consumer", "journal"])
+def test_leaf_watch_strict_unlock_choices_sources_and_consumers(damage):
+    def mutate(records):
+        route = records["livelihood", "idle.leaf_nursery_watch"]
+        if damage == "gate":
+            route["requirements"]["mainline_stage"] = "missing.stage"
+        elif damage == "null":
+            route["requirements"]["mainline_stage"] = None
+        elif damage == "locked":
+            records["mainline", "leaf_watch.2"]["status"] = "locked"
+        elif damage == "reward":
+            records["reward", "reward_pool.idle.leaf_watch.leaf"]["outcomes"][0]["rewards"]["item.mat.array_sand"] = True
+        elif damage == "weight":
+            records["reward", "reward_pool.idle.leaf_watch.sand"]["outcomes"][0]["weight"] = 0
+        elif damage == "consumer":
+            records["livelihood", "town_commission.nursery_supplies"]["inputs"][0]["item_key"] = "item.missing"
+        else:
+            route["gathering_journal"]["complete_text"] = " "
+    with pytest.raises(ContentError):
+        bundle = change_content(mutate)
+        idle_route_definitions(bundle)
+        mainline_definitions(bundle, story_key="story.mainline.leaf_watch")
+
+
+def test_leaf_watch_choices_cover_delivery_and_declare_actual_sources():
+    from nonebot_plugin_xiuxian_3.xiuxian.content import bundled_content
+
+    bundle = bundled_content()
+    route = idle_route_definitions(bundle)["idle.leaf_nursery_watch"]
+    commission = town_commission_definitions(bundle)["town_commission.nursery_supplies"]
+    choices = [select_wilderness_choice(route, key) for key in ("leaf", "sand")]
+    assert choices[0].energy_cost > choices[1].energy_cost
+    assert choices[1].stamina_cost > choices[0].stamina_cost
+    assert route.required_mainline_stage == "leaf_watch.2"
+    for choice in choices:
+        for _, reward in reward_pool_outcomes(choice.pool_key, bundle):
+            assert all(reward.get(item, 0) >= count for item, count in commission.inputs.items())
+        for item in commission.inputs:
+            assert any(channel == {"operation": "specials.claim_idle", "reference": choice.pool_key}
+                       for source in bundle.sources_for(item) for channel in source["channels"])
+
+
+@pytest.mark.parametrize("adapter,choice", [("onebot.v11", "护叶引露"), ("qq.official", "理沟收砂")])
+def test_leaf_watch_story_unlock_frozen_idle_and_real_supply(tmp_path, adapter, choice):
+    async def run():
+        j = FieldJourney(_copy_content(tmp_path), adapter)
+        try:
+            await starter(j.runtime, adapter=adapter, path="辅修 布阵")
+            with j.runtime.repository._connect() as db:
+                db.execute("UPDATE players SET realm_layer=2, spirit_stones=1000")
+                db.execute("INSERT INTO player_reputations(player_id, local_json, service_reputation, updated_at) "
+                           "SELECT id, ?, 0, ? FROM players", (json.dumps({"local.xuantian.new_town": 60}), j.clock.value.isoformat()))
+            await j.move("青石镇")
+            assert (await j.send("租住居所 灵圃小院")).ok
+            assert (await j.send("开始灵叶守圃主线 泉边识叶", "leaf-stage-1")).ok
+            await j.move("灵泉谷")
+            before = _database_state(j.runtime)
+            preview = await j.send("挂机预览 灵泉守圃")
+            assert not preview.data["routes"][0]["ready"] and "疏枝养叶" in preview.message
+            assert not (await j.send(f"开始挂机 灵泉守圃 {choice}", "locked-watch")).ok
+            assert _database_state(j.runtime) == before
+            assert (await j.send("开始探索 灵泉采集", "leaf-explore")).ok
+            j.clock.advance(minutes=3)
+            leaf = await j.send("结算探索", "leaf-source")
+            assert leaf.ok and leaf.data["result"]["item.herb.spirit_leaf"] >= 1
+            assert (await j.send("领取灵叶守圃主线奖励 泉边识叶", "leaf-claim-1")).ok
+            assert (await j.send("开始灵叶守圃主线 疏枝养叶", "leaf-stage-2")).ok
+            await j.move("青石镇")
+            assert (await j.send("灵田播种 灵叶 1 精耕", "leaf-plant")).ok
+            for _ in range(3):
+                assert (await j.send("灵田维护 1")).ok
+            j.clock.advance(hours=6)
+            assert (await j.send("灵田收获 1", "leaf-harvest")).ok
+            await j.move("灵泉谷")
+            before = _database_state(j.runtime)
+            assert not (await j.send(f"开始挂机 灵泉守圃 {choice}", "unclaimed-gate")).ok
+            assert _database_state(j.runtime) == before
+            second = await j.send("领取灵叶守圃主线奖励 疏枝养叶", "leaf-claim-2")
+            assert second.ok
+            await j.render(second, "开始灵叶守圃主线 leaf_watch.3", keyboard=True)
+            assert (await j.send("挂机预览 灵泉守圃")).data["routes"][0]["ready"]
+            # Unclaimed/foreign/forged stages cannot provide the unlock.
+            with j.runtime.repository._connect() as db:
+                payload = db.execute("SELECT result_json FROM operations WHERE operation_id='leaf-claim-2'").fetchone()[0]
+                changed = json.loads(payload)
+                changed["stage_key"] = "leaf_watch.1"
+                db.execute("UPDATE operations SET result_json=? WHERE operation_id='leaf-claim-2'", (json.dumps(changed),))
+            before = _database_state(j.runtime)
+            assert not (await j.send(f"开始挂机 灵泉守圃 {choice}", "bad-gate")).ok
+            assert _database_state(j.runtime) == before
+            with j.runtime.repository._connect() as db:
+                db.execute("UPDATE operations SET result_json=? WHERE operation_id='leaf-claim-2'", (payload,))
+            assert (await j.send(f"开始挂机 灵泉守圃 {choice}", "old-watch")).ok
+            third = await j.send("开始灵叶守圃主线 圃夜交灯", "leaf-stage-3")
+            assert third.ok
+            await j.render(third, f"开始挂机 灵泉守圃 {choice}")
+            j.clock.advance(hours=6)
+            assert (await j.send("领取挂机", "old-watch-claim")).ok
+            claim = "领取灵叶守圃主线奖励 圃夜交灯"
+            assert (await j.send(claim)).code == "MAINLINE_OBJECTIVES_INCOMPLETE"
+            await j.next_day()
+            assert (await j.send(f"开始挂机 灵泉守圃 {choice}", "cancel-watch")).ok
+            assert (await j.send("取消挂机", "cancel")).ok
+            assert (await j.send(f"开始挂机 灵泉守圃 {choice}", "late-watch")).ok
+            j.clock.advance(hours=31)
+            late = await j.send("领取挂机", "late-claim")
+            assert late.ok and late.data["fallback"] and "codex.story.leaf_watch" not in late.data["reward"]
+            assert (await j.send(claim)).code == "MAINLINE_OBJECTIVES_INCOMPLETE"
+            await j.next_day()
+            before = _database_state(j.runtime)
+            assert not (await j.send("开始挂机 灵泉守圃 错误选择", "bad-choice")).ok
+            assert _database_state(j.runtime) == before
+            assert (await j.send(f"开始挂机 灵泉守圃 {choice}", "watch")).ok
+            before = _database_state(j.runtime)
+            assert (await j.send(f"开始挂机 灵泉守圃 {choice}", "watch")).data["idempotent_replay"]
+            other = "护叶引露" if choice == "理沟收砂" else "理沟收砂"
+            assert (await j.send(f"开始挂机 灵泉守圃 {other}", "watch")).code == "OPERATION_CONFLICT"
+            assert (await j.send("领取挂机", "watch-claim")).code == "IDLE_CLAIM_TOO_EARLY"
+            assert _database_state(j.runtime) == before
+            with j.runtime.repository._connect() as db:
+                snapshot = json.loads(db.execute("SELECT snapshot_json FROM idle_assignments WHERE operation_id='watch'").fetchone()[0])
+            j.clock.advance(hours=6)
+            await j.restart()
+            content = j.runtime.repository.content
+            records = dict(content._records)
+            records["livelihood", "idle.leaf_nursery_watch"] = {**records["livelihood", "idle.leaf_nursery_watch"], "status": "locked"}
+            j.runtime.repository.content = replace(content, _records=records)
+            assert (await j.send("挂机状态")).data["claimable"]
+            j.fail("watch-claim")
+            before = _database_state(j.runtime)
+            with pytest.raises(sqlite3.IntegrityError, match="field journey fault"):
+                await j.send("领取挂机", "watch-claim")
+            assert _database_state(j.runtime) == before
+            j.repair()
+            original = _inventory(j.runtime)
+            reward = await j.send("领取挂机", "watch-claim")
+            assert reward.ok and reward.data["reward"] == snapshot["full_reward"]
+            assert all(_inventory(j.runtime).get(item, 0) - original.get(item, 0) == count
+                       for item, count in reward.data["reward"].items() if item.startswith("item."))
+            before = _database_state(j.runtime)
+            assert (await j.send("领取挂机", "watch-claim")).data["idempotent_replay"]
+            assert _database_state(j.runtime) == before
+            j.runtime.repository.content = content
+            await j.move("青石镇")
+            await j.next_day()
+            assert (await j.send("接取委托 圃夜备材", "leaf-accept")).ok
+            j.fail("leaf-deliver")
+            before = _database_state(j.runtime)
+            assert (await j.send("交付委托 圃夜备材", "leaf-deliver")).code == "PERSISTENCE_ERROR"
+            assert _database_state(j.runtime) == before
+            j.repair()
+            original = _inventory(j.runtime)
+            assert (await j.send("交付委托 圃夜备材", "leaf-deliver")).ok
+            assert original["item.herb.spirit_leaf"] - _inventory(j.runtime)["item.herb.spirit_leaf"] == 2
+            assert original["item.mat.array_sand"] - _inventory(j.runtime)["item.mat.array_sand"] == 1
+            await j.restart()
+            j.fail("leaf-final")
+            before = _database_state(j.runtime)
+            assert (await j.send(claim, "leaf-final")).code == "PERSISTENCE_ERROR"
+            assert _database_state(j.runtime) == before
+            j.repair()
+            final = await j.send(claim, "leaf-final")
+            assert final.ok
+            await j.render(final, "挂机预览 灵泉守圃", keyboard=True)
+            before = _database_state(j.runtime)
+            assert (await j.send(claim, "leaf-final")).data["idempotent_replay"]
+            assert _database_state(j.runtime) == before
+            assert all(row["status"] == "claimed" for row in (await j.send("灵叶守圃主线")).data["stages"])
+            assert "灵叶守圃主线" in (await j.send("修仙帮助 生活")).message
+            assert (await j.send("开始灵叶守圃主线 疏枝养叶", "leaf-replay")).ok
+            await j.move("灵泉谷")
+            await j.next_day()
+            assert (await j.send("挂机预览 灵泉守圃")).data["routes"][0]["ready"]
+            assert (await j.send(f"开始挂机 灵泉守圃 {choice}", "watch-after-replay")).ok
         finally:
             await j.runtime.close()
     asyncio.run(run())

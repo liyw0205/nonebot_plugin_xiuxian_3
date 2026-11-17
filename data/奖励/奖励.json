@@ -1,6 +1,21 @@
 {
   "kind": "reward",
   "records": [
+    {"key": "reward_pool.idle.leaf_watch", "name": "守圃交班所得", "desc": "六小时守圃收回灵叶、阵砂与手记。", "status": "active", "pool_type": "weighted", "outcomes": [
+      {"weight": 3, "rewards": {"item.herb.spirit_leaf": 2, "item.mat.array_sand": 1, "codex.story.leaf_watch": 1}},
+      {"weight": 1, "rewards": {"item.herb.spirit_leaf": 3, "item.mat.array_sand": 2, "codex.story.leaf_watch": 1}}
+    ]},
+    {"key": "reward_pool.idle.leaf_watch.leaf", "name": "护叶引露所得", "desc": "多费精力护叶，收下更多灵叶与一份阵砂。", "status": "active", "pool_type": "weighted", "outcomes": [
+      {"weight": 3, "rewards": {"item.herb.spirit_leaf": 3, "item.mat.array_sand": 1, "codex.story.leaf_watch": 1}},
+      {"weight": 1, "rewards": {"item.herb.spirit_leaf": 4, "item.mat.array_sand": 1, "codex.story.leaf_watch": 1}}
+    ]},
+    {"key": "reward_pool.idle.leaf_watch.sand", "name": "理沟收砂所得", "desc": "多费体力理沟，收下更多阵砂与两份灵叶。", "status": "active", "pool_type": "weighted", "outcomes": [
+      {"weight": 3, "rewards": {"item.herb.spirit_leaf": 2, "item.mat.array_sand": 2, "codex.story.leaf_watch": 1}},
+      {"weight": 1, "rewards": {"item.herb.spirit_leaf": 2, "item.mat.array_sand": 3, "codex.story.leaf_watch": 1}}
+    ]},
+    {"key": "reward_pool.idle.leaf_watch.fallback", "name": "守圃逾时所得", "desc": "沈青代为收圃，只留一束灵叶，没有完整交班手记。", "status": "active", "pool_type": "weighted", "outcomes": [
+      {"weight": 1, "rewards": {"item.herb.spirit_leaf": 1}}
+    ]},
     {"key": "reward_pool.idle.mist_lamp", "name": "守灯所得", "desc": "完整守灯收回阵砂与灯簿。", "status": "active", "pool_type": "weighted", "outcomes": [
       {"weight": 3, "rewards": {"item.mat.array_sand": 2, "codex.story.mist_lamp": 1}},
       {"weight": 1, "rewards": {"item.mat.array_sand": 3, "codex.story.mist_lamp": 1}}

@@ -35,6 +35,7 @@ from .adventures.mainline import (
     CLOUD_TIDE_STORY_KEY,
     FIELD_SEEDS_STORY_KEY,
     RICE_TABLE_STORY_KEY,
+    LEAF_WATCH_STORY_KEY,
     DAO_SETTLEMENT_STORY_KEY,
     DOMAIN_FRONTIER_STORY_KEY,
     VOID_ARCHIVE_STORY_KEY,
@@ -161,6 +162,14 @@ _RICE_TABLE_HELP = (
     "下一关用烹饪辅修新做云纹灵米饭并实际恢复体力或精力，最后交付云饭待客。"
     "旧田、旧锅、失败生产、满状态吃饭和旧交单不替代目标；用我的灵田、生产状态与主线接续。"
 )
+_LEAF_WATCH_HELP = (
+    "\n\n感气二层后，"
+    f"{command_link('灵叶守圃主线', '灵叶守圃主线')}从灵泉采集开始：实收灵叶，"
+    "再于本关新播精耕灵叶、照料三次并收获，领取疏枝养叶奖励后才开放"
+    f"{command_link('挂机预览 灵泉守圃', '挂机预览 灵泉守圃')}。"
+    "在灵泉谷选择护叶引露或理沟收砂，六小时完整交班后回镇交付圃夜备材。"
+    "未领奖不解锁；取消、旧安排与逾时保底不算守夜，重启后用主线和挂机状态接续。"
+)
 _HELP_PAGES = {
     "启程": (
         "**启程**\n\n"
@@ -236,6 +245,7 @@ _HELP_PAGES = {
         + _CLOUD_TIDE_HELP
         + _FIELD_SEEDS_HELP
         + _RICE_TABLE_HELP
+        + _LEAF_WATCH_HELP
     ),
     "悬赏": (
         "**悬赏**\n\n"
@@ -374,6 +384,7 @@ _HELP_PAGES = {
         + _CLOUD_TIDE_HELP
         + _FIELD_SEEDS_HELP
         + _RICE_TABLE_HELP
+        + _LEAF_WATCH_HELP
     ),
     "社交": (
         "**社交**\n\n"
@@ -523,6 +534,10 @@ class XiuxianApplication:
         self.rice_table_mainline = AdventuresMainlineApplication(
             repository, story_key=RICE_TABLE_STORY_KEY, title="云稻炊香主线",
             start_command="开始云稻炊香主线", claim_command="领取云稻炊香主线奖励",
+        )
+        self.leaf_watch_mainline = AdventuresMainlineApplication(
+            repository, story_key=LEAF_WATCH_STORY_KEY, title="灵叶守圃主线",
+            start_command="开始灵叶守圃主线", claim_command="领取灵叶守圃主线奖励",
         )
         self.three_realms = ThreeRealmsApplication(repository)
         self.secret_realms = SecretRealmApplication(repository)
@@ -1917,6 +1932,15 @@ class XiuxianApplication:
 
     async def get_herb_shelter_mainline_status(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.herb_shelter_mainline.get_status(context), require_write=False)
+
+    async def get_leaf_watch_mainline_status(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.leaf_watch_mainline.get_status(context), require_write=False)
+
+    async def start_leaf_watch_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.leaf_watch_mainline.start_stage(context), write_message="此刻无法开始灵叶守圃。")
+
+    async def claim_leaf_watch_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.leaf_watch_mainline.claim_reward(context), write_message="此刻无法领取灵叶守圃所得。")
 
     async def get_rice_table_mainline_status(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.rice_table_mainline.get_status(context), require_write=False)
