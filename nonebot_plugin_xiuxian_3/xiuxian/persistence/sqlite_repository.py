@@ -23,6 +23,8 @@ from ..world.repository import WorldRepositoryMixin
 from ..world.travel_repository import TravelRepositoryMixin
 from ..world.cloud_repository import CloudRepositoryMixin
 from ..exploration.repository import ExplorationRepositoryMixin
+from ..exploration.survey_repository import SurveyRepositoryMixin
+from ..exploration.survey_migration import ensure_survey_schema
 from ..combat.repository import CombatRepositoryMixin
 from ..combat.party_repository import PartyCombatRepositoryMixin
 from ..companions.repository import CompanionRepositoryMixin
@@ -141,6 +143,7 @@ class SQLitePlayerRepository(
     ProgressionRepositoryMixin,
     RoutineRepositoryMixin,
     ExplorationRepositoryMixin,
+    SurveyRepositoryMixin,
     CompanionRepositoryMixin,
     CombatRepositoryMixin,
     PartyCombatRepositoryMixin,
@@ -366,6 +369,7 @@ class SQLitePlayerRepository(
             ensure_legacy_manor_schema(connection)
             ensure_idle_schema(connection)
             ensure_dispatch_schema(connection)
+            ensure_survey_schema(connection)
             ensure_codex_schema(connection)
             ensure_tower_schema(connection)
             ensure_void_spire_schema(connection)

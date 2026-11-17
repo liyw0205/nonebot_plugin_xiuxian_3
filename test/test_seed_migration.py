@@ -707,6 +707,7 @@ def old_official_manifest() -> bytes:
             "生产/设施.json",
             "生产/终局配方.json",
             "任务/跨界任务.json",
+            "探索/地貌.json",
             "特殊/竞技场.json",
             "特殊/终局天榜.json",
             "功业/功业.json",

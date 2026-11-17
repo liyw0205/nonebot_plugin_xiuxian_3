@@ -66,6 +66,10 @@ class ContentBundle:
             from .world_content import validate_world_content
 
             validate_world_content(bundle)
+        if any(kind == "survey" for kind, _ in records):
+            from .exploration.survey_rules import survey_definitions
+
+            survey_definitions(bundle)
         return bundle
 
     @classmethod
