@@ -88,8 +88,10 @@ def _definitions(content: ContentBundle | None = None) -> dict[str, ExplorationD
             if pool is None or not isinstance(pool.get("candidates"), list) or not pool["candidates"]:
                 raise ContentError(f"exploration mode {key} references an empty encounter pool")
         from .patrol_rules import patrol_definition
+        from .relic_rules import relic_definition
 
         patrol_definition(row, bundle)
+        relic_definition(row, bundle)
         definitions[key] = ExplorationDefinition(
             key=key,
             label=row["name"].strip(),

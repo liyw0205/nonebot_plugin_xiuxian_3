@@ -197,6 +197,7 @@ def register_core_commands(router: CommandRouter, application: XiuxianApplicatio
     router.register("结算虚空航道", application.settle_void_route)
     router.register("开始探索", application.start_exploration)
     router.register("巡查预览", application.preview_patrol)
+    router.register("寻遗预览", application.preview_relic)
     router.register("山野手札", application.survey_journal)
     router.register("勘察地貌", application.start_survey)
     router.register("勘察抉择", application.choose_survey)

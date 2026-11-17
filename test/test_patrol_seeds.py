@@ -29,8 +29,10 @@ def old_patrol_seeds():
             text = text[:first] + text[text.index(markers[relative]):]
         else:
             text = text.replace('        "explore.patrol_outskirts",\n', "")
+            text = text.replace('        "explore.relic.creek",\n', "")
             for slug in ("ironwood", "basalt"):
                 text = text.replace(', "explore.patrol_' + slug + '"', "")
+                text = text.replace(', "explore.relic.' + slug + '"', "")
         blob = text.encode("utf-8")
         assert hashlib.sha256(blob).hexdigest() == expected, relative
         result[relative] = blob

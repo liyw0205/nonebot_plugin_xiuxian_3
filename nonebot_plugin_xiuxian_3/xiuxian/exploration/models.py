@@ -43,6 +43,7 @@ class ExplorationStartRecord:
     bloodline_stability_before: int = 0
     bloodline_stability_after: int = 0
     patrol: dict[str, Any] = field(default_factory=dict)
+    relic: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,3 +72,4 @@ class ExplorationSettlementRecord:
     bloodline_stability_before: int = 0
     bloodline_stability_after: int = 0
     patrol: dict[str, Any] = field(default_factory=dict)
+    relic: dict[str, Any] = field(default_factory=dict)

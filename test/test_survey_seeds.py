@@ -21,7 +21,8 @@ def old_survey_seeds():
             text = text.replace('    "探索/地貌.json",\n', "").replace('    "探索/资源脉.json",\n', "")
         else:
             text = "".join(line for line in text.splitlines(keepends=True)
-                           if not line.startswith(('    {"key":"source.survey.', '    {"key":"source.deposit.')))
+                           if not line.startswith(('    {"key":"source.survey.', '    {"key":"source.deposit.',
+                                                   '    {"key":"source.relic.')))
         result[relative] = text.encode("utf-8")
         assert hashlib.sha256(result[relative]).hexdigest() == expected
     return result

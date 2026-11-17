@@ -200,6 +200,8 @@ _HELP_PAGES = {
         "每处储量独立随时间恢复；木材与药草可在青石镇制成护脉木楔，带回现场养护。\n\n"
         f"{command_link('巡查预览', '巡查预览')}可查看近郊巡路、铁木巡林与岩径巡标："
         "选稳行或追迹，途中随机遇到不同人物与路况，真实战败无收成；完整材料可继续制作。\n\n"
+        f"{command_link('寻遗预览', '寻遗预览')}可查看三处已查地貌所指向的古迹；青石镇用可再生资源制作勘掘行囊，"
+        "现场必经真实守护战，胜利带回的三类残件可复原可穿戴山河罗盘，余料可交全天委托换取灵石。\n\n"
         f"用{command_link('我的状态', '我的状态')}确认所在地，"
         f"再{command_link('开始探索', '开始探索')}；途中所得在{command_link('结算探索', '结算探索')}时领取。\n\n"
         "备下药材、木石或阵砂后，可在山野现场承接勘务，选择踏勘或整治："
@@ -1522,6 +1524,9 @@ class XiuxianApplication:
 
     async def preview_patrol(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.exploration.preview_patrol(context), require_write=False)
+
+    async def preview_relic(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.exploration.preview_relic(context), require_write=False)
 
     async def survey_journal(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.surveys.execute(context, "journal"), require_write=False)

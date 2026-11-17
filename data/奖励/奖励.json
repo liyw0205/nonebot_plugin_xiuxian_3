@@ -1,6 +1,9 @@
 {
   "kind": "reward",
   "records": [
+    {"key":"reward_pool.relic.creek","name":"旧窑回收残件","desc":"在旧窑守护战获胜后回收陶盘残片，失败或过期无残件。","status":"active","pool_type":"weighted","outcomes":[{"weight":3,"rewards":{"item.relic.clay_disc":2}},{"weight":1,"rewards":{"item.relic.clay_disc":3}}]},
+    {"key":"reward_pool.relic.ironwood","name":"匠棚回收残件","desc":"在旧匠棚守护战获胜后回收定向铜针，失败或过期无残件。","status":"active","pool_type":"weighted","outcomes":[{"weight":3,"rewards":{"item.relic.bronze_needle":2}},{"weight":1,"rewards":{"item.relic.bronze_needle":3}}]},
+    {"key":"reward_pool.relic.basalt","name":"水工坊回收残件","desc":"在水工坊守护战获胜后回收测水刻环，失败或过期无残件。","status":"active","pool_type":"weighted","outcomes":[{"weight":3,"rewards":{"item.relic.water_ring":2}},{"weight":1,"rewards":{"item.relic.water_ring":3}}]},
     {"key":"reward_pool.idle.camp.outskirts.meal","name":"近郊篝火营饭食交班","desc":"消耗自备补给完整交班后收下可制作的材料和营地行记。","status":"active","pool_type":"weighted","outcomes":[{"weight":3,"rewards":{"item.mat.wood":4,"item.ore.ironstone":2,"item.herb.blood_grass":2,"codex.story.camp.outskirts":1}},{"weight":1,"rewards":{"item.mat.wood":5,"item.ore.ironstone":2,"item.herb.blood_grass":2,"codex.story.camp.outskirts":1}}]},
     {"key":"reward_pool.idle.camp.outskirts.pill","name":"近郊篝火营备药交班","desc":"消耗自备补给完整交班后收下可制作的材料和营地行记。","status":"active","pool_type":"weighted","outcomes":[{"weight":3,"rewards":{"item.mat.wood":2,"item.ore.ironstone":4,"item.herb.blood_grass":3,"codex.story.camp.outskirts":1}},{"weight":1,"rewards":{"item.mat.wood":3,"item.ore.ironstone":4,"item.herb.blood_grass":3,"codex.story.camp.outskirts":1}}]},
     {"key":"reward_pool.idle.camp.outskirts.fallback","name":"近郊篝火营逾时留料","desc":"迟到只收少量干料，不退已用补给，不记完整交班。","status":"active","pool_type":"weighted","outcomes":[{"weight":1,"rewards":{"item.mat.wood":1}}]},

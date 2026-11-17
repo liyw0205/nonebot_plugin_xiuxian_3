@@ -495,6 +495,10 @@ def old_official_materials() -> bytes:
             "item.food.cloud_rice_meal",
             "item.material.ward_plate",
             "item.mat.root_wedge",
+            "item.relic.excavation_kit",
+            "item.relic.clay_disc",
+            "item.relic.bronze_needle",
+            "item.relic.water_ring",
         }
     ]
     blob = (json.dumps(document, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
@@ -553,6 +557,9 @@ def old_official_locations() -> bytes:
     )
     text = (ROOT / "data" / LOCATION_FILE).read_text(encoding="utf-8")
     text = text.replace('        "explore.patrol_outskirts",\n', "")
+    text = text.replace('        "explore.relic.creek",\n', "")
+    for slug in ("ironwood", "basalt"):
+        text = text.replace(', "explore.relic.' + slug + '"', "")
     for slug in ("ironwood", "basalt"):
         text = text.replace(', "explore.patrol_' + slug + '"', "")
     # The discoverability slice rewrote exploration actions on existing records.

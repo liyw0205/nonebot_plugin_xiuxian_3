@@ -85,6 +85,7 @@ from ..world.cloud_rules import DEMON_INTRO_FLAG
 from ..events.contribution_projection import record_spirit_spring_contribution
 from ..exploration.models import ExplorationSettlementRecord, ExplorationStartRecord
 from .patrol_rules import freeze_patrol, frozen_patrol
+from .relic_rules import RelicRequirementError, freeze_relic, frozen_relic, relic_definition
 from ..exploration.rules import (
     CLOUD_BOAT_STORM_CHANCE_BP,
     CLOUD_BOAT_STORM_CHOICES,
@@ -169,6 +170,7 @@ from ..routine.rules import (
 
 from ..persistence.errors import *  # noqa: F401,F403
 from ..utils.assets import assets_spend, assets_with_delta, player_currency
+from ..utils.assets import player_available_item_amount
 from ..utils.player import (
     change_player_state,
     grant_player_reward,
@@ -182,6 +184,31 @@ from ..rewards.rules import RewardContentError
 
 
 class ExplorationRepositoryMixin:
+    async def relic_preview(self, *, platform, platform_user_id, selector=""):
+        await self.initialize()
+        return await asyncio.to_thread(self._relic_preview_sync, platform, platform_user_id, selector)
+
+    def _relic_preview_sync(self, platform, user, selector):
+        bundle = self.content or bundled_content()
+        entries = []
+        with self._connect() as connection:
+            player = self._require_player(connection, platform, user, writable=False)
+            for row in bundle.list("exploration_mode", include_locked=False):
+                if not row.get("relic") or selector and selector not in {row["key"], row["name"], *row.get("aliases", [])}:
+                    continue
+                definition = relic_definition(row, bundle)
+                saved = connection.execute("SELECT * FROM field_surveys WHERE player_id=? AND site_key=?",
+                                           (player["id"], definition["survey_key"])).fetchone()
+                if saved:
+                    self._survey_evidence(connection, saved)
+                entries.append({"mode": row, "definition": definition,
+                                "unlocked": saved is not None and saved["status"] == "completed",
+                                "inventory": {key: player_available_item_amount(connection, player, key)
+                                              for key in definition["costs"]}})
+        if selector and not entries:
+            raise RelicRequirementError("没有这一处开放古迹，请查看寻遗预览。")
+        return {"entries": entries}
+
     def _validate_patrol_snapshot(self, connection, session, snapshot):
         receipt = connection.execute(
             "SELECT result_json FROM operations WHERE operation_id=? AND player_id=? "
@@ -189,6 +216,7 @@ class ExplorationRepositoryMixin:
             (session["operation_id"], session["player_id"]),
         ).fetchone()
         saved = decode_json_strict(receipt["result_json"]) if receipt else {}
+        self._validate_relic_snapshot(connection, session, snapshot, saved)
         if "patrol" not in snapshot and not saved.get("patrol"):
             return {}
         patrol = frozen_patrol(snapshot.get("patrol"))
@@ -200,6 +228,42 @@ class ExplorationRepositoryMixin:
                 or snapshot.get("base_battle_chance_bp") != patrol["approach"]["battle_chance_bp"]):
             raise RewardContentError("patrol snapshot disagrees with its start operation")
         return patrol
+
+    def _validate_relic_snapshot(self, connection, session, snapshot, saved):
+        if "relic" not in snapshot and not saved.get("relic"):
+            return
+        relic = frozen_relic(snapshot.get("relic"))
+        if (saved.get("relic") != relic or relic["mode_key"] != session["mode_key"]
+                or relic["location_key"] != session["location_key"]
+                or saved.get("exploration_id") != session["exploration_id"]
+                or saved.get("starts_at") != session["starts_at"] or saved.get("ends_at") != session["ends_at"]
+                or snapshot.get("frozen_result") != relic["reward"]
+                or snapshot.get("reward_pool_key") != relic["pool_key"]
+                or type(snapshot.get("battle_chance_bp")) is not int or snapshot["battle_chance_bp"] != 10000
+                or type(snapshot.get("base_battle_chance_bp")) is not int or snapshot["base_battle_chance_bp"] != 10000
+                or snapshot.get("battle_failure_result", {}) != {}
+                or snapshot.get("random_seed") != session["operation_id"]):
+            raise RewardContentError("relic snapshot disagrees with its start operation")
+        for key in ("stamina_cost", "energy_cost"):
+            if type(snapshot.get(key)) is not int or snapshot[key] != relic[key] or saved.get(key) != relic[key]:
+                raise RewardContentError("relic cost evidence is invalid")
+        if (session["stamina_cost"] != relic["stamina_cost"] or session["daily_limit"] != relic["daily_limit"]
+                or datetime.fromisoformat(session["ends_at"]) - datetime.fromisoformat(session["starts_at"])
+                != timedelta(seconds=relic["duration_seconds"])):
+            raise RewardContentError("relic session timing/cost evidence is invalid")
+        discovery = connection.execute(
+            "SELECT result_json FROM operations WHERE operation_id=? AND player_id=? AND operation_name='survey.choose'",
+            (relic["discovery_operation_id"], session["player_id"]),
+        ).fetchone()
+        proof = self._survey_payload(decode_json_strict(discovery["result_json"])) if discovery else None
+        survey = connection.execute("SELECT * FROM field_surveys WHERE player_id=? AND site_key=?",
+                                    (session["player_id"], relic["definition"]["survey_key"])).fetchone()
+        if (proof is None or survey is None or survey["status"] != "completed"
+                or self._survey_evidence(connection, survey)["site"]["key"] != relic["definition"]["survey_key"]
+                or survey["last_operation_id"] != relic["discovery_operation_id"]
+                or proof["state"]["status"] != "completed"
+                or proof["site"]["key"] != relic["definition"]["survey_key"]):
+            raise RewardContentError("relic discovery evidence is missing")
 
     @staticmethod
     def _strict_exploration_object(value: Any, label: str) -> dict[str, Any]:
@@ -390,6 +454,7 @@ class ExplorationRepositoryMixin:
             definition = exploration_definition(mode_key, self.content)
             bundle = self.content or bundled_content()
             patrol = freeze_patrol(bundle.require("exploration_mode", mode_key, include_locked=False), bundle, approach, operation_id)
+            relic_config = relic_definition(bundle.require("exploration_mode", mode_key, include_locked=False), bundle)
             if patrol:
                 selected = patrol["approach"]
                 definition = replace(definition, **{key: selected[key] for key in
@@ -410,6 +475,17 @@ class ExplorationRepositoryMixin:
                 self.content,
             ):
                 raise LocationRequirementError("realm requirement is not met")
+            discovery_operation_id = ""
+            if relic_config:
+                discovery = connection.execute("SELECT * FROM field_surveys WHERE player_id=? AND site_key=?",
+                                               (row["id"], relic_config["survey_key"])).fetchone()
+                if discovery is None or discovery["status"] != "completed":
+                    raise RelicRequirementError("先完成当地地貌勘察；山野手札可查发现与路线。")
+                self._survey_evidence(connection, discovery)
+                discovery_operation_id = discovery["last_operation_id"]
+                for key, amount in relic_config["costs"].items():
+                    if player_available_item_amount(connection, row, key) < amount:
+                        raise RelicRequirementError("勘掘物资不足；请先在青石镇生产" + bundle.label("recipe", relic_config["supply_recipe_key"]) + "。")
             pollution_before = player_integer(row, "pollution")
             pollution_after = pollution_before
             bloodline_stability_before = player_integer(row, "bloodline_stability")
@@ -519,6 +595,8 @@ class ExplorationRepositoryMixin:
                 barrier_risk_reduction_bp = int(
                     self._json_object(active_barrier["snapshot_json"], {})["risk_reduction_bp"]
                 )
+            if relic_config:
+                barrier_risk_reduction_bp = 0
             battle_chance_bp = max(0, definition.battle_chance_bp - barrier_risk_reduction_bp)
             player_state = player_combat_values(row)
             stat_snapshot = self._build_player_stat_snapshot(connection, row)
@@ -593,10 +671,16 @@ class ExplorationRepositoryMixin:
                 snapshot["patrol"] = patrol
                 snapshot["reward_pool_key"] = patrol["pool_key"]
                 snapshot["frozen_result"] = patrol["reward"]
+            relic = freeze_relic(bundle.require("exploration_mode", mode_key), bundle, discovery_operation_id,
+                                 snapshot.get("frozen_result", {})) if relic_config else {}
+            if relic:
+                snapshot["relic"] = relic
             change_player_state(
                 connection,
                 row,
                 updated_at=starts_at,
+                asset_values=relic_config["costs"] if relic_config else None,
+                asset_mode="spend",
                 value_delta={
                     "stamina": -definition.stamina_cost,
                     "energy": -definition.energy_cost,
@@ -655,6 +739,7 @@ class ExplorationRepositoryMixin:
                 "encounter_enemy_key": snapshot.get("encounter_enemy_key"),
                 "frozen_result": dict(snapshot.get("frozen_result", {})),
                 "patrol": patrol,
+                "relic": relic,
             }
             connection.execute(
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -689,6 +774,7 @@ class ExplorationRepositoryMixin:
             bloodline_stability_before=int(payload.get("bloodline_stability_before", 0)),
             bloodline_stability_after=int(payload.get("bloodline_stability_after", 0)),
             patrol=frozen_patrol(payload["patrol"]) if payload.get("patrol") else {},
+            relic=frozen_relic(payload["relic"]) if payload.get("relic") else {},
             already_completed=replay,
         )
 
@@ -812,6 +898,7 @@ class ExplorationRepositoryMixin:
             if str(session["status"]) != "combat_pending":
                 stored = self._strict_exploration_object(session["result_json"], "exploration result")
                 snapshot = self._strict_exploration_object(session["snapshot_json"], "exploration snapshot")
+                self._validate_patrol_snapshot(connection, session, snapshot)
                 settled_result = self._strict_exploration_reward(
                     stored.get("result", {}), "exploration settled result"
                 )
@@ -828,6 +915,8 @@ class ExplorationRepositoryMixin:
                     "energy_cost": int(snapshot.get("energy_cost", 0)),
                     "battle_id": stored.get("battle_id"),
                     "battle_outcome": stored.get("battle_outcome"),
+                    "patrol": snapshot.get("patrol", {}),
+                    "relic": snapshot.get("relic", {}),
                 }
                 connection.execute(
                     "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -1044,6 +1133,7 @@ class ExplorationRepositoryMixin:
                 "battle_outcome": battle_outcome,
                 "pollution_before": int(snapshot.get("pollution_before", 0)),
                 "patrol": snapshot.get("patrol", {}),
+                "relic": snapshot.get("relic", {}),
                 "pollution_after": int(snapshot.get("pollution_after", 0)),
                 "bloodline_stability_before": int(snapshot.get("bloodline_stability_before", 0)),
                 "bloodline_stability_after": int(snapshot.get("bloodline_stability_after", 0)),
@@ -1137,6 +1227,8 @@ class ExplorationRepositoryMixin:
                     "energy_cost": int(snapshot["energy_cost"]),
                     "battle_id": stored_result.get("battle_id"),
                     "battle_outcome": stored_result.get("battle_outcome"),
+                    "patrol": snapshot.get("patrol", {}),
+                    "relic": snapshot.get("relic", {}),
                 }
                 connection.execute(
                     "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -1237,7 +1329,7 @@ class ExplorationRepositoryMixin:
                     else 0
                 )
                 reward_pool_key = exploration_reward_pool(str(session["mode_key"]), self.content)
-                if reward_pool_key is not None or snapshot.get("patrol"):
+                if reward_pool_key is not None or snapshot.get("patrol") or snapshot.get("relic"):
                     frozen_result = snapshot.get("frozen_result")
                     if not isinstance(frozen_result, dict):
                         raise RewardContentError("exploration reward snapshot is missing")
@@ -1361,6 +1453,7 @@ class ExplorationRepositoryMixin:
                 "random_seed": snapshot.get("random_seed"),
                 "frozen_result": dict(result),
                 "patrol": snapshot.get("patrol", {}),
+                "relic": snapshot.get("relic", {}),
             }
             connection.execute(
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -1425,6 +1518,7 @@ class ExplorationRepositoryMixin:
             storm_deadline=str(payload["storm_deadline"]) if payload.get("storm_deadline") else None,
             storm_choice=str(payload["storm_choice"]) if payload.get("storm_choice") else None,
             patrol=frozen_patrol(payload["patrol"]) if payload.get("patrol") else {},
+            relic=frozen_relic(payload["relic"]) if payload.get("relic") else {},
             pollution_before=int(payload.get("pollution_before", 0)),
             pollution_after=int(payload.get("pollution_after", 0)),
             soul_power_loss=int(payload.get("soul_power_loss", 0)),
@@ -1644,12 +1738,18 @@ class ExplorationRepositoryMixin:
             if session is None:
                 raise ExplorationNotFoundError("exploration cannot be cancelled")
             snapshot = decode_json_strict(session["snapshot_json"])
+            self._validate_patrol_snapshot(connection, session, snapshot)
+            relic = snapshot.get("relic", {})
+            if relic and self._now() >= datetime.fromisoformat(session["starts_at"]) + timedelta(seconds=relic["definition"]["cancel_seconds"]):
+                raise RelicRequirementError("已离开勘掘准备窗口，物资已拆用；请到时结算探索，战败或过期不会退回物资。")
             stamina_refund = int(session["stamina_cost"])
             energy_refund = int(snapshot.get("energy_cost", 0))
             change_player_state(
                 connection,
                 row,
                 updated_at=now_text,
+                asset_values=relic["definition"]["costs"] if relic else None,
+                asset_mode="grant",
                 value_delta={"stamina": stamina_refund, "energy": energy_refund},
                 maximums={"stamina": player_integer(row, "stamina_max"), "energy": player_integer(row, "energy_max")},
             )
@@ -1670,6 +1770,7 @@ class ExplorationRepositoryMixin:
                 "expired": False,
                 "stamina_cost": int(session["stamina_cost"]),
                 "energy_cost": energy_refund,
+                "relic": relic,
             }
             connection.execute(
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
