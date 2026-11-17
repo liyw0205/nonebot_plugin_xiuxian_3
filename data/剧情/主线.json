@@ -4847,6 +4847,61 @@
       "status": "open", "aliases": ["药畦入铺"], "prerequisites": ["field_seeds.2"], "required_realm": "qi_sensing", "required_layer": 2,
       "lane": "field_seeds", "lane_name": "药畦换种", "reputation_key": "local.xuantian.new_town",
       "first_clear_reward": {"spirit_stones": 24, "local_reputation": 4, "service_reputation": 2}, "repeat_reward": {"spirit_stones": 5}
+    },
+    {
+      "key": "rice_table.1", "story_key": "story.mainline.rice_table", "chapter": 1, "stage": 1,
+      "name": "稻畦起穗", "desc": "把换来的云纹稻种播进灵圃，充分照料一季新稻。",
+      "body": "阿禾打开药苗换来的稻种袋，让你听谷粒在掌心落下的声音。云纹稻需要灵圃小院的田气，先在青石镇积累六十名望，再按居所预览备好租金。没有稻种时，回药畦用精耕止血草、充分照料的收成换一份。本页开始后再播云纹稻：精耕六小时，成熟前照料三次；缓养十小时，只需照料一次，两种都要在各自窗口内收获。阿禾只认新田的实收，不认旧袋中的稻谷。漏了照料或等到枯萎，这页不会消失，保留种子按日限重播即可；收成妥当后，他会陪你回灶边蒸饭。",
+      "objectives": [{"key": "rice", "type": "field_harvest", "label": "本关新播云纹稻并充分照料收获至少四份稻谷", "crop_key": "crop.cloud_rice", "plan_keys": ["intensive", "patient"], "item_key": "item.grain.cloud_rice", "quantity": 4}],
+      "actions": [
+        {"command": "药畦换种主线", "argument": "", "description": "缺稻种可先完成精耕止血草的换种劳作。"},
+        {"command": "居所预览", "argument": "", "description": "查看灵圃小院的六十名望与租金条件。"},
+        {"command": "租住居所", "argument": "灵圃小院", "description": "在青石镇租院，已有有效小院无需重租。"},
+        {"command": "灵田播种", "argument": "云纹稻 1 缓养", "description": "也可选精耕，按方案在成熟前完成照料。"},
+        {"command": "灵田维护", "argument": "1", "description": "缓养一次、精耕三次，不能等成熟后补。"},
+        {"command": "灵田收获", "argument": "1", "description": "用我的灵田看成熟时刻与窗口。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.rice_table:rice_table.1"]}, "next_stage_key": "rice_table.2",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "只认本关新播且充分照料的云纹稻实收；旧田、少照料和枯萎不算。用我的灵田看窗口，缺种先精耕止血草换种，按日限重播。"},
+      "status": "open", "aliases": ["稻畦起穗"], "prerequisites": ["player.start_seeking"], "required_realm": "qi_sensing", "required_layer": 2,
+      "lane": "rice_table", "lane_name": "云稻炊香", "first_clear_reward": {"spirit_stones": 15, "service_reputation": 1}, "repeat_reward": {"spirit_stones": 3}
+    },
+    {
+      "key": "rice_table.2", "story_key": "story.mainline.rice_table", "chapter": 1, "stage": 2,
+      "name": "新米开甑", "desc": "以新锅成功蒸出云纹灵米饭，吃一份恢复劳作消耗。",
+      "body": "稻穗已晾干，阿禾把三份稻谷淘净放进甑里，灶边便有了淡淡的米香。你需要烹饪辅修，先看生产预览，再在本页开始后新开一锅云纹灵米饭，等成功领取才算做成。旧锅、未收的饭与失败返料都不是这一桌的成品。熟饭有两份，留一份给客人，自己吃一份补回种田和开灶耗去的精力或体力；若状态已满，先做真实劳作再用饭，零恢复不能交卷。阿禾不急着催客人进门，只请你先尝过自己煮的米。火候不成时保留返料，回田里补足三份谷，再开新锅便是。",
+      "objectives": [
+        {"key": "cook", "type": "production_complete", "label": "本关新开锅成功领取云纹灵米饭", "crop_source": {"crop_key": "crop.cloud_rice", "plan_keys": ["intensive", "patient"]}, "recipe_key": "recipe.food.cloud_rice_meal", "item_key": "item.food.cloud_rice_meal"},
+        {"key": "eat", "type": "item_use", "label": "新锅成功出饭后实际恢复体力或精力", "recipe_key": "recipe.food.cloud_rice_meal", "item_key": "item.food.cloud_rice_meal", "resources": ["stamina", "energy"]}
+      ],
+      "actions": [
+        {"command": "辅修预览", "argument": "烹饪", "description": "不自动改变辅修；按公开条件准备烹饪资格。"},
+        {"command": "生产预览", "argument": "云纹灵米饭", "description": "查看三份谷的投入与失败返料。"},
+        {"command": "开始生产", "argument": "云纹灵米饭", "description": "本关新开锅，旧锅不算。"},
+        {"command": "领取生产", "argument": "", "description": "到时成功领取；过期可按生产状态恢复。"},
+        {"command": "使用物品", "argument": "云纹灵米饭 精力", "description": "成功出饭后恢复劳作消耗，留一份饭待客。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.rice_table:rice_table.2"]}, "next_stage_key": "rice_table.3",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "需本关新锅成功出饭，再实际恢复体力或精力。旧锅、失败和零恢复不算；用生产状态接续，缺谷再种，进度保留。"},
+      "status": "open", "aliases": ["新米开甑"], "prerequisites": ["rice_table.1"], "required_realm": "qi_sensing", "required_layer": 2,
+      "lane": "rice_table", "lane_name": "云稻炊香", "first_clear_reward": {"spirit_stones": 20, "service_reputation": 2}, "repeat_reward": {"spirit_stones": 4}
+    },
+    {
+      "key": "rice_table.3", "story_key": "story.mainline.rice_table", "chapter": 1, "stage": 3,
+      "name": "一饭留客", "desc": "给食肆交一份云纹灵米饭，让田里的收成走到旅人桌上。",
+      "body": "暮色落到青石镇的门楼，赶路的人在食肆门口停住脚步。阿禾请你把留好的那份云纹灵米饭交给柜上的云饭待客公示。先开始这一页，再备实物、看十二小时公示的期限，接单后交出一份饭。旧交单与口头许诺不算，食肆会真实扣物、付酬并记下服务名望。若饭已经吃完，可以用留下的谷另蒸一锅；谷不足就回小院再养一季，不必重做前两页。交卷后阿禾收起空甑，请你去灵泉谷看看沈青的苗圃：饭香可以待客，灵叶也能给来年的药田留下一夜安稳。",
+      "objectives": [{"key": "meal", "type": "commission_delivery", "label": "本关交付云饭待客，实际交出一份云纹灵米饭", "commission_key": "town_commission.rice_hospitality"}],
+      "actions": [
+        {"command": "城镇委托", "argument": "", "description": "在青石镇查看当日云饭待客。"},
+        {"command": "接取委托", "argument": "云饭待客", "description": "先备一份云纹灵米饭，过期次日重接。"},
+        {"command": "交付委托", "argument": "云饭待客", "description": "实交饭食后领取本关奖励。"},
+        {"command": "前往", "argument": "灵泉谷", "description": "交卷后可去灵泉采集、继续养灵叶。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.rice_table:rice_table.3"]}, "next_stage_key": null,
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "需本关的云饭待客交单。缺饭不扣物，用生产预览补锅；过期次日重接，已完成田作与用餐记录保留。"},
+      "status": "open", "aliases": ["一饭留客"], "prerequisites": ["rice_table.2"], "required_realm": "qi_sensing", "required_layer": 2,
+      "lane": "rice_table", "lane_name": "云稻炊香", "reputation_key": "local.xuantian.new_town",
+      "first_clear_reward": {"spirit_stones": 28, "local_reputation": 4, "service_reputation": 2}, "repeat_reward": {"spirit_stones": 5}
     }
   ]
 }

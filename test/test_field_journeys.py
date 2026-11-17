@@ -15,6 +15,7 @@ from nonebot_plugin_xiuxian_3.adapters.qq import normalize_event as normalize_qq
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 from nonebot_plugin_xiuxian_3.xiuxian.adventures.mainline import mainline_definitions
 from nonebot_plugin_xiuxian_3.xiuxian.content import ContentError
+from nonebot_plugin_xiuxian_3.xiuxian.production.rules import random_quality_bp
 from test_adapter_simulation import _onebot_group_event, _qq_group_event
 from test_companion_old_trail_mainline import _database_state, _inventory
 from test_mainline_vertical_slice import _copy_content
@@ -254,6 +255,122 @@ def test_seed_exchange_public_story_farming_delivery_and_message_contract(tmp_pa
             j.runtime.repository.content = content
             assert all(row["status"] == "claimed" for row in (await j.send("药畦换种主线")).data["stages"])
             assert "药畦换种主线" in (await j.send("修仙帮助 生活")).message
+        finally:
+            await j.runtime.close()
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("damage", ["plan", "quantity", "source", "empty", "extra", "consumer"])
+def test_rice_story_production_source_and_consumer_validation(damage):
+    def mutate(records):
+        source = records["mainline", "rice_table.2"]["objectives"][0]["crop_source"]
+        if damage == "plan":
+            source["plan_keys"] = ["missing"]
+        elif damage == "quantity":
+            records["recipe", "recipe.food.cloud_rice_meal"]["inputs"]["item.grain.cloud_rice"] = 20
+        elif damage == "source":
+            source["crop_key"] = "crop.spirit_leaf"
+        elif damage == "empty":
+            source["plan_keys"] = []
+        elif damage == "extra":
+            source["client_amount"] = 50
+        else:
+            records["livelihood", "town_commission.rice_hospitality"]["inputs"][0]["item_key"] = "item.missing"
+    with pytest.raises(ContentError):
+        mainline_definitions(change_content(mutate), story_key="story.mainline.rice_table")
+
+
+@pytest.mark.parametrize("adapter,plan,hours,care", [("onebot.v11", "精耕", 6, 3), ("qq.official", "缓养", 10, 1)])
+def test_rice_table_public_crop_cooking_recovery_and_delivery(tmp_path, adapter, plan, hours, care):
+    async def run():
+        j = FieldJourney(_copy_content(tmp_path), adapter)
+        try:
+            await starter(j.runtime, adapter=adapter, path="辅修 烹饪")
+            before = _database_state(j.runtime)
+            assert (await j.send("开始云稻炊香主线 稻畦起穗")).code == "MAINLINE_REQUIREMENT_MISSING"
+            assert (await j.send("开始云稻炊香主线 稻畦起穗 多余参数")).code == "INVALID_MAINLINE_COMMAND"
+            assert _database_state(j.runtime) == before
+            # Realm/funds/reputation are established growth; all seed/food evidence
+            # comes from real public producers below.
+            with j.runtime.repository._connect() as db:
+                db.execute("UPDATE players SET realm_layer=2, spirit_stones=1000")
+                db.execute("INSERT INTO player_reputations(player_id, local_json, service_reputation, updated_at) "
+                           "SELECT id, ?, 0, ? FROM players", (json.dumps({"local.xuantian.new_town": 60}), j.clock.value.isoformat()))
+            await j.move("青石镇")
+            assert (await j.send("租住居所 灵圃小院")).ok
+            assert (await j.send("开始云稻炊香主线 稻畦起穗", "rice-stage-1")).ok
+            before = _database_state(j.runtime)
+            assert not (await j.send("灵田播种 云纹稻 1 缓养", "no-seed")).ok
+            assert _database_state(j.runtime) == before
+            assert (await j.send("灵田播种 止血草 1 精耕", "seed-source")).ok
+            for _ in range(2):
+                assert (await j.send("灵田维护 1")).ok
+            j.clock.advance(hours=4)
+            assert (await j.send("灵田收获 1")).data["harvest"]["item.grain.cloud_rice"] == 1
+            assert (await j.send(f"灵田播种 云纹稻 1 {plan}", "rice-plant")).ok
+            before = _database_state(j.runtime)
+            assert (await j.send(f"灵田播种 云纹稻 1 {plan}", "rice-plant")).data["idempotent_replay"]
+            other = "缓养" if plan == "精耕" else "精耕"
+            assert (await j.send(f"灵田播种 云纹稻 1 {other}", "rice-plant")).code == "OPERATION_CONFLICT"
+            assert _database_state(j.runtime) == before
+            for _ in range(care):
+                assert (await j.send("灵田维护 1")).ok
+            j.clock.advance(hours=hours)
+            await j.restart()
+            original = _inventory(j.runtime)
+            harvested = await j.send("灵田收获 1", "rice-harvest")
+            assert harvested.ok
+            assert _inventory(j.runtime)["item.grain.cloud_rice"] == original.get("item.grain.cloud_rice", 0) + harvested.data["harvest"]["item.grain.cloud_rice"]
+            first = await j.send("领取云稻炊香主线奖励 稻畦起穗", "rice-claim-1")
+            assert first.ok
+            await j.render(first, "开始云稻炊香主线 rice_table.2", keyboard=True)
+            second = await j.send(first.actions[0].command, "rice-stage-2")
+            assert second.ok
+            await j.render(second, "开始生产 云纹灵米饭")
+            good = next(f"rice-cook-{i}" for i in range(200) if random_quality_bp(f"rice-cook-{i}") == 1000)
+            before_inventory = _inventory(j.runtime)
+            started = await j.send("开始生产 云纹灵米饭", good)
+            assert started.ok, started.message
+            assert before_inventory["item.grain.cloud_rice"] - _inventory(j.runtime)["item.grain.cloud_rice"] == 3
+            j.clock.advance(seconds=30)
+            await j.restart()
+            made = await j.send("领取生产", "rice-cooked")
+            assert made.ok and made.data["success"]
+            claim = "领取云稻炊香主线奖励 新米开甑"
+            before = _database_state(j.runtime)
+            assert (await j.send(claim)).code == "MAINLINE_OBJECTIVES_INCOMPLETE"
+            assert _database_state(j.runtime) == before
+            ate = await j.send("使用物品 云纹灵米饭 精力", "eat-rice")
+            assert ate.ok, ate.message
+            assert _inventory(j.runtime)["item.food.cloud_rice_meal"] == 1
+            j.fail("rice-claim-2")
+            before = _database_state(j.runtime)
+            assert (await j.send(claim, "rice-claim-2")).code == "PERSISTENCE_ERROR"
+            assert _database_state(j.runtime) == before
+            j.repair()
+            assert (await j.send(claim, "rice-claim-2")).ok
+            before = _database_state(j.runtime)
+            assert (await j.send(claim, "rice-claim-2")).data["idempotent_replay"]
+            assert _database_state(j.runtime) == before
+            assert (await j.send("开始云稻炊香主线 一饭留客", "rice-stage-3")).ok
+            await j.next_day()
+            assert (await j.send("接取委托 云饭待客", "rice-accept")).ok
+            j.fail("rice-deliver")
+            before = _database_state(j.runtime)
+            assert (await j.send("交付委托 云饭待客", "rice-deliver")).code == "PERSISTENCE_ERROR"
+            assert _database_state(j.runtime) == before
+            j.repair()
+            assert (await j.send("交付委托 云饭待客", "rice-deliver")).ok
+            assert _inventory(j.runtime).get("item.food.cloud_rice_meal", 0) == 0
+            await j.restart()
+            command = "领取云稻炊香主线奖励 一饭留客"
+            final = await j.send(command, "rice-final")
+            assert final.ok
+            before = _database_state(j.runtime)
+            assert (await j.send(command, "rice-final")).data["idempotent_replay"]
+            assert (await j.send("交付委托 云饭待客", "rice-deliver")).data["idempotent_replay"]
+            assert _database_state(j.runtime) == before
+            assert all(row["status"] == "claimed" for row in (await j.send("云稻炊香主线")).data["stages"])
         finally:
             await j.runtime.close()
     asyncio.run(run())

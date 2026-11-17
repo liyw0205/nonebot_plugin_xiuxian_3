@@ -28,6 +28,7 @@ HERB_SHELTER_STORY_KEY = "story.mainline.herb_shelter"
 MIST_LAMP_STORY_KEY = "story.mainline.mist_lamp"
 CLOUD_TIDE_STORY_KEY = "story.mainline.cloud_tide"
 FIELD_SEEDS_STORY_KEY = "story.mainline.field_seeds"
+RICE_TABLE_STORY_KEY = "story.mainline.rice_table"
 MAINLINE_TOWN_COMMISSION_DELIVERED = "livelihood.town_commission.delivered"
 
 MAINLINE_LOCKED = "locked"
@@ -253,6 +254,9 @@ _VERTICAL_SLICE_STAGES = frozenset(
         "field_seeds.1",
         "field_seeds.2",
         "field_seeds.3",
+        "rice_table.1",
+        "rice_table.2",
+        "rice_table.3",
         "lane.builder.chapter.01",
         "lane.builder.chapter.02",
         "lane.builder.chapter.03",
@@ -603,13 +607,19 @@ def _story_objectives(
             }
         elif kind in {"production_complete", "item_use"}:
             extra = "route_key" if kind == "production_complete" else "resources"
-            optional = {"additional_route_keys"} if kind == "production_complete" else set()
+            if kind == "production_complete" and "crop_source" in objective:
+                extra = "crop_source"
+            optional = {"additional_route_keys"} if extra == "route_key" else set()
             if set(objective) - optional != {"key", "type", "label", "recipe_key", "item_key", extra}:
                 raise ContentError(f"mainline {key} objective {objective_key} has an invalid {kind} shape")
             recipe_key, item_key = objective.get("recipe_key"), objective.get("item_key")
             if any(not isinstance(item, str) or not item.strip() for item in (recipe_key, item_key)):
                 raise ContentError(f"mainline {key} objective {objective_key} requires recipe and item keys")
-            if kind == "production_complete":
+            if extra == "crop_source":
+                from .field_objectives import crop_source_yields
+
+                guaranteed_crop = crop_source_yields(objective[extra], bundle)
+            elif kind == "production_complete":
                 if not isinstance(objective[extra], str) or not objective[extra].strip():
                     raise ContentError(f"mainline {key} objective {objective_key} requires route_key")
                 additional_routes = objective.get("additional_route_keys", [])
@@ -638,7 +648,10 @@ def _story_objectives(
                     raise ContentError(f"mainline {key} objective {objective_key} references an inactive recipe") from exc
                 if recipe.outputs.get(item_key, 0) < 1:
                     raise ContentError(f"mainline {key} objective {objective_key} recipe does not produce its item")
-                if kind == "production_complete":
+                if extra == "crop_source":
+                    if any(guaranteed_crop.get(asset, 0) < amount for asset, amount in recipe.inputs.items()):
+                        raise ContentError(f"mainline {key} objective {objective_key} crop ingredients are not guaranteed")
+                elif kind == "production_complete":
                     from ..specials.idle_rules import idle_route_definitions
                     from ..rewards.rules import reward_pool_outcomes
 
@@ -1396,6 +1409,7 @@ __all__ = [
     "MIST_LAMP_STORY_KEY",
     "CLOUD_TIDE_STORY_KEY",
     "FIELD_SEEDS_STORY_KEY",
+    "RICE_TABLE_STORY_KEY",
     "MAINLINE_TOWN_COMMISSION_DELIVERED",
     "MainlineDefinition",
     "MainlineStageDefinition",

@@ -2,6 +2,14 @@
   "kind": "livelihood",
   "records": [
     {
+      "key": "town_commission.rice_hospitality", "record_type": "commission", "status": "active",
+      "name": "云饭待客", "desc": "阿禾请你送来一份云纹灵米饭，让赶路的客人吃上热饭。",
+      "inputs": [{"item_key": "item.food.cloud_rice_meal", "quantity": 1}],
+      "reward": {"currency_key": "currency.spirit_stone", "amount": 20, "reputation_key": "local.xuantian.new_town", "reputation": 3, "service_reputation": 1},
+      "stock": 120, "stock_bonus_key": "town_commission.stock_bonus", "duration_seconds": 43200,
+      "requirements_any": [{"type": "realm", "realm_key": "qi_sensing", "min_layer": 2}]
+    },
+    {
       "key": "idle.herb_vale_gather", "record_type": "idle_route", "status": "active",
       "name": "百草坡采药", "desc": "跟随姜婆辨认坡地药草，留根采叶，为日常疗伤炼药攒下材料。",
       "aliases": ["坡地采药"], "duration_seconds": 14400,

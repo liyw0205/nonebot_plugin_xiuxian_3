@@ -8,6 +8,31 @@ from ..content import ContentBundle, ContentError
 from ..utils.json_cache import decode_json_strict
 
 
+def crop_source_yields(value: object, bundle: ContentBundle | None = None) -> dict[str, int]:
+    if (
+        not isinstance(value, dict) or set(value) != {"crop_key", "plan_keys"}
+        or not isinstance(value["crop_key"], str) or not value["crop_key"].strip()
+        or not isinstance(value["plan_keys"], list) or not value["plan_keys"]
+        or any(not isinstance(key, str) or not key.strip() for key in value["plan_keys"])
+        or len(set(value["plan_keys"])) != len(value["plan_keys"])
+    ):
+        raise ContentError("mainline crop_source has an invalid shape")
+    if bundle is None:
+        return {}
+    from ..livelihood.rules import crop_definitions
+
+    crop = crop_definitions(bundle).get(value["crop_key"])
+    if crop is None or not crop.cultivation:
+        raise ContentError("mainline crop_source references an unknown cultivated crop")
+    definitions = {plan["key"]: plan for plan in crop.cultivation["plans"]}
+    harvests = []
+    for key in value["plan_keys"]:
+        if key not in definitions:
+            raise ContentError("mainline crop_source references an unknown crop plan")
+        harvests.extend(event["harvest"] for event in definitions[key]["events"])
+    return {item: min(harvest.get(item, 0) for harvest in harvests) for item in harvests[0]}
+
+
 def field_harvest_objective(value: dict, bundle: ContentBundle | None = None) -> dict:
     fields = {"key", "type", "label", "crop_key", "plan_keys", "item_key", "quantity"}
     plans = value.get("plan_keys")

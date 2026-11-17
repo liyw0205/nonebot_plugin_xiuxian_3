@@ -34,6 +34,7 @@ from .adventures.mainline import (
     MIST_LAMP_STORY_KEY,
     CLOUD_TIDE_STORY_KEY,
     FIELD_SEEDS_STORY_KEY,
+    RICE_TABLE_STORY_KEY,
     DAO_SETTLEMENT_STORY_KEY,
     DOMAIN_FRONTIER_STORY_KEY,
     VOID_ARCHIVE_STORY_KEY,
@@ -153,6 +154,13 @@ _FIELD_SEEDS_HELP = (
     "旧田、本关才收的旧苗、少照料与枯萎都不算；用我的灵田看窗口，保留种子按日限重种。"
     "换种后可积累镇中名望，租灵圃小院，继续种云纹稻。"
 )
+_RICE_TABLE_HELP = (
+    "\n\n感气二层后可从"
+    f"{command_link('云稻炊香主线', '云稻炊香主线')}接稻畦起穗：镇中名望六十、租得灵圃小院，"
+    "本关新播云纹稻，精耕或缓养均须充分照料收获。稻种可从精耕止血草换来。"
+    "下一关用烹饪辅修新做云纹灵米饭并实际恢复体力或精力，最后交付云饭待客。"
+    "旧田、旧锅、失败生产、满状态吃饭和旧交单不替代目标；用我的灵田、生产状态与主线接续。"
+)
 _HELP_PAGES = {
     "启程": (
         "**启程**\n\n"
@@ -227,6 +235,7 @@ _HELP_PAGES = {
         + _MIST_LAMP_HELP
         + _CLOUD_TIDE_HELP
         + _FIELD_SEEDS_HELP
+        + _RICE_TABLE_HELP
     ),
     "悬赏": (
         "**悬赏**\n\n"
@@ -364,6 +373,7 @@ _HELP_PAGES = {
         + _MIST_LAMP_HELP
         + _CLOUD_TIDE_HELP
         + _FIELD_SEEDS_HELP
+        + _RICE_TABLE_HELP
     ),
     "社交": (
         "**社交**\n\n"
@@ -509,6 +519,10 @@ class XiuxianApplication:
         self.field_seeds_mainline = AdventuresMainlineApplication(
             repository, story_key=FIELD_SEEDS_STORY_KEY, title="药畦换种主线",
             start_command="开始药畦换种主线", claim_command="领取药畦换种主线奖励",
+        )
+        self.rice_table_mainline = AdventuresMainlineApplication(
+            repository, story_key=RICE_TABLE_STORY_KEY, title="云稻炊香主线",
+            start_command="开始云稻炊香主线", claim_command="领取云稻炊香主线奖励",
         )
         self.three_realms = ThreeRealmsApplication(repository)
         self.secret_realms = SecretRealmApplication(repository)
@@ -1903,6 +1917,15 @@ class XiuxianApplication:
 
     async def get_herb_shelter_mainline_status(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.herb_shelter_mainline.get_status(context), require_write=False)
+
+    async def get_rice_table_mainline_status(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.rice_table_mainline.get_status(context), require_write=False)
+
+    async def start_rice_table_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.rice_table_mainline.start_stage(context), write_message="此刻无法开始云稻炊香。")
+
+    async def claim_rice_table_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.rice_table_mainline.claim_reward(context), write_message="此刻无法领取云稻炊香所得。")
 
     async def get_field_seeds_mainline_status(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.field_seeds_mainline.get_status(context), require_write=False)

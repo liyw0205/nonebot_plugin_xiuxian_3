@@ -2560,6 +2560,8 @@ class AdventuresRepositoryMixin:
                     )
                 if objective["type"] in {"production_complete", "item_use"}:
                     extra = "route_key" if objective["type"] == "production_complete" else "resources"
+                    if objective["type"] == "production_complete" and "crop_source" in objective:
+                        extra = "crop_source"
                     optional = {"additional_route_keys"} if extra == "route_key" else set()
                     if (
                         set(objective) - optional != {"key", "type", "label", "recipe_key", "item_key", extra}
@@ -2570,6 +2572,11 @@ class AdventuresRepositoryMixin:
                     ):
                         return False
                     value = objective[extra]
+                    if extra == "crop_source":
+                        from .field_objectives import crop_source_yields
+
+                        crop_source_yields(value)
+                        return True
                     if extra == "route_key":
                         additional = objective.get("additional_route_keys", [])
                         return (
