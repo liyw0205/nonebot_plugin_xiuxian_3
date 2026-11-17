@@ -118,7 +118,10 @@ def validate_content_references(bundle: ContentBundle) -> dict[str, int]:
     from .production.rules import recipe_definitions
     from .world_content import validate_world_content
     from .exploration.rules import _definitions
-    from .advancement.equipment_rules import validate_equipment_reclamation_consumers
+    from .advancement.equipment_rules import (
+        validate_equipment_reclamation_consumers,
+        validate_equipment_repair_kit_consumers,
+    )
 
     world = validate_world_content(bundle)
     combat = validate_combat_content(bundle)
@@ -128,6 +131,9 @@ def validate_content_references(bundle: ContentBundle) -> dict[str, int]:
     bounties = len(bounty_definitions(bundle))
     recipe_definitions_by_key = recipe_definitions(bundle)
     equipment_reclamation_assets = validate_equipment_reclamation_consumers(
+        bundle, recipe_definitions_by_key
+    )
+    equipment_repair_kits = validate_equipment_repair_kit_consumers(
         bundle, recipe_definitions_by_key
     )
     recipes = len(recipe_definitions_by_key)
@@ -144,6 +150,7 @@ def validate_content_references(bundle: ContentBundle) -> dict[str, int]:
         "bounties": bounties,
         "recipes": recipes,
         "equipment_reclamation_assets": equipment_reclamation_assets,
+        "equipment_repair_kits": equipment_repair_kits,
         "sources": sources,
         **{f"materials_{key}": value for key, value in materials.items()},
         **{f"combat_{key}": value for key, value in combat.items()},

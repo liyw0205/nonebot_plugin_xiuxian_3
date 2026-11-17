@@ -86,6 +86,17 @@ class EquipmentReclamationPreviewRecord:
 
 
 @dataclass(frozen=True, slots=True)
+class EquipmentFieldRepairRecord:
+    player: PlayerView
+    equipment: EquipmentRecord
+    durability_before: int
+    durability_after: int
+    kit_key: str
+    kit_spent: int = 1
+    already_completed: bool = False
+
+
+@dataclass(frozen=True, slots=True)
 class EquipmentListRecord:
     player: PlayerView
     equipment: tuple[EquipmentRecord, ...]
@@ -97,6 +108,7 @@ __all__ = [
     "EquipmentRepairRecord",
     "EquipmentReclamationPreviewRecord",
     "EquipmentReclamationRecord",
+    "EquipmentFieldRepairRecord",
     "EquipmentRecord",
     "RefinementRecord",
     "TemperingRecord",

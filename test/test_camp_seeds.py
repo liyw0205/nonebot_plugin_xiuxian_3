@@ -26,7 +26,9 @@ def old_camp_seeds():
         lines = (ROOT / "data" / relative).read_text(encoding="utf-8").splitlines(keepends=True)
         markers = tuple('    {"key":"' + prefix for prefix in
                         (*prefixes, "source.survey.", "source.deposit.", "recipe.field.root_wedge",
-                         "source.relic.", "recipe.relic.", "reward_pool.relic.", "town_commission.relic_fragments"))
+                         "source.relic.", "recipe.relic.", "reward_pool.relic.",
+                         "town_commission.relic_fragments", "recipe.equipment.repair_kit",
+                         "town_commission.repair_kits"))
         blob = "".join(line for line in lines if not line.startswith(markers)).encode("utf-8")
         assert hashlib.sha256(blob).hexdigest() == expected, relative
         result[relative] = blob

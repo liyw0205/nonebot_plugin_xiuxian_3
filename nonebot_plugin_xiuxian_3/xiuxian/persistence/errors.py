@@ -1297,6 +1297,14 @@ class EquipmentReclamationEquippedError(RuntimeError):
     """Equipped equipment must be removed before reclamation."""
 
 
+class EquipmentFieldRepairNotNeededError(RuntimeError):
+    """The equipment has no missing durability for field repair."""
+
+
+class EquipmentRepairKitInsufficientError(RuntimeError):
+    """The player has no repair kit available."""
+
+
 class RealmCultivationInsufficientError(RuntimeError):
     """The player has not reached the next layer threshold."""
 

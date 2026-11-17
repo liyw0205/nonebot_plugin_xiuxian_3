@@ -26,8 +26,12 @@ BASELINES = {
 
 def old_relic_seeds():
     result = {}
-    prefixes = ("explore.relic.", "reward_pool.relic.", "source.relic.", "recipe.relic.",
-                "town_commission.relic_fragments", "item.accessory.field_compass", "item.relic.")
+    prefixes = (
+        "explore.relic.", "reward_pool.relic.", "source.relic.", "recipe.relic.",
+        "recipe.equipment.repair_kit", "town_commission.relic_fragments",
+        "town_commission.repair_kits", "item.accessory.field_compass", "item.relic.",
+        "item.equipment.repair_kit",
+    )
     markers = tuple('    {"key":"' + prefix for prefix in prefixes)
     for relative, expected in BASELINES.items():
         text = (ROOT / "data" / relative).read_text(encoding="utf-8")

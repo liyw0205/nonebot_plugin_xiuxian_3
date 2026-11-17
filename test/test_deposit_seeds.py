@@ -20,7 +20,9 @@ def old_deposit_seeds():
     result = {}
     markers = ('    {"key":"source.deposit.', '    {"key":"recipe.field.root_wedge"',
                '    {"key":"item.mat.root_wedge"', '    {"key":"source.relic.',
-               '    {"key":"recipe.relic.', '    {"key":"item.relic.')
+               '    {"key":"recipe.relic.', '    {"key":"item.relic.',
+               '    {"key":"recipe.equipment.repair_kit',
+               '    {"key":"item.equipment.repair_kit')
     for relative, expected in BASELINES.items():
         text = (ROOT / "data" / relative).read_text(encoding="utf-8")
         text = "".join(line for line in text.splitlines(keepends=True)

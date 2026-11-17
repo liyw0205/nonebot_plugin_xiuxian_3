@@ -1285,6 +1285,27 @@ CREATE TABLE IF NOT EXISTS equipment_reclamation_events (
 CREATE INDEX IF NOT EXISTS idx_equipment_reclamation_events_player
     ON equipment_reclamation_events(player_id, created_at);
 
+CREATE TABLE IF NOT EXISTS equipment_field_repair_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id TEXT NOT NULL UNIQUE,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    equipment_id INTEGER NOT NULL REFERENCES equipment_instances(id),
+    operation_id TEXT NOT NULL UNIQUE,
+    status_before TEXT NOT NULL CHECK (status_before IN ('active', 'broken')),
+    status_after TEXT NOT NULL CHECK (status_after IN ('active', 'broken')),
+    equipped_before INTEGER NOT NULL CHECK (equipped_before IN (0, 1)),
+    equipped_after INTEGER NOT NULL CHECK (equipped_after IN (0, 1)),
+    durability_before INTEGER NOT NULL CHECK (durability_before BETWEEN 0 AND 9999),
+    durability_after INTEGER NOT NULL CHECK (durability_after BETWEEN 1 AND 10000),
+    kit_key TEXT NOT NULL,
+    kit_spent INTEGER NOT NULL CHECK (kit_spent = 1),
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_equipment_field_repair_events_player
+    ON equipment_field_repair_events(player_id, created_at);
+
 CREATE TABLE IF NOT EXISTS production_orders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     order_id TEXT NOT NULL UNIQUE,

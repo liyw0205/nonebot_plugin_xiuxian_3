@@ -2718,6 +2718,20 @@ class XiuxianApplication:
             write_message="当前事件不允许回收装备。",
         )
 
+    async def field_repair_equipment(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.equipment.field_repair(context),
+            write_message="当前事件不允许野外修缮装备。",
+        )
+
+    async def preview_field_repair_equipment(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.equipment.field_repair_preview(context),
+            require_write=False,
+        )
+
     async def list_equipment(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.equipment.list_equipment(context), require_write=False)
 

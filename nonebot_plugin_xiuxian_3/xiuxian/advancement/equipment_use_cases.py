@@ -12,6 +12,8 @@ from ..repository import (
     EquipmentRepairLocationError,
     EquipmentRepairNotNeededError,
     EquipmentReclamationEquippedError,
+    EquipmentFieldRepairNotNeededError,
+    EquipmentRepairKitInsufficientError,
     EquipmentTemperingMaxedError,
     OperationConflictError,
     PlayerNotFoundError,
@@ -30,6 +32,7 @@ from .equipment_rules import (
     equipment_definitions,
     equipment_repair_cost,
     equipment_resource_label,
+    equipment_repair_kit,
     refinement_cost,
     refinement_pity_failures,
     refinement_success_bp,
@@ -375,6 +378,112 @@ class EquipmentApplication:
             },
         )
 
+    async def field_repair(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) != 1:
+            return CommandResult(False, "INVALID_EQUIPMENT_FIELD_REPAIR_COMMAND", "请指定装备编号。", context.request_id)
+        operation_id = self._operation_id(context, "item.field_repair")
+        try:
+            record = await self.repository.field_repair_equipment(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                equipment_instance_id=context.command_args[0],
+                operation_id=operation_id,
+            )
+        except PlayerNotFoundError:
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
+        except PlayerStageConflictError:
+            return CommandResult(False, "PLAYER_STAGE_CONFLICT", "完成入道后才能使用野外修缮包。", context.request_id, operation_id)
+        except EquipmentNotOwnedError:
+            return CommandResult(False, "EQUIPMENT_NOT_OWNED", "没有找到这件可修缮的装备。", context.request_id, operation_id)
+        except EquipmentFieldRepairNotNeededError:
+            return CommandResult(False, "EQUIPMENT_REPAIR_NOT_NEEDED", "这件装备耐久充足，无需野外修缮。", context.request_id, operation_id)
+        except EquipmentRepairKitInsufficientError:
+            return CommandResult(False, "EQUIPMENT_REPAIR_KIT_INSUFFICIENT", "缺少野外修缮包，未改变装备。", context.request_id, operation_id)
+        except EquipmentBusyError:
+            return CommandResult(False, "EQUIPMENT_BUSY", "当前有进行中的行动或战斗，暂不能野外修缮。", context.request_id, operation_id)
+        except OperationConflictError:
+            return CommandResult(False, "OPERATION_CONFLICT", "这次野外修缮编号已用于其他请求，请重新发起。", context.request_id, operation_id)
+        except PlayerSuspendedError:
+            return CommandResult(False, "PLAYER_SUSPENDED", "当前角色暂时不能野外修缮。", context.request_id, operation_id)
+        except RepositoryBusyError:
+            return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+        return CommandResult(
+            True,
+            "EQUIPMENT_FIELD_REPAIRED",
+            f"## 野外修缮\n\n**{record.equipment.label}** 耐久 {record.durability_before / 100:.0f}% → {record.durability_after / 100:.0f}%，消耗 1 个野外修缮包。",
+            context.request_id,
+            operation_id,
+            data={
+                "instance_id": record.equipment.instance_id,
+                "durability_before": record.durability_before,
+                "durability_after": record.durability_after,
+                "kit_key": record.kit_key,
+                "kit_spent": record.kit_spent,
+                "status": record.equipment.status,
+                "equipped": record.equipment.equipped,
+                "idempotent_replay": record.already_completed,
+            },
+        )
+
+    async def field_repair_preview(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) != 1:
+            return CommandResult(
+                False,
+                "INVALID_EQUIPMENT_FIELD_REPAIR_COMMAND",
+                "请从我的装备中选择具体实例，例如 `野外修缮预览 装备编号`。",
+                context.request_id,
+            )
+        try:
+            listing = await self.repository.list_equipment(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+            )
+            kit_key, kit_amount = equipment_repair_kit(self._content())
+        except PlayerNotFoundError:
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id)
+        except PlayerSuspendedError:
+            return CommandResult(False, "PLAYER_SUSPENDED", "当前角色暂时无法查看装备。", context.request_id)
+        except RepositoryBusyError:
+            return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, retryable=True)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, retryable=True)
+        instance_id = context.command_args[0].strip()
+        equipment = next((row for row in listing.equipment if row.instance_id == instance_id), None)
+        if equipment is None:
+            return CommandResult(False, "EQUIPMENT_NOT_OWNED", "没有找到这件可修缮的装备。", context.request_id)
+        if equipment.durability_bp >= 10_000:
+            return CommandResult(False, "EQUIPMENT_REPAIR_NOT_NEEDED", "这件装备耐久充足，无需野外修缮。", context.request_id)
+        available = int(listing.player.inventory.get(kit_key, 0))
+        after = min(10_000, equipment.durability_bp + kit_amount)
+        lines = [
+            "## 野外修缮预览",
+            "",
+            f"装备：**{equipment.label}** · {equipment.instance_id}",
+            f"耐久：{equipment.durability_bp / 100:.0f}% → {after / 100:.0f}%",
+            f"消耗：{self._content().label('item', kit_key)} ×1（当前 {available}）",
+        ]
+        if available < 1:
+            lines.append("修缮包不足，可在青石镇" + command_link("制作修缮包", "生产预览 野外修缮包") + "。")
+        else:
+            lines.append(command_link("确认野外修缮", f"野外修缮装备 {instance_id}"))
+        return CommandResult(
+            True,
+            "EQUIPMENT_FIELD_REPAIR_PREVIEW",
+            "\n".join(lines),
+            context.request_id,
+            data={
+                "instance_id": instance_id,
+                "durability_before": equipment.durability_bp,
+                "durability_after": after,
+                "kit_key": kit_key,
+                "kit_amount": 1,
+                "kit_restore_bp": kit_amount,
+                "kit_available": available,
+            },
+        )
+
     async def list_equipment(self, context: CommandContext) -> CommandResult:
         if context.command_args:
             return CommandResult(False, "INVALID_EQUIPMENT_COMMAND", "查看装备无需附加参数。", context.request_id)
@@ -406,6 +515,7 @@ class EquipmentApplication:
                     line += " · " + command_link("重铸", f"重铸法器 {equipment.instance_id}")
                 if equipment.durability_bp < 10_000:
                     line += " · " + command_link("修复预览", f"装备修复预览 {equipment.instance_id}")
+                    line += " · " + command_link("野外修缮", f"野外修缮预览 {equipment.instance_id}")
                 if not equipment.equipped:
                     line += " · " + command_link("回收预览", f"装备回收预览 {equipment.instance_id}")
                 lines.append(line)

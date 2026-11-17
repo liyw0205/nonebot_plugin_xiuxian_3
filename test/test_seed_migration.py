@@ -496,10 +496,11 @@ def old_official_materials() -> bytes:
             "item.material.ward_plate",
             "item.mat.root_wedge",
             "item.relic.excavation_kit",
-            "item.relic.clay_disc",
-            "item.relic.bronze_needle",
-            "item.relic.water_ring",
-        }
+                "item.relic.clay_disc",
+                "item.relic.bronze_needle",
+                "item.relic.water_ring",
+                "item.equipment.repair_kit",
+            }
     ]
     blob = (json.dumps(document, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
     rule = json.loads((ROOT / "scripts/seed_migrations.json").read_text(encoding="utf-8"))[

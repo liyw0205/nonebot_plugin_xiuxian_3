@@ -380,6 +380,64 @@ def validate_equipment_reclamation_consumers(
     return len(reclaimed_items)
 
 
+def equipment_repair_kit(content: ContentBundle | None = None) -> tuple[str, int]:
+    """Resolve the single active item that declares bounded field repair."""
+
+    bundle = content or _default_content()
+    matches: list[tuple[str, int]] = []
+    for row in bundle.list("item", include_locked=False):
+        effects = row.get("effects")
+        if not isinstance(effects, list):
+            continue
+        configured = [
+            effect for effect in effects
+            if isinstance(effect, dict) and effect.get("type") == "equipment_repair_kit"
+        ]
+        if not configured:
+            continue
+        if len(effects) != 1 or set(configured[0]) != {"type", "durability_bp"}:
+            raise ContentError(f"repair kit {row.get('key')} has invalid equipment_repair_kit effect")
+        if (
+            row.get("item_type") != "material"
+            or row.get("instance_mode") != "stack"
+            or type(row.get("stack_limit")) is not int
+            or row["stack_limit"] < 1
+        ):
+            raise ContentError(f"repair kit {row.get('key')} must be a stackable material")
+        amount = configured[0]["durability_bp"]
+        if isinstance(amount, bool) or not isinstance(amount, int) or not 1 <= amount <= 10_000:
+            raise ContentError(f"repair kit {row.get('key')} has invalid durability_bp")
+        matches.append((str(row.get("key")), amount))
+    if len(matches) != 1:
+        raise ContentError("content must declare exactly one active equipment repair kit")
+    return matches[0]
+
+
+def validate_equipment_repair_kit_consumers(
+    content: ContentBundle,
+    recipes: dict[str, Any] | None = None,
+) -> int:
+    """Require the repair kit to have an open recipe and commission consumer."""
+
+    kit_key, _ = equipment_repair_kit(content)
+    item = content.require("item", kit_key, include_locked=False)
+    source_key = item.get("source_recipe_key")
+    if not isinstance(source_key, str) or not source_key:
+        raise ContentError(f"repair kit {kit_key} requires source_recipe_key")
+    if recipes is None:
+        from ..production.rules import recipe_definitions
+
+        recipes = recipe_definitions(content)
+    source = recipes.get(source_key)
+    if source is None or source.outputs.get(kit_key, 0) <= 0:
+        raise ContentError(f"repair kit {kit_key} source recipe is not open or does not produce it")
+    from ..livelihood.rules import town_commission_definitions
+
+    if not any(kit_key in definition.inputs for definition in town_commission_definitions(content).values()):
+        raise ContentError(f"repair kit {kit_key} has no open town commission consumer")
+    return 1
+
+
 def _validated_costs(value: Any, key: str, operation: str) -> dict[str, int]:
     if not isinstance(value, dict) or not value:
         raise ContentError(f"equipment {key} {operation} cost must be a non-empty object")
@@ -485,6 +543,7 @@ __all__ = [
     "equipment_definitions",
     "equipment_initial_durability_bp",
     "equipment_reclamation_yields",
+    "equipment_repair_kit",
     "equipment_repair_cost",
     "equipment_meets_path",
     "equipment_meets_realm",
@@ -498,4 +557,5 @@ __all__ = [
     "temper_roll_bp",
     "temper_success_bp",
     "validate_equipment_reclamation_consumers",
+    "validate_equipment_repair_kit_consumers",
 ]

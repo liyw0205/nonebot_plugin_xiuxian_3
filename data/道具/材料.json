@@ -6,6 +6,7 @@
     {"key":"item.relic.bronze_needle","name":"定向铜针","desc":"铁木旧匠棚回收的测地铜针，与陶盘及刻环合成山河罗盘，余料可交古器收录委托。","item_type":"material","quality":"common","stack_limit":99,"instance_mode":"stack","bind_type":"character_bound","tradeable":false,"effects":[],"requirements":[],"status":"active"},
     {"key":"item.relic.water_ring","name":"测水刻环","desc":"岩径水工坊回收的带度数刻环，与陶盘和铜针复原罗盘，多余成套残件可交古器收录委托。","item_type":"material","quality":"uncommon","stack_limit":99,"instance_mode":"stack","bind_type":"character_bound","tradeable":false,"effects":[],"requirements":[],"status":"active"},
     {"key":"item.mat.root_wedge","name":"护脉木楔","desc":"以干木和止血草纤维缠成的木楔，用于稳住资源脉的松土、倒木和渠边石片；在养护资源脉时实际消耗。","item_type":"material","quality":"common","stack_limit":99,"instance_mode":"stack","bind_type":"character_bound","tradeable":false,"effects":[],"requirements":[],"source_recipe_key":"recipe.field.root_wedge","status":"active"},
+    {"key":"item.equipment.repair_kit","name":"野外修缮包","desc":"把回收铁石与木材、药草缝成的应急修缮包；野外可将一件装备的耐久补回一小段，也可交城镇委托换取灵石。","item_type":"material","quality":"common","stack_limit":99,"instance_mode":"stack","bind_type":"character_bound","tradeable":false,"effects":[{"type":"equipment_repair_kit","durability_bp":2000}],"requirements":[],"source_recipe_key":"recipe.equipment.repair_kit","status":"active"},
     {
       "key": "item.void_power_crystal",
       "name": "虚空能量晶",
