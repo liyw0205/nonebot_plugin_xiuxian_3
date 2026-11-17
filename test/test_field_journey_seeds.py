@@ -34,6 +34,8 @@ def old_field_journey_seeds() -> dict[str, bytes]:
                 first = text.index('  "records": [\n') + len('  "records": [\n')
                 marker = text.index('    {\n      "key": "source.item.herb.blood_grass"')
                 text = text[:first] + text[marker:]
+            if relative == "图鉴/条目.json":
+                text = "".join(line for line in text.splitlines(keepends=True) if "codex.story.camp." not in line)
             text = "".join(line for line in text.splitlines(keepends=True)
                            if "leaf_watch" not in line)
         blob = text.encode("utf-8")
