@@ -437,6 +437,8 @@ def register_core_commands(router: CommandRouter, application: XiuxianApplicatio
     router.register("参悟神通", application.train_skill, aliases=("升级神通",))
     router.register("法器预览", application.preview_equipment, aliases=("预览法器",))
     router.register("重铸预览", application.preview_refinement, aliases=("预览重铸",))
+    router.register("装备修复预览", application.preview_equipment_repair, aliases=("修复预览",))
+    router.register("修复装备", application.repair_equipment)
     router.register("强化法器", application.temper_equipment)
     router.register("重铸法器", application.refine_equipment)
     router.register("我的装备", application.list_equipment, aliases=("装备状态",))

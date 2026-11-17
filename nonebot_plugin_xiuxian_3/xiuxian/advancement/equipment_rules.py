@@ -54,6 +54,7 @@ def equipment_definitions(content: ContentBundle | None = None) -> dict[str, Equ
         name = row.get("name")
         growth = row.get("growth")
         growth_profile_key = row.get("growth_profile_key")
+        repair_profile_key = row.get("repair_profile_key")
         if growth_profile_key is not None:
             if not isinstance(growth_profile_key, str) or growth is not None:
                 raise ContentError(f"equipment {key} must use either growth or growth_profile_key")
@@ -61,6 +62,20 @@ def equipment_definitions(content: ContentBundle | None = None) -> dict[str, Equ
                 growth = bundle.require("equipment_growth", growth_profile_key, include_locked=False).get("growth")
             except KeyError as exc:
                 raise ContentError(f"equipment {key} references unknown growth profile {growth_profile_key}") from exc
+        if repair_profile_key is not None:
+            if not isinstance(repair_profile_key, str):
+                raise ContentError(f"equipment {key} repair_profile_key must be a string")
+            if not isinstance(growth, dict):
+                raise ContentError(f"equipment {key} repair_profile_key requires custom growth")
+            if "repair" in growth:
+                raise ContentError(f"equipment {key} cannot define repair rules and a repair profile")
+            try:
+                repair_growth = bundle.require("equipment_growth", repair_profile_key, include_locked=False).get("growth")
+            except KeyError as exc:
+                raise ContentError(f"equipment {key} references unknown repair profile {repair_profile_key}") from exc
+            if not isinstance(repair_growth, dict) or not isinstance(repair_growth.get("repair"), dict):
+                raise ContentError(f"equipment {key} repair profile {repair_profile_key} requires repair rules")
+            growth = {**growth, "repair": repair_growth["repair"]}
         if not isinstance(key, str) or not isinstance(name, str) or not isinstance(growth, dict):
             raise ContentError(f"equipment item requires key, name and growth configuration: {row!r}")
         slot = row.get("equipment_slot", row.get("item_type"))
@@ -113,8 +128,32 @@ def equipment_definitions(content: ContentBundle | None = None) -> dict[str, Equ
             raise ContentError(f"equipment {key} durability_bp must be a non-negative integer")
         temper = growth.get("temper")
         refinement = growth.get("refinement")
+        repair = growth.get("repair")
         if not isinstance(temper, dict) or not isinstance(refinement, dict):
             raise ContentError(f"equipment {key} requires temper and refinement rules")
+        if not isinstance(repair, dict):
+            raise ContentError(f"equipment {key} requires repair rules")
+        repair_location = repair.get("location_key")
+        location = bundle.get("location", repair_location, include_locked=False) if isinstance(repair_location, str) else None
+        chunk_bp = repair.get("durability_chunk_bp")
+        if location is None or location.get("status") != "open":
+            raise ContentError(f"equipment {key} repair location must be open")
+        if isinstance(chunk_bp, bool) or not isinstance(chunk_bp, int) or not 1 <= chunk_bp <= 10_000:
+            raise ContentError(f"equipment {key} repair durability_chunk_bp must be between 1 and 10000")
+        repair_costs = repair.get("cost_per_chunk")
+        if not isinstance(repair_costs, dict) or not repair_costs:
+            raise ContentError(f"equipment {key} repair cost_per_chunk must be a non-empty object")
+        for resource_key, quantity in repair_costs.items():
+            if not isinstance(resource_key, str) or isinstance(quantity, bool) or not isinstance(quantity, int) or quantity <= 0:
+                raise ContentError(f"equipment {key} repair cost quantities must be positive integers")
+            if resource_key.startswith("item."):
+                bundle.require("item", resource_key, include_locked=False)
+            elif resource_key == "currency.spirit_stone":
+                resource = bundle.require("resource", resource_key, include_locked=False)
+                if resource.get("storage") != "spirit_stones":
+                    raise ContentError(f"equipment {key} repair currency has unsupported storage")
+            else:
+                raise ContentError(f"equipment {key} repair uses unsupported cost resource: {resource_key}")
         if not isinstance(temper.get("costs"), dict) or not isinstance(temper.get("success_bp"), dict):
             raise ContentError(f"equipment {key} temper requires costs and success_bp")
         if not isinstance(refinement.get("cost"), dict) or not isinstance(refinement.get("affix_pool"), list):
@@ -240,6 +279,22 @@ def refinement_pity_failures(definition: EquipmentDefinition) -> int:
     return value
 
 
+def equipment_repair_cost(durability_missing_bp: int, definition: EquipmentDefinition) -> dict[str, int]:
+    repair = definition.growth.get("repair")
+    if not isinstance(repair, dict):
+        raise ContentError(f"equipment {definition.key} has no repair rules")
+    if isinstance(durability_missing_bp, bool) or not isinstance(durability_missing_bp, int):
+        raise ValueError("missing durability must be an integer")
+    if not 1 <= durability_missing_bp <= 10_000:
+        raise ValueError("missing durability must be between 1 and 10000")
+    chunk_bp = repair.get("durability_chunk_bp")
+    costs = repair.get("cost_per_chunk")
+    if isinstance(chunk_bp, bool) or not isinstance(chunk_bp, int) or chunk_bp <= 0 or not isinstance(costs, dict):
+        raise ContentError(f"equipment {definition.key} has invalid repair rules")
+    chunks = (durability_missing_bp + chunk_bp - 1) // chunk_bp
+    return {str(key): int(quantity) * chunks for key, quantity in costs.items()}
+
+
 def _validated_costs(value: Any, key: str, operation: str) -> dict[str, int]:
     if not isinstance(value, dict) or not value:
         raise ContentError(f"equipment {key} {operation} cost must be a non-empty object")
@@ -344,6 +399,7 @@ __all__ = [
     "equipment_definition",
     "equipment_definitions",
     "equipment_initial_durability_bp",
+    "equipment_repair_cost",
     "equipment_meets_path",
     "equipment_meets_realm",
     "equipment_resource_label",

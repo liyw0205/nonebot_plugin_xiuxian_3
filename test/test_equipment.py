@@ -180,7 +180,7 @@ def test_equipment_catalog_covers_every_quality_with_distinct_combat_stats() -> 
         if row["key"] != "mortal"
     }
     paths = {row["key"] for row in content.list("path", include_locked=False)}
-    accessories_by_build: dict[tuple[str, str], list[dict[str, object]]] = defaultdict(list)
+    accessories_by_build: dict[tuple[str | None, str], list[dict[str, object]]] = defaultdict(list)
     for row in accessories:
         realm_requirements = [
             requirement for requirement in row["requirements"]
@@ -189,9 +189,12 @@ def test_equipment_catalog_covers_every_quality_with_distinct_combat_stats() -> 
         assert len(realm_requirements) == 1
         accessories_by_build[(row["path_key"], realm_requirements[0]["realm_key"])].append(row)
 
-    expected_builds = {(path, realm) for path in paths for realm in realms}
+    expected_builds = {(path, realm) for path in paths for realm in realms} | {(None, "qi_gathering")}
     assert set(accessories_by_build) == expected_builds
-    assert all(len(rows) >= 2 for rows in accessories_by_build.values())
+    assert {row["key"] for row in accessories_by_build[(None, "qi_gathering")]} == {
+        "item.accessory.field_compass"
+    }
+    assert all(len(rows) >= (1 if path is None else 2) for (path, _), rows in accessories_by_build.items())
     assert all(
         len({tuple(sorted((effect["stat"], effect["value"]) for effect in row["effects"])) for row in rows})
         == len(rows)
@@ -685,9 +688,10 @@ def test_broken_equipment_list_does_not_offer_unavailable_instance_actions() -> 
             assert listed.ok
             equipment = next(item for item in listed.data["equipment"] if item["instance_id"] == instance_id)
             assert equipment["status"] == "broken" and equipment["durability_bp"] == 0
-            line = next(line for line in listed.message.splitlines() if instance_id not in line and "木纹剑" in line)
+            line = next(line for line in listed.message.splitlines() if "木纹剑" in line)
             assert "已损坏" in line
             assert all(action not in line for action in ("[穿戴]", "[卸下]", "[祭炼]", "[重铸]"))
+            assert "[修复预览]" in line
             await runtime.close()
 
     asyncio.run(run())
@@ -815,31 +819,45 @@ def test_equipment_growth_replays_after_content_close_for_both_adapters() -> Non
                 adapter=adapter,
                 ironstone=100,
                 stones=10_000,
-                sword=1,
+                sword=0,
             )
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                row = connection.execute(
+                    "SELECT inventory_json FROM players WHERE platform=? AND platform_user_id=?",
+                    (adapter, user),
+                ).fetchone()
+                inventory = json.loads(row[0])
+                inventory["item.accessory.body.stone_pulse_bracer"] = 1
+                connection.execute(
+                    "UPDATE players SET inventory_json=?, realm_key='qi_sensing', realm_layer=1 "
+                    "WHERE platform=? AND platform_user_id=?",
+                    (json.dumps(inventory, ensure_ascii=False, sort_keys=True), adapter, user),
+                )
             temper_operation = f"{adapter}:growth:temper"
             refine_operation = f"{adapter}:growth:refine"
             tempered = await runtime.adapters.dispatch(
                 adapter,
                 _context(user, f"{adapter}-growth-temper", adapter=adapter, operation_id=temper_operation),
-                "强化法器 木纹剑",
+                "强化法器 石脉护腕",
             )
             refined = await runtime.adapters.dispatch(
                 adapter,
                 _context(user, f"{adapter}-growth-refine", adapter=adapter, operation_id=refine_operation),
-                "重铸法器 木纹剑",
+                "重铸法器 石脉护腕",
             )
             assert tempered.code == "EQUIPMENT_TEMPERED", tempered
             assert refined.code == "EQUIPMENT_REFINED", refined
             operation_ids[adapter] = (temper_operation, refine_operation)
         await runtime.close()
 
-        equipment_path = data_dir / "装备" / "法器.json"
+        equipment_path = data_dir / "装备" / "饰品.json"
         document = json.loads(equipment_path.read_text(encoding="utf-8"))
-        wood_sword = next(row for row in document["records"] if row["key"] == "item.weapon.wood_sword")
-        wood_sword["name"] = "青木灵剑"
-        wood_sword["aliases"] = []
-        wood_sword["status"] = "closed"
+        stone_pulse_bracer = next(
+            row for row in document["records"] if row["key"] == "item.accessory.body.stone_pulse_bracer"
+        )
+        stone_pulse_bracer["name"] = "青石护腕"
+        stone_pulse_bracer["aliases"] = []
+        stone_pulse_bracer["status"] = "closed"
         equipment_path.write_text(json.dumps(document, ensure_ascii=False, indent=2), encoding="utf-8")
 
         recovered = create_runtime(data_dir=data_dir, adapters=adapters)
@@ -849,12 +867,12 @@ def test_equipment_growth_replays_after_content_close_for_both_adapters() -> Non
             replay_temper = await recovered.adapters.dispatch(
                 adapter,
                 _context(user, f"{adapter}-growth-temper-replay", adapter=adapter, operation_id=temper_operation),
-                "强化法器 木纹剑",
+                "强化法器 石脉护腕",
             )
             replay_refine = await recovered.adapters.dispatch(
                 adapter,
                 _context(user, f"{adapter}-growth-refine-replay", adapter=adapter, operation_id=refine_operation),
-                "重铸法器 木纹剑",
+                "重铸法器 石脉护腕",
             )
             assert replay_temper.code == "EQUIPMENT_TEMPERED", replay_temper
             assert replay_temper.data["idempotent_replay"] is True
@@ -863,13 +881,13 @@ def test_equipment_growth_replays_after_content_close_for_both_adapters() -> Non
             changed_input = await recovered.adapters.dispatch(
                 adapter,
                 _context(user, f"{adapter}-growth-input-conflict", adapter=adapter, operation_id=refine_operation),
-                "重铸法器 青木灵剑",
+                "重铸法器 青石护腕",
             )
             assert changed_input.code == "OPERATION_CONFLICT", changed_input
             stale_new = await recovered.adapters.dispatch(
                 adapter,
                 _context(user, f"{adapter}-growth-stale-new", adapter=adapter, operation_id=f"{adapter}:growth:new"),
-                "重铸法器 木纹剑",
+                "重铸法器 石脉护腕",
             )
             assert stale_new.code == "INVALID_EQUIPMENT", stale_new
         await recovered.close()

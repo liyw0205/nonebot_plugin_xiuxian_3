@@ -9,6 +9,8 @@ from ..repository import (
     EquipmentAmbiguousError,
     EquipmentNotOwnedError,
     EquipmentRequirementError,
+    EquipmentRepairLocationError,
+    EquipmentRepairNotNeededError,
     EquipmentTemperingMaxedError,
     OperationConflictError,
     PlayerNotFoundError,
@@ -25,6 +27,7 @@ from .equipment_rules import (
     EquipmentDefinition,
     equipment_affix_label,
     equipment_definitions,
+    equipment_repair_cost,
     equipment_resource_label,
     refinement_cost,
     refinement_pity_failures,
@@ -161,11 +164,133 @@ class EquipmentApplication:
             context.request_id,
         )
 
+    async def preview_repair(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) != 1:
+            return CommandResult(
+                False,
+                "INVALID_EQUIPMENT_REPAIR_COMMAND",
+                "请从我的装备中选择具体实例，例如 `装备修复预览 装备编号`。",
+                context.request_id,
+            )
+        try:
+            listing = await self.repository.list_equipment(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+            )
+        except PlayerNotFoundError:
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id)
+        except PlayerSuspendedError:
+            return CommandResult(False, "PLAYER_SUSPENDED", "当前角色暂时无法查看装备。", context.request_id)
+        except RepositoryBusyError:
+            return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, retryable=True)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, retryable=True)
+
+        instance_id = context.command_args[0].strip()
+        equipment = next((row for row in listing.equipment if row.instance_id == instance_id), None)
+        if equipment is None:
+            return CommandResult(False, "EQUIPMENT_NOT_OWNED", "没有找到这件可修缮的装备。", context.request_id)
+        missing_bp = 10_000 - equipment.durability_bp
+        if missing_bp <= 0:
+            return CommandResult(False, "EQUIPMENT_REPAIR_NOT_NEEDED", "这件装备耐久充足，无需修缮。", context.request_id)
+        content = self._content()
+        definition = self._equipment_definitions(content).get(equipment.item_key)
+        if definition is None:
+            return CommandResult(False, "EQUIPMENT_CONTENT_CLOSED", "这件装备当前没有开放的修缮规则。", context.request_id)
+        repair = definition.growth["repair"]
+        location_key = str(repair["location_key"])
+        costs = equipment_repair_cost(missing_bp, definition)
+        inventory = listing.player.inventory
+        shortages = {
+            key: quantity - (listing.player.spirit_stones if key == "currency.spirit_stone" else int(inventory.get(key, 0)))
+            for key, quantity in costs.items()
+            if (listing.player.spirit_stones if key == "currency.spirit_stone" else int(inventory.get(key, 0))) < quantity
+        }
+        at_location = listing.player.location_key == location_key
+        lines = ["## 装备修复预览", "", f"装备：**{equipment.label}** · {equipment.instance_id}"]
+        lines.append(f"耐久：{equipment.durability_bp / 100:.0f}% → 100%")
+        lines.append(f"修缮地点：{content.label('location', location_key)}")
+        lines.append(f"消耗：{self._cost_text(costs, content)}")
+        if not at_location:
+            lines.append(f"请先{command_link('前往青石镇', '前往 青石镇')}。")
+        elif shortages:
+            lines.append("当前材料或灵石不足：" + self._cost_text(shortages, content) + "。")
+        else:
+            lines.append(command_link("确认修复装备", f"修复装备 {instance_id}"))
+        return CommandResult(
+            True,
+            "EQUIPMENT_REPAIR_PREVIEW",
+            "\n".join(lines),
+            context.request_id,
+            data={
+                "instance_id": equipment.instance_id,
+                "durability_before": equipment.durability_bp,
+                "durability_after": 10_000,
+                "costs": costs,
+                "location_key": location_key,
+                "at_location": at_location,
+                "shortages": shortages,
+            },
+        )
+
     async def temper(self, context: CommandContext) -> CommandResult:
         return await self._mutate(context, mode="temper")
 
     async def refine(self, context: CommandContext) -> CommandResult:
         return await self._mutate(context, mode="refine")
+
+    async def repair(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) != 1:
+            return CommandResult(False, "INVALID_EQUIPMENT_REPAIR_COMMAND", "请指定装备编号，例如 `修复装备 装备编号`。", context.request_id)
+        operation_id = self._operation_id(context, "item.repair")
+        try:
+            record = await self.repository.repair_equipment(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                equipment_instance_id=context.command_args[0],
+                operation_id=operation_id,
+            )
+        except ValueError:
+            return CommandResult(False, "INVALID_EQUIPMENT", "无法识别这件装备。", context.request_id, operation_id)
+        except PlayerNotFoundError:
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
+        except PlayerStageConflictError:
+            return CommandResult(False, "PLAYER_STAGE_CONFLICT", "完成入道后才能修缮装备。", context.request_id, operation_id)
+        except EquipmentNotOwnedError:
+            return CommandResult(False, "EQUIPMENT_NOT_OWNED", "没有找到这件可修缮的装备。", context.request_id, operation_id)
+        except EquipmentRepairNotNeededError:
+            return CommandResult(False, "EQUIPMENT_REPAIR_NOT_NEEDED", "这件装备耐久充足，无需修缮。", context.request_id, operation_id)
+        except EquipmentRepairLocationError as exc:
+            location = self._content().label("location", str(exc))
+            return CommandResult(False, "EQUIPMENT_REPAIR_WRONG_LOCATION", f"需前往{location}修缮装备。", context.request_id, operation_id)
+        except ResourceInsufficientError:
+            return CommandResult(False, "EQUIPMENT_REPAIR_RESOURCE_INSUFFICIENT", "材料或灵石不足，装备未改变。", context.request_id, operation_id)
+        except EquipmentBusyError:
+            return CommandResult(False, "EQUIPMENT_BUSY", "当前有进行中的行动，暂不能修缮装备。", context.request_id, operation_id)
+        except PlayerSuspendedError:
+            return CommandResult(False, "PLAYER_SUSPENDED", "当前角色暂时不能修缮装备。", context.request_id, operation_id)
+        except OperationConflictError:
+            return CommandResult(False, "OPERATION_CONFLICT", "这次修缮编号已用于其他请求，请重新发起。", context.request_id, operation_id)
+        except RepositoryBusyError:
+            return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+        return CommandResult(
+            True,
+            "EQUIPMENT_REPAIRED",
+            f"## 装备修缮\n\n**{record.equipment.label}** 已恢复至完整耐久。消耗：{self._cost_text(record.costs_spent)}。",
+            context.request_id,
+            operation_id,
+            data={
+                "instance_id": record.equipment.instance_id,
+                "durability_before": record.durability_before,
+                "durability_after": record.durability_after,
+                "costs_spent": record.costs_spent,
+                "status": record.equipment.status,
+                "equipped": record.equipment.equipped,
+                "idempotent_replay": record.already_completed,
+            },
+        )
 
     async def list_equipment(self, context: CommandContext) -> CommandResult:
         if context.command_args:
@@ -196,6 +321,8 @@ class EquipmentApplication:
                     if equipment.temper_level < equipment.max_temper_level:
                         line += " · " + command_link("祭炼", f"强化法器 {equipment.instance_id}")
                     line += " · " + command_link("重铸", f"重铸法器 {equipment.instance_id}")
+                if equipment.durability_bp < 10_000:
+                    line += " · " + command_link("修复预览", f"装备修复预览 {equipment.instance_id}")
                 lines.append(line)
         return CommandResult(
             True,

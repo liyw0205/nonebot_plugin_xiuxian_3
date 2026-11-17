@@ -56,6 +56,7 @@ from ..advancement.skill_models import SkillMasteryRecord, SkillProfileRecord
 from ..advancement.equipment_models import (
     EquipmentListRecord,
     EquipmentLoadoutRecord,
+    EquipmentRepairRecord,
     EquipmentRecord,
     RefinementRecord,
     TemperingRecord,
@@ -90,6 +91,7 @@ from ..advancement.equipment_rules import (
     equipment_definition,
     equipment_meets_path,
     equipment_meets_realm,
+    equipment_repair_cost,
     refinement_affix,
     refinement_cost,
     refinement_pity_failures,
@@ -1823,6 +1825,19 @@ class AdvancementRepositoryMixin:
         )
 
     @staticmethod
+    def _equipment_repair_from_payload(
+        payload: dict[str, Any], *, replay: bool = False
+    ) -> EquipmentRepairRecord:
+        return EquipmentRepairRecord(
+            player=SQLitePlayerRepository._row_to_player(payload["player"]),
+            equipment=SQLitePlayerRepository._equipment_from_payload(payload["equipment"]),
+            durability_before=int(payload["durability_before"]),
+            durability_after=int(payload["durability_after"]),
+            costs_spent={str(key): int(value) for key, value in dict(payload["costs_spent"]).items()},
+            already_completed=replay,
+        )
+
+    @staticmethod
     def _equipment_list_from_rows(
         player: sqlite3.Row, rows: list[sqlite3.Row]
     ) -> EquipmentListRecord:
@@ -1947,6 +1962,157 @@ class AdvancementRepositoryMixin:
             player = self._require_player(connection, platform, platform_user_id, writable=False)
             rows = equipment_instance_rows(connection, int(player["id"]))
             return self._equipment_list_from_rows(player, rows)
+
+    async def repair_equipment(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        equipment_instance_id: str,
+        operation_id: str,
+    ) -> EquipmentRepairRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._repair_equipment_sync,
+                platform,
+                platform_user_id,
+                equipment_instance_id,
+                operation_id,
+            )
+
+    def _repair_equipment_sync(
+        self,
+        platform: str,
+        platform_user_id: str,
+        equipment_instance_id: str,
+        operation_id: str,
+    ) -> EquipmentRepairRecord:
+        operation_name = "item.repair"
+        normalized_instance_id = equipment_instance_id.strip()
+        request_hash = self._request_hash(
+            operation_name,
+            {
+                "platform": platform,
+                "platform_user_id": platform_user_id,
+                "equipment_instance_id": normalized_instance_id,
+            },
+        )
+        now_text = serialize_datetime(self._now())
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            replay_payload = operation_replay(connection, operation_id, operation_name, request_hash)
+            if replay_payload is not None:
+                return self._equipment_repair_from_payload(replay_payload, replay=True)
+
+            player = self._require_player(connection, platform, platform_user_id)
+            if str(player["stage"]) != "cultivator":
+                raise PlayerStageConflictError("equipment repair requires entry into cultivation")
+            if self._has_active_long_action(connection, int(player["id"])):
+                raise EquipmentBusyError("equipment cannot be repaired during an active action")
+            equipment = connection.execute(
+                "SELECT * FROM equipment_instances WHERE player_id=? AND instance_id=? AND status IN ('active', 'broken')",
+                (player["id"], normalized_instance_id),
+            ).fetchone()
+            if equipment is None:
+                raise EquipmentNotOwnedError("equipment instance is not owned or repairable")
+            durability_before = int(equipment["durability_bp"])
+            if not 0 <= durability_before < 10_000:
+                raise EquipmentRepairNotNeededError("equipment does not need repair")
+            definition = equipment_definition(str(equipment["item_key"]), self.content)
+            repair = definition.growth["repair"]
+            location_key = str(repair["location_key"])
+            if str(player["location_key"]) != location_key:
+                raise EquipmentRepairLocationError(location_key)
+            _decode_equipment_affixes(equipment["affixes_json"])
+            costs = equipment_repair_cost(10_000 - durability_before, definition)
+            try:
+                spend_player_assets(connection, player, costs, now_text)
+            except ValueError as exc:
+                raise ResourceInsufficientError("equipment repair materials are insufficient") from exc
+
+            status_before = str(equipment["status"])
+            equipped_before = bool(equipment["equipped"])
+            equipped_after = equipped_before if status_before == "active" else False
+            connection.execute(
+                "UPDATE equipment_instances SET status='active', equipped=?, durability_bp=10000, updated_at=? WHERE id=? AND player_id=?",
+                (int(equipped_after), now_text, equipment["id"], player["id"]),
+            )
+            updated_equipment = connection.execute(
+                "SELECT * FROM equipment_instances WHERE id=? AND player_id=?",
+                (equipment["id"], player["id"]),
+            ).fetchone()
+            updated_player = connection.execute(
+                "SELECT * FROM players WHERE id=?",
+                (player["id"],),
+            ).fetchone()
+            if updated_equipment is None or updated_player is None:
+                raise RuntimeError("equipment repair returned no state")
+
+            equipment_payload = {
+                "instance_id": str(updated_equipment["instance_id"]),
+                "item_key": str(updated_equipment["item_key"]),
+                "label": str(updated_equipment["label"]),
+                "slot": str(updated_equipment["slot"]),
+                "status": str(updated_equipment["status"]),
+                "equipped": bool(updated_equipment["equipped"]),
+                "durability_bp": int(updated_equipment["durability_bp"]),
+                "temper_level": int(updated_equipment["temper_level"]),
+                "max_temper_level": int(updated_equipment["max_temper_level"]),
+                "affixes": _decode_equipment_affixes(updated_equipment["affixes_json"]),
+                "refinement_failure_streak": int(updated_equipment["refinement_failure_streak"]),
+            }
+            snapshot = {
+                "equipment_instance_id": normalized_instance_id,
+                "item_key": str(equipment["item_key"]),
+                "status_before": status_before,
+                "status_after": "active",
+                "equipped_before": equipped_before,
+                "equipped_after": equipped_after,
+                "durability_before": durability_before,
+                "durability_after": 10_000,
+                "location_key": location_key,
+                "costs_spent": costs,
+            }
+            payload = {
+                "player": self._player_payload(self._row_to_player(updated_player)),
+                "equipment": equipment_payload,
+                "durability_before": durability_before,
+                "durability_after": 10_000,
+                "costs_spent": costs,
+            }
+            connection.execute(
+                """
+                INSERT INTO equipment_repair_events(
+                    event_id, player_id, equipment_id, operation_id, status_before,
+                    status_after, equipped_before, equipped_after, durability_before,
+                    durability_after, costs_json, snapshot_json, created_at
+                ) VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, 10000, ?, ?, ?)
+                """,
+                (
+                    uuid4().hex,
+                    player["id"],
+                    equipment["id"],
+                    operation_id,
+                    status_before,
+                    int(equipped_before),
+                    int(equipped_after),
+                    durability_before,
+                    json.dumps(costs, ensure_ascii=False, sort_keys=True),
+                    json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
+                    now_text,
+                ),
+            )
+            record_operation(
+                connection,
+                operation_id,
+                operation_name,
+                int(player["id"]),
+                request_hash,
+                payload,
+                now_text,
+            )
+            return self._equipment_repair_from_payload(payload)
 
     async def equip_equipment(
         self,

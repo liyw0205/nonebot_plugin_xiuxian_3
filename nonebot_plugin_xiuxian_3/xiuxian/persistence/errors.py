@@ -1285,6 +1285,14 @@ class EquipmentDurabilityZeroError(RuntimeError):
     """An equipment instance with no remaining durability cannot be worn."""
 
 
+class EquipmentRepairLocationError(RuntimeError):
+    """The player is not at the configured equipment repair location."""
+
+
+class EquipmentRepairNotNeededError(RuntimeError):
+    """The equipment already has full durability."""
+
+
 class RealmCultivationInsufficientError(RuntimeError):
     """The player has not reached the next layer threshold."""
 

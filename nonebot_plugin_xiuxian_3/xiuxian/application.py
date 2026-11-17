@@ -2698,6 +2698,16 @@ class XiuxianApplication:
             write_message="当前事件不允许重铸法器。",
         )
 
+    async def preview_equipment_repair(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.equipment.preview_repair(context), require_write=False)
+
+    async def repair_equipment(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.equipment.repair(context),
+            write_message="当前事件不允许修缮装备。",
+        )
+
     async def list_equipment(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.equipment.list_equipment(context), require_write=False)
 
