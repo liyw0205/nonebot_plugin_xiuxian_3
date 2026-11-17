@@ -2,6 +2,7 @@
   "schema": "xiuxian.content",
   "kind": "source",
   "records": [
+    {"key":"source.bounty.patrol","name":"巡查悬赏酬劳","desc":"完成接单后的成功巡查，由镇务簿发放灵石与制作材料。","asset_keys":["item.herb.blood_grass","item.mat.wood","item.ore.ironstone","item.mat.array_sand"],"channels":[{"operation":"bounty.claim","reference":"reward_pool.bounty.patrol.outskirts"},{"operation":"bounty.claim","reference":"reward_pool.bounty.patrol.ironwood"},{"operation":"bounty.claim","reference":"reward_pool.bounty.patrol.basalt"}],"status":"active"},
     {
       "key": "source.patrol.outskirts",
       "name": "近郊巡路材料",

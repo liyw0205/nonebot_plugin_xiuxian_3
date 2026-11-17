@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from threading import Lock
 from typing import Any, Mapping
 
 from ..combat.tribulation_content import tribulation_trial
@@ -14,12 +15,15 @@ from ..utils.randomness import deterministic_weighted_choice
 
 
 _DEFAULT_CONTENT = bundled_content()
+_BOUNTY_DEFINITION_CACHE = []
+_BOUNTY_DEFINITION_CACHE_LOCK = Lock()
 _TARGET_KINDS = frozenset(
     {
         "inventory_gain",
         "inventory_delivery",
         "production_completed",
         "exploration_battle_wins",
+        "exploration_completions",
         "tribulation_trial_wins",
         "dispatch_successes",
         "public_service_completions",
@@ -69,7 +73,20 @@ def default_content_bundle() -> ContentBundle:
 
 def bounty_definitions(content: ContentBundle | None = None) -> tuple[BountyDefinition, ...]:
     bundle = _content(content)
+    with _BOUNTY_DEFINITION_CACHE_LOCK:
+        for cached_bundle, definitions in reversed(_BOUNTY_DEFINITION_CACHE):
+            if cached_bundle is bundle:
+                return definitions
+        definitions = _parse_bounty_definitions(bundle)
+        _BOUNTY_DEFINITION_CACHE.append((bundle, definitions))
+        del _BOUNTY_DEFINITION_CACHE[:-16]
+        return definitions
+
+
+def _parse_bounty_definitions(content: ContentBundle) -> tuple[BountyDefinition, ...]:
+    bundle = _content(content)
     definitions: list[BountyDefinition] = []
+    exploration_routes = None
     for row in bundle.list("bounty"):
         key = row.get("key")
         name = row.get("name")
@@ -170,6 +187,20 @@ def bounty_definitions(content: ContentBundle | None = None) -> tuple[BountyDefi
                     raise ContentError(
                         f"bounty {key} references inactive idle route {target_key}"
                     )
+            elif target_kind == "exploration_completions":
+                from ..exploration.rules import exploration_definitions_by_location, meets_realm as exploration_meets_realm
+
+                mode = bundle.get("exploration_mode", target_key, include_locked=False)
+                if mode is None or not mode.get("patrol"):
+                    raise ContentError(f"bounty {key} requires an open repeatable patrol")
+                if exploration_routes is None:
+                    exploration_routes = {key: route for routes in exploration_definitions_by_location(bundle).values() for key, route in routes.items()}
+                route = exploration_routes[target_key]
+                if (target_amount > route.daily_limit
+                        or duration <= target_amount * max(a["duration_seconds"] for a in mode["patrol"]["approaches"])
+                        or access_any or not exploration_meets_realm(required_realm or "mortal", required_layer,
+                            route.required_realm, route.required_layer, bundle)):
+                    raise ContentError(f"bounty {key} patrol target is not reachable within its requirements")
         if "consume_target" not in row or not isinstance(row["consume_target"], bool):
             raise ContentError(f"bounty {key} consume_target must be a boolean")
         if row["consume_target"] and target_kind not in {"inventory_gain", "inventory_delivery"}:
@@ -205,6 +236,17 @@ def bounty_definitions(content: ContentBundle | None = None) -> tuple[BountyDefi
             )
         )
     return tuple(definitions)
+
+
+def bounty_next_actions(definition, content):
+    if definition.target_kind != "exploration_completions":
+        return []
+    bundle = _content(content)
+    mode = bundle.require("exploration_mode", definition.target_key, include_locked=False)
+    return [
+        {"label": bundle.label("location", mode["location_key"]), "command": "前往 " + bundle.label("location", mode["location_key"])},
+        {"label": mode["name"], "command": "巡查预览 " + mode["name"]},
+    ]
 
 
 def _validate_access_conditions(bounty_key: str, conditions: Any, bundle: ContentBundle) -> None:

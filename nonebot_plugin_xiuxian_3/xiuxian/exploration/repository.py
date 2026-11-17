@@ -375,8 +375,9 @@ class ExplorationRepositoryMixin:
             if existing is not None:
                 payload = decode_json_strict(existing["result_json"])
                 if payload.get("patrol"):
-                    saved = frozen_patrol(payload["patrol"])["approach"]
-                    if approach and approach not in {saved["key"], saved["name"]}:
+                    frozen = frozen_patrol(payload["patrol"])
+                    saved = frozen["approach"]
+                    if (approach and approach not in {saved["key"], saved["name"]}) or (not approach and frozen.get("default_approach") != saved["key"]):
                         raise OperationConflictError("patrol approach differs from its original request")
                     request_payload["approach"] = saved["key"]
                 elif approach:

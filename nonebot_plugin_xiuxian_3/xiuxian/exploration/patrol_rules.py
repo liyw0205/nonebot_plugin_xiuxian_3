@@ -86,6 +86,7 @@ def freeze_patrol(row: dict, bundle: ContentBundle, approach: str, seed: str) ->
     event = deterministic_weighted_choice(tuple((e["weight"], e) for e in patrol["events"]), seed + ":patrol")
     pool = event["pools"][selected["key"]]
     return {
+        "default_approach": patrol["approaches"][0]["key"],
         "mode_label": row["name"], "scene": patrol["scene"], "approach": selected,
         "event": {key: event[key] for key in ("key", "name", "start_text", "complete_text", "defeat_text", "expired_text")},
         "candidates": [{"key": e["key"], "weight": e["weight"]} for e in patrol["events"]],
@@ -95,8 +96,11 @@ def freeze_patrol(row: dict, bundle: ContentBundle, approach: str, seed: str) ->
 
 
 def frozen_patrol(value: object) -> dict:
-    if not isinstance(value, dict) or set(value) != {"mode_label", "scene", "approach", "event", "candidates", "pool_key", "reward", "uses"}:
+    fields = {"mode_label", "scene", "approach", "event", "candidates", "pool_key", "reward", "uses"}
+    if not isinstance(value, dict) or set(value) not in (fields, fields | {"default_approach"}):
         raise ValueError("patrol snapshot has an invalid shape")
+    if "default_approach" in value and (not isinstance(value["default_approach"], str) or not value["default_approach"]):
+        raise ValueError("patrol default approach is invalid")
     for field in ("mode_label", "scene", "pool_key"):
         if not isinstance(value[field], str) or not value[field].strip():
             raise ValueError("patrol snapshot text is missing")

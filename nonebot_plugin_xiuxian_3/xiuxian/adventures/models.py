@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from ...contracts import PlayerView
 from .mainline_models import (
@@ -24,6 +24,7 @@ class BountyOfferView:
     reward: dict[str, int]
     reward_labels: dict[str, str]
     expires_at: str | None = None
+    next_actions: list[dict[str, str]] = field(default_factory=list)
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,6 +46,7 @@ class BountyAcceptRecord:
     starts_at: str
     expires_at: str
     already_completed: bool = False
+    next_actions: list[dict[str, str]] = field(default_factory=list)
 
 
 @dataclass(frozen=True, slots=True)

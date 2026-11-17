@@ -83,6 +83,8 @@ def test_patrol_public_events_frozen_rewards_recovery_and_rendering(tmp_path, ad
                 await j.render(result, "结算探索", keyboard=True)
                 assert (await j.send(f"开始探索 {name} {approach}", op)).data["idempotent_replay"]
                 assert (await j.send(f"开始探索 {name} " + ("追迹" if approach == "稳行" else "稳行"), op)).code == "OPERATION_CONFLICT"
+                omitted = await j.send(f"开始探索 {name}", op)
+                assert (omitted.ok and omitted.data["idempotent_replay"]) if approach == "稳行" else omitted.code == "OPERATION_CONFLICT"
                 assert (await j.send("结算探索")).code == "EXPLORATION_NOT_READY"
                 j.clock.advance(minutes=5)
                 await j.restart()

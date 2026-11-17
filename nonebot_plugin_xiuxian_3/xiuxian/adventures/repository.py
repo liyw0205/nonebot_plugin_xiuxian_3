@@ -181,6 +181,8 @@ from ..utils.player import (
     split_player_rewards,
 )
 from ..rewards.rules import local_reputation_maximum
+from .rules import bounty_next_actions
+from .exploration_evidence import exploration_completion_count
 
 
 def _bounty_snapshot(raw_value: Any) -> dict[str, Any]:
@@ -234,6 +236,7 @@ def _bounty_snapshot(raw_value: Any) -> dict[str, Any]:
         "inventory_delivery",
         "production_completed",
         "exploration_battle_wins",
+        "exploration_completions",
         "tribulation_trial_wins",
         "dispatch_successes",
         "public_service_completions",
@@ -244,6 +247,13 @@ def _bounty_snapshot(raw_value: Any) -> dict[str, Any]:
         not isinstance(snapshot["target_key"], str) or not snapshot["target_key"]
     ):
         raise ValueError("bounty snapshot contains an invalid target key")
+    if snapshot["target_kind"] == "exploration_completions":
+        baseline = snapshot.get("baseline_operation_rowid")
+        actions = snapshot.get("next_actions")
+        if type(baseline) is not int or baseline < 0 or not isinstance(actions, list) or not actions:
+            raise ValueError("bounty exploration baseline or actions are invalid")
+        if any(not isinstance(a, dict) or set(a) != {"label", "command"} or any(not isinstance(v, str) or not v for v in a.values()) for a in actions):
+            raise ValueError("bounty exploration actions are invalid")
     for key in ("target_amount", "local_reputation_maximum"):
         if (
             isinstance(snapshot[key], bool)
@@ -604,6 +614,7 @@ class AdventuresRepositoryMixin:
                         reward=reward,
                         reward_labels=reward_labels,
                         expires_at=expires_at,
+                        next_actions=accepted_snapshot.get("next_actions", []) if is_accepted else bounty_next_actions(definition, self.content),
                     )
                 )
             if accepted is not None and not any(item.key == accepted["bounty_key"] for item in offers):
@@ -630,6 +641,7 @@ class AdventuresRepositoryMixin:
                         reward=accepted_snapshot["reward"],
                         reward_labels=accepted_snapshot["reward_labels"],
                         expires_at=str(accepted["expires_at"]),
+                        next_actions=accepted_snapshot.get("next_actions", []),
                     )
                 )
             return BountyBoardRecord(
@@ -659,6 +671,15 @@ class AdventuresRepositoryMixin:
             player_inventory(row), str(definition.target_key)
         ) < definition.target_amount:
             return False
+        if definition.target_kind == "exploration_completions":
+            content = self.content or default_content_bundle()
+            mode = content.require("exploration_mode", definition.target_key, include_locked=False)
+            used = connection.execute(
+                "SELECT COUNT(*) FROM exploration_sessions WHERE player_id=? AND mode_key=? AND business_date=?",
+                (row["id"], definition.target_key, now.date().isoformat()),
+            ).fetchone()[0]
+            if mode["daily_limit"] - used < definition.target_amount:
+                return False
         if definition.target_kind == "tribulation_trial_wins":
             event = tribulation_definition(self.content)
             won_trials = {
@@ -753,6 +774,16 @@ class AdventuresRepositoryMixin:
         snapshot: dict[str, Any],
     ) -> int:
         target_amount = int(snapshot["target_amount"])
+        if snapshot["target_kind"] == "exploration_completions":
+            receipt = connection.execute(
+                "SELECT result_json FROM operations WHERE operation_id=? AND player_id=? AND operation_name='bounty.accept'",
+                (offer["operation_id"], row["id"]),
+            ).fetchone()
+            evidence = {k: snapshot[k] for k in ("target_key", "target_amount", "baseline_operation_rowid")}
+            if receipt is None or decode_json_strict(receipt["result_json"]).get("exploration_evidence") != evidence:
+                raise ValueError("bounty exploration baseline disagrees with its acceptance receipt")
+            return min(target_amount, exploration_completion_count(connection, int(row["id"]),
+                snapshot["target_key"], snapshot["baseline_operation_rowid"], str(offer["expires_at"])))
         if snapshot["target_kind"] in {"inventory_gain", "inventory_delivery"}:
             inventory = player_inventory(row)
             current = inventory_amount(inventory, str(snapshot["target_key"]))
@@ -1055,6 +1086,9 @@ class AdventuresRepositoryMixin:
                 },
             }
             offer_id = uuid4().hex
+            if definition.target_kind == "exploration_completions":
+                snapshot["baseline_operation_rowid"] = int(connection.execute("SELECT COALESCE(MAX(rowid), 0) FROM operations").fetchone()[0])
+                snapshot["next_actions"] = bounty_next_actions(definition, self.content)
             connection.execute(
                 """
                 INSERT INTO bounty_offers(
@@ -1086,6 +1120,9 @@ class AdventuresRepositoryMixin:
                 "target": definition.target_amount,
                 "starts_at": starts_at,
                 "expires_at": expires_at,
+                "next_actions": snapshot.get("next_actions", []),
+                **({"exploration_evidence": {k: snapshot[k] for k in ("target_key", "target_amount", "baseline_operation_rowid")}}
+                   if definition.target_kind == "exploration_completions" else {}),
             }
             connection.execute(
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -1112,6 +1149,7 @@ class AdventuresRepositoryMixin:
             starts_at=str(payload["starts_at"]),
             expires_at=str(payload["expires_at"]),
             already_completed=replay,
+            next_actions=payload.get("next_actions", []),
         )
     async def claim_bounty(
         self,

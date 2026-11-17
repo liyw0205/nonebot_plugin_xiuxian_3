@@ -1,6 +1,9 @@
 {
   "kind": "reward",
   "records": [
+    {"key":"reward_pool.bounty.patrol.outskirts","name":"近郊巡路酬劳","desc":"接单时抽定酬劳，完成后由镇务簿发放灵石与制作材料。","status":"active","pool_type":"weighted","outcomes":[{"weight":3,"rewards":{"spirit_stones":35,"item.herb.blood_grass":2,"local_reputation":2}},{"weight":1,"rewards":{"spirit_stones":55,"item.mat.wood":3,"local_reputation":3}}]},
+    {"key":"reward_pool.bounty.patrol.ironwood","name":"铁木巡林酬劳","desc":"接单时抽定酬劳，完成后由镇务簿发放灵石与制作材料。","status":"active","pool_type":"weighted","outcomes":[{"weight":3,"rewards":{"spirit_stones":55,"item.mat.wood":2,"local_reputation":3}},{"weight":1,"rewards":{"spirit_stones":80,"item.ore.ironstone":3,"local_reputation":4}}]},
+    {"key":"reward_pool.bounty.patrol.basalt","name":"岩径巡标酬劳","desc":"接单时抽定酬劳，完成后由镇务簿发放灵石与制作材料。","status":"active","pool_type":"weighted","outcomes":[{"weight":3,"rewards":{"spirit_stones":75,"item.mat.array_sand":2,"local_reputation":4}},{"weight":1,"rewards":{"spirit_stones":110,"item.ore.ironstone":3,"local_reputation":5}}]},
     {
       "key": "reward_pool.patrol.outskirts.cart.careful",
       "name": "断辕旧车·稳行所得",
