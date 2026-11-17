@@ -1268,6 +1268,23 @@ CREATE TABLE IF NOT EXISTS equipment_repair_events (
 CREATE INDEX IF NOT EXISTS idx_equipment_repair_events_player
     ON equipment_repair_events(player_id, created_at);
 
+CREATE TABLE IF NOT EXISTS equipment_reclamation_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id TEXT NOT NULL UNIQUE,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    equipment_id INTEGER NOT NULL REFERENCES equipment_instances(id),
+    operation_id TEXT NOT NULL UNIQUE,
+    status_before TEXT NOT NULL CHECK (status_before IN ('active', 'broken')),
+    status_after TEXT NOT NULL CHECK (status_after = 'archived'),
+    equipped_before INTEGER NOT NULL CHECK (equipped_before = 0),
+    yields_json TEXT NOT NULL DEFAULT '{}',
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_equipment_reclamation_events_player
+    ON equipment_reclamation_events(player_id, created_at);
+
 CREATE TABLE IF NOT EXISTS production_orders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     order_id TEXT NOT NULL UNIQUE,

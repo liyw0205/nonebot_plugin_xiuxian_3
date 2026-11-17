@@ -10,6 +10,7 @@
       "growth": {
         "craft_durability": {"base_bp": 8000, "quality_divisor": 5, "minimum_bp": 8000, "maximum_bp": 10000},
         "repair": {"location_key": "xuantian.new_town", "durability_chunk_bp": 2000, "cost_per_chunk": {"item.ore.ironstone": 1, "currency.spirit_stone": 20}},
+        "reclamation": {"yields": {"item.ore.ironstone": 1}},
         "temper": {
           "max_level": 3,
           "costs": {
@@ -46,6 +47,7 @@
       "growth": {
         "craft_durability": {"base_bp": 8200, "quality_divisor": 5, "minimum_bp": 8200, "maximum_bp": 10000},
         "repair": {"location_key": "xuantian.new_town", "durability_chunk_bp": 2000, "cost_per_chunk": {"item.ore.ironstone": 2, "currency.spirit_stone": 40}},
+        "reclamation": {"yields": {"item.ore.ironstone": 2}},
         "temper": {
           "max_level": 4,
           "costs": {
@@ -92,6 +94,7 @@
       "growth": {
         "craft_durability": {"base_bp": 8500, "quality_divisor": 10, "minimum_bp": 8500, "maximum_bp": 10000},
         "repair": {"location_key": "xuantian.new_town", "durability_chunk_bp": 1000, "cost_per_chunk": {"item.material.cloud_iron": 1, "currency.spirit_stone": 80}},
+        "reclamation": {"yields": {"item.material.cloud_iron": 1}},
         "temper": {
           "max_level": 5,
           "costs": {
@@ -139,6 +142,7 @@
       "growth": {
         "craft_durability": {"base_bp": 9000, "quality_divisor": 20, "minimum_bp": 9000, "maximum_bp": 10000},
         "repair": {"location_key": "xuantian.new_town", "durability_chunk_bp": 1000, "cost_per_chunk": {"item.soul_crystal": 1, "currency.spirit_stone": 250}},
+        "reclamation": {"yields": {"item.soul_crystal": 1}},
         "temper": {
           "max_level": 6,
           "costs": {
@@ -187,6 +191,7 @@
       "growth": {
         "craft_durability": {"base_bp": 9500, "quality_divisor": 25, "minimum_bp": 9500, "maximum_bp": 10000},
         "repair": {"location_key": "xuantian.new_town", "durability_chunk_bp": 1000, "cost_per_chunk": {"item.void_crystal": 1, "currency.spirit_stone": 1000}},
+        "reclamation": {"yields": {"item.void_crystal": 1}},
         "temper": {
           "max_level": 7,
           "costs": {

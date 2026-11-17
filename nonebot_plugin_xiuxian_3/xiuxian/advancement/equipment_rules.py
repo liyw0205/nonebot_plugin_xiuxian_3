@@ -55,6 +55,7 @@ def equipment_definitions(content: ContentBundle | None = None) -> dict[str, Equ
         growth = row.get("growth")
         growth_profile_key = row.get("growth_profile_key")
         repair_profile_key = row.get("repair_profile_key")
+        reclamation_profile_key = row.get("reclamation_profile_key")
         if growth_profile_key is not None:
             if not isinstance(growth_profile_key, str) or growth is not None:
                 raise ContentError(f"equipment {key} must use either growth or growth_profile_key")
@@ -76,6 +77,28 @@ def equipment_definitions(content: ContentBundle | None = None) -> dict[str, Equ
             if not isinstance(repair_growth, dict) or not isinstance(repair_growth.get("repair"), dict):
                 raise ContentError(f"equipment {key} repair profile {repair_profile_key} requires repair rules")
             growth = {**growth, "repair": repair_growth["repair"]}
+        if reclamation_profile_key is not None:
+            if not isinstance(reclamation_profile_key, str):
+                raise ContentError(f"equipment {key} reclamation_profile_key must be a string")
+            if not isinstance(growth, dict):
+                raise ContentError(f"equipment {key} reclamation_profile_key requires custom growth")
+            if "reclamation" in growth:
+                raise ContentError(f"equipment {key} cannot define reclamation rules and a reclamation profile")
+            try:
+                reclamation_growth = bundle.require(
+                    "equipment_growth", reclamation_profile_key, include_locked=False
+                ).get("growth")
+            except KeyError as exc:
+                raise ContentError(
+                    f"equipment {key} references unknown reclamation profile {reclamation_profile_key}"
+                ) from exc
+            if not isinstance(reclamation_growth, dict) or not isinstance(
+                reclamation_growth.get("reclamation"), dict
+            ):
+                raise ContentError(
+                    f"equipment {key} reclamation profile {reclamation_profile_key} requires reclamation rules"
+                )
+            growth = {**growth, "reclamation": reclamation_growth["reclamation"]}
         if not isinstance(key, str) or not isinstance(name, str) or not isinstance(growth, dict):
             raise ContentError(f"equipment item requires key, name and growth configuration: {row!r}")
         slot = row.get("equipment_slot", row.get("item_type"))
@@ -154,6 +177,22 @@ def equipment_definitions(content: ContentBundle | None = None) -> dict[str, Equ
                     raise ContentError(f"equipment {key} repair currency has unsupported storage")
             else:
                 raise ContentError(f"equipment {key} repair uses unsupported cost resource: {resource_key}")
+        reclamation = growth.get("reclamation")
+        yields = reclamation.get("yields") if isinstance(reclamation, dict) else None
+        if not isinstance(reclamation, dict) or set(reclamation) != {"yields"}:
+            raise ContentError(f"equipment {key} reclamation requires exactly a yields object")
+        if not isinstance(yields, dict) or not yields:
+            raise ContentError(f"equipment {key} reclamation yields must be a non-empty object")
+        for item_key, quantity in yields.items():
+            item = bundle.get("item", item_key, include_locked=False) if isinstance(item_key, str) else None
+            if (
+                item is None
+                or item.get("item_type") not in {"material", "ore", "breakthrough_material"}
+                or isinstance(quantity, bool)
+                or not isinstance(quantity, int)
+                or quantity <= 0
+            ):
+                raise ContentError(f"equipment {key} reclamation yield is invalid: {item_key!r}")
         if not isinstance(temper.get("costs"), dict) or not isinstance(temper.get("success_bp"), dict):
             raise ContentError(f"equipment {key} temper requires costs and success_bp")
         if not isinstance(refinement.get("cost"), dict) or not isinstance(refinement.get("affix_pool"), list):
@@ -295,6 +334,52 @@ def equipment_repair_cost(durability_missing_bp: int, definition: EquipmentDefin
     return {str(key): int(quantity) * chunks for key, quantity in costs.items()}
 
 
+def equipment_reclamation_yields(definition: EquipmentDefinition) -> dict[str, int]:
+    reclamation = definition.growth.get("reclamation")
+    yields = reclamation.get("yields") if isinstance(reclamation, dict) else None
+    if not isinstance(reclamation, dict) or set(reclamation) != {"yields"}:
+        raise ContentError(f"equipment {definition.key} has invalid reclamation rules")
+    if not isinstance(yields, dict) or not yields:
+        raise ContentError(f"equipment {definition.key} reclamation yields must be non-empty")
+    result: dict[str, int] = {}
+    for item_key, quantity in yields.items():
+        if (
+            not isinstance(item_key, str)
+            or not item_key.startswith("item.")
+            or isinstance(quantity, bool)
+            or not isinstance(quantity, int)
+            or quantity <= 0
+        ):
+            raise ContentError(f"equipment {definition.key} has invalid reclamation yield")
+        result[item_key] = quantity
+    return result
+
+
+def validate_equipment_reclamation_consumers(
+    content: ContentBundle, recipes: dict[str, Any] | None = None
+) -> int:
+    """Require each reclaimed material to feed a currently open recipe."""
+
+    if recipes is None:
+        from ..production.rules import recipe_definitions
+
+        recipes = recipe_definitions(content)
+    consumed_items = {
+        item_key
+        for recipe in recipes.values()
+        for item_key in recipe.inputs
+    }
+    reclaimed_items = {
+        item_key
+        for definition in equipment_definitions(content).values()
+        for item_key in equipment_reclamation_yields(definition)
+    }
+    unused = sorted(reclaimed_items - consumed_items)
+    if unused:
+        raise ContentError(f"equipment reclamation outputs have no open crafting consumer: {unused!r}")
+    return len(reclaimed_items)
+
+
 def _validated_costs(value: Any, key: str, operation: str) -> dict[str, int]:
     if not isinstance(value, dict) or not value:
         raise ContentError(f"equipment {key} {operation} cost must be a non-empty object")
@@ -399,6 +484,7 @@ __all__ = [
     "equipment_definition",
     "equipment_definitions",
     "equipment_initial_durability_bp",
+    "equipment_reclamation_yields",
     "equipment_repair_cost",
     "equipment_meets_path",
     "equipment_meets_realm",
@@ -411,4 +497,5 @@ __all__ = [
     "temper_cost",
     "temper_roll_bp",
     "temper_success_bp",
+    "validate_equipment_reclamation_consumers",
 ]

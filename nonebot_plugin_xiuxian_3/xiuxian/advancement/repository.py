@@ -56,6 +56,8 @@ from ..advancement.skill_models import SkillMasteryRecord, SkillProfileRecord
 from ..advancement.equipment_models import (
     EquipmentListRecord,
     EquipmentLoadoutRecord,
+    EquipmentReclamationPreviewRecord,
+    EquipmentReclamationRecord,
     EquipmentRepairRecord,
     EquipmentRecord,
     RefinementRecord,
@@ -92,6 +94,7 @@ from ..advancement.equipment_rules import (
     equipment_meets_path,
     equipment_meets_realm,
     equipment_repair_cost,
+    equipment_reclamation_yields,
     refinement_affix,
     refinement_cost,
     refinement_pity_failures,
@@ -188,6 +191,7 @@ from ..persistence.errors import *  # noqa: F401,F403
 from ..utils.json_cache import decode_json_strict
 from ..utils.operations import operation_replay, record_operation
 from ..utils.assets import (
+    grant_player_items,
     inventory_amount,
     inventory_json,
     spend_player_items,
@@ -1838,6 +1842,17 @@ class AdvancementRepositoryMixin:
         )
 
     @staticmethod
+    def _equipment_reclamation_from_payload(
+        payload: dict[str, Any], *, replay: bool = False
+    ) -> EquipmentReclamationRecord:
+        return EquipmentReclamationRecord(
+            player=SQLitePlayerRepository._row_to_player(payload["player"]),
+            equipment=SQLitePlayerRepository._equipment_from_payload(payload["equipment"]),
+            yields={str(key): int(value) for key, value in dict(payload["yields"]).items()},
+            already_completed=replay,
+        )
+
+    @staticmethod
     def _equipment_list_from_rows(
         player: sqlite3.Row, rows: list[sqlite3.Row]
     ) -> EquipmentListRecord:
@@ -1962,6 +1977,155 @@ class AdvancementRepositoryMixin:
             player = self._require_player(connection, platform, platform_user_id, writable=False)
             rows = equipment_instance_rows(connection, int(player["id"]))
             return self._equipment_list_from_rows(player, rows)
+
+    async def preview_equipment_reclamation(
+        self, *, platform: str, platform_user_id: str, equipment_instance_id: str
+    ) -> EquipmentReclamationPreviewRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._preview_equipment_reclamation_sync,
+                platform,
+                platform_user_id,
+                equipment_instance_id,
+            )
+
+    def _preview_equipment_reclamation_sync(
+        self, platform: str, platform_user_id: str, equipment_instance_id: str
+    ) -> EquipmentReclamationPreviewRecord:
+        with self._connect() as connection:
+            player = self._require_player(connection, platform, platform_user_id, writable=False)
+            equipment = connection.execute(
+                "SELECT * FROM equipment_instances WHERE player_id=? AND instance_id=? "
+                "AND status IN ('active', 'broken')",
+                (player["id"], equipment_instance_id.strip()),
+            ).fetchone()
+            if equipment is None:
+                raise EquipmentNotOwnedError("equipment instance is not owned or reclaimable")
+            if bool(equipment["equipped"]):
+                raise EquipmentReclamationEquippedError("equipped equipment cannot be reclaimed")
+            definition = equipment_definition(str(equipment["item_key"]), self.content)
+            _decode_equipment_affixes(equipment["affixes_json"])
+            return EquipmentReclamationPreviewRecord(
+                player=self._row_to_player(player),
+                equipment=self._equipment_from_row(equipment),
+                yields=equipment_reclamation_yields(definition),
+            )
+
+    async def reclaim_equipment(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        equipment_instance_id: str,
+        operation_id: str,
+    ) -> EquipmentReclamationRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._reclaim_equipment_sync,
+                platform,
+                platform_user_id,
+                equipment_instance_id,
+                operation_id,
+            )
+
+    def _reclaim_equipment_sync(
+        self,
+        platform: str,
+        platform_user_id: str,
+        equipment_instance_id: str,
+        operation_id: str,
+    ) -> EquipmentReclamationRecord:
+        operation_name = "item.reclaim"
+        normalized_instance_id = equipment_instance_id.strip()
+        request_hash = self._request_hash(
+            operation_name,
+            {
+                "platform": platform,
+                "platform_user_id": platform_user_id,
+                "equipment_instance_id": normalized_instance_id,
+            },
+        )
+        now_text = serialize_datetime(self._now())
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            replay_payload = operation_replay(connection, operation_id, operation_name, request_hash)
+            if replay_payload is not None:
+                return self._equipment_reclamation_from_payload(replay_payload, replay=True)
+            player = self._require_player(connection, platform, platform_user_id)
+            if str(player["stage"]) != "cultivator":
+                raise PlayerStageConflictError("equipment reclamation requires entry into cultivation")
+            if self._has_active_long_action(connection, int(player["id"])):
+                raise EquipmentBusyError("equipment cannot be reclaimed during an active action")
+            equipment = connection.execute(
+                "SELECT * FROM equipment_instances WHERE player_id=? AND instance_id=? "
+                "AND status IN ('active', 'broken')",
+                (player["id"], normalized_instance_id),
+            ).fetchone()
+            if equipment is None:
+                raise EquipmentNotOwnedError("equipment instance is not owned or reclaimable")
+            if bool(equipment["equipped"]):
+                raise EquipmentReclamationEquippedError("equipped equipment cannot be reclaimed")
+            definition = equipment_definition(str(equipment["item_key"]), self.content)
+            affixes = _decode_equipment_affixes(equipment["affixes_json"])
+            yields = equipment_reclamation_yields(definition)
+            status_before = str(equipment["status"])
+            grant_player_items(connection, player, yields, now_text)
+            connection.execute(
+                "UPDATE equipment_instances SET status='archived', updated_at=? "
+                "WHERE id=? AND player_id=? AND status IN ('active', 'broken') AND equipped=0",
+                (now_text, equipment["id"], player["id"]),
+            )
+            updated_player = connection.execute("SELECT * FROM players WHERE id=?", (player["id"],)).fetchone()
+            if updated_player is None:
+                raise RuntimeError("equipment reclamation returned no player")
+            equipment_payload = {
+                "instance_id": str(equipment["instance_id"]),
+                "item_key": str(equipment["item_key"]),
+                "label": str(equipment["label"]),
+                "slot": str(equipment["slot"]),
+                "status": "archived",
+                "equipped": False,
+                "durability_bp": int(equipment["durability_bp"]),
+                "temper_level": int(equipment["temper_level"]),
+                "max_temper_level": int(equipment["max_temper_level"]),
+                "affixes": affixes,
+                "refinement_failure_streak": int(equipment["refinement_failure_streak"]),
+            }
+            snapshot = {
+                "equipment_instance_id": normalized_instance_id,
+                "item_key": str(equipment["item_key"]),
+                "status_before": status_before,
+                "status_after": "archived",
+                "equipped_before": False,
+                "durability_bp": int(equipment["durability_bp"]),
+                "temper_level": int(equipment["temper_level"]),
+                "affixes": affixes,
+                "yields": yields,
+            }
+            payload = {
+                "player": self._player_payload(self._row_to_player(updated_player)),
+                "equipment": equipment_payload,
+                "yields": yields,
+            }
+            connection.execute(
+                "INSERT INTO equipment_reclamation_events(event_id, player_id, equipment_id, operation_id, "
+                "status_before, status_after, equipped_before, yields_json, snapshot_json, created_at) "
+                "VALUES (?, ?, ?, ?, ?, 'archived', 0, ?, ?, ?)",
+                (
+                    uuid4().hex,
+                    player["id"],
+                    equipment["id"],
+                    operation_id,
+                    status_before,
+                    json.dumps(yields, ensure_ascii=False, sort_keys=True),
+                    json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
+                    now_text,
+                ),
+            )
+            record_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
+            return self._equipment_reclamation_from_payload(payload)
 
     async def repair_equipment(
         self,

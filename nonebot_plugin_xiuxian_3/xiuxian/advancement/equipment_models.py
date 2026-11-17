@@ -71,6 +71,21 @@ class EquipmentRepairRecord:
 
 
 @dataclass(frozen=True, slots=True)
+class EquipmentReclamationRecord:
+    player: PlayerView
+    equipment: EquipmentRecord
+    yields: dict[str, int] = field(default_factory=dict)
+    already_completed: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class EquipmentReclamationPreviewRecord:
+    player: PlayerView
+    equipment: EquipmentRecord
+    yields: dict[str, int] = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
 class EquipmentListRecord:
     player: PlayerView
     equipment: tuple[EquipmentRecord, ...]
@@ -80,6 +95,8 @@ __all__ = [
     "EquipmentListRecord",
     "EquipmentLoadoutRecord",
     "EquipmentRepairRecord",
+    "EquipmentReclamationPreviewRecord",
+    "EquipmentReclamationRecord",
     "EquipmentRecord",
     "RefinementRecord",
     "TemperingRecord",

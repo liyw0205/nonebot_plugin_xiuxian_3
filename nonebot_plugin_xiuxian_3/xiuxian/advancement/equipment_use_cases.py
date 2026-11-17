@@ -11,6 +11,7 @@ from ..repository import (
     EquipmentRequirementError,
     EquipmentRepairLocationError,
     EquipmentRepairNotNeededError,
+    EquipmentReclamationEquippedError,
     EquipmentTemperingMaxedError,
     OperationConflictError,
     PlayerNotFoundError,
@@ -292,6 +293,88 @@ class EquipmentApplication:
             },
         )
 
+    async def preview_reclamation(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) != 1:
+            return CommandResult(False, "INVALID_EQUIPMENT_RECLAMATION_COMMAND", "请指定装备编号。", context.request_id)
+        try:
+            record = await self.repository.preview_equipment_reclamation(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                equipment_instance_id=context.command_args[0],
+            )
+        except PlayerNotFoundError:
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id)
+        except EquipmentNotOwnedError:
+            return CommandResult(False, "EQUIPMENT_NOT_OWNED", "没有找到这件可回收的装备。", context.request_id)
+        except EquipmentReclamationEquippedError:
+            return CommandResult(False, "EQUIPMENT_RECLAMATION_EQUIPPED", "请先卸下这件装备，再预览回收。", context.request_id)
+        except PlayerSuspendedError:
+            return CommandResult(False, "PLAYER_SUSPENDED", "当前角色暂时无法查看装备。", context.request_id)
+        except RepositoryBusyError:
+            return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, retryable=True)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, retryable=True)
+        content = self._content()
+        yields_text = "、".join(
+            f"{equipment_resource_label(key, content)} ×{value}" for key, value in record.yields.items()
+        )
+        return CommandResult(
+            True,
+            "EQUIPMENT_RECLAMATION_PREVIEW",
+            f"## 旧器回收预览\n\n装备：**{record.equipment.label}** · {record.equipment.instance_id}\n产出：{yields_text}\n\n确认回收：`回收装备 {record.equipment.instance_id}`",
+            context.request_id,
+            data={"instance_id": record.equipment.instance_id, "yields": record.yields},
+        )
+
+    async def reclaim(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) != 1:
+            return CommandResult(False, "INVALID_EQUIPMENT_RECLAMATION_COMMAND", "请指定装备编号。", context.request_id)
+        operation_id = self._operation_id(context, "item.reclaim")
+        try:
+            record = await self.repository.reclaim_equipment(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                equipment_instance_id=context.command_args[0],
+                operation_id=operation_id,
+            )
+        except ValueError:
+            return CommandResult(False, "INVALID_EQUIPMENT", "无法识别这件装备。", context.request_id, operation_id)
+        except PlayerNotFoundError:
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有角色，请先发送 `开始修仙`。", context.request_id, operation_id)
+        except PlayerStageConflictError:
+            return CommandResult(False, "PLAYER_STAGE_CONFLICT", "完成入道后才能回收装备。", context.request_id, operation_id)
+        except EquipmentNotOwnedError:
+            return CommandResult(False, "EQUIPMENT_NOT_OWNED", "没有找到这件可回收的装备。", context.request_id, operation_id)
+        except EquipmentReclamationEquippedError:
+            return CommandResult(False, "EQUIPMENT_RECLAMATION_EQUIPPED", "请先卸下这件装备，再进行回收。", context.request_id, operation_id)
+        except EquipmentBusyError:
+            return CommandResult(False, "EQUIPMENT_BUSY", "当前有进行中的行动，暂不能回收装备。", context.request_id, operation_id)
+        except OperationConflictError:
+            return CommandResult(False, "OPERATION_CONFLICT", "这次回收编号已用于其他请求，请重新发起。", context.request_id, operation_id)
+        except PlayerSuspendedError:
+            return CommandResult(False, "PLAYER_SUSPENDED", "当前角色暂时不能回收装备。", context.request_id, operation_id)
+        except RepositoryBusyError:
+            return CommandResult(False, "PERSISTENCE_BUSY", "仙缘簿暂时繁忙，请稍后再试。", context.request_id, operation_id, retryable=True)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+        content = self._content()
+        yields_text = "、".join(
+            f"{equipment_resource_label(key, content)} ×{value}" for key, value in record.yields.items()
+        )
+        return CommandResult(
+            True,
+            "EQUIPMENT_RECLAIMED",
+            f"## 旧器回收\n\n**{record.equipment.label}** 已归档，获得：{yields_text}。",
+            context.request_id,
+            operation_id,
+            data={
+                "instance_id": record.equipment.instance_id,
+                "yields": record.yields,
+                "status": record.equipment.status,
+                "idempotent_replay": record.already_completed,
+            },
+        )
+
     async def list_equipment(self, context: CommandContext) -> CommandResult:
         if context.command_args:
             return CommandResult(False, "INVALID_EQUIPMENT_COMMAND", "查看装备无需附加参数。", context.request_id)
@@ -323,6 +406,8 @@ class EquipmentApplication:
                     line += " · " + command_link("重铸", f"重铸法器 {equipment.instance_id}")
                 if equipment.durability_bp < 10_000:
                     line += " · " + command_link("修复预览", f"装备修复预览 {equipment.instance_id}")
+                if not equipment.equipped:
+                    line += " · " + command_link("回收预览", f"装备回收预览 {equipment.instance_id}")
                 lines.append(line)
         return CommandResult(
             True,

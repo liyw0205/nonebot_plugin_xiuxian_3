@@ -43,6 +43,7 @@
         }
       ],
       "repair_profile_key": "equipment.growth.rare",
+      "reclamation_profile_key": "equipment.growth.rare",
       "growth": {
         "craft_durability": {
           "base_bp": 8500,

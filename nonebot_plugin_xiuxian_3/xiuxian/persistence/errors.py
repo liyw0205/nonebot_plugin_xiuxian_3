@@ -1293,6 +1293,10 @@ class EquipmentRepairNotNeededError(RuntimeError):
     """The equipment already has full durability."""
 
 
+class EquipmentReclamationEquippedError(RuntimeError):
+    """Equipped equipment must be removed before reclamation."""
+
+
 class RealmCultivationInsufficientError(RuntimeError):
     """The player has not reached the next layer threshold."""
 
