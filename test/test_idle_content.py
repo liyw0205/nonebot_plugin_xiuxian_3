@@ -401,8 +401,8 @@ def test_idle_claim_ledger_failure_rolls_back_and_retries(monkeypatch, tmp_path:
                     before_local = connection.execute(
                         "SELECT local_json FROM player_reputations WHERE player_id = ?", (row["id"],)
                     ).fetchone()
-                with pytest.raises(sqlite3.OperationalError, match="injected ledger failure"):
-                    await _command(runtime, adapter, user, operation, "领取挂机")
+                failed = await _command(runtime, adapter, user, operation, "领取挂机")
+                assert not failed.ok and failed.code == "PERSISTENCE_ERROR" and failed.retryable
                 with runtime.repository._connect() as connection:
                     row = connection.execute(
                         "SELECT id, spirit_stones FROM players WHERE platform = ? AND platform_user_id = ?",

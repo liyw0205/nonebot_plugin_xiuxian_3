@@ -49,6 +49,7 @@ from ..companions.rules import companion_definition, level_after_experience
 from .codex_projection import record_codex_discovery, record_material_discoveries
 from ..adventures.rules import meets_realm
 from ..utils.assets import inventory_amount
+from ..utils.json_cache import decode_json_strict
 from ..utils.player import (
     grant_player_reward,
     grant_player_state,
@@ -70,6 +71,37 @@ class _IdlePreviewSharedState:
 
 
 class IdleRepositoryMixin:
+    def _validate_idle_supply_evidence(
+        self, connection: sqlite3.Connection, assignment: sqlite3.Row,
+    ) -> dict[str, int]:
+        receipt = connection.execute(
+            "SELECT result_json FROM operations WHERE operation_id=? AND player_id=? AND operation_name='specials.assign_idle'",
+            (assignment["operation_id"], assignment["player_id"]),
+        ).fetchone()
+        payload = decode_json_strict(receipt["result_json"]) if receipt else {}
+        cost = decode_json_strict(assignment["cost_json"])
+        if not isinstance(payload, dict) or not isinstance(cost, dict):
+            raise ValueError("idle supply evidence must contain objects")
+        saved_cost = payload.get("cost", {})
+        if not isinstance(saved_cost, dict):
+            raise ValueError("idle supply evidence cost must be an object")
+        if "supply_evidence" not in payload and not any(k.startswith("item.") for k in {*cost, *saved_cost}):
+            return cost
+        snapshot = decode_json_strict(assignment["snapshot_json"])
+        if not isinstance(snapshot, dict):
+            raise ValueError("idle supply evidence snapshot must be an object")
+        evidence = payload.get("supply_evidence")
+        fields = ("cost", "full_reward", "fallback_reward", "gathering_journal", "codex_entries", "reward_labels", "pool_key")
+        if (not isinstance(evidence, dict) or set(evidence) != set(fields)
+                or payload.get("assignment_id") != assignment["assignment_id"]
+                or payload.get("route_key") != assignment["route_key"]
+                or saved_cost != cost or any(type(n) is not int or n < 0 for n in cost.values())
+                or any(k not in {"stamina", "energy"} and (not k.startswith("item.") or cost[k] <= 0) for k in cost)
+                or json.dumps({k: snapshot.get(k) for k in fields}, sort_keys=True, allow_nan=False)
+                != json.dumps(evidence, sort_keys=True, allow_nan=False) or evidence["cost"] != cost):
+            raise ValueError("idle supply evidence disagrees with its start receipt")
+        return cost
+
     async def get_idle_status(self, *, platform: str, platform_user_id: str) -> IdleStatusRecord | None:
         await self.initialize()
         async with self._inflight:
@@ -268,6 +300,10 @@ class IdleRepositoryMixin:
             missing.append(f"精力不足（需要 {definition.energy_cost}）")
         if player_integer(player, "stamina") < definition.stamina_cost:
             missing.append(f"体力不足（需要 {definition.stamina_cost}）")
+        inventory = player_inventory(player)
+        for key, quantity in definition.supply_cost.items():
+            if inventory_amount(inventory, key) < quantity:
+                missing.append(f"补给不足：{idle_reward_label(key, self.content)}需要 {quantity}")
         return missing
 
     def _idle_preview(
@@ -285,6 +321,11 @@ class IdleRepositoryMixin:
         missing = self._idle_requirements_missing(
             connection, player, definition, now, shared_state.local_reputation
         )
+        supplied_choices = [c for c in definition.wilderness_event.get("choices", []) if c.get("supplies")]
+        if supplied_choices and not definition.supply_cost:
+            inventory = player_inventory(player)
+            if not any(all(inventory_amount(inventory, k) >= n for k, n in c["supplies"].items()) for c in supplied_choices):
+                missing.append("补给不足：请先备妥饭食或疗伤丹，再选择方案")
         if shared_state.active_idle:
             missing.append("已有进行中的挂机")
         if shared_state.active_long_action:
@@ -375,7 +416,7 @@ class IdleRepositoryMixin:
                 return self._assignment_from_payload(replay, replay=True)
             definition = resolve_route(route_key, self.content)
             choice_selector = None
-            if definition.wilderness_event and tool_or_facility:
+            if definition.wilderness_event:
                 choice_selector = tool_or_facility
                 definition = select_wilderness_choice(definition, tool_or_facility)
                 tool_or_facility = None
@@ -393,6 +434,7 @@ class IdleRepositoryMixin:
             cost = {
                 "stamina": definition.stamina_cost,
                 "energy": definition.energy_cost,
+                **definition.supply_cost,
             }
             starts_at = now
             claim_at = now + timedelta(seconds=definition.duration_seconds)
@@ -456,7 +498,7 @@ class IdleRepositoryMixin:
                 connection,
                 player,
                 updated_at=now_text,
-                costs={str(tool["tool_key"]): 1} if tool else None,
+                costs={**definition.supply_cost, **({str(tool["tool_key"]): 1} if tool else {})},
                 value_delta={
                     "stamina": -definition.stamina_cost,
                     "energy": -definition.energy_cost,
@@ -514,6 +556,7 @@ class IdleRepositoryMixin:
                 "companion_label": snapshot["companion_label"],
                 "journal": definition.gathering_journal,
                 "patrol_journal": definition.patrol_journal,
+                **({"supply_evidence": {k: snapshot[k] for k in ("cost", "full_reward", "fallback_reward", "gathering_journal", "codex_entries", "reward_labels", "pool_key")}} if definition.supply_cost else {}),
             }
             self._record_idle_operation(connection, operation_id, operation_name, int(player["id"]), request_hash, payload, now_text)
             return self._assignment_from_payload(payload)
@@ -555,6 +598,7 @@ class IdleRepositoryMixin:
             if status != "running":
                 raise IdleAlreadySettledError("idle assignment is not running")
             snapshot = self._required_json_object(assignment["snapshot_json"], "idle snapshot")
+            self._validate_idle_supply_evidence(connection, assignment)
             journal = {**journal_from_snapshot(snapshot), **patrol_journal_from_snapshot(snapshot)}
             expected_claim_at = datetime.fromisoformat(str(assignment["claim_at"]))
             expected_max_claim_at = datetime.fromisoformat(str(assignment["max_claim_at"]))
@@ -783,14 +827,14 @@ class IdleRepositoryMixin:
                 raise IdleAlreadySettledError("idle assignment is not running")
             if now > datetime.fromisoformat(str(assignment["cancel_until"])):
                 raise IdleCancellationExpiredError("idle cancellation window expired")
-            cost = self._required_json_object(assignment["cost_json"], "idle cost")
             snapshot = self._required_json_object(assignment["snapshot_json"], "idle snapshot")
+            cost = self._validate_idle_supply_evidence(connection, assignment)
             tool_key = snapshot.get("tool_key")
             grant_player_state(
                 connection,
                 player,
                 updated_at=now_text,
-                rewards={str(tool_key): 1} if tool_key else None,
+                rewards={**{k: n for k, n in cost.items() if k.startswith("item.")}, **({str(tool_key): 1} if tool_key else {})},
                 value_delta={
                     "stamina": int(cost.get("stamina", 0)),
                     "energy": int(cost.get("energy", 0)),

@@ -20,6 +20,7 @@ def test_wilderness_choices_have_distinct_costs_rewards_and_consumers():
     assert {route.key for route in routes} == {
         "idle.herb_vale_gather", "idle.ironwood_gather", "idle.basalt_sifting",
         "idle.mist_lamp_watch", "idle.cloud_dock_tide", "idle.leaf_nursery_watch",
+        "idle.camp.outskirts", "idle.camp.ironwood", "idle.camp.basalt",
     }
     for route in routes:
         choices = [select_wilderness_choice(route, c['name']) for c in route.wilderness_event['choices']]

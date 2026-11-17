@@ -2,6 +2,9 @@
   "schema": "xiuxian.content",
   "kind": "codex_entry",
   "records": [
+    {"key":"codex.story.camp.outskirts","name":"近郊篝火营交班记","category":"story","status":"active","desc":"篝火照到旧车轮，林安把重新打通的路记进巡簿。搬来的木石与收好的药草留给你，下一趟巡路也有了落脚处。"},
+    {"key":"codex.story.camp.ironwood","name":"铁木桥畔营交班记","category":"story","status":"active","desc":"桥板不再晃动，石伯把检过暗裂的木料与铁石分袋交来。运材人重新上路，桥边还留着你添过的柴火。"},
+    {"key":"codex.story.camp.basalt","name":"岩径避风营交班记","category":"story","status":"active","desc":"水痕退过最后一道刻线，阿砺验过干砂与铁石后签下交班。商队沿新立的路标离开，避风棚仍给后来人留着空位。"},
     {"key": "codex.story.leaf_watch", "name": "圃夜手记", "category": "story", "status": "active", "desc": "沈青记下六小时完整守圃，灵叶留露，浅沟收砂，田里的功夫延续到夜里。"},
     {"key": "codex.story.mist_lamp", "name": "雾中灯簿", "category": "story", "status": "active", "desc": "陆灯记下六小时完整守灯。筛净阵砂、辨认灵叶，旧灯才有下一夜的光。"},
     {"key": "codex.story.cloud_tide", "name": "候潮航簿", "category": "story", "status": "active", "desc": "晏潮记下八小时完整候潮。云铁稳舷、阵砂封舱，航路的安稳来自一次真实交班。"},

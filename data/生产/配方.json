@@ -2,6 +2,7 @@
   "schema": "xiuxian.content",
   "kind": "recipe",
   "records": [
+    {"key":"recipe.armor.patrol_vest","name":"巡山护甲","desc":"将捡回的铁石、木材和阵砂拼接成护甲，工匠收取装配费；各营地收材可在青石镇制作，穿戴后增加气血。","profession":null,"aliases":[],"inputs":{"item.mat.wood":2,"item.ore.ironstone":2,"item.mat.array_sand":1},"energy_cost":3,"duration_seconds":60,"daily_limit":3,"tool_key":null,"tool_cost_bp":0,"currency_cost":18,"outputs":{"item.armor.patrol_vest":1},"high_quality_bonus":{},"failure_refunds":{"item.mat.wood":1},"min_realm_layer":2,"required_realm":"qi_sensing","additional_realms":["qi_gathering","foundation","golden_core","nascent_soul","soul_transformation","void_refining","dao_union","tribulation"],"proficiency_bp":3000,"required_location":["xuantian.new_town"],"teaching_allowed":false,"required_path":null,"required_paths":[],"required_subprofession":[],"success_threshold_bp":4500,"high_quality_threshold_bp":10001,"facility_kind":null,"failure_refund_bp":null,"binding_kind":null,"binding_duration_seconds":0,"binding_slot_limit":0,"cross_realm_faction":null,"status":"active"},
     {
       "key": "recipe.permit.mist_grotto", "name": "洞天验行牌", "profession": null,
       "desc": "用木牌与止血药草向守洞人备一份入洞行装，缴费刻成一次雾隐洞天凭证；从灵泉谷入洞时消耗。",
