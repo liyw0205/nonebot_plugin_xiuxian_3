@@ -484,7 +484,7 @@
       "5d3548aa79e6941ddb7053d3825a12b0f42f1e4ff13574649a0f4671d0fbe1dc": "bf6775fd61668e0170e611f2cc809ef349fa4c6d:data/装备/成长.json"
     },
     "new_sha256": "938e0b64a59d526277e3b8e81257febaf0a79a8e8dc3d187a3f4de993552e9c7",
-    "new_commit": "bf6775fd61668e0170e611f2cc809ef349fa4c6d"
+    "new_commit": "111fbfa42c1c65e91c90a6d12d13c72a5f4e38ac"
   },
   "装备/法器.json": {
     "old_sha256": {
@@ -492,7 +492,7 @@
       "457af4fd331bc04b2106e8ce0c16f50168f74a83cfd302dc9176d8e96d5b8568": "bf6775fd61668e0170e611f2cc809ef349fa4c6d:data/装备/法器.json"
     },
     "new_sha256": "759b3af58d31f33b6f5bf0d9162ac53da2d8def700710a18a519777da70dba08",
-    "new_commit": "bf6775fd61668e0170e611f2cc809ef349fa4c6d"
+    "new_commit": "111fbfa42c1c65e91c90a6d12d13c72a5f4e38ac"
   },
   "装备/防具.json": {
     "old_sha256": {
