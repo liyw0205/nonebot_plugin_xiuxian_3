@@ -404,8 +404,11 @@ def _story_objectives(
                 "key": str(objective_key), "type": kind, "label": label.strip(), "entry_key": entry_key,
             }
         elif kind == "exploration_reward":
-            if set(objective) != {"key", "type", "label", "mode_key", "location_key", "item_key", "quantity"}:
+            fields = {"key", "type", "label", "mode_key", "location_key", "item_key", "quantity"}
+            if set(objective) not in (fields, fields | {"owned_receipts"}):
                 raise ContentError(f"mainline {key} objective {objective_key} has an invalid exploration shape")
+            if "owned_receipts" in objective and objective["owned_receipts"] is not True:
+                raise ContentError(f"mainline {key} objective {objective_key} requires owned receipts")
             mode_key = objective.get("mode_key")
             location_key = objective.get("location_key")
             item_key = objective.get("item_key")
@@ -445,6 +448,8 @@ def _story_objectives(
                 "mode_key": mode_key, "location_key": location_key,
                 "item_key": item_key, "quantity": quantity,
             }
+            if "owned_receipts" in objective:
+                normalized["owned_receipts"] = True
         elif kind == "exploration_battle_victory":
             if set(objective) != {"key", "type", "label", "mode_key", "location_key"}:
                 raise ContentError(f"mainline {key} objective {objective_key} has an invalid battle shape")

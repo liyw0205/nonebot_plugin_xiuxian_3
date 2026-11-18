@@ -16,6 +16,9 @@ BASELINES = {
 
 def before_herb_shelter_release(relative: str, text: str) -> str:
     """Reconstruct pinned Git blobs, never exclude records from live contracts."""
+    from test_mist_lamp_seeds import before_mist_lamp_release
+
+    text = before_mist_lamp_release(relative, text)
     if relative == "图鉴/条目.json":
         return "".join(line for line in text.splitlines(keepends=True) if '"codex.story.herb_shelter"' not in line)
     if relative != "剧情/主线.json":
@@ -79,6 +82,9 @@ def test_herb_shelter_seeds_upgrade_backup_replay_custom_and_rollback(host):
 
     codex = json.loads(old["图鉴/条目.json"])
     codex["records"][0]["desc"] += " 本地旧版图鉴。"
+    current_codex = json.loads((ROOT / "data/图鉴/条目.json").read_text(encoding="utf-8"))
+    handover = next(row for row in current_codex["records"] if row["key"] == "codex.story.mist_lamp_handover")
+    codex["records"].append(handover)
     custom_codex = (json.dumps(codex, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
     (host / "data/图鉴/条目.json").write_bytes(custom_codex)
     (host / "data/剧情/主线.json").write_bytes(old["剧情/主线.json"])

@@ -4618,7 +4618,7 @@
       "objectives": [
         {"key": "make_pass", "type": "production_complete", "label": "本关新制并成功领取洞天验行牌", "route_key": "idle.herb_vale_gather", "additional_route_keys": ["idle.ironwood_gather"], "recipe_key": "recipe.permit.mist_grotto", "item_key": "item.cave_pass_basic"},
         {"key": "arrive", "type": "travel_arrival", "label": "本关真实抵达雾隐洞天一层", "destination_key": "cave.mist_grotto"},
-        {"key": "survey", "type": "exploration_reward", "label": "本关洞天探索结算取得阵砂", "mode_key": "explore.mist_grotto", "location_key": "cave.mist_grotto", "item_key": "item.mat.array_sand", "quantity": 1}
+        {"key": "survey", "type": "exploration_reward", "label": "本关洞天探索结算取得阵砂", "mode_key": "explore.mist_grotto", "location_key": "cave.mist_grotto", "item_key": "item.mat.array_sand", "quantity": 1, "owned_receipts": true}
       ],
       "actions": [
         {"command": "生产预览", "argument": "洞天验行牌", "description": "聚气四层后在青石镇或灵泉谷，以一木两草和十灵石制牌。"},
@@ -4655,7 +4655,7 @@
       "body": "守夜结束，陆灯没有让你继续添油。他把两份干砂包进旧布，说灯要长明，得把灵机引回来。离开洞天回到灵泉谷，先看布阵辅修与基础聚灵阵预览，在这一页开始后用两份阵砂新开制作，成功收下一座阵；尚未习得布阵时按原有辅修规则选择，不会替你改业。随后到青石镇接灯阵续灵，实交一座基础聚灵阵，由航铺随下一班物资送回洞口。只收旧阵、制作失败、订单未交都不算续灯。阵砂不足可再回洞守夜，重新入洞仍须备凭证；若错过订单截止，等次日公示，陆灯会留着这页灯簿等你。",
       "objectives": [
         {"key": "make_array", "type": "production_complete", "label": "本关新制并成功领取基础聚灵阵", "route_key": "idle.mist_lamp_watch", "recipe_key": "recipe.array.gathering_basic", "item_key": "item.array.gathering_basic"},
-        {"key": "deliver", "type": "commission_delivery", "label": "本关交付灯阵续灵并实交聚灵阵", "commission_key": "town_commission.lamp_array"}
+        {"key": "deliver", "type": "commission_delivery", "label": "本关新接并交付灯阵续灵，实交聚灵阵", "commission_key": "town_commission.lamp_array", "delivery_evidence": {"inputs": {"item.array.gathering_basic": 1}, "location_key": "xuantian.new_town", "fresh_acceptance": true}}
       ],
       "actions": [
         {"command": "前往", "argument": "灵泉谷", "description": "结算离洞，在灵泉谷制作聚灵阵。"},
@@ -4663,14 +4663,14 @@
         {"command": "开始生产", "argument": "基础聚灵阵", "description": "两份阵砂与二十灵石，新制九十秒后领取。"},
         {"command": "领取生产", "argument": "", "description": "须成功出阵，失败按原规则补料再试。"},
         {"command": "前往", "argument": "青石镇", "description": "实到镇中，先备阵再接十二小时公示订单。"},
-        {"command": "接取委托", "argument": "灯阵续灵", "description": "查看当日公示后接取。"},
+        {"command": "接取委托", "argument": "灯阵续灵", "description": "本关开始后在青石镇查看公示并新接订单，关前接单不计。"},
         {"command": "交付委托", "argument": "灯阵续灵", "description": "实交一座聚灵阵，完成灯簿最后一页。"}
       ],
       "state_changes": {"activity_events": ["story.mainline.mist_lamp:mist_lamp.3"]}, "next_stage_key": null,
-      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "需要本关新制成功的聚灵阵和本人灯阵续灵交单。旧阵、失败、只接未交不能交卷，材料不足补给，过期次日重接，重启后进度保留。"},
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "需要本关新制成功的聚灵阵，以及本关开始后在青石镇新接并交付的灯阵续灵订单。旧阵、失败、关前接单、只接未交和过期订单不能交卷；材料不足补给，过期次日重接，重启后保留剧情与下一步行动。"},
       "status": "open", "aliases": ["归谷续灯"], "prerequisites": ["mist_lamp.2"], "required_realm": "qi_gathering", "required_layer": 4,
       "lane": "mist_lamp", "lane_name": "雾隐守灯", "reputation_key": "local.xuantian.new_town",
-      "first_clear_reward": {"spirit_stones": 35, "local_reputation": 4, "service_reputation": 3}, "repeat_reward": {"spirit_stones": 6}
+      "first_clear_reward": {"spirit_stones": 35, "local_reputation": 4, "service_reputation": 3, "codex.story.mist_lamp_handover": 1}, "repeat_reward": {"spirit_stones": 6}
     },
     {
       "key": "cloud_tide.1", "story_key": "story.mainline.cloud_tide", "chapter": 1, "stage": 1,

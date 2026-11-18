@@ -2335,6 +2335,12 @@ class AdventuresRepositoryMixin:
                 if objective.get("entry_key") in baseline:
                     found = None
             elif kind == "exploration_reward":
+                if objective.get("owned_receipts") is True:
+                    from .exploration_evidence import has_owned_exploration_reward
+
+                    if not has_owned_exploration_reward(connection, player_id, objective, operation_baseline, started_at):
+                        missing.append(str(objective["label"]))
+                    continue
                 rows = connection.execute(
                     "SELECT result_json FROM exploration_sessions WHERE player_id=? "
                     "AND status='settled' AND mode_key=? AND location_key=? AND starts_at>=?",
@@ -2560,9 +2566,10 @@ class AdventuresRepositoryMixin:
                     )
                 if objective["type"] == "exploration_reward":
                     quantity = objective.get("quantity")
+                    fields = {"key", "type", "label", "mode_key", "location_key", "item_key", "quantity"}
                     return (
-                        set(objective)
-                        == {"key", "type", "label", "mode_key", "location_key", "item_key", "quantity"}
+                        set(objective) in (fields, fields | {"owned_receipts"})
+                        and ("owned_receipts" not in objective or objective["owned_receipts"] is True)
                         and all(
                             isinstance(objective.get(field), str) and objective[field].strip()
                             for field in ("mode_key", "location_key", "item_key")

@@ -7,6 +7,7 @@
     {"key":"codex.story.camp.basalt","name":"岩径避风营交班记","category":"story","status":"active","desc":"水痕退过最后一道刻线，阿砺验过干砂与铁石后签下交班。商队沿新立的路标离开，避风棚仍给后来人留着空位。"},
     {"key": "codex.story.leaf_watch", "name": "圃夜手记", "category": "story", "status": "active", "desc": "沈青记下六小时完整守圃，灵叶留露，浅沟收砂，田里的功夫延续到夜里。"},
     {"key": "codex.story.mist_lamp", "name": "雾中灯簿", "category": "story", "status": "active", "desc": "陆灯记下六小时完整守灯。筛净阵砂、辨认灵叶，旧灯才有下一夜的光。"},
+    {"key": "codex.story.mist_lamp_handover", "name": "归谷续灯录", "category": "story", "status": "active", "desc": "从雾隐洞天守过一夜，携干砂归谷制成聚灵阵，再将实物交给青石镇航铺。陆灯收到了续阵的回简，旧灯的光也沿来路照向下一位入洞人。"},
     {"key": "codex.story.cloud_tide", "name": "候潮航簿", "category": "story", "status": "active", "desc": "晏潮记下八小时完整候潮。云铁稳舷、阵砂封舱，航路的安稳来自一次真实交班。"},
     {"key": "codex.story.herb_vale_gather", "name": "采药留根", "category": "story", "status": "active", "desc": "在百草坡跟姜婆辨药采叶，完整收回药篓后记下：取成叶，留根须，来年的坡地仍会有药香。"},
     {"key": "codex.story.herb_shelter", "name": "药棚留根簿", "category": "story", "status": "active", "desc": "从百草坡完整收篓，亲手炼成疗伤丹并送回青石镇，再将三份止血草交入药柜。姜婆记下这次救治，也给下一位背药人留好了药。"},
