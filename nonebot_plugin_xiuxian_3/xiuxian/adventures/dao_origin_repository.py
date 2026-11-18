@@ -148,10 +148,18 @@ class DaoOriginRepositoryMixin:
             player = self._require_player(connection, platform, platform_user_id)
             season_id = final_heaven_season_window(now)[0]
             qualification = connection.execute(
-                "SELECT readiness_flag, status FROM dao_origin_qualifications "
+                "SELECT readiness_flag, status, snapshot_json FROM dao_origin_qualifications "
                 "WHERE player_id=? AND season_id=?",
                 (player["id"], season_id),
             ).fetchone()
+            qualification_snapshot: dict[str, Any] | None = None
+            if qualification is not None:
+                try:
+                    decoded_snapshot = json.loads(str(qualification["snapshot_json"]))
+                except (TypeError, json.JSONDecodeError):
+                    decoded_snapshot = None
+                if isinstance(decoded_snapshot, dict):
+                    qualification_snapshot = decoded_snapshot
             if (
                 str(player["location_key"]) != DAO_ORIGIN_LOCATION
                 or not realm_at_least(str(player["realm_key"]), player_integer(player, "realm_layer"), "dao_union", 1, self.content)
@@ -159,6 +167,9 @@ class DaoOriginRepositoryMixin:
                 or qualification is None
                 or str(qualification["readiness_flag"]) != DAO_ORIGIN_PERMISSION
                 or str(qualification["status"]) != "qualified"
+                or qualification_snapshot is None
+                or qualification_snapshot.get("season_id") != season_id
+                or qualification_snapshot.get("readiness_flag") != DAO_ORIGIN_PERMISSION
             ):
                 raise DaoOriginRequirementError("location, realm, or current seasonal qualification is missing")
             if connection.execute("SELECT 1 FROM dao_origin_runs WHERE player_id=? AND status IN ('routing','cleared') LIMIT 1", (player["id"],)).fetchone():
