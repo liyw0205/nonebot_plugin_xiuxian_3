@@ -535,8 +535,8 @@ def test_leaf_watch_story_unlock_frozen_idle_and_real_supply(tmp_path, adapter, 
             assert (await j.send("挂机状态")).data["claimable"]
             j.fail("watch-claim")
             before = _database_state(j.runtime)
-            with pytest.raises(sqlite3.IntegrityError, match="field journey fault"):
-                await j.send("领取挂机", "watch-claim")
+            failed = await j.send("领取挂机", "watch-claim")
+            assert failed.code == "PERSISTENCE_ERROR" and failed.retryable
             assert _database_state(j.runtime) == before
             j.repair()
             original = _inventory(j.runtime)
