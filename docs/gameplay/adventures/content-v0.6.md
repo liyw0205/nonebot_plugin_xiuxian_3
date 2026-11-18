@@ -6,7 +6,7 @@
 |:--|:--|:--|
 | 悬赏 | `bounty.dao_origin_service`：道统服务资格 | 完成公共服务 3；12h；道统名望 +20、故事图鉴 |
 | 悬赏 | `bounty.ascension_supply`：普通角色也可参加 | 交付疗伤/维修物 5；8h；世界功勋 50、灵石 300；不得发飞升功勋 |
-| 秘境 | `instance.secret_realm.dao_origin`：合道 L1、道源许可 | 单人 8 节点、60 体力/人；首通新篇章线索/展示；每角色 1 次 |
+| 秘境 | `instance.secret_realm.dao_origin`：合道 L1、当前赛季道源资格 | 单人 8 节点、60 体力/人；首通新篇章线索/展示；每角色 1 次 |
 | 秘境 | `instance.secret_realm.heaven_echo`：渡劫 L1、非最终战 | 3 节点、天劫债不变；首通结局旁线旗标 |
 | 遗府 | `instance.legacy.demon_abyss_echo`：筑基 L1、深渊门地点/权限、绑定深渊残响线索 | 固定 3 节点、无资源成本；首通仅写故事旗标 |
 | 主线 | `story.mainline.dao_echoes`：炼虚 L10 | 建设者/见证者/远行者三线各 10 关；lane 内顺序推进；只写故事/服务/图鉴旗标 |

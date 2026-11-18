@@ -10,6 +10,7 @@ import pytest
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
+from nonebot_plugin_xiuxian_3.xiuxian.events.rules import final_heaven_season_window
 
 
 class MutableClock:
@@ -35,6 +36,17 @@ async def _player(runtime, adapter: str, user: str) -> None:
             "UPDATE players SET realm_key='dao_union', realm_layer=1, location_key='dao.origin_gate', "
             "stamina=100, stamina_max=100, intro_json=? WHERE platform=? AND platform_user_id=?",
             (json.dumps({"flags": ["access.final_heaven"]}), adapter, user),
+        )
+        player_id = connection.execute(
+            "SELECT id FROM players WHERE platform=? AND platform_user_id=?", (adapter, user)
+        ).fetchone()[0]
+        season_id = final_heaven_season_window(runtime.repository._now())[0]
+        now_text = runtime.repository._now().isoformat()
+        connection.execute(
+            "INSERT INTO dao_origin_qualifications("
+            "player_id, season_id, readiness_flag, status, snapshot_json, operation_id, created_at, updated_at) "
+            "VALUES (?, ?, 'access.final_heaven', 'qualified', '{}', ?, ?, ?)",
+            (player_id, season_id, f"{user}:qualification", now_text, now_text),
         )
 
 
@@ -87,6 +99,48 @@ def test_dao_origin_full_route_is_idempotent_and_resource_isolated(adapter: str)
             assert dao_progress == 0
             assert merit == 0
             assert settled.data["story_flag_written"] is True
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_dao_origin_rejects_stale_season_qualification() -> None:
+    async def run() -> None:
+        clock = MutableClock(datetime(2026, 10, 1, tzinfo=timezone.utc))
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir, clock=clock, adapters=("qq.official",))
+            user = "stale-dao-origin"
+            created = await runtime.adapters.dispatch(
+                "qq.official", _ctx("qq.official", user, "create"), "开始修仙"
+            )
+            assert created.ok
+            season_id, season_start, _ = final_heaven_season_window(clock())
+            old_season = final_heaven_season_window(season_start - timedelta(seconds=1))[0]
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                player_id = connection.execute(
+                    "SELECT id FROM players WHERE platform=? AND platform_user_id=?",
+                    ("qq.official", user),
+                ).fetchone()[0]
+                connection.execute(
+                    "UPDATE players SET realm_key='dao_union', realm_layer=1, location_key='dao.origin_gate', "
+                    "stamina=100, stamina_max=100, intro_json=? WHERE id=?",
+                    (json.dumps({"flags": ["access.final_heaven"]}), player_id),
+                )
+                connection.execute(
+                    "INSERT INTO dao_origin_qualifications("
+                    "player_id, season_id, readiness_flag, status, snapshot_json, operation_id, created_at, updated_at) "
+                    "VALUES (?, ?, 'access.final_heaven', 'qualified', '{}', ?, ?, ?)",
+                    (player_id, old_season, f"{user}:old-qualification", season_start.isoformat(), season_start.isoformat()),
+                )
+            result = await runtime.adapters.dispatch(
+                "qq.official", _ctx("qq.official", user, "enter"), "进入秘境 道源秘境"
+            )
+            assert result.code == "DAO_ORIGIN_REQUIREMENT_MISSING"
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                assert connection.execute(
+                    "SELECT COUNT(*) FROM dao_origin_runs WHERE player_id=?", (player_id,)
+                ).fetchone()[0] == 0
+            assert season_id != old_season
             await runtime.close()
 
     asyncio.run(run())

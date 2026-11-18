@@ -21,6 +21,7 @@ from ..persistence.errors import (
 )
 from ..specials.codex_projection import record_codex_discovery
 from ..utils.player import change_player_state, player_integer
+from ..events.rules import final_heaven_season_window
 from .dao_origin_models import DaoOriginRunRecord
 from .dao_origin_rules import (
     DAO_ORIGIN_CODEX,
@@ -145,12 +146,21 @@ class DaoOriginRepositoryMixin:
             if replay is not None:
                 return self._dao_origin_record(replay, replay=True)
             player = self._require_player(connection, platform, platform_user_id)
+            season_id = final_heaven_season_window(now)[0]
+            qualification = connection.execute(
+                "SELECT readiness_flag, status FROM dao_origin_qualifications "
+                "WHERE player_id=? AND season_id=?",
+                (player["id"], season_id),
+            ).fetchone()
             if (
                 str(player["location_key"]) != DAO_ORIGIN_LOCATION
                 or not realm_at_least(str(player["realm_key"]), player_integer(player, "realm_layer"), "dao_union", 1, self.content)
                 or DAO_ORIGIN_PERMISSION not in self._dao_origin_json(player["intro_json"], {}).get("flags", [])
+                or qualification is None
+                or str(qualification["readiness_flag"]) != DAO_ORIGIN_PERMISSION
+                or str(qualification["status"]) != "qualified"
             ):
-                raise DaoOriginRequirementError("location, realm, or dao-origin permission is missing")
+                raise DaoOriginRequirementError("location, realm, or current seasonal qualification is missing")
             if connection.execute("SELECT 1 FROM dao_origin_runs WHERE player_id=? AND status IN ('routing','cleared') LIMIT 1", (player["id"],)).fetchone():
                 raise DaoOriginBusyError("dao-origin run is already active")
             if self._has_active_long_action(connection, int(player["id"])):
