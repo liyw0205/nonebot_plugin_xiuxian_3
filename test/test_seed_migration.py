@@ -468,6 +468,9 @@ def old_official_secret_realms() -> bytes:
         if record["key"]
         not in {"instance.secret_realm.time_fort", "instance.secret_realm.void_ruins"}
     ]
+    for record in document["records"]:
+        if record["key"] == "instance.secret_realm.dao_origin":
+            record["permission"] = "access.dao.origin"
     blob = (json.dumps(document, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
     rule = json.loads((ROOT / "scripts/seed_migrations.json").read_text(encoding="utf-8"))[
         SECRET_REALM_FILE.as_posix()
