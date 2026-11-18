@@ -34,7 +34,7 @@ async def _player(runtime, adapter: str, user: str) -> None:
         connection.execute(
             "UPDATE players SET realm_key='dao_union', realm_layer=1, location_key='dao.origin_gate', "
             "stamina=100, stamina_max=100, intro_json=? WHERE platform=? AND platform_user_id=?",
-            (json.dumps({"flags": ["access.dao.origin"]}), adapter, user),
+            (json.dumps({"flags": ["access.final_heaven"]}), adapter, user),
         )
 
 
@@ -87,6 +87,30 @@ def test_dao_origin_full_route_is_idempotent_and_resource_isolated(adapter: str)
             assert dao_progress == 0
             assert merit == 0
             assert settled.data["story_flag_written"] is True
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_dao_origin_rejects_legacy_permission_flag() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir, adapters=("qq.official",))
+            await runtime.adapters.dispatch(
+                "qq.official", _ctx("qq.official", "legacy-dao-origin", "create"), "开始修仙"
+            )
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                connection.execute(
+                    "UPDATE players SET realm_key='dao_union', realm_layer=1, location_key='dao.origin_gate', "
+                    "stamina=100, stamina_max=100, intro_json=? WHERE platform=? AND platform_user_id=?",
+                    (json.dumps({"flags": ["access.dao.origin"]}), "qq.official", "legacy-dao-origin"),
+                )
+            result = await runtime.adapters.dispatch(
+                "qq.official",
+                _ctx("qq.official", "legacy-dao-origin", "enter"),
+                "进入秘境 道源秘境",
+            )
+            assert result.code == "DAO_ORIGIN_REQUIREMENT_MISSING"
             await runtime.close()
 
     asyncio.run(run())

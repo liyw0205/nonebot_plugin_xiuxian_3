@@ -339,7 +339,7 @@ class SecretRealmApplication:
                     "- **奖励**：首通逐成员阵砂 ×2 并写入 `story.mainline.void_archive.time_fort`；重复通关阵砂 ×1。",
                     "",
                     "### 道源秘境",
-                    "- **前置**：合道 L1；位于 `dao.origin_gate`；持有 `access.dao.origin`。",
+                    "- **前置**：合道 L1；位于 `dao.origin_gate`；持有当前赛季资格标记 `access.final_heaven`。",
                     f"- **路线**：{' → '.join(DAO_ORIGIN_NODES)}；单人，体力 60；每角色仅一次。",
                     "- **首通**：写入 `story.dao_origin` 并发现 `codex.dao.service_origin`；不发终局资源。",
                     "",

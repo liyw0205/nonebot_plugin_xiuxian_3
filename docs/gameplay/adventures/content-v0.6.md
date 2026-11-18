@@ -20,7 +20,7 @@
 
 #### 5.4.3 `instance.secret_realm.dao_origin`
 
-道源秘境是合道角色的单人终局旁线，入口固定为 `dao.origin_gate`。角色须合道 L1、持有 `access.dao.origin`，入场原子扣除 60 体力；每个角色终身仅可尝试一次，运行时长 60 分钟。路线随机池为 `none`，固定八节点：`origin_threshold -> dao_spring -> three_realm_seal -> service_archive -> fruit_trace -> witness_platform -> origin_oath -> new_chapter_gate`。
+道源秘境是合道角色的单人终局旁线，入口固定为 `dao.origin_gate`。角色须合道 L1、持有当前赛季资格标记 `access.final_heaven`，入场原子扣除 60 体力；每个角色终身仅可尝试一次，运行时长 60 分钟。路线随机池为 `none`，固定八节点：`origin_threshold -> dao_spring -> three_realm_seal -> service_archive -> fruit_trace -> witness_platform -> origin_oath -> new_chapter_gate`。
 
 路线推进由服务端按序校验，开始、节点、结算和系统补偿均写入 operation ledger；重启或 QQ/OneBot 身份切换后可从当前节点继续。跳跃节点、重复 operation 的不同输入、缺少地点/境界/许可、活动锁和一次性额度均原子拒绝。过期保留已扣体力和额度，不写首通结果；明确的系统中止才退还 60 体力并释放一次性额度。
 

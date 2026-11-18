@@ -199,7 +199,7 @@
       "desc": "以道源关隘与三界校验印为路的道源秘境。",
       "status": "active",
       "location_key": "dao.origin_gate",
-      "permission": "access.dao.origin",
+      "permission": "access.final_heaven",
       "stamina_cost": 60,
       "quota_limit": 1,
       "quota_key": "lifetime",
