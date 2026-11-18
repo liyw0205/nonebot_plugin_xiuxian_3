@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 from test_seed_migration import ROOT, deploy, host, preserved
+from test_herb_shelter_seeds import before_herb_shelter_release
 
 
 # Exact 9219b3bf6f908f08ee884149af311a30e8caeb9f Git blobs, reconstructed
@@ -21,7 +22,7 @@ BASELINE_HASHES = {
 def old_field_journey_seeds() -> dict[str, bytes]:
     result = {}
     for relative, expected in BASELINE_HASHES.items():
-        text = (ROOT / "data" / relative).read_text(encoding="utf-8")
+        text = before_herb_shelter_release(relative, (ROOT / "data" / relative).read_text(encoding="utf-8"))
         if relative == "剧情/主线.json":
             marker = text.index('    {\n      "key": "field_seeds.1"')
             text = text[:marker].rstrip()[:-1] + "\n  ]\n}\n"

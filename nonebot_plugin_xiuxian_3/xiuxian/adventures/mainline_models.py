@@ -20,6 +20,9 @@ class MainlineStageView:
     repeat_reward: dict[str, int | str] = field(default_factory=dict)
     completed: bool = False
     claimed: bool = False
+    body: str = ""
+    actions: tuple[dict[str, str], ...] = ()
+    retry_message: str = ""
 
 
 @dataclass(frozen=True, slots=True)

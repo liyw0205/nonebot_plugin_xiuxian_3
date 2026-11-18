@@ -8,6 +8,7 @@ from test_bounty_patrol_seeds import old_bounty_patrol_seeds
 from test_field_journey_seeds import old_field_journey_seeds
 from test_patrol_seeds import old_patrol_seeds
 from test_seed_migration import ROOT, old_official_place_codex
+from test_herb_shelter_seeds import before_herb_shelter_release
 
 
 BASELINES = {
@@ -23,7 +24,7 @@ BASELINES = {
 def old_camp_seeds():
     result = {}
     for relative, (expected, prefixes) in BASELINES.items():
-        lines = (ROOT / "data" / relative).read_text(encoding="utf-8").splitlines(keepends=True)
+        lines = before_herb_shelter_release(relative, (ROOT / "data" / relative).read_text(encoding="utf-8")).splitlines(keepends=True)
         markers = tuple('    {"key":"' + prefix for prefix in
                         (*prefixes, "source.survey.", "source.deposit.", "recipe.field.root_wedge",
                          "source.relic.", "recipe.relic.", "reward_pool.relic.",

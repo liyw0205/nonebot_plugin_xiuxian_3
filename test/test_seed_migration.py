@@ -1078,6 +1078,7 @@ PLACE_CODEX_ADDED = frozenset(
         "codex.story.mist_lamp",
         "codex.story.cloud_tide",
         "codex.story.herb_vale_gather",
+        "codex.story.herb_shelter",
         "codex.story.ironwood_gather",
         "codex.story.basalt_sifting",
         "codex.story.spring_gleaning",
@@ -1401,13 +1402,16 @@ def test_companion_old_trail_seeds_upgrade_together_and_preserve_custom(host: Pa
         _historical_mainline_prefix(mainline, marker).rstrip()[:-1] + "\n  ]\n}\n"
     ).encode("utf-8")
     assert hashlib.sha256(old_mainline).hexdigest() == "ad6aae6f0a4037c52c17ea17e902188bcca190676d455bca6a49fa178c4ed473"
+    from test_herb_shelter_seeds import before_herb_shelter_release
+
     codex_file = Path("图鉴/条目.json")
     codex = (ROOT / "data" / codex_file).read_text(encoding="utf-8")
+    codex = before_herb_shelter_release(codex_file.as_posix(), codex)
     codex, count = re.subn(
-        r'^    \{"key": "codex\.story\.(?:mist_lamp|cloud_tide|leaf_watch)",[^\n]*\n',
+        r'^    \{"key":\s*"codex\.story\.(?:mist_lamp|cloud_tide|leaf_watch|camp\.(?:outskirts|ironwood|basalt))",[^\n]*\n',
         "", codex, flags=re.M,
     )
-    assert count == 3
+    assert count == 6
     old_codex, count = re.subn(
         r'    \{\n      "key": "codex\.story\.companion_old_trail\.[123]",.*?\n    \},\n',
         "", codex, flags=re.S,

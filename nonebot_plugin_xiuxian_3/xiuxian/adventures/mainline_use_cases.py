@@ -160,6 +160,14 @@ class AdventuresMainlineApplication:
                 command = f"{self.start_command} {item.label}"
                 lines.append(f"  {command_link(command, command)}")
             elif item.status in {"running", "cleared", "reward_pending"}:
+                if item.body:
+                    lines.append(f"  剧情：{item.body}")
+                lines.extend(
+                    f"  行动：{self._action_link(action)} · {action['description']}"
+                    for action in item.actions
+                )
+                if item.retry_message:
+                    lines.append(f"  未完成时：{item.retry_message}")
                 command = f"{self.claim_command} {item.label}"
                 lines.append(f"  {command_link(command, command)}")
             stages.append(
@@ -171,6 +179,9 @@ class AdventuresMainlineApplication:
                     "status": item.status,
                     "completed": item.completed,
                     "claimed": item.claimed,
+                    "body": item.body,
+                    "actions": list(item.actions),
+                    "retry_message": item.retry_message,
                 }
             )
         lines.extend(

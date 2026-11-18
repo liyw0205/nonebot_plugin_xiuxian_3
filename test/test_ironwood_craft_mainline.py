@@ -108,7 +108,7 @@ def test_ironwood_public_journey_restart_replay_and_rollback(tmp_path, monkeypat
         async def rollback_retry(command, operation):
             trigger(operation)
             before = _database_state(runtime)
-            if command.startswith(("领取挂机", "接受派遣", "结算派遣")):
+            if command.startswith(("接受派遣", "结算派遣")):
                 with pytest.raises(sqlite3.IntegrityError, match="forced ironwood failure"):
                     await send(command, operation)
             else:

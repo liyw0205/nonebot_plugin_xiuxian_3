@@ -4756,7 +4756,7 @@
       "body": "姜婆把湿布从学徒肩头取下，露出一道擦伤。她不许你把灵叶混进止血药，却指着药篓说：两份止血草配一份粗糙灵米，可以炼一枚低阶疗伤丹。米不足时先到灵泉谷拾穗；止血草不足时按百草坡原日限再采。你须有炼丹辅修和基础炉具，先看辅修与生产预览，再在这一页开始后新开丹炉，等炼制成功并领取。旧炉、失败返料和只点火未收丹都不计炼药。带着可用的疗伤丹回青石镇，查看药棚救治公示，接单后在期限内交出实物。药铺只验真药，不认一句救人的承诺，交单和炼药都完成后，姜婆才会收下这一页。",
       "objectives": [
         {"key": "brew_medicine", "type": "production_complete", "label": "本关新开炉并成功领取低阶疗伤丹", "route_key": "idle.herb_vale_gather", "additional_route_keys": ["idle.spring_gleaning"], "recipe_key": "recipe.pill.healing_low", "item_key": "item.pill.healing_low"},
-        {"key": "deliver_medicine", "type": "commission_delivery", "label": "本关交付药棚救治委托并交出一枚疗伤丹", "commission_key": "town_commission.shelter_medicine"}
+        {"key": "deliver_medicine", "type": "commission_delivery", "label": "本关在青石镇新接并交付药棚救治，实交一枚疗伤丹", "commission_key": "town_commission.shelter_medicine", "delivery_evidence": {"inputs": {"item.pill.healing_low": 1}, "location_key": "xuantian.new_town", "fresh_acceptance": true}}
       ],
       "actions": [
         {"command": "辅修预览", "argument": "炼丹", "description": "确认辅修与基础炉具；不自动改变既有辅修。"},
@@ -4765,12 +4765,12 @@
         {"command": "开始生产", "argument": "低阶疗伤丹", "description": "本关新开炉；失败可补料再炼。"},
         {"command": "领取生产", "argument": "", "description": "丹熟后领取；逾期按生产状态恢复，仍需成功出丹。"},
         {"command": "前往", "argument": "青石镇", "description": "沿公开通路回镇并结算移动，备好实物后接单。"},
-        {"command": "接取委托", "argument": "药棚救治", "description": "查看城镇委托期限后接单，炼药与交付都须在本关发生。"},
+        {"command": "接取委托", "argument": "药棚救治", "description": "回青石镇查看期限后新接单，炼药、接单与交付都须在本关发生。"},
         {"command": "交付委托", "argument": "药棚救治", "description": "真实扣除一枚低阶疗伤丹，取得药铺付酬与名望。"}
       ],
       "state_changes": {"activity_events": ["story.mainline.herb_shelter:herb_shelter.2"]},
       "next_stage_key": "herb_shelter.3",
-      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "需要本关新炉成功出丹和本人药棚救治交单两项记录。旧炉、失败、尚未领取、只接未交和旧交单不算；缺料按采药与拾穗日限补给，过期委托次日重接，主线保留。"},
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "需要本关新炉成功出丹和本人在青石镇新接并交付药棚救治两项记录。旧炉、失败、尚未领取、只接未交、关前接单和旧交单不算；缺料按采药与拾穗日限补给，过期委托次日重接，主线保留。"},
       "status": "open", "aliases": ["丹火济伤"],
       "prerequisites": ["herb_shelter.1"], "required_realm": "qi_sensing", "required_layer": 2,
       "lane": "herb_shelter", "lane_name": "百草坡药棚",
@@ -4782,7 +4782,7 @@
       "chapter": 1, "stage": 3, "name": "留根归铺",
       "desc": "把三份止血草交回青石镇药铺，让救治不止于一枚丹药。",
       "body": "学徒的伤口已经包好，雨棚下却还有下一位背药人。姜婆把空篓翻过来，篓底留着一截未剪的根：今天有药，是因为昨日有人留下来年的新芽。最后一页不是把余药换成一句称赞，而是在本关开始后，亲自给青石镇药铺交一份止血草供应。你须备齐三份止血草，再看当日公示，接单并在期限内真实交付；药草不足可以返回百草坡另日采药，两种选择的所得不同，要按背包实数备料。旧交单与未完成的订单不能充数。药铺把新的干药收进柜里，姜婆才将你的名字记入留根簿，今后山路上的劳作便有了可以续下去的去处。",
-      "objectives": [{"key": "deliver_herbs", "type": "commission_delivery", "label": "本关交付止血草供应并交出三份止血草", "commission_key": "town_commission.herb_supply"}],
+      "objectives": [{"key": "deliver_herbs", "type": "commission_delivery", "label": "本关在青石镇新接并交付止血草供应，实交三份止血草", "commission_key": "town_commission.herb_supply", "delivery_evidence": {"inputs": {"item.herb.blood_grass": 3}, "location_key": "xuantian.new_town", "fresh_acceptance": true}}],
       "actions": [
         {"command": "挂机预览", "argument": "百草坡采药", "description": "药草不足时按原日限补给；先备料再接十二小时委托。"},
         {"command": "城镇委托", "argument": "", "description": "身在青石镇查看止血草供应的库存与期限。"},
@@ -4791,11 +4791,11 @@
       ],
       "state_changes": {"activity_events": ["story.mainline.herb_shelter:herb_shelter.3"]},
       "next_stage_key": null,
-      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "只认本关开始后的本人止血草供应交单；旧交单、缺药和过期订单不能交卷。材料不足不扣药，过期按原委托规则次日重接，主线进度保留。"},
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "只认本关开始后本人在青石镇新接并交付的止血草供应；关前接单、旧交单、缺药和过期订单不能交卷。材料不足不扣药，过期按原委托规则次日重接，主线进度保留。"},
       "status": "open", "aliases": ["留根归铺"],
       "prerequisites": ["herb_shelter.2"], "required_realm": "qi_sensing", "required_layer": 2,
       "lane": "herb_shelter", "lane_name": "百草坡药棚", "reputation_key": "local.xuantian.new_town",
-      "first_clear_reward": {"spirit_stones": 24, "local_reputation": 3, "service_reputation": 3},
+      "first_clear_reward": {"spirit_stones": 24, "local_reputation": 3, "service_reputation": 3, "codex.story.herb_shelter": 1},
       "repeat_reward": {"spirit_stones": 5}
     },
     {

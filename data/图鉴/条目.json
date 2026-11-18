@@ -9,6 +9,7 @@
     {"key": "codex.story.mist_lamp", "name": "雾中灯簿", "category": "story", "status": "active", "desc": "陆灯记下六小时完整守灯。筛净阵砂、辨认灵叶，旧灯才有下一夜的光。"},
     {"key": "codex.story.cloud_tide", "name": "候潮航簿", "category": "story", "status": "active", "desc": "晏潮记下八小时完整候潮。云铁稳舷、阵砂封舱，航路的安稳来自一次真实交班。"},
     {"key": "codex.story.herb_vale_gather", "name": "采药留根", "category": "story", "status": "active", "desc": "在百草坡跟姜婆辨药采叶，完整收回药篓后记下：取成叶，留根须，来年的坡地仍会有药香。"},
+    {"key": "codex.story.herb_shelter", "name": "药棚留根簿", "category": "story", "status": "active", "desc": "从百草坡完整收篓，亲手炼成疗伤丹并送回青石镇，再将三份止血草交入药柜。姜婆记下这次救治，也给下一位背药人留好了药。"},
     {"key": "codex.story.ironwood_gather", "name": "顺纹成器", "category": "story", "status": "active", "desc": "老樵匠教你从风折木中辨出实心好料。顺着木纹做柄，拾来的材料也能成为不易折断的工具。"},
     {"key": "codex.story.basalt_sifting", "name": "一砂一阵", "category": "story", "status": "active", "desc": "在玄武岩径迎风筛砂，石匠让你先压稳筛脚。阵法能否稳住，起头便在这一捧不掺碎石的阵砂。"},
     {"key": "codex.story.spring_gleaning", "name": "泉畦饭香", "category": "story", "status": "active", "desc": "与阿禾疏通旧稻畦水口，完整收回一袋粗糙灵米。旅途再远也得吃饭，泉边散穗正好煮成两碗。"},

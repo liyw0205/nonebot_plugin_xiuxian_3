@@ -1754,16 +1754,20 @@ class AdventuresRepositoryMixin:
         for current_definition in definitions:
             run = runs.get(current_definition.key)
             runs_by_key[current_definition.key] = run
-            effective_definitions.append(
-                (
-                    AdventuresRepositoryMixin._mainline_definition_from_snapshot(
-                        run, current_definition
-                    )
-                    if run is not None
-                    else None
-                )
-                or current_definition
+            definition = (
+                AdventuresRepositoryMixin._mainline_definition_from_snapshot(run, current_definition)
+                if run is not None else current_definition
             )
+            if definition is None:
+                # Pre-snapshot completed rows carry no resumable work or reward.
+                if (
+                    run["status"] == "claimed" and bool(run["first_clear_claimed"])
+                    and decode_json_strict(run["snapshot_json"] or "{}") == {}
+                ):
+                    definition = current_definition
+                else:
+                    raise ValueError("mainline run snapshot is invalid")
+            effective_definitions.append(definition)
         prerequisite_results = mainline_prerequisites_met_many(
             effective_definitions,
             completed_stages=completed_stages,
@@ -1799,6 +1803,9 @@ class AdventuresRepositoryMixin:
                     repeat_reward=definition.repeat_reward_map(),
                     completed=bool(run and run["status"] in {"cleared", "reward_pending", "claimed"}),
                     claimed=bool(run and run["status"] == "claimed"),
+                    body=definition.body,
+                    actions=tuple(dict(item) for item in definition.actions),
+                    retry_message=definition.retry_message,
                 )
             )
         current = next((item for item in views if not item.claimed), views[-1])
@@ -1948,6 +1955,18 @@ class AdventuresRepositoryMixin:
                 if has_local_reputation_reward
                 else None
             )
+            codex_categories = {}
+            from ..content import bundled_content
+
+            reward_content = self.content or bundled_content()
+            for reward_key in set(definition.first_clear_reward_map()) | set(definition.repeat_reward_map()):
+                if not reward_key.startswith("codex.") or reward_key == "codex.observation":
+                    continue
+                entry = reward_content.require("codex_entry", reward_key, include_locked=False)
+                category = entry.get("category")
+                if not isinstance(category, str) or not reward_content.has("codex_category", category, include_locked=False):
+                    raise ValueError("mainline codex category is invalid")
+                codex_categories[reward_key] = category
             snapshot = {
                 "started_at": now_text,
                 "baseline_operation_rowid": int(connection.execute(
@@ -1992,6 +2011,7 @@ class AdventuresRepositoryMixin:
                     "repeat_reward": definition.repeat_reward_map(),
                     "reputation_key": definition.reputation_key,
                     "local_reputation_maximum": reputation_maximum,
+                    "codex_categories": codex_categories,
                 },
             }
             if run is None:
@@ -2240,7 +2260,7 @@ class AdventuresRepositoryMixin:
         run: sqlite3.Row,
     ) -> tuple[str, ...]:
         try:
-            snapshot = json.loads(run["snapshot_json"] or "{}")
+            snapshot = decode_json_strict(run["snapshot_json"] or "{}")
             definition = snapshot.get("definition")
             if not isinstance(definition, dict):
                 raise ValueError("mainline snapshot definition is missing")
@@ -2280,21 +2300,11 @@ class AdventuresRepositoryMixin:
             raise ValueError("mainline run snapshot is invalid") from exc
 
         def completed_production(objective: dict) -> int | None:
-            item_path = '$.outputs.' + json.dumps(objective["item_key"])
-            completed = connection.execute(
-                "SELECT o.rowid FROM production_orders p JOIN operations o "
-                "ON o.player_id=p.player_id AND json_extract(o.result_json, '$.order_id')=p.order_id "
-                "WHERE p.player_id=? AND p.recipe_key=? AND p.id>? AND p.starts_at>=? "
-                "AND p.status='completed' AND o.operation_name IN ('production.complete','production.recover') "
-                "AND o.rowid>? AND json_type(o.result_json, '$.success')='true' "
-                "AND json_type(o.result_json, ?)='integer' "
-                "AND json_extract(o.result_json, ?)>=1 ORDER BY o.rowid LIMIT 1",
-                (
-                    player_id, objective["recipe_key"], production_baseline, started_at,
-                    operation_baseline, item_path, item_path,
-                ),
-            ).fetchone()
-            return int(completed[0]) if completed is not None else None
+            from .work_evidence import completed_production_rowid
+
+            return completed_production_rowid(
+                connection, player_id, objective, production_baseline, operation_baseline, started_at,
+            )
 
         missing: list[str] = []
         for objective in objectives:
@@ -2369,6 +2379,12 @@ class AdventuresRepositoryMixin:
                     ),
                 ).fetchone()
             elif kind == "commission_delivery":
+                if "delivery_evidence" in objective:
+                    from .commission_evidence import has_commission_delivery
+
+                    if not has_commission_delivery(connection, player_id, objective, operation_baseline, started_at):
+                        missing.append(str(objective["label"]))
+                    continue
                 found = connection.execute(
                     "SELECT 1 FROM town_commission_claims AS claims "
                     "JOIN town_commissions AS commissions ON commissions.commission_id=claims.commission_id "
@@ -2387,11 +2403,11 @@ class AdventuresRepositoryMixin:
                 ).fetchone()
                 found = progress if progress[0] >= objective["min_points"] else None
             elif kind == "idle_claim":
-                found = connection.execute(
-                    "SELECT 1 FROM idle_assignments WHERE player_id=? AND route_key=? "
-                    "AND status='claimed' AND starts_at>=? AND id>? LIMIT 1",
-                    (player_id, objective["route_key"], started_at, idle_baseline),
-                ).fetchone()
+                from .work_evidence import has_full_idle_claim
+
+                found = True if has_full_idle_claim(
+                    connection, player_id, objective["route_key"], idle_baseline, operation_baseline, started_at,
+                ) else None
             elif kind in {"companion_bond", "companion_feed"}:
                 operation_name = "companion.bond" if kind == "companion_bond" else "companion.feed"
                 alternative = "companion.company" if objective.get("allow_company") is True else operation_name
@@ -2480,7 +2496,7 @@ class AdventuresRepositoryMixin:
         current: MainlineStageDefinition,
     ) -> MainlineStageDefinition | None:
         try:
-            snapshot = json.loads(run["snapshot_json"] or "{}")
+            snapshot = decode_json_strict(run["snapshot_json"] or "{}")
             payload = snapshot.get("definition")
             if not isinstance(payload, dict):
                 return None
@@ -2493,6 +2509,16 @@ class AdventuresRepositoryMixin:
             state_events = payload.get("state_events", [])
             next_stage_key = payload.get("next_stage_key")
             retry_message = payload.get("retry_message", "")
+            codex_categories = payload.get("codex_categories", {})
+            if (
+                not isinstance(codex_categories, dict)
+                or any(not isinstance(value, str) or not value.strip() for value in codex_categories.values())
+                or ("codex_categories" in payload and set(codex_categories) != {
+                    key for key in set(first_clear) | set(repeat)
+                    if key.startswith("codex.") and key != "codex.observation"
+                })
+            ):
+                return None
             started_at = snapshot.get("started_at")
             def valid_reward(reward: object) -> bool:
                 if not isinstance(reward, dict) or not reward:
@@ -2559,11 +2585,10 @@ class AdventuresRepositoryMixin:
                     field_harvest_objective(objective)
                     return True
                 if objective["type"] == "commission_delivery":
-                    return (
-                        set(objective) == {"key", "type", "label", "commission_key"}
-                        and isinstance(objective["commission_key"], str)
-                        and bool(objective["commission_key"].strip())
-                    )
+                    from .commission_evidence import commission_delivery_objective
+
+                    commission_delivery_objective(objective)
+                    return True
                 if objective["type"] == "public_project_contribution":
                     points = objective.get("min_points")
                     return (
@@ -2729,6 +2754,7 @@ class AdventuresRepositoryMixin:
                 state_events=tuple(state_events),
                 next_stage_key=next_stage_key,
                 retry_message=retry_message,
+                codex_categories=tuple(codex_categories.items()),
             )
         except (KeyError, TypeError, ValueError, json.JSONDecodeError):
             return None
@@ -2780,6 +2806,14 @@ class AdventuresRepositoryMixin:
                 quantity = int(raw_value)
                 actual[key] = quantity
                 event_keys.append(key)
+                category = dict(definition.codex_categories).get(key)
+                if category is not None:
+                    record_codex_discovery(
+                        connection, player_id=int(player["id"]), entry_key=key,
+                        operation_id=operation_id, occurred_at=now_text,
+                        category_snapshot=category,
+                        snapshot={"stage_key": definition.key, "story_key": definition.story_key},
+                    )
             else:
                 raise ValueError(f"unsupported mainline reward: {key}")
         reputation_before = (

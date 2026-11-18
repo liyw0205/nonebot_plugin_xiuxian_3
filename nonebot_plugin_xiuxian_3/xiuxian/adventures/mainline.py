@@ -77,6 +77,7 @@ class MainlineStageDefinition:
     next_stage_key: str | None = None
     retry_message: str = ""
     completion_actions: tuple[Mapping[str, str], ...] = ()
+    codex_categories: tuple[tuple[str, str], ...] = ()
 
     @property
     def codex_flag(self) -> str:
@@ -476,20 +477,9 @@ def _story_objectives(
 
             normalized = field_harvest_objective(objective, bundle)
         elif kind == "commission_delivery":
-            if set(objective) != {"key", "type", "label", "commission_key"}:
-                raise ContentError(f"mainline {key} objective {objective_key} has an invalid commission shape")
-            commission_key = objective.get("commission_key")
-            if not isinstance(commission_key, str) or not commission_key.strip():
-                raise ContentError(f"mainline {key} objective {objective_key} requires commission_key")
-            if bundle is not None:
-                from ..livelihood.rules import town_commission_definitions
+            from .commission_evidence import commission_delivery_objective
 
-                if commission_key not in town_commission_definitions(bundle):
-                    raise ContentError(f"mainline {key} objective {objective_key} references unknown commission")
-            normalized = {
-                "key": str(objective_key), "type": kind, "label": label.strip(),
-                "commission_key": commission_key,
-            }
+            normalized = commission_delivery_objective(objective, bundle)
         elif kind == "public_project_contribution":
             if set(objective) != {"key", "type", "label", "project_key", "min_points"}:
                 raise ContentError(f"mainline {key} objective {objective_key} has an invalid project shape")
@@ -731,6 +721,7 @@ def _reward_map(
     key: str,
     *,
     allow_empty: bool = False,
+    validate_sources: bool = True,
 ) -> tuple[tuple[str, int | str], ...]:
     if not isinstance(value, dict) or (not allow_empty and not value):
         expected = "object" if allow_empty else "non-empty object"
@@ -756,7 +747,7 @@ def _reward_map(
             raise ContentError(f"mainline {key} contains forbidden reward {reward_key}")
         if reward_key.startswith("item."):
             try:
-                bundle.require("item", reward_key, include_locked=False)
+                bundle.require("item", reward_key, include_locked=not validate_sources)
             except KeyError as exc:
                 raise ContentError(f"mainline {key} references unknown item {reward_key}") from exc
         if reward_key == "title_key":
@@ -766,7 +757,7 @@ def _reward_map(
                 honor_title(reward_value)
             except ValueError as exc:
                 raise ContentError(f"mainline {key} references unknown title {reward_value}") from exc
-        if reward_key.startswith("codex.") and bundle.get("codex_entry", reward_key, include_locked=False) is None:
+        if reward_key.startswith("codex.") and bundle.get("codex_entry", reward_key, include_locked=not validate_sources) is None:
             if reward_key != "codex.observation":
                 raise ContentError(f"mainline {key} references unknown codex entry {reward_key}")
         result.append((reward_key, reward_value))
@@ -933,9 +924,9 @@ def _parse_mainline_definitions(
         reputation_key = row.get("reputation_key")
         if reputation_key is not None and (not isinstance(reputation_key, str) or not reputation_key.strip()):
             raise ContentError(f"mainline {key} reputation_key must be a non-empty string")
-        first_clear_reward = _reward_map(bundle, row.get("first_clear_reward"), "first_clear_reward", key)
+        first_clear_reward = _reward_map(bundle, row.get("first_clear_reward"), "first_clear_reward", key, validate_sources=validate_sources)
         repeat_reward = _reward_map(
-            bundle, row.get("repeat_reward"), "repeat_reward", key, allow_empty=True
+            bundle, row.get("repeat_reward"), "repeat_reward", key, allow_empty=True, validate_sources=validate_sources
         )
         if ("local_reputation" in dict(first_clear_reward) or "local_reputation" in dict(repeat_reward)) and reputation_key is None:
             raise ContentError(f"mainline {key} requires reputation_key for local_reputation")
