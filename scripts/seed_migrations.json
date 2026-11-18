@@ -159,7 +159,7 @@
       "d7060c48cac18ec33924aea7f8337fcc58ded6ad65cbdcf4a74d8e4753def60a": "07edd1dc7aa604f7045d61814c43b47e667cb9c4:data/内容清单.json"
     },
     "new_sha256": "8334baff0b88e57f9eff7848112bac2da5baaae235eaa57918fa531ab8e69bf6",
-    "new_commit": "1cc75e6ad397425bd6e02f8a64fb3fa1b45720dc"
+    "new_commit": "f5c91acbfddce2c0dcc41e80355d7fc7b3cb7152"
   },
   "地图/地点.json": {
     "old_sha256": {
@@ -529,6 +529,6 @@
   "经济/生产委托.json": {
     "old_sha256": {},
     "new_sha256": "4b722d39569c96f05717bad25a563050cae2b5887e36c86e84005d32e215e8ee",
-    "new_commit": "6aa7d3e9105a9e2437f0222f1ec260e66985e2e8"
+    "new_commit": "f5c91acbfddce2c0dcc41e80355d7fc7b3cb7152"
   }
 }
