@@ -19,6 +19,8 @@ class ProductionCommissionRecord:
     recipe_name: str
     reward_stones: int
     material_mode: str
+    batch_count: int
+    reward_per_unit: int
     starts_at: str | None
     ends_at: str | None
     expires_at: str

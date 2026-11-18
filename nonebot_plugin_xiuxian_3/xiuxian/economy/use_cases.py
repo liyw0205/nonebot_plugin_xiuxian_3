@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ...contracts import CommandContext, CommandResult
+from ...contracts import CommandAction, CommandContext, CommandResult
 from ..repository import (
     BalanceInsufficientError,
     CommissionDeliveryError,
@@ -33,6 +33,7 @@ from ..repository import (
 from .rules import resolve_market_item
 from ..production.rules import resolve_recipe
 from .rules import COMMISSION_RECIPES
+from .batch_commission_content import resolve_batch_commission
 
 
 class EconomyApplication:
@@ -130,6 +131,8 @@ class EconomyApplication:
             "recipe_name": record.recipe_name,
             "reward_stones": record.reward_stones,
             "material_mode": record.material_mode,
+            "batch_count": record.batch_count,
+            "reward_per_unit": record.reward_per_unit,
             "starts_at": record.starts_at,
             "ends_at": record.ends_at,
             "expires_at": record.expires_at,
@@ -299,6 +302,174 @@ class EconomyApplication:
         except Exception as exc:
             return self._error(context, operation_id, exc)
         return CommandResult(True, "COMMISSION_RECOVERED", f"## 过期生产委托已恢复\n\n委托 `{record.commission_id}` 已按原生产快照结算，状态为 {record.status}。", context.request_id, operation_id, data=self._commission_data(record))
+
+    async def preview_batch_production_commission(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) not in {1, 2}:
+            return CommandResult(False, "INVALID_COMMISSION_COMMAND", "请使用 `批量委托预览 配方 [份数]`。", context.request_id)
+        try:
+            definition = resolve_batch_commission(context.command_args[0], self.repository.content)
+            quantity = 2 if len(context.command_args) == 1 else int(context.command_args[1])
+        except (TypeError, ValueError):
+            return CommandResult(False, "COMMISSION_RECIPE_FORBIDDEN", "当前未开放该配方的批量生产委托。", context.request_id)
+        if quantity < 2 or quantity > definition.max_quantity:
+            return CommandResult(False, "COMMISSION_REQUIREMENT_MISSING", f"批量份数必须为 2-{definition.max_quantity}。", context.request_id)
+        recipe = self.repository._commission_recipe(definition.recipe_key)
+        inputs = {key: int(value) * quantity for key, value in recipe.inputs.items()}
+        outputs = {key: int(value) * quantity for key, value in recipe.outputs.items()}
+        data = {
+            "catalogue_key": definition.key,
+            "name": definition.name,
+            "desc": definition.desc,
+            "recipe_key": recipe.key,
+            "recipe_name": recipe.name,
+            "batch_count": quantity,
+            "max_quantity": definition.max_quantity,
+            "min_reward_per_unit": definition.min_reward_per_unit,
+            "max_reward_per_unit": definition.max_reward_per_unit,
+            "escrow_min": definition.min_reward_per_unit * quantity,
+            "escrow_max": definition.max_reward_per_unit * quantity,
+            "inputs": inputs,
+            "outputs": outputs,
+            "duration_seconds": recipe.duration_seconds * quantity,
+            "ttl_seconds": definition.ttl_seconds,
+            "recovery_grace_seconds": definition.recovery_grace_seconds,
+        }
+        return CommandResult(
+            True,
+            "BATCH_COMMISSION_PREVIEW",
+            f"## 批量生产委托预览\n\n**{definition.name}**：{definition.desc}\n\n"
+            f"- **份数**：{quantity}/{definition.max_quantity}\n"
+            f"- **单份报酬**：{definition.min_reward_per_unit}-{definition.max_reward_per_unit} 灵石\n"
+            f"- **总托管**：{data['escrow_min']}-{data['escrow_max']} 灵石\n"
+            f"- **整批投入**：{inputs}\n- **整批产出**：{outputs}\n\n"
+            "确认后发送 `发布批量生产委托 配方 份数 单份报酬 生产者供料` 或 `委托人供料`。",
+            context.request_id,
+            data=data,
+            actions=(CommandAction("发布批量生产委托", f"发布批量生产委托 {recipe.name} {quantity} {definition.min_reward_per_unit} 生产者供料", enter=True),),
+        )
+
+    @staticmethod
+    def _batch_material_mode(value: str) -> str | None:
+        return {
+            "生产者供料": "producer_supplies",
+            "自备材料": "producer_supplies",
+            "producer": "producer_supplies",
+            "委托人供料": "publisher_supplies",
+            "委托方供料": "publisher_supplies",
+            "publisher": "publisher_supplies",
+        }.get(value)
+
+    async def create_batch_production_commission(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) != 4:
+            return CommandResult(False, "INVALID_COMMISSION_COMMAND", "请使用 `发布批量生产委托 配方 份数 单份报酬 生产者供料|委托人供料`。", context.request_id)
+        try:
+            definition = resolve_batch_commission(context.command_args[0], self.repository.content)
+            quantity = int(context.command_args[1])
+            unit_reward = int(context.command_args[2])
+        except (TypeError, ValueError):
+            return CommandResult(False, "COMMISSION_REQUIREMENT_MISSING", "配方、份数和单份报酬必须有效。", context.request_id)
+        mode = self._batch_material_mode(context.command_args[3])
+        if mode is None:
+            return CommandResult(False, "INVALID_COMMISSION_COMMAND", "供料方式只能填写 `委托人供料` 或 `生产者供料`。", context.request_id)
+        if quantity < 2 or quantity > definition.max_quantity:
+            return CommandResult(False, "COMMISSION_REQUIREMENT_MISSING", f"批量份数必须为 2-{definition.max_quantity}。", context.request_id)
+        if not definition.min_reward_per_unit <= unit_reward <= definition.max_reward_per_unit:
+            return CommandResult(False, "COMMISSION_ESCROW_CONFLICT", "单份报酬超出该批量内容范围。", context.request_id)
+        operation_id = self._operation_id(context, "economy.create_production_commission")
+        try:
+            record = await self.repository.create_production_commission(
+                platform=context.adapter, platform_user_id=context.user_id,
+                recipe_key=definition.recipe_key, reward_stones=unit_reward * quantity,
+                material_mode=mode, operation_id=operation_id,
+                batch_count=quantity, reward_per_unit=unit_reward,
+            )
+        except Exception as exc:
+            return self._error(context, operation_id, exc)
+        return CommandResult(
+            True, "BATCH_COMMISSION_CREATED",
+            f"## 批量生产委托已发布\n\n**{record.recipe_name}** × {record.batch_count}，总托管 {record.reward_stones} 灵石。\n\n"
+            f"- **委托号**：`{record.commission_id}`\n- **单份报酬**：{record.reward_per_unit} 灵石\n"
+            f"- **供料方式**：{record.material_mode}\n- **有效至**：{record.expires_at}",
+            context.request_id, operation_id, data=self._commission_data(record),
+        )
+
+    async def list_batch_production_commissions(self, context: CommandContext) -> CommandResult:
+        if context.command_args:
+            return CommandResult(False, "INVALID_COMMISSION_COMMAND", "批量生产委托列表无需附加参数。", context.request_id)
+        try:
+            records = await self.repository.list_production_commissions(platform=context.adapter, platform_user_id=context.user_id)
+        except Exception as exc:
+            return self._error(context, "", exc)
+        records = tuple(record for record in records if record.batch_count > 1)
+        if not records:
+            return CommandResult(True, "BATCH_COMMISSION_LIST_EMPTY", "当前没有公开的批量生产委托。", context.request_id, data={"commissions": []})
+        lines = ["## 批量生产委托列表", ""]
+        data = []
+        for record in records:
+            lines.append(f"- `{record.commission_id}` {record.recipe_name} ×{record.batch_count}，单份 {record.reward_per_unit} 灵石，委托人 {record.publisher_dao_name}")
+            data.append(self._commission_data(record))
+        return CommandResult(True, "BATCH_COMMISSION_LISTED", "\n".join(lines), context.request_id, data={"commissions": data})
+
+    async def _batch_transition(self, context: CommandContext, action: str) -> CommandResult:
+        if len(context.command_args) != 1:
+            labels = {"accept": "接取", "deliver": "交付", "settle": "确认", "cancel": "取消", "expire": "清理", "recover": "恢复"}
+            return CommandResult(False, "INVALID_COMMISSION_COMMAND", f"请使用 `{labels[action]}批量生产委托 委托号`。", context.request_id)
+        operation_name = {
+            "accept": "economy.accept_production_commission",
+            "deliver": "economy.deliver_production_commission",
+            "settle": "economy.settle_production_commission",
+            "cancel": "economy.cancel_production_commission",
+            "expire": "economy.expire_production_commission",
+            "recover": "economy.recover_production_commission",
+        }[action]
+        operation_id = self._operation_id(context, operation_name)
+        try:
+            current = await self.repository.get_production_commission(
+                platform=context.adapter, platform_user_id=context.user_id, commission_id=context.command_args[0]
+            )
+            if current.batch_count <= 1:
+                return CommandResult(False, "COMMISSION_STATE_CONFLICT", "该委托不是批量生产委托。", context.request_id, operation_id)
+            if action == "accept":
+                record = await self.repository.accept_production_commission(platform=context.adapter, platform_user_id=context.user_id, commission_id=context.command_args[0], operation_id=operation_id)
+            elif action == "deliver":
+                record = await self.repository.deliver_production_commission(platform=context.adapter, platform_user_id=context.user_id, commission_id=context.command_args[0], operation_id=operation_id)
+            elif action == "settle":
+                record = await self.repository.settle_production_commission(platform=context.adapter, platform_user_id=context.user_id, commission_id=context.command_args[0], operation_id=operation_id)
+            elif action == "cancel":
+                record = await self.repository.cancel_production_commission(platform=context.adapter, platform_user_id=context.user_id, commission_id=context.command_args[0], operation_id=operation_id)
+            elif action == "expire":
+                record = await self.repository.expire_production_commission(platform=context.adapter, platform_user_id=context.user_id, commission_id=context.command_args[0], operation_id=operation_id)
+            else:
+                record = await self.repository.recover_production_commission(platform=context.adapter, platform_user_id=context.user_id, commission_id=context.command_args[0], operation_id=operation_id)
+        except Exception as exc:
+            return self._error(context, operation_id, exc)
+        messages = {
+            "accept": f"## 批量生产委托已接取\n\n你已锁定 {record.recipe_name} × {record.batch_count} 的材料、精力与工具。完成后发送 `交付批量生产委托 {record.commission_id}`。",
+            "deliver": f"## 批量成品待确认\n\n整批 {record.recipe_name} 已完成，请委托人发送 `确认批量生产委托 {record.commission_id}`。",
+            "settle": f"## 批量生产委托已结算\n\n{record.recipe_name} × {record.batch_count} 已交付，生产者获得 {record.producer_payment} 灵石。",
+            "cancel": f"## 批量生产委托已取消\n\n委托 `{record.commission_id}` 的托管与锁定资源已释放。",
+            "expire": f"## 批量生产委托已清理\n\n委托 `{record.commission_id}` 已过期，托管与材料已释放。",
+            "recover": f"## 批量生产委托已恢复\n\n委托 `{record.commission_id}` 已按冻结批量快照结算为 {record.status}。",
+        }
+        return CommandResult(True, f"BATCH_COMMISSION_{action.upper()}", messages[action], context.request_id, operation_id, data=self._commission_data(record))
+
+    async def accept_batch_production_commission(self, context: CommandContext) -> CommandResult:
+        return await self._batch_transition(context, "accept")
+
+    async def deliver_batch_production_commission(self, context: CommandContext) -> CommandResult:
+        return await self._batch_transition(context, "deliver")
+
+    async def settle_batch_production_commission(self, context: CommandContext) -> CommandResult:
+        return await self._batch_transition(context, "settle")
+
+    async def cancel_batch_production_commission(self, context: CommandContext) -> CommandResult:
+        return await self._batch_transition(context, "cancel")
+
+    async def expire_batch_production_commission(self, context: CommandContext) -> CommandResult:
+        return await self._batch_transition(context, "expire")
+
+    async def recover_batch_production_commission(self, context: CommandContext) -> CommandResult:
+        return await self._batch_transition(context, "recover")
 
     async def create_market_order(self, context: CommandContext) -> CommandResult:
         if len(context.command_args) != 3:

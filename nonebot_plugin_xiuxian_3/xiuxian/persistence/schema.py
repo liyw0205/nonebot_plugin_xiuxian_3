@@ -2723,6 +2723,7 @@ CREATE TABLE IF NOT EXISTS production_commission_orders (
     producer_player_id INTEGER REFERENCES players(id),
     recipe_key TEXT NOT NULL,
     reward_stones INTEGER NOT NULL CHECK (reward_stones BETWEEN 1 AND 500),
+    batch_count INTEGER NOT NULL DEFAULT 1 CHECK (batch_count BETWEEN 1 AND 5),
     material_mode TEXT NOT NULL CHECK (material_mode IN ('producer_supplies', 'publisher_supplies')),
     status TEXT NOT NULL CHECK (status IN ('draft', 'published', 'accepted', 'locked', 'processing', 'completed', 'failed', 'delivered', 'settled', 'cancelled', 'expired')),
     published_at TEXT NOT NULL,

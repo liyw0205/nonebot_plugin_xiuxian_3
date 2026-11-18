@@ -24,6 +24,7 @@ COMMISSION_FAILURE_REFUND_BP = 8000
 COMMISSION_TTL_SECONDS = 24 * 60 * 60
 COMMISSION_RECOVERY_GRACE_SECONDS = 24 * 60 * 60
 COMMISSION_RECIPES = frozenset({"recipe.pill.healing_low", "recipe.weapon.wood_sword"})
+COMMISSION_MAX_BATCH = 5
 @dataclass(frozen=True, slots=True)
 class MarketItem:
     key: str
@@ -79,6 +80,7 @@ __all__ = [
     "COMMISSION_MIN_REWARD",
     "COMMISSION_PLATFORM_FEE_BP",
     "COMMISSION_RECIPES",
+    "COMMISSION_MAX_BATCH",
     "COMMISSION_RECOVERY_GRACE_SECONDS",
     "COMMISSION_TTL_SECONDS",
     "MarketItem",

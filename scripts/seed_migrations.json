@@ -158,7 +158,7 @@
       "c4246fa9c525bc454c17e5a345c389b07d44c9526620e35c27a0a8d5f8853bd5": "59d2448d87ddc13f9596de2938e4790fc45b7cd6:data/内容清单.json",
       "d7060c48cac18ec33924aea7f8337fcc58ded6ad65cbdcf4a74d8e4753def60a": "07edd1dc7aa604f7045d61814c43b47e667cb9c4:data/内容清单.json"
     },
-    "new_sha256": "95441f1bd3db49553b1b68c77027b646e474804e26332602f8c8ee8dce0c0f17",
+    "new_sha256": "8334baff0b88e57f9eff7848112bac2da5baaae235eaa57918fa531ab8e69bf6",
     "new_commit": "1cc75e6ad397425bd6e02f8a64fb3fa1b45720dc"
   },
   "地图/地点.json": {
@@ -525,5 +525,10 @@
     },
     "new_sha256": "2afe36aedce989f252b9589f50fd1550616069fad6b8f35ebc468d8d269f9ecb",
     "new_commit": "0b9c57cd95eb169c6d540b85bba5d3925b895dfe"
+  },
+  "经济/生产委托.json": {
+    "old_sha256": {},
+    "new_sha256": "4b722d39569c96f05717bad25a563050cae2b5887e36c86e84005d32e215e8ee",
+    "new_commit": "6aa7d3e9105a9e2437f0222f1ec260e66985e2e8"
   }
 }

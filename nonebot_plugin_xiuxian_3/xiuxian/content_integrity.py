@@ -122,6 +122,7 @@ def validate_content_references(bundle: ContentBundle) -> dict[str, int]:
         validate_equipment_reclamation_consumers,
         validate_equipment_repair_kit_consumers,
     )
+    from .economy.batch_commission_content import batch_commission_definitions
 
     world = validate_world_content(bundle)
     combat = validate_combat_content(bundle)
@@ -137,6 +138,7 @@ def validate_content_references(bundle: ContentBundle) -> dict[str, int]:
         bundle, recipe_definitions_by_key
     )
     recipes = len(recipe_definitions_by_key)
+    batch_commissions = len(batch_commission_definitions(bundle))
     materials = validate_material_content(bundle)
     sources = validate_source_content(bundle)
     crop_definitions(bundle)
@@ -149,6 +151,7 @@ def validate_content_references(bundle: ContentBundle) -> dict[str, int]:
         "reward_pools": rewards,
         "bounties": bounties,
         "recipes": recipes,
+        "batch_commissions": batch_commissions,
         "equipment_reclamation_assets": equipment_reclamation_assets,
         "equipment_repair_kits": equipment_repair_kits,
         "sources": sources,

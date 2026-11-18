@@ -352,6 +352,7 @@ class SQLitePlayerRepository(
             self._migrate_cultivation_session_status(connection)
             self._migrate_economy_ledger_asset_kind(connection)
             self._migrate_facility_schema(connection)
+            self._migrate_production_commission_schema(connection)
             self._migrate_companion_schema(connection)
             self._migrate_field_plot_schema(connection)
             self._migrate_sect_war_schema(connection)
@@ -473,6 +474,18 @@ class SQLitePlayerRepository(
                 "CREATE UNIQUE INDEX IF NOT EXISTS idx_players_dao_name "
                 "ON players(dao_name) WHERE dao_name <> ''"
             )
+
+    @staticmethod
+    def _migrate_production_commission_schema(connection: sqlite3.Connection) -> None:
+        columns = {str(row["name"]) for row in connection.execute("PRAGMA table_info(production_commission_orders)")}
+        if "batch_count" not in columns:
+            connection.execute(
+                "ALTER TABLE production_commission_orders ADD COLUMN batch_count INTEGER NOT NULL DEFAULT 1"
+            )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_production_commissions_batch_status "
+            "ON production_commission_orders(batch_count, status, expires_at)"
+        )
 
     @staticmethod
     def _migrate_arena_snapshot_expiry_index(connection: sqlite3.Connection) -> None:

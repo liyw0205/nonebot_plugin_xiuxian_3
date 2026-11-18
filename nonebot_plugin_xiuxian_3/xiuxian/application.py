@@ -413,6 +413,11 @@ _HELP_PAGES = {
         f"已结缘的灵兽可在玄天近郊参与{command_link('挂机预览 灵兽栖地巡护', '挂机预览 灵兽栖地巡护')}；"
         f"安排时填写灵兽编号，完整领取会让它获得经验与亲和，逾时只收保底物资。\n\n"
         f"买卖所需物资时，先看{command_link('摆摊列表', '摆摊列表')}了解货物与标价。"
+        f"生产者可先用{command_link('批量委托预览', '批量委托预览 疗伤丹')}核对整批投入、报酬和时限，"
+        f"再用{command_link('发布批量生产委托', '发布批量生产委托 疗伤丹 2 30 生产者供料')}发布；"
+        f"公开订单用{command_link('批量生产委托列表', '批量生产委托列表')}查看，依次{command_link('接取批量生产委托', '接取批量生产委托 委托号')}、"
+        f"{command_link('交付批量生产委托', '交付批量生产委托 委托号')}，委托人再{command_link('确认批量生产委托', '确认批量生产委托 委托号')}；"
+        "发布前可取消，未接取订单可清理，生产超时可恢复，均按冻结批量快照释放或结算托管。"
         + _HERB_SHELTER_HELP
         + _MIST_LAMP_HELP
         + _CLOUD_TIDE_HELP
@@ -3543,3 +3548,30 @@ class XiuxianApplication:
 
     async def recover_production_commission(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.economy.recover_production_commission(context), write_message="当前事件不允许恢复生产委托。")
+
+    async def preview_batch_production_commission(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.economy.preview_batch_production_commission(context), require_write=False)
+
+    async def create_batch_production_commission(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.economy.create_batch_production_commission(context), write_message="当前事件不允许发布批量生产委托。")
+
+    async def list_batch_production_commissions(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.economy.list_batch_production_commissions(context), require_write=False)
+
+    async def accept_batch_production_commission(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.economy.accept_batch_production_commission(context), write_message="当前事件不允许接取批量生产委托。")
+
+    async def deliver_batch_production_commission(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.economy.deliver_batch_production_commission(context), write_message="当前事件不允许交付批量生产委托。")
+
+    async def settle_batch_production_commission(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.economy.settle_batch_production_commission(context), write_message="当前事件不允许确认批量生产委托。")
+
+    async def cancel_batch_production_commission(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.economy.cancel_batch_production_commission(context), write_message="当前事件不允许取消批量生产委托。")
+
+    async def expire_batch_production_commission(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.economy.expire_batch_production_commission(context), write_message="当前事件不允许清理批量生产委托。")
+
+    async def recover_batch_production_commission(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.economy.recover_batch_production_commission(context), write_message="当前事件不允许恢复批量生产委托。")
