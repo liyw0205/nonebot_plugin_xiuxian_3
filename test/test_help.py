@@ -58,3 +58,31 @@ def test_help_overview_and_bounty_category_use_unprefixed_commands() -> None:
                 await runtime.close()
 
     asyncio.run(run())
+
+
+def test_life_help_exposes_complete_equipment_care_loop() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            try:
+                result = await runtime.dispatch(
+                    CommandContext(adapter="onebot.v11", user_id="equipment-help"),
+                    "修仙帮助 生活",
+                )
+                assert result.ok
+                for token in (
+                    "装备修复预览 实例编号",
+                    "修复装备 实例编号",
+                    "装备回收预览 实例编号",
+                    "回收装备 实例编号",
+                    "生产预览 野外修缮包",
+                    "野外修缮预览 实例编号",
+                    "野外修缮装备 实例编号",
+                    "接取委托 修缮包回收",
+                    "交付委托 修缮包回收",
+                ):
+                    assert token in result.message, token
+            finally:
+                await runtime.close()
+
+    asyncio.run(run())

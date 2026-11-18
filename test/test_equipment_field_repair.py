@@ -256,3 +256,49 @@ def test_repair_kit_commission_consumes_surplus_and_rewards(tmp_path: Path) -> N
             await runtime.close()
 
     asyncio.run(run())
+
+
+def test_equipment_care_commands_share_qq_and_onebot_application_entry(tmp_path: Path) -> None:
+    async def run() -> None:
+        data_dir = tmp_path / "data"
+        shutil.copytree(ROOT / "data", data_dir)
+        runtime = create_runtime(data_dir=data_dir, adapters=("qq.official", "onebot.v11"))
+        try:
+            for adapter in ("qq.official", "onebot.v11"):
+                user = f"equipment-care-{adapter}"
+                created = await runtime.adapters.dispatch(
+                    adapter,
+                    CommandContext(adapter=adapter, user_id=user, request_id=f"{adapter}-create"),
+                    "开始修仙",
+                )
+                assert created.ok
+                listed = await runtime.adapters.dispatch(
+                    adapter,
+                    CommandContext(adapter=adapter, user_id=user, request_id=f"{adapter}-list"),
+                    "我的装备",
+                )
+                assert listed.code == "EQUIPMENT_LISTED"
+                for index, command in enumerate(
+                    (
+                        "装备修复预览 missing-instance",
+                        "修复装备 missing-instance",
+                        "装备回收预览 missing-instance",
+                        "回收装备 missing-instance",
+                        "野外修缮预览 missing-instance",
+                        "野外修缮装备 missing-instance",
+                    )
+                ):
+                    result = await runtime.adapters.dispatch(
+                        adapter,
+                        CommandContext(
+                            adapter=adapter,
+                            user_id=user,
+                            request_id=f"{adapter}-care-{index}",
+                        ),
+                        command,
+                    )
+                    assert result.code != "COMMAND_NOT_FOUND", (adapter, command, result)
+        finally:
+            await runtime.close()
+
+    asyncio.run(run())
