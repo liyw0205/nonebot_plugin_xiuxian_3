@@ -130,7 +130,8 @@
       "51a3a2c6969d4cfceee5c1ac8dbb733a05059c00a655f5a2ae0b00cd6f2cec39": "8f55e2a4872df3521d0542ae43ebad5acb073487:data/剧情/主线.json",
       "df303282c65581f376ed4a035f140fa96e158f893b1e51ccd6df71177baedacd": "3d83636536ec6223af405511c70bc21de04ae7c6:data/剧情/主线.json"
     },
-    "new_sha256": "75c2ddfc88e7a6d6829104f7b840d944b4bfd522704da23c4ed0140c9c0d7e5d"
+    "new_sha256": "75c2ddfc88e7a6d6829104f7b840d944b4bfd522704da23c4ed0140c9c0d7e5d",
+    "new_commit": "708655a889cfd10c696b86792925dc37438edb9f"
   },
   "内容清单.json": {
     "old_sha256": {
@@ -298,7 +299,8 @@
       "813a83c76e6bf0b744e56b9593926904098cd0334e9460fca824a62d64bfee5e": "8f55e2a4872df3521d0542ae43ebad5acb073487:data/图鉴/条目.json",
       "cfb0df5264b01d7fd7fdc10f58bed19b9da1f1ae1c0c699c3e8b27d885b879ac": "3d83636536ec6223af405511c70bc21de04ae7c6:data/图鉴/条目.json"
     },
-    "new_sha256": "0e6180662fc8e7ada7424b3a1714c2b948fd8057a9966fbe54edaf9a37bff140"
+    "new_sha256": "0e6180662fc8e7ada7424b3a1714c2b948fd8057a9966fbe54edaf9a37bff140",
+    "new_commit": "708655a889cfd10c696b86792925dc37438edb9f"
   },
   "图鉴/里程碑.json": {
     "old_sha256": {
