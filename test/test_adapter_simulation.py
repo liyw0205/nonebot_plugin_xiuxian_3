@@ -197,8 +197,13 @@ def test_qq_and_onebot_normalized_events_reach_sky_terrace_flow() -> None:
                     connection.execute(
                         "UPDATE players SET stage='cultivator', realm_key='tribulation', realm_layer=3, "
                         "endgame_status='tribulation', location_key='dao.origin_gate', "
-                        "inventory_json=? WHERE platform=? AND platform_user_id=?",
-                        (json.dumps({"item.tribulation_token": 2}), base.adapter, base.user_id),
+                        "intro_json=?, inventory_json=? WHERE platform=? AND platform_user_id=?",
+                        (
+                            json.dumps({"flags": ["access.final_heaven", "story.dao_origin"]}),
+                            json.dumps({"item.tribulation_token": 2}),
+                            base.adapter,
+                            base.user_id,
+                        ),
                     )
 
                 started = await dispatch("travel", "前往 天劫台")

@@ -174,8 +174,13 @@ def test_qq_and_onebot_sky_terrace_travel_and_trial_location_gate() -> None:
                     connection.execute(
                         "UPDATE players SET stage='cultivator', realm_key='tribulation', realm_layer=3, "
                         "endgame_status='tribulation', location_key='xuantian.new_town', stamina=30, "
-                        "inventory_json=? WHERE platform=? AND platform_user_id=?",
-                        (json.dumps({"item.tribulation_token": 2}), adapter, user),
+                        "intro_json=?, inventory_json=? WHERE platform=? AND platform_user_id=?",
+                        (
+                            json.dumps({"flags": ["access.final_heaven", "story.dao_origin"]}),
+                            json.dumps({"item.tribulation_token": 2}),
+                            adapter,
+                            user,
+                        ),
                     )
 
                 context = lambda request, operation="": CommandContext(
@@ -282,6 +287,36 @@ def test_qq_and_onebot_sky_terrace_travel_and_trial_location_gate() -> None:
                         "SELECT id FROM players WHERE platform=? AND platform_user_id=?)",
                         (adapter, user),
                     ).fetchone()[0] == 1
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_dao_origin_to_sky_terrace_requires_settled_dao_origin_story() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir, adapters=("onebot.v11",))
+            user = "sky-terrace-story-gate"
+            context = lambda request: CommandContext(
+                adapter="onebot.v11", user_id=user, request_id=request
+            )
+            await runtime.dispatch(context("create"), "开始修仙")
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                connection.execute(
+                    "UPDATE players SET stage='cultivator', realm_key='tribulation', realm_layer=3, "
+                    "endgame_status='tribulation', location_key='dao.origin_gate', stamina=100, "
+                    "inventory_json=? WHERE platform='onebot.v11' AND platform_user_id=?",
+                    (json.dumps({"item.tribulation_token": 1}), user),
+                )
+            blocked = await runtime.dispatch(context("blocked"), "前往 天劫台")
+            assert blocked.code == "TRIBULATION_TERRACE_REQUIREMENT_MISSING"
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                state = connection.execute(
+                    "SELECT stamina, inventory_json, location_key FROM players "
+                    "WHERE platform='onebot.v11' AND platform_user_id=?",
+                    (user,),
+                ).fetchone()
+            assert state == (100, json.dumps({"item.tribulation_token": 1}), "dao.origin_gate")
             await runtime.close()
 
     asyncio.run(run())

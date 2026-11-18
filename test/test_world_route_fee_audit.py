@@ -143,6 +143,9 @@ def test_shared_gates_and_special_entry_edges_are_complete() -> None:
         for edge in sky_entries
         if edge["from"] in {"dao.origin_gate", "ascension.heaven_path"}
     )
+    assert edges[("dao.origin_gate", "tribulation.sky_terrace")]["requirements"] == [
+        {"type": "intro_flag", "value": "story.dao_origin"}
+    ]
     assert edges[("location.final_arena", "tribulation.sky_terrace")].get("item_key") is None
 
     assert "requirements" not in edges[("xuantian.war_front", "cave.boundary_realm")]

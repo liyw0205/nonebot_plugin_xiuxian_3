@@ -2020,6 +2020,11 @@ def test_shared_commands_can_reach_tribulation_l10_from_new_player() -> None:
                 assert int(terminal_inventory[2]) >= 8_998_960
                 assert json.loads(terminal_inventory[3]).get("item.tribulation_token") == 4
 
+                qualification = await _dispatch(
+                    runtime, adapter, user, 84890, "领取道源资格"
+                )
+                assert qualification.code == "DAO_ORIGIN_QUALIFICATION_GRANTED"
+
                 tribulation = await _dispatch(runtime, adapter, user, 84900, "开始渡劫")
                 assert tribulation.code == "TRIBULATION_STARTED"
                 assert tribulation.data["realm_key"] == "tribulation"
@@ -2150,6 +2155,27 @@ def test_shared_commands_can_reach_tribulation_l10_from_new_player() -> None:
                 clock.advance(hours=1)
                 arrived_gate = await _dispatch(runtime, adapter, user, 907706, "结算移动")
                 assert arrived_gate.data["destination"] == "dao.origin_gate"
+
+                entered_dao_origin = await _dispatch(
+                    runtime, adapter, user, 9077061, "进入秘境 道源秘境"
+                )
+                assert entered_dao_origin.code == "DAO_ORIGIN_ENTERED"
+                for node_index, node_label in enumerate(
+                    ("道源关隘", "道源泉眼", "三界校验印", "服务档案库", "道果痕迹", "见证台", "道源誓约", "新章门扉")
+                ):
+                    node = await _dispatch(
+                        runtime,
+                        adapter,
+                        user,
+                        9077070 + node_index,
+                        f"选择秘境节点 {node_label}",
+                    )
+                    assert node.ok, node.message
+                settled_dao_origin = await _dispatch(
+                    runtime, adapter, user, 9077079, "结算秘境"
+                )
+                assert settled_dao_origin.code == "DAO_ORIGIN_SETTLED"
+                assert settled_dao_origin.data["story_flag_written"] is True
                 await _dispatch(runtime, adapter, user, 907707, "前往 天劫台")
                 clock.advance(minutes=30)
                 arrived_terrace = await _dispatch(runtime, adapter, user, 907708, "结算移动")
