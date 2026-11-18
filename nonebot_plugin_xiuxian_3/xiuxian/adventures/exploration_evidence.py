@@ -97,7 +97,19 @@ def has_owned_exploration_reward(connection, player_id, objective, baseline, sta
         if not all(isinstance(value, dict) for value in (snapshot, result, initial)):
             raise ValueError("mainline exploration evidence must be objects")
         frozen = strict_reward(snapshot.get("frozen_result"), "story exploration reward")
-        actual = strict_reward(result.get("result"), "story exploration result")
+        receipts = connection.execute(
+            "SELECT rowid, * FROM operations WHERE player_id=? "
+            "AND operation_name IN ('exploration.settle','exploration.settle_combat','exploration.storm') "
+            "AND json_extract(result_json, '$.exploration_id')=? ORDER BY rowid",
+            (player_id, session["exploration_id"]),
+        ).fetchall()
+        storm_reward, storm_terminal = None, None
+        cloud_trial = session["mode_key"] == "explore.cloud_boat_trial"
+        if cloud_trial:
+            from .cloud_storm_evidence import cloud_storm_evidence
+
+            storm_reward, storm_terminal = cloud_storm_evidence(session, initial, snapshot, result, receipts, identity)
+        actual = result.get("result") if storm_terminal == "turn_back" else strict_reward(result.get("result"), "story exploration result")
         request = {**identity, "mode_key": session["mode_key"]}
         if snapshot.get("patrol"):
             request["approach"] = snapshot["patrol"]["approach"]["key"]
@@ -107,13 +119,13 @@ def has_owned_exploration_reward(connection, player_id, objective, baseline, sta
             or snapshot.get("random_seed") != session["operation_id"]
             or initial.get("random_seed") != session["operation_id"]
             or initial.get("starts_at") != session["starts_at"]
-            or initial.get("ends_at") != session["ends_at"]
+            or (not cloud_trial and initial.get("ends_at") != session["ends_at"])
             or initial.get("stamina_cost") != session["stamina_cost"]
             or initial.get("frozen_result") != frozen
             or result.get("frozen_result") != frozen
             or result.get("status") != "settled"
-            or result.get("battle_pending") is not False
-            or result.get("expired") is not False
+            or result.get("battle_pending", False if storm_terminal else None) is not False
+            or result.get("expired", False if storm_terminal else None) is not False
             or datetime.fromisoformat(result["settled_at"]) < datetime.fromisoformat(session["ends_at"])
         ):
             raise ValueError("mainline exploration start or frozen result is inconsistent")
@@ -128,32 +140,40 @@ def has_owned_exploration_reward(connection, player_id, objective, baseline, sta
             or initial["player"].get("location_key") != session["location_key"]
         ):
             raise ValueError("mainline exploration start belongs to another source")
-        receipts = connection.execute(
-            "SELECT rowid, * FROM operations WHERE player_id=? "
-            "AND operation_name IN ('exploration.settle','exploration.settle_combat') "
-            "AND json_extract(result_json, '$.exploration_id')=? ORDER BY rowid",
-            (player_id, session["exploration_id"]),
-        ).fetchall()
         settled = False
         for receipt in receipts:
             payload = decode_json_strict(receipt["result_json"])
-            if payload.get("status") == "combat_pending":
-                continue
             request = dict(identity)
             if receipt["operation_name"] == "exploration.settle_combat":
                 request.update(exploration_id=session["exploration_id"], battle_id=result.get("battle_id"))
+            hashes = {SQLitePlayerRepository._request_hash(receipt["operation_name"], request)}
+            if cloud_trial and receipt["operation_name"] == "exploration.storm":
+                from ..exploration.rules import CLOUD_BOAT_STORM_CHOICES
+
+                hashes = {SQLitePlayerRepository._request_hash("exploration.storm", {**identity, "choice": choice}) for choice in CLOUD_BOAT_STORM_CHOICES}
             if (
                 receipt["rowid"] <= start["rowid"]
-                or receipt["request_hash"] != SQLitePlayerRepository._request_hash(receipt["operation_name"], request)
+                or receipt["request_hash"] not in hashes
                 or not isinstance(payload.get("player"), dict)
                 or payload["player"].get("player_id") != player["player_id"]
                 or any(payload.get(field) != session[field] for field in ("mode_key", "location_key"))
-                or payload.get("status") != "settled"
+            ):
+                raise ValueError("mainline exploration receipt belongs to another source")
+            if payload.get("status") in ({"combat_pending", "storm_pending", "running"} if cloud_trial else {"combat_pending"}):
+                continue
+            receipt_reward = payload.get("result")
+            if storm_terminal == "turn_back":
+                if not isinstance(receipt_reward, dict) or type(receipt_reward.get("stamina_refund")) is not int:
+                    raise ValueError("mainline storm return receipt reward is invalid")
+            else:
+                receipt_reward = strict_reward(receipt_reward, "story exploration receipt")
+            if (
+                payload.get("status") != "settled"
                 or payload.get("battle_pending") is not False
                 or payload.get("expired") is not False
                 or payload.get("battle_id") != result.get("battle_id")
                 or payload.get("battle_outcome") != result.get("battle_outcome")
-                or strict_reward(payload.get("result"), "story exploration receipt") != actual
+                or receipt_reward != actual
             ):
                 raise ValueError("mainline exploration settlement disagrees with its source")
             settled = True
@@ -173,8 +193,8 @@ def has_owned_exploration_reward(connection, player_id, objective, baseline, sta
         expected = frozen if outcome in {None, "won"} else strict_reward(
             snapshot.get("battle_failure_result", {}), "story failed exploration reward",
         )
-        if actual != expected:
+        if actual != (storm_reward if storm_terminal else expected):
             raise ValueError("mainline exploration reward disagrees with its frozen outcome")
-        if outcome in {None, "won"} and actual.get(objective["item_key"], 0) >= objective["quantity"]:
+        if storm_terminal != "turn_back" and outcome in {None, "won"} and actual.get(objective["item_key"], 0) >= objective["quantity"]:
             return True
     return False

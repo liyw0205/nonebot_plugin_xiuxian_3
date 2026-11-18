@@ -83,8 +83,8 @@ def test_herb_shelter_seeds_upgrade_backup_replay_custom_and_rollback(host):
     codex = json.loads(old["图鉴/条目.json"])
     codex["records"][0]["desc"] += " 本地旧版图鉴。"
     current_codex = json.loads((ROOT / "data/图鉴/条目.json").read_text(encoding="utf-8"))
-    handover = next(row for row in current_codex["records"] if row["key"] == "codex.story.mist_lamp_handover")
-    codex["records"].append(handover)
+    for key in ("codex.story.mist_lamp_handover", "codex.story.cloud_tide_handover"):
+        codex["records"].append(next(row for row in current_codex["records"] if row["key"] == key))
     custom_codex = (json.dumps(codex, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
     (host / "data/图鉴/条目.json").write_bytes(custom_codex)
     (host / "data/剧情/主线.json").write_bytes(old["剧情/主线.json"])

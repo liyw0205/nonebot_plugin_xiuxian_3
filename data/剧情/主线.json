@@ -4678,7 +4678,7 @@
       "body": "云城航铺收到晏潮的木牌，说渡口的潮汐又乱了一回。金丹修士走得远，却也得亲自认清这一段水路。先记下本关，再从云城沿公开相邻航路到云舟渡口，等行程真实结束，完成一轮云舟试炼并结算取得云舟碎票。旧行程、旧票和未结算的试航都不能替你认潮；遇上风暴时按试炼原规则处理，未得票则按每日额度重试。晏潮看过新票上的潮痕，才肯把交班木牌交到你手里。下一页不是再闯一场险境，而是留在渡口八小时，替往来舟工稳住压舱铁和封舱砂。",
       "objectives": [
         {"key": "arrive", "type": "travel_arrival", "label": "本关真实抵达云舟渡口", "destination_key": "xuantian.floating_boat"},
-        {"key": "trial", "type": "exploration_reward", "label": "本关云舟试炼结算取得云舟碎票", "mode_key": "explore.cloud_boat_trial", "location_key": "xuantian.floating_boat", "item_key": "item.ticket.cloud_boat_fragment", "quantity": 1}
+        {"key": "trial", "type": "exploration_reward", "label": "本关云舟试炼结算取得云舟碎票", "mode_key": "explore.cloud_boat_trial", "location_key": "xuantian.floating_boat", "item_key": "item.ticket.cloud_boat_fragment", "quantity": 1, "owned_receipts": true}
       ],
       "actions": [
         {"command": "前往", "argument": "云舟渡口", "description": "从云城沿公开山路登舟，行程结束后结算移动。"},
@@ -4712,20 +4712,20 @@
       "body": "晏潮收好航簿，却把装着云铁和干砂的小包又推回你面前。渡口的安稳不能只守一班，镇中航铺得知道下一班船还缺什么。先开始最后一页，再沿云城、青石镇的公开路线返回，等实际抵达，查看候潮备材的当日库存与期限，接单后实交两份云铁和一份阵砂。完整候潮的两种选择都够这份用料；若材料已另作他用，可回渡口按原日限补给，也可保留多出的云铁炼剑、阵砂布阵。旧交单不算这次回镇，缺料时不会扣一半，错过截止就等次日。航铺验过实物，才将下一班的物资栏填满，这段潮路也才真正接回镇中的日常。",
       "objectives": [
         {"key": "arrive", "type": "travel_arrival", "label": "本关真实返回青石镇", "destination_key": "xuantian.new_town"},
-        {"key": "deliver", "type": "commission_delivery", "label": "本关交付候潮备材并实交两云铁一阵砂", "commission_key": "town_commission.tide_supplies"}
+        {"key": "deliver", "type": "commission_delivery", "label": "本关新接并交付候潮备材，实交两云铁一阵砂", "commission_key": "town_commission.tide_supplies", "delivery_evidence": {"inputs": {"item.material.cloud_iron": 2, "item.mat.array_sand": 1}, "location_key": "xuantian.new_town", "fresh_acceptance": true}}
       ],
       "actions": [
         {"command": "前往", "argument": "云城", "description": "离开渡口，行程结束后结算移动。"},
         {"command": "前往", "argument": "青石镇", "description": "从云城回镇，实际抵达才可交卷。"},
         {"command": "城镇委托", "argument": "", "description": "先备两云铁一阵砂，再看当日十二小时公示期限。"},
-        {"command": "接取委托", "argument": "候潮备材", "description": "身在青石镇且金丹一层后接单。"},
+        {"command": "接取委托", "argument": "候潮备材", "description": "本关开始后在青石镇查看公示并新接订单，关前接单不计。"},
         {"command": "交付委托", "argument": "候潮备材", "description": "实交全部材料，取得航铺灵石与名望。"}
       ],
       "state_changes": {"activity_events": ["story.mainline.cloud_tide:cloud_tide.3"]}, "next_stage_key": null,
-      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "需要本关实际回镇和本人候潮备材交单。旧行程、旧交单或缺料不算；补足两云铁一阵砂，过期次日重接，重启后进度保留。"},
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "需要本关实际回镇，以及本关开始后在青石镇新接并交付的候潮备材订单。旧行程、关前接单、只接未交、过期或缺料不算；补足两云铁一阵砂，过期次日重接，重启后保留剧情与下一步行动。"},
       "status": "open", "aliases": ["航材归镇"], "prerequisites": ["cloud_tide.2"], "required_realm": "golden_core", "required_layer": 1,
       "lane": "cloud_tide", "lane_name": "云舟候潮", "reputation_key": "local.xuantian.new_town",
-      "first_clear_reward": {"spirit_stones": 45, "local_reputation": 5, "service_reputation": 4}, "repeat_reward": {"spirit_stones": 8}
+      "first_clear_reward": {"spirit_stones": 45, "local_reputation": 5, "service_reputation": 4, "codex.story.cloud_tide_handover": 1}, "repeat_reward": {"spirit_stones": 8}
     },
     {
       "key": "herb_shelter.1", "story_key": "story.mainline.herb_shelter",

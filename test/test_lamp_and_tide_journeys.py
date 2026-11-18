@@ -36,6 +36,7 @@ ARCS = {
         "route": "云舟渡口候潮", "route_key": "idle.cloud_dock_tide", "hours": 8,
         "choices": ("扶舷搬铁", "护袋理砂"), "commission": "候潮备材",
         "mode": "explore.cloud_boat_trial", "explore": "云舟试炼", "proof": "item.ticket.cloud_boat_fragment",
+        "codex": "codex.story.cloud_tide_handover",
         "stages": ("问潮登舟", "候潮交班", "航材归镇"),
     },
 }
@@ -188,7 +189,7 @@ def test_public_journey_producers_choices_consumers_restart_and_zero_write(tmp_p
             await journey.restart()
             explored = await journey.send("结算探索", "survey-claim")
             assert explored.ok, explored.message
-            if arc == "mist_lamp":
+            if arc in {"mist_lamp", "cloud_tide"}:
                 claim_command = f"领取{title}主线奖励 {spec['stages'][0]}"
                 await journey.reject_corrupt_receipt(
                     "exploration_sessions", "exploration_id", explored.data["exploration_id"],
@@ -274,6 +275,12 @@ def test_public_journey_producers_choices_consumers_restart_and_zero_write(tmp_p
                 await journey.move("青石镇")
                 await journey.next_day()
                 assert (await journey.send("接取委托 灯阵续灵", "old-lamp-order")).code == "COMMISSION_ACCEPTED"
+            elif arc == "cloud_tide":
+                await journey.move("云城")
+                await journey.move("青石镇")
+                await journey.next_day()
+                assert (await journey.send("接取委托 候潮备材", "old-tide-order")).code == "COMMISSION_ACCEPTED"
+                await journey.move("云城")
             await story_start(3, "start-3")
             if arc == "mist_lamp":
                 await journey.move("灵泉谷")
@@ -284,8 +291,6 @@ def test_public_journey_producers_choices_consumers_restart_and_zero_write(tmp_p
                 journey.clock.advance(seconds=90)
                 made = await journey.send("领取生产", "array-claim")
                 assert made.ok and made.data["success"], made.message
-            else:
-                await journey.move("云城")
             await journey.move("青石镇")
             if arc == "mist_lamp":
                 assert (await journey.send("交付委托 灯阵续灵", "old-lamp-delivery")).code == "COMMISSION_DELIVERED"
@@ -297,6 +302,18 @@ def test_public_journey_producers_choices_consumers_restart_and_zero_write(tmp_p
                 journey.clock.advance(seconds=90)
                 fresh_array = await journey.send("领取生产", "fresh-array-claim")
                 assert fresh_array.ok and fresh_array.data["success"]
+                await journey.move("青石镇")
+            elif arc == "cloud_tide":
+                assert (await journey.send("交付委托 候潮备材", "old-tide-delivery")).code == "COMMISSION_DELIVERED"
+                before = _database_state(journey.runtime)
+                assert (await story_claim(3, "old-tide-story")).code == "MAINLINE_OBJECTIVES_INCOMPLETE"
+                assert _database_state(journey.runtime) == before
+                await journey.move("云城")
+                await journey.move("云舟渡口")
+                await journey.next_day()
+                topped = await journey.gather(route, spec["hours"], "fresh-tide-source")
+                assert topped.data["reward"].get("item.material.cloud_iron", 0) >= 2
+                await journey.move("云城")
                 await journey.move("青石镇")
             await journey.next_day()
             accepted = await journey.send(f"接取委托 {spec['commission']}", "accept-final")
@@ -311,11 +328,11 @@ def test_public_journey_producers_choices_consumers_restart_and_zero_write(tmp_p
             assert delivered.code == "COMMISSION_DELIVERED", delivered.message
             spent = {"item.array.gathering_basic": 1} if arc == "mist_lamp" else {"item.material.cloud_iron": 2, "item.mat.array_sand": 1}
             assert all(original[key] - _inventory(journey.runtime).get(key, 0) == amount for key, amount in spent.items())
-            if arc == "mist_lamp":
+            if arc in {"mist_lamp", "cloud_tide"}:
                 await journey.reject_corrupt_receipt(
                     "town_commission_claims", "claim_id", accepted.data["claim_id"],
-                    "deliver_operation_id", "missing-lamp-delivery", f"领取{title}主线奖励 {spec['stages'][2]}",
-                    "missing-lamp-receipt",
+                    "deliver_operation_id", f"missing-{arc}-delivery", f"领取{title}主线奖励 {spec['stages'][2]}",
+                    f"missing-{arc}-receipt",
                 )
             await journey.restart()
             journey.fail_on("claim-3")
@@ -327,10 +344,11 @@ def test_public_journey_producers_choices_consumers_restart_and_zero_write(tmp_p
             bundle = journey.runtime.repository.content
             records = dict(bundle._records)
             for (kind, key), value in list(records.items()):
-                if key.startswith(f"{arc}.") or key in {spec["route_key"], "codex.story.mist_lamp_handover"}:
+                codex_key = spec.get("codex", "codex.story.mist_lamp_handover")
+                if key.startswith(f"{arc}.") or key in {spec["route_key"], codex_key}:
                     records[kind, key] = {**value, "status": "locked"}
             journey.runtime.repository.content = replace(bundle, _records=records)
-            if arc == "mist_lamp":
+            if arc in {"mist_lamp", "cloud_tide"}:
                 concurrent = await asyncio.gather(
                     story_claim(3, "claim-3"), story_claim(3, "claim-3"),
                 )
@@ -344,10 +362,9 @@ def test_public_journey_producers_choices_consumers_restart_and_zero_write(tmp_p
             assert (await story_claim(3, "claim-3")).data["idempotent_replay"]
             assert (await journey.send("领取挂机", "full-claim")).data["idempotent_replay"]
             assert _database_state(journey.runtime) == before
-            if arc == "mist_lamp":
-                with journey.runtime.repository._connect() as connection:
-                    assert connection.execute("SELECT COUNT(*) FROM codex_entries WHERE entry_key='codex.story.mist_lamp_handover'").fetchone()[0] == 1
-                    assert connection.execute("SELECT COUNT(*) FROM activity_events WHERE event_key='story.mainline.mist_lamp:mist_lamp.3'").fetchone()[0] == 1
+            with journey.runtime.repository._connect() as connection:
+                assert connection.execute("SELECT COUNT(*) FROM codex_entries WHERE entry_key=?", (codex_key,)).fetchone()[0] == 1
+                assert connection.execute("SELECT COUNT(*) FROM activity_events WHERE event_key=?", (f"story.mainline.{arc}:{arc}.3",)).fetchone()[0] == 1
             from nonebot_plugin_xiuxian_3.adapters.message.markdown import _qq_command_links, markdown_to_text
 
             converted = _qq_command_links(second.message, command_prefix="!")
@@ -432,6 +449,25 @@ def test_mist_lamp_rejects_invalid_owned_evidence_contract(tmp_path, damage):
         mainline_definitions(ContentBundle.load(data), story_key="story.mainline.mist_lamp")
 
 
+@pytest.mark.parametrize("damage", ["false_receipts", "numeric_receipts", "stale_order", "wrong_input", "missing_handover"])
+def test_cloud_tide_rejects_invalid_owned_evidence_contract(tmp_path, damage):
+    data = _copy_content(tmp_path)
+    path = data / "剧情/主线.json"
+    document = json.loads(path.read_text(encoding="utf-8"))
+    stages = {row["key"]: row for row in document["records"] if row.get("story_key") == "story.mainline.cloud_tide"}
+    if damage in {"false_receipts", "numeric_receipts"}:
+        stages["cloud_tide.1"]["objectives"][-1]["owned_receipts"] = False if damage == "false_receipts" else 1
+    elif damage == "stale_order":
+        stages["cloud_tide.3"]["objectives"][-1]["delivery_evidence"]["fresh_acceptance"] = False
+    elif damage == "wrong_input":
+        stages["cloud_tide.3"]["objectives"][-1]["delivery_evidence"]["inputs"] = {"item.mat.array_sand": 2}
+    else:
+        stages["cloud_tide.3"]["first_clear_reward"]["codex.story.missing"] = 1
+    path.write_text(json.dumps(document, ensure_ascii=False), encoding="utf-8")
+    with pytest.raises(ContentError):
+        mainline_definitions(ContentBundle.load(data), story_key="story.mainline.cloud_tide")
+
+
 @pytest.mark.parametrize("outcome", ["won", "lost"])
 def test_mist_lamp_owned_evidence_follows_the_actual_exploration_battle(tmp_path, outcome):
     from test_exploration_mist_content import (
@@ -492,6 +528,96 @@ def test_mist_lamp_help_exposes_each_stage_and_delivery_without_asset_operations
                     assert command in result.message
                 assert "关前接单" in result.message and "归谷续灯录" in result.message
             assert _database_state(journey.runtime) == before
+        finally:
+            await journey.runtime.close()
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("adapter", ["qq.official", "onebot.v11"])
+def test_cloud_tide_help_exposes_each_stage_and_delivery_without_asset_operations(tmp_path, adapter):
+    async def run():
+        journey = Journey(_copy_content(tmp_path), adapter)
+        try:
+            assert (await journey.send("开始修仙")).ok
+            before = _database_state(journey.runtime)
+            for category in ("生活", "探索"):
+                result = await journey.send(f"修仙帮助 {category}")
+                assert result.ok
+                for command in (
+                    "开始云舟候潮主线 问潮登舟", "开始云舟候潮主线 候潮交班",
+                    "开始云舟候潮主线 航材归镇", "云舟试炼",
+                    "挂机预览 云舟渡口候潮", "接取委托 候潮备材", "交付委托 候潮备材",
+                ):
+                    assert command in result.message
+                assert "八小时" in result.message and "候潮归航录" in result.message
+            assert _database_state(journey.runtime) == before
+        finally:
+            await journey.runtime.close()
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("adapter", ["qq.official", "onebot.v11"])
+@pytest.mark.parametrize("choice", ["支付", "等待", "超时", "返航"])
+def test_cloud_tide_owned_trial_receipts_follow_public_storm_choices(tmp_path, adapter, choice):
+    async def run():
+        journey = Journey(_copy_content(tmp_path), adapter)
+        try:
+            await starter(journey.runtime, adapter=adapter)
+            with journey.runtime.repository._connect() as connection:
+                connection.execute(
+                    "UPDATE players SET realm_key='golden_core',realm_layer=1,stamina=100,"
+                    "stamina_max=100,energy=100,energy_max=100,spirit_stones=1000"
+                )
+            assert (await journey.send("开始云舟候潮主线 问潮登舟", "storm-story")).code == "MAINLINE_STARTED"
+            await journey.move("青石镇")
+            await journey.move("云城")
+            await journey.move("云舟渡口")
+            operation = next(
+                f"storm-story-{i}" for i in range(1000)
+                if cloud_boat_storm_roll_bp(f"storm-story-{i}") < 2500
+                and battle_roll_bp(f"storm-story-{i}:battle") >= 2500
+            )
+            assert (await journey.send("开始探索 云舟试炼", operation)).code == "EXPLORATION_STARTED"
+            journey.clock.advance(minutes=5)
+            assert (await journey.send("结算探索", "storm-pending")).code == "EXPLORATION_STORM_PENDING"
+            command = "领取云舟候潮主线奖励 问潮登舟"
+            before = _database_state(journey.runtime)
+            assert (await journey.send(command, "unresolved-storm-story")).code == "MAINLINE_OBJECTIVES_INCOMPLETE"
+            assert _database_state(journey.runtime) == before
+            await journey.restart()
+            if choice == "返航" and adapter == "onebot.v11":
+                assert (await journey.send("恢复状态")).ok
+            if choice == "超时":
+                journey.clock.advance(minutes=2)
+                waiting = await journey.send("结算探索", "storm-timeout")
+                assert waiting.code == "EXPLORATION_STORM_WAITING"
+            else:
+                selected = await journey.send(f"选择云舟风暴 {choice}", "storm-choice")
+                expected = "EXPLORATION_STORM_WAITING" if choice == "等待" else "EXPLORATION_STORM_SETTLED"
+                assert selected.code == expected, selected.message
+            if choice in {"等待", "超时"}:
+                journey.clock.advance(minutes=2)
+                settled = await journey.send("结算探索", "storm-finish")
+                assert settled.code == "EXPLORATION_SETTLED", settled.message
+            source_operation = "storm-timeout" if choice == "超时" else "storm-choice"
+            await journey.reject_corrupt_receipt(
+                "operations", "operation_id", source_operation, "request_hash", "foreign-request",
+                command, "bad-storm-request",
+            )
+            await journey.reject_corrupt_receipt(
+                "operations", "operation_id", "storm-pending", "result_json", "{}",
+                command, "missing-storm-prompt",
+            )
+            before = _database_state(journey.runtime)
+            claimed = await journey.send(command, "storm-story-claim")
+            expected = "MAINLINE_OBJECTIVES_INCOMPLETE" if choice == "返航" else "MAINLINE_REWARD_CLAIMED"
+            assert claimed.code == expected, claimed.message
+            if choice == "返航":
+                assert _database_state(journey.runtime) == before
+            else:
+                before = _database_state(journey.runtime)
+                assert (await journey.send(command, "storm-story-claim")).data["idempotent_replay"]
+                assert _database_state(journey.runtime) == before
         finally:
             await journey.runtime.close()
     asyncio.run(run())

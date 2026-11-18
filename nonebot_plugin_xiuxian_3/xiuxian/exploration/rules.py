@@ -36,6 +36,14 @@ CLOUD_MINE_ACCESS_ITEMS = frozenset({
     "item.tool.mining_pickaxe",
     "item.tool.mining_pickaxe_t2",
 })
+
+
+def cloud_boat_storm_payment_reward(frozen_reward: dict[str, int]) -> dict[str, int]:
+    result = dict(frozen_reward)
+    result["cultivation"] = result.get("cultivation", 0) + 200
+    return result
+
+
 def _content(content: ContentBundle | None = None) -> ContentBundle:
     return content or bundled_content()
 

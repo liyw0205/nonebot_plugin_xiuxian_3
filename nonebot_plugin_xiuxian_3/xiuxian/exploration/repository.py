@@ -91,6 +91,7 @@ from ..exploration.rules import (
     CLOUD_BOAT_STORM_CHOICES,
     CLOUD_BOAT_STORM_PAY_COST,
     CLOUD_BOAT_STORM_WAIT_SECONDS,
+    cloud_boat_storm_payment_reward,
     cloud_boat_storm_roll_bp,
     exploration_definitions_by_location,
     exploration_discovery_weight_bp,
@@ -1629,8 +1630,7 @@ class ExplorationRepositoryMixin:
             elif effective_choice == "pay":
                 if player_currency(row) < CLOUD_BOAT_STORM_PAY_COST:
                     raise CurrencyInsufficientError("cloud boat storm payment requires spirit stones")
-                result = dict(frozen_result)
-                result["cultivation"] = int(result.get("cultivation", 0)) + 200
+                result = cloud_boat_storm_payment_reward(frozen_result)
                 status = "settled"
                 cultivation_gain = int(result.get("cultivation", 0))
                 change_player_state(

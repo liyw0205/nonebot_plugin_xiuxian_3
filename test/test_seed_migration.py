@@ -1078,6 +1078,7 @@ PLACE_CODEX_ADDED = frozenset(
         "codex.story.mist_lamp",
         "codex.story.mist_lamp_handover",
         "codex.story.cloud_tide",
+        "codex.story.cloud_tide_handover",
         "codex.story.herb_vale_gather",
         "codex.story.herb_shelter",
         "codex.story.ironwood_gather",

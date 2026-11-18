@@ -16,6 +16,9 @@ BASELINES = {
 
 def before_mist_lamp_release(relative: str, text: str) -> str:
     """Rebuild the fixed 3d83636 official blobs for migration tests only."""
+    from test_cloud_tide_seeds import before_cloud_tide_release
+
+    text = before_cloud_tide_release(relative, text)
     if relative == "图鉴/条目.json":
         return "".join(line for line in text.splitlines(keepends=True) if '"codex.story.mist_lamp_handover"' not in line)
     if relative != "剧情/主线.json":
@@ -25,9 +28,11 @@ def before_mist_lamp_release(relative: str, text: str) -> str:
     evidence = json.dumps(final["objectives"][-1]["delivery_evidence"], ensure_ascii=False)
     text = text.replace(', "delivery_evidence": ' + evidence, "")
     text = text.replace(', "owned_receipts": true', "")
+    action = dict(final["actions"][-2])
+    old_action = {**action, "description": "查看当日公示后接取。"}
     replacements = (
         (final["objectives"][-1]["label"], "本关交付灯阵续灵并实交聚灵阵"),
-        (final["actions"][-2]["description"], "查看当日公示后接取。"),
+        (action, old_action),
         (final["retry"]["message"], "需要本关新制成功的聚灵阵和本人灯阵续灵交单。旧阵、失败、只接未交不能交卷，材料不足补给，过期次日重接，重启后进度保留。"),
     )
     for current, old in replacements:
@@ -64,6 +69,8 @@ def test_mist_lamp_seed_upgrade_backup_replay_and_custom_rollback(host):
 
     custom_codex = json.loads(old["图鉴/条目.json"])
     custom_codex["records"][0]["desc"] += " 本地灯簿。"
+    current_codex = json.loads((ROOT / "data/图鉴/条目.json").read_text(encoding="utf-8"))
+    custom_codex["records"].append(next(row for row in current_codex["records"] if row["key"] == "codex.story.cloud_tide_handover"))
     custom_blob = (json.dumps(custom_codex, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
     (host / "data/图鉴/条目.json").write_bytes(custom_blob)
     (host / "data/剧情/主线.json").write_bytes(old["剧情/主线.json"])
