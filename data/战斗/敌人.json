@@ -213,7 +213,14 @@
       "stats": {"hp": 900, "attack": 120, "initiative": 16, "agility": 16},
       "skills": ["enemy_skill.cloud_armor"],
       "reward_refs": [],
-      "combat_profile": {"random_pool_key": "battle.enemy.cloud_boat_guardian", "reward": {}},
+      "combat_profile": {
+        "random_pool_key": "battle.enemy.cloud_boat_guardian", "reward": {},
+        "party_profile": {
+          "party_type": "standard_pve",
+          "entry": {"stamina": 12, "energy": 3, "daily_limit": 3},
+          "reward": {"cultivation": 100, "spirit_stones": 40, "item.material.cloud_iron": 1, "item.mat.array_sand": 1}
+        }
+      },
       "key": "enemy.cloud_boat_guardian",
       "status": "active"
     },

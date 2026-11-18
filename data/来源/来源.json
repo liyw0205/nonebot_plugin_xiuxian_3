@@ -2,6 +2,7 @@
   "schema": "xiuxian.content",
   "kind": "source",
   "records": [
+    {"key":"source.party.cloud_boat","name":"云舟合力护航材料","desc":"四至五名金丹修士在云舟渡口共同战胜守灵，每名有贡献的成员各得一份云铁与阵砂，供云纹剑、聚灵阵和候潮备材使用。","asset_keys":["item.material.cloud_iron","item.mat.array_sand"],"channels":[{"operation":"battle.party.resolve","reference":"enemy.cloud_boat_guardian"}],"status":"active"},
     {"key":"source.relic.fragments","name":"三地古迹残件","desc":"完成当地勘察、拆用行囊并战胜真实守护者后，从溪崖旧窑、铁木旧匠棚与岩径水工坊带回三种残件。","asset_keys":["item.relic.clay_disc","item.relic.bronze_needle","item.relic.water_ring"],"channels":[{"operation":"exploration.settle_combat","reference":"reward_pool.relic.creek"},{"operation":"exploration.settle_combat","reference":"reward_pool.relic.ironwood"},{"operation":"exploration.settle_combat","reference":"reward_pool.relic.basalt"}],"status":"active"},
     {"key":"source.relic.supplies","name":"勘掘行装制作","desc":"青石镇以可再生木材、铁石和止血草制作行囊，供公开寻遗路线使用。","asset_keys":["item.relic.excavation_kit"],"channels":[{"operation":"production.complete","reference":"recipe.relic.excavation_kit"}],"status":"active"},
     {"key":"source.relic.restoration","name":"山河罗盘复原","desc":"三种真实寻遗残件与阵砂在青石镇合成可穿戴罗盘。","asset_keys":["item.accessory.field_compass"],"channels":[{"operation":"production.complete","reference":"recipe.relic.field_compass"}],"status":"active"},

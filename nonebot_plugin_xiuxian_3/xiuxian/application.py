@@ -440,6 +440,11 @@ _HELP_PAGES = {
     ),
     "社交": (
         "**社交**\n\n"
+        f"结伴迎战可先{command_link('多人副本预览', '多人副本预览')}，再{command_link('创建多人副本队伍', '创建多人副本队伍')}；"
+        f"用{command_link('邀请入队', '邀请入队')}填写平台与用户 ID，受邀者发送{command_link('接受入队 队伍号', '接受入队 队伍号')}后全员"
+        f"{command_link('确认入队 队伍号', '确认入队 队伍号')}完成确认，"
+        f"队长{command_link('开始队伍战斗', '开始队伍战斗')}。断线后参战者可{command_link('结算队伍战斗', '结算队伍战斗')}恢复，"
+        f"并用{command_link('队伍战斗回放', '队伍战斗回放')}查看原战局。云舟渡口金丹一层起四至五人同行，战备页列明每人入场成本、今日次数与材料去处。\n\n"
         f"{command_link('我的宗门', '我的宗门')}可查看归属。想自立门户，用{command_link('创建宗门', '创建宗门')}填写名称；"
         f"想拜入已有宗门，用{command_link('申请入宗', '申请入宗')}填写宗门号或名称。\n\n"
         f"掌门可用{command_link('审批入宗', '审批入宗')}填写申请号与同意或拒绝，处理入宗申请。\n\n"
@@ -2600,6 +2605,9 @@ class XiuxianApplication:
 
     async def create_standard_pve_party(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.party.create_standard_pve_party(context), write_message="当前事件不允许创建多人副本队伍。")
+
+    async def preview_standard_party(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.party.preview_standard_party(context), require_write=False)
 
     async def create_three_realms_tower_duo_party(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.party.create_three_realms_tower_duo_party(context), write_message="当前事件不允许创建三界塔双人队伍。")

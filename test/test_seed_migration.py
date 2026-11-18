@@ -425,9 +425,16 @@ def test_fieldwork_seeds_upgrade_from_v0134_and_preserve_custom(host: Path, cust
     manifest = json.loads((ROOT / "scripts/seed_migrations.json").read_text())
     originals = {}
     for relative, fixture in files.items():
-        original = (ROOT / "test/fixtures/official_seeds" / fixture).read_bytes()
-        assert hashlib.sha256(original).hexdigest() in manifest[relative]["old_sha256"]
-        originals[relative] = original + (b"\n" if custom else b"")
+        if custom:
+            from test_cloud_party_seeds import before_cloud_party_release
+
+            text = (ROOT / "data" / relative).read_text(encoding="utf-8")
+            text = before_cloud_party_release(relative, text)
+            originals[relative] = (text + "\n").encode("utf-8")
+        else:
+            original = (ROOT / "test/fixtures/official_seeds" / fixture).read_bytes()
+            assert hashlib.sha256(original).hexdigest() in manifest[relative]["old_sha256"]
+            originals[relative] = original
         (host / "data" / relative).write_bytes(originals[relative])
     source = host / "src/plugins/nonebot_plugin_xiuxian_3/__init__.py"
     previous_source = source.read_bytes()
@@ -435,14 +442,21 @@ def test_fieldwork_seeds_upgrade_from_v0134_and_preserve_custom(host: Path, cust
     result = deploy(host)
     if custom:
         assert result.returncode != 0
-        assert "mist_lamp.2 objective watch references unknown idle route" in result.stdout + result.stderr
+        assert "source.party.cloud_boat references unavailable costed party enemy enemy.cloud_boat_guardian" in result.stdout + result.stderr
         assert "已回退" in result.stderr
         assert all((host / "data" / relative).read_bytes() == blob for relative, blob in originals.items())
         assert source.read_bytes() == previous_source
         assert (host / "pyproject.toml").read_bytes() == previous_toml
         preserved(host)
-        originals["生活/生活.json"] = (ROOT / "data/生活/生活.json").read_bytes() + b"\n"
-        (host / "data/生活/生活.json").write_bytes(originals["生活/生活.json"])
+        # Merge the new public producer explicitly into preserved custom data;
+        # the installer must not invent it or overwrite the custom enemy file.
+        enemies = json.loads(originals["战斗/敌人.json"])
+        current = json.loads((ROOT / "data/战斗/敌人.json").read_bytes())
+        current_guard = next(row for row in current["records"] if row["key"] == "enemy.cloud_boat_guardian")
+        guard = next(row for row in enemies["records"] if row["key"] == current_guard["key"])
+        guard["combat_profile"] = current_guard["combat_profile"]
+        originals["战斗/敌人.json"] = (json.dumps(enemies, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+        (host / "data/战斗/敌人.json").write_bytes(originals["战斗/敌人.json"])
         result = deploy(host)
     assert result.returncode == 0, result.stdout + result.stderr
     backup = next((host / ".xiuxian3/backups").glob("deploy-*"))

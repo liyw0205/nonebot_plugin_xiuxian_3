@@ -30,11 +30,17 @@ def validate_reward_content(bundle: ContentBundle) -> int:
     return pools
 
 
-def validate_source_content(bundle: ContentBundle) -> int:
+def validate_source_content(bundle: ContentBundle, *, party_only: bool = False) -> int:
     """Validate source declarations without treating them as new producers."""
 
     source_count = 0
     for row in bundle.list("source", include_locked=False):
+        channels_value = row.get("channels")
+        if party_only and not (
+            isinstance(channels_value, list)
+            and any(isinstance(channel, dict) and channel.get("operation") == "battle.party.resolve" for channel in channels_value)
+        ):
+            continue
         key = _record_key(row, "source")
         _labels(row, f"source {key}")
         assets = row.get("asset_keys")
@@ -69,13 +75,26 @@ def validate_source_content(bundle: ContentBundle) -> int:
             if not isinstance(channel, dict):
                 raise ContentError(f"source {key} has a malformed channel")
             operation = channel.get("operation")
+            if party_only and operation != "battle.party.resolve":
+                continue
             reference = channel.get("reference")
             if not isinstance(operation, str) or not operation.strip():
                 raise ContentError(f"source {key} channel operation is required")
             if not isinstance(reference, str) or not reference.strip():
                 raise ContentError(f"source {key} channel reference is required")
             _validate_source_reference(bundle, key, reference)
+            if operation == "battle.party.resolve":
+                from .combat.party_rules import party_entry_for_enemy
+
+                enemy = bundle.get("enemy", reference, include_locked=False)
+                if enemy is None or party_entry_for_enemy(reference, bundle) is None:
+                    raise ContentError(f"source {key} references unavailable costed party enemy {reference}")
+                reward = enemy["combat_profile"]["party_profile"]["reward"]
+                if not assets or not set(assets) <= set(reward):
+                    raise ContentError(f"source {key} party enemy does not pay its declared assets")
         source_count += 1
+    if party_only and not source_count:
+        raise ContentError("no active costed party source")
     return source_count
 
 

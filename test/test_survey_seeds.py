@@ -5,6 +5,7 @@ import json
 
 from scripts.install_plugin_source import _seed_plan
 from test_seed_migration import ROOT, old_official_manifest
+from test_cloud_party_seeds import before_cloud_party_release
 
 
 BASELINES = {
@@ -16,7 +17,7 @@ BASELINES = {
 def old_survey_seeds():
     result = {}
     for relative, expected in BASELINES.items():
-        text = (ROOT / "data" / relative).read_text(encoding="utf-8")
+        text = before_cloud_party_release(relative, (ROOT / "data" / relative).read_text(encoding="utf-8"))
         if relative == "内容清单.json":
             text = text.replace('    "探索/地貌.json",\n', "").replace('    "探索/资源脉.json",\n', "")
         else:

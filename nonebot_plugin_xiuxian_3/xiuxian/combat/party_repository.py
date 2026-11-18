@@ -10,11 +10,12 @@ from __future__ import annotations
 import asyncio
 import json
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import uuid4
 
 from ...contracts import serialize_datetime
+from ..content import ContentError, bundled_content
 from ..persistence.errors import (
     OperationConflictError,
     PartyBattleBusyError,
@@ -22,6 +23,8 @@ from ..persistence.errors import (
     PartyBattleNotReadyError,
     PartyBattlePermissionError,
     PartyBattleRequirementError,
+    PartyBattleResourceError,
+    PartyBattleDailyLimitError,
     BoundaryRealmRequirementError,
     BoundaryRealmResourceError,
     CrossRealmPartyRequirementError,
@@ -49,6 +52,8 @@ from .party_rules import (
     DEMON_REALM_REWARD,
     DEMON_REALM_STAMINA_COST,
     party_enemy_for_location,
+    party_entry_for_enemy,
+    party_material_consumers,
 )
 from .rules import TURN_TIMEOUT_SECONDS, battle_roll_bp, hit_chance_bp, enemy_definition
 from ..stats.rules import frozen_combat_stats
@@ -94,6 +99,108 @@ from ..utils.assets import inventory_amount, inventory_spend, spend_player_asset
 
 class PartyCombatRepositoryMixin:
     """Run a server-authoritative battle for the already-confirmed party."""
+
+    def _party_daily_starts(self, connection, player_id: int, enemy_key: str, *, now: datetime | None = None) -> int:
+        today = (now or self._now()).astimezone(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        return int(connection.execute(
+            "SELECT COUNT(*) FROM party_battle_members m JOIN party_battle_sessions b ON b.battle_id=m.battle_id "
+            "WHERE m.player_id=? AND b.enemy_key=? AND b.starts_at>=? AND b.starts_at<?",
+            (player_id, enemy_key, serialize_datetime(today), serialize_datetime(today + timedelta(days=1))),
+        ).fetchone()[0])
+
+    def _standard_party_member_blockers(self, connection, row, enemy, entry, location_key, *, confirmed: bool, now: datetime | None = None) -> tuple[list[str], int]:
+        blockers = []
+        if row["status"] != "active" or row["endgame_status"] in {"ascension_ready", "ascended", "remained_in_world"}:
+            blockers.append("unavailable")
+        if not confirmed:
+            blockers.append("unconfirmed")
+        if row["location_key"] != location_key:
+            blockers.append("location")
+        if not self._meets_realm_values(str(row["realm_key"]), player_integer(row, "realm_layer"), enemy.required_realm, enemy.required_layer):
+            blockers.append("realm")
+        used = 0
+        if entry is not None:
+            for resource in ("stamina", "energy"):
+                if player_integer(row, resource) < getattr(entry, resource):
+                    blockers.append(resource)
+            used = self._party_daily_starts(connection, int(row["id"]), enemy.key, now=now)
+            if used >= entry.daily_limit:
+                blockers.append("daily_limit")
+        if self._has_active_long_action(connection, int(row["id"])) or connection.execute(
+            "SELECT 1 FROM party_battle_members WHERE player_id=? AND asset_lock_status='locked' LIMIT 1", (row["id"],)
+        ).fetchone():
+            blockers.append("busy")
+        return blockers, used
+
+    async def preview_standard_party(self, *, platform: str, platform_user_id: str) -> dict[str, Any]:
+        await self.initialize()
+        return await asyncio.to_thread(self._preview_standard_party_once, platform, platform_user_id)
+
+    def _preview_standard_party_once(self, platform: str, platform_user_id: str) -> dict[str, Any]:
+        bundle = self.content if self.content is not None else bundled_content()
+        with self._connect() as connection:
+            connection.execute("BEGIN")
+            actor = self._require_player(connection, platform, platform_user_id, writable=False)
+            membership = connection.execute(
+                "SELECT m.*, p.location_key, p.party_type, p.status AS party_status, p.current_session_id, p.confirmation_deadline "
+                "FROM party_members m JOIN parties p ON p.party_id=m.party_id "
+                "WHERE m.player_id=? AND m.status IN ('active','invited') ORDER BY m.id DESC LIMIT 1", (actor["id"],)
+            ).fetchone()
+            location_key = str(membership["location_key"] if membership else actor["location_key"])
+            locations = [bundle.require("location", row["location_key"], include_locked=False)
+                         for row in bundle.list("enemy", include_locked=False)
+                         if row.get("combat_profile", {}).get("party_profile", {}).get("party_type") == PARTY_TYPE_STANDARD_PVE]
+            result = {"location_key": location_key, "supported": False, "locations": [{"key": row["key"], "name": row["name"]} for row in locations]}
+            try:
+                enemy = party_enemy_for_location(location_key, content=bundle)
+            except ContentError:
+                raise
+            except ValueError:
+                return result
+            row = bundle.require("enemy", enemy.key, include_locked=False)
+            if row.get("combat_profile", {}).get("party_profile", {}).get("party_type") != PARTY_TYPE_STANDARD_PVE:
+                return result
+            entry = party_entry_for_enemy(enemy.key, bundle)
+            definition = party_definition_for(PARTY_TYPE_STANDARD_PVE)
+            blockers = []
+            if membership is None:
+                blockers.append("no_party")
+                members = [dict(actor, member_confirmed_at=None, member_status="active")]
+            else:
+                if membership["party_type"] != PARTY_TYPE_STANDARD_PVE:
+                    blockers.append("party_type")
+                if membership["role"] != "leader" or membership["status"] != "active":
+                    blockers.append("not_leader")
+                if membership["party_status"] != "ready":
+                    blockers.append("not_ready")
+                if entry is not None and membership["confirmation_deadline"] <= serialize_datetime(self._now()):
+                    blockers.append("expired")
+                if membership["current_session_id"]:
+                    blockers.append("busy")
+                members = connection.execute(
+                    "SELECT p.*, m.confirmed_at AS member_confirmed_at, m.status AS member_status "
+                    "FROM party_members m JOIN players p ON p.id=m.player_id WHERE m.party_id=? "
+                    "AND m.status IN ('active','invited') ORDER BY m.id", (membership["party_id"],)
+                ).fetchall()
+            active_count = sum(member["member_status"] == "active" for member in members)
+            if not definition.min_members <= active_count <= definition.max_members:
+                blockers.append("member_count")
+            member_views = []
+            for member in members:
+                member_blockers, used = self._standard_party_member_blockers(
+                    connection, member, enemy, entry, location_key,
+                    confirmed=bool(member["member_confirmed_at"]) and member["member_status"] == "active",
+                )
+                member_views.append({"player_id": member["player_id"], "name": member["dao_name"] or "未命名", "blockers": member_blockers,
+                                     "stamina": player_integer(member, "stamina"), "energy": player_integer(member, "energy"), "daily_used": used})
+            result.update(supported=True, enemy_key=enemy.key, enemy_name=enemy.label,
+                          required_realm=enemy.required_realm, required_layer=enemy.required_layer,
+                          min_members=definition.min_members, max_members=definition.max_members,
+                          cost={"stamina": entry.stamina, "energy": entry.energy} if entry else {"stamina": 0, "energy": 0},
+                          daily_limit=entry.daily_limit if entry else None, reward=enemy.party_reward,
+                          consumers=party_material_consumers(bundle, enemy.party_reward), members=member_views,
+                          blockers=blockers, can_start=not blockers and not any(member["blockers"] for member in member_views))
+            return result
 
     async def start_party_battle(
         self,
@@ -382,6 +489,26 @@ class PartyCombatRepositoryMixin:
                     )
             except ValueError as exc:
                 raise PartyBattleRequirementError("party PVE is not available at this location") from exc
+            standard_entry = party_entry_for_enemy(enemy.key, self.content) if not (
+                tower_duo_party or secret_rift_party or ancient_domain_party or void_ruins_party or time_fort_party
+            ) else None
+            if standard_entry is not None:
+                if party_type != PARTY_TYPE_STANDARD_PVE:
+                    raise PartyBattleRequirementError("costed standard encounters require a standard PVE party")
+                if party["confirmation_deadline"] <= now_text:
+                    raise PartyBattleRequirementError("standard party confirmation has expired")
+                for row in members:
+                    blockers, _ = self._standard_party_member_blockers(
+                        connection, row, enemy, standard_entry, str(party["location_key"]), confirmed=bool(row["member_confirmed_at"]), now=now
+                    )
+                    if "daily_limit" in blockers:
+                        raise PartyBattleDailyLimitError("a member used the encounter daily quota")
+                    if "stamina" in blockers or "energy" in blockers:
+                        raise PartyBattleResourceError("a member lacks the encounter entry resources")
+                    if "busy" in blockers:
+                        raise PartyBattleBusyError("a member is busy")
+                    if blockers:
+                        raise PartyBattleRequirementError("a member cannot enter the standard encounter")
             snapshots: list[dict[str, Any]] = []
             boundary_party = party_type in {PARTY_TYPE_BOUNDARY_REALM, PARTY_TYPE_PARTY_BOUNDARY}
             boundary_rift_combat = boundary_party or secret_rift_party
@@ -497,6 +624,7 @@ class PartyCombatRepositoryMixin:
                 snapshots.append(
                     {
                         "player_id": str(row["stable_player_id"]),
+                        "dao_name": str(row["dao_name"] or "未命名"),
                         "database_id": int(row["database_player_id"]),
                         "role": str(row["member_role"]),
                         "realm_key": member_realm,
@@ -560,6 +688,12 @@ class PartyCombatRepositoryMixin:
                         updated_at=now_text,
                         value_delta={"stamina": -stamina_cost},
                     )
+            elif standard_entry is not None:
+                for row in members:
+                    change_player_state(
+                        connection, row, updated_at=now_text,
+                        value_delta={"stamina": -standard_entry.stamina, "energy": -standard_entry.energy},
+                    )
             dungeon_reward = (
                 DEMON_REALM_REWARD
                 if demon_party
@@ -610,11 +744,14 @@ class PartyCombatRepositoryMixin:
                         if demon_party
                         else BEAST_REALM_STAMINA_COST
                         if beast_party
-                        else 0
+                        else standard_entry.stamina if standard_entry else 0
                     ),
+                    "energy": standard_entry.energy if standard_entry else 0,
                     "ticket": {BOUNDARY_REALM_TICKET: BOUNDARY_REALM_TICKET_COST} if boundary_party else {},
                 },
             }
+            if standard_entry is not None:
+                snapshot["entry_daily_limit"] = standard_entry.daily_limit
             state = {
                 "round_no": 0,
                 "member_hp": {member["player_id"]: member["stats"]["max_hp"] for member in snapshots},
@@ -1428,6 +1565,26 @@ class PartyCombatRepositoryMixin:
     @staticmethod
     def _party_battle_snapshot(raw: str) -> dict[str, Any]:
         snapshot = decode_json_strict(raw)
+        cost, reward = snapshot.get("resource_cost"), snapshot.get("reward")
+        has_standard_entry_cost = (
+            snapshot.get("party_type") == PARTY_TYPE_STANDARD_PVE
+            and isinstance(cost, dict)
+            and any(type(cost.get(key)) is int and cost[key] > 0 for key in ("stamina", "energy"))
+        )
+        if "entry_daily_limit" in snapshot or has_standard_entry_cost:
+            if (
+                snapshot.get("party_type") != PARTY_TYPE_STANDARD_PVE
+                or type(snapshot.get("entry_daily_limit")) is not int or snapshot["entry_daily_limit"] <= 0
+                or not isinstance(cost, dict) or set(cost) != {"stamina", "energy", "ticket"}
+                or any(type(cost[key]) is not int or cost[key] < 0 for key in ("stamina", "energy"))
+                or cost["ticket"] != {}
+                or not isinstance(reward, dict) or not reward
+                or any(not isinstance(key, str) or type(value) is not int or value <= 0
+                       or (key.startswith("item.") and value != 1)
+                       or (not key.startswith("item.") and key not in {"cultivation", "spirit_stones"})
+                       for key, value in reward.items())
+            ):
+                raise ValueError("standard party entry or reward snapshot is invalid")
         members = snapshot["members"]
         if not isinstance(members, list) or not members:
             raise ValueError("party battle member snapshots are missing")

@@ -65,18 +65,23 @@ def _edit(root: Path, relative: str, key: str, **changes: object) -> None:
 
 
 def test_combat_content_closes_current_enemy_and_encounter_data() -> None:
-    summary = validate_combat_content(ContentBundle.load(DATA))
+    bundle = ContentBundle.load(DATA)
+    summary = validate_combat_content(bundle)
 
-    # Two of the 22 declared pools belong to inert-location modes and are not
-    # consumed; the other 20 are connected to open exploration modes.
-    expected_consumed_encounters = 20 if (DATA / "探索/模式.json").exists() else 0
+    # Relic expeditions added the real ironwood guardian pool. Include it in
+    # both the catalogue totals and the pools consumed by open modes.
+    assert bundle.require("encounter_pool", "encounter.relic.ironwood")["candidates"] == [
+        {"enemy_key": "enemy.ironwood_weasel", "weight": 100}
+    ]
+    assert bundle.require("exploration_mode", "explore.relic.ironwood")["enemy_pool_key"] == "encounter.relic.ironwood"
+    expected_consumed_encounters = 21 if (DATA / "探索/模式.json").exists() else 0
     # The early basalt source adds one profile; specialized tower enemies retain
     # their existing dedicated content consumer.
     assert summary == {
         "enemies": 69,
         "enemy_profiles": 51,
-        "encounters": 22,
-        "candidates": 39,
+        "encounters": 23,
+        "candidates": 40,
         "drop_pools": 8,
         "consumed_encounters": expected_consumed_encounters,
         "enemy_skills": 16,

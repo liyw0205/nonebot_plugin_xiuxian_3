@@ -16,6 +16,9 @@ BASELINES = {
 
 def before_cloud_tide_release(relative: str, text: str) -> str:
     """Rebuild the pinned c53fc18 official blobs for migration tests only."""
+    from test_cloud_party_seeds import before_cloud_party_release
+
+    text = before_cloud_party_release(relative, text)
     if relative == "图鉴/条目.json":
         return "".join(line for line in text.splitlines(keepends=True) if '"codex.story.cloud_tide_handover"' not in line)
     if relative != "剧情/主线.json":

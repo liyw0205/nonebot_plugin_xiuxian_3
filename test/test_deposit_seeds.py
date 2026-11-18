@@ -6,6 +6,7 @@ import json
 from scripts.install_plugin_source import _seed_plan
 from test_seed_migration import ROOT, old_official_materials
 from test_survey_seeds import old_survey_seeds
+from test_cloud_party_seeds import before_cloud_party_release
 
 
 BASELINES = {
@@ -24,7 +25,7 @@ def old_deposit_seeds():
                '    {"key":"recipe.equipment.repair_kit',
                '    {"key":"item.equipment.repair_kit')
     for relative, expected in BASELINES.items():
-        text = (ROOT / "data" / relative).read_text(encoding="utf-8")
+        text = before_cloud_party_release(relative, (ROOT / "data" / relative).read_text(encoding="utf-8"))
         text = "".join(line for line in text.splitlines(keepends=True)
                        if not line.startswith(markers) and line != '    "探索/资源脉.json",\n')
         result[relative] = text.encode("utf-8")

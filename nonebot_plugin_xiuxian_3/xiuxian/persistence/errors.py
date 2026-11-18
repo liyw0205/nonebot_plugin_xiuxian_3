@@ -1550,6 +1550,14 @@ class PartyBattleRequirementError(RuntimeError):
     """The party is not ready for its location or enemy encounter."""
 
 
+class PartyBattleResourceError(PartyBattleRequirementError):
+    """A member lacks the configured standard party entry resources."""
+
+
+class PartyBattleDailyLimitError(PartyBattleRequirementError):
+    """A member has used the encounter's daily entry quota."""
+
+
 class BoundaryRealmRequirementError(PartyBattleRequirementError):
     """A boundary-realm member is missing the cross-realm qualification."""
 

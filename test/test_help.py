@@ -86,3 +86,30 @@ def test_life_help_exposes_complete_equipment_care_loop() -> None:
                 await runtime.close()
 
     asyncio.run(run())
+
+
+def test_social_help_exposes_party_preparation_and_recovery() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            try:
+                result = await runtime.dispatch(
+                    CommandContext(adapter="onebot.v11", user_id="party-help"),
+                    "修仙帮助 社交",
+                )
+                assert result.ok
+                for command in (
+                    "多人副本预览",
+                    "创建多人副本队伍",
+                    "邀请入队",
+                    "接受入队",
+                    "确认入队",
+                    "开始队伍战斗",
+                    "结算队伍战斗",
+                    "队伍战斗回放",
+                ):
+                    assert command in result.message
+            finally:
+                await runtime.close()
+
+    asyncio.run(run())

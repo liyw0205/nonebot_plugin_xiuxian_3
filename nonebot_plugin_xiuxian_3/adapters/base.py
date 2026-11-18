@@ -402,6 +402,7 @@ def register_core_commands(router: CommandRouter, application: XiuxianApplicatio
     router.register("创建魔渊队伍", application.create_demon_party, aliases=("创建魔界副本队伍",))
     router.register("创建万兽队伍", application.create_beast_party, aliases=("创建妖界副本队伍",))
     router.register("创建多人副本队伍", application.create_standard_pve_party, aliases=("创建四人副本队伍", "创建普通副本队伍"))
+    router.register("多人副本预览", application.preview_standard_party, aliases=("队伍战备",))
     router.register("创建三界塔双人队伍", application.create_three_realms_tower_duo_party)
     router.register("邀请入队", application.invite_party, aliases=("邀请队伍",))
     router.register("接受入队", application.accept_party, aliases=("同意入队",))

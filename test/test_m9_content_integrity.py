@@ -38,13 +38,13 @@ def _edit(root: Path, relative: str, key: str, **changes: object) -> None:
 
 def test_m9_content_references_are_closed() -> None:
     summary = validate_content_references(ContentBundle.load(DATA))
-    # These counts pin all current active content, including relics and field repair.
+    # Counts include relics, field repair and the new cooperative cloud-boat source.
     assert summary["locations"] == 34
     assert summary["mainline_stages"] == 175
     assert summary["exploration_modes"] == 33
     assert summary["bounties"] == 60
     assert summary["recipes"] == 44
-    assert summary["sources"] == 34
+    assert summary["sources"] == 35
     assert summary["equipment_repair_kits"] == 1
     assert summary["combat_enemies"] == 69
 

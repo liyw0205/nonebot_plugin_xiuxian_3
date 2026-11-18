@@ -9,6 +9,7 @@ from test_deposit_seeds import old_deposit_seeds
 from test_patrol_seeds import old_patrol_seeds
 from test_seed_migration import ROOT, old_official_locations, old_official_materials
 from test_survey_seeds import old_survey_seeds
+from test_cloud_party_seeds import before_cloud_party_release
 
 
 BASELINES = {
@@ -34,7 +35,7 @@ def old_relic_seeds():
     )
     markers = tuple('    {"key":"' + prefix for prefix in prefixes)
     for relative, expected in BASELINES.items():
-        text = (ROOT / "data" / relative).read_text(encoding="utf-8")
+        text = before_cloud_party_release(relative, (ROOT / "data" / relative).read_text(encoding="utf-8"))
         text = "".join(line for line in text.splitlines(keepends=True)
                        if not line.startswith((*markers, '    {"key": "encounter.relic.')))
         if relative == "地图/地点.json":
