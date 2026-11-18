@@ -13,7 +13,10 @@ from ..content import ContentError, bundled_content
 from ..utils.assets import inventory_amount, spend_player_items
 from ..utils.player import grant_player_state, player_integer, player_inventory
 from ..events.rules import final_heaven_season_window
+from ..events.season_content import FINAL_HEAVEN_SEASON_KEY, season_record
 from ..persistence.errors import (
+    DaoOriginQualificationAlreadyClaimedError,
+    DaoOriginQualificationIncompleteError,
     DaoOriginTaskRequirementError,
     QuestAlreadyCompletedError,
     QuestNotCompletedError,
@@ -21,7 +24,11 @@ from ..persistence.errors import (
     QuestResourceInsufficientError,
 )
 from ..specials.codex_projection import record_codex_discovery
-from .models import DaoUnionQualificationRecord, QuestActionRecord
+from .models import (
+    DaoOriginSeasonQualificationRecord,
+    DaoUnionQualificationRecord,
+    QuestActionRecord,
+)
 from .rules import (
     DAO_ORIGIN_TASKS,
     dao_origin_task_definition,
@@ -141,6 +148,29 @@ class EndgameQuestRepositoryMixin:
                 platform,
                 platform_user_id,
                 task_key,
+                operation_id,
+            )
+
+    async def get_dao_origin_qualification(
+        self, *, platform: str, platform_user_id: str
+    ) -> DaoOriginSeasonQualificationRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._get_dao_origin_qualification_sync,
+                platform,
+                platform_user_id,
+            )
+
+    async def claim_dao_origin_qualification(
+        self, *, platform: str, platform_user_id: str, operation_id: str
+    ) -> DaoOriginSeasonQualificationRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._claim_dao_origin_qualification_sync,
+                platform,
+                platform_user_id,
                 operation_id,
             )
 
@@ -489,15 +519,364 @@ class EndgameQuestRepositoryMixin:
             )
             return self._action_from_payload(payload)
 
+    def _dao_origin_qualification_config(self) -> tuple[tuple[str, ...], str]:
+        record = season_record(FINAL_HEAVEN_SEASON_KEY, self.content or bundled_content())
+        qualification = record.get("qualification")
+        if not isinstance(qualification, dict):
+            raise ContentError("final-heaven qualification content is missing")
+        task_keys = qualification.get("task_keys")
+        readiness_flag = qualification.get("readiness_flag")
+        if (
+            not isinstance(task_keys, tuple)
+            or not task_keys
+            or not isinstance(readiness_flag, str)
+            or not readiness_flag.strip()
+        ):
+            raise ContentError("final-heaven qualification content is invalid")
+        return tuple(str(key) for key in task_keys), readiness_flag.strip()
+
+    def _dao_origin_task_evidence(
+        self,
+        connection: sqlite3.Connection,
+        player_id: int,
+        task_key: str,
+        season_id: str,
+        season_start: datetime,
+        season_end: datetime,
+    ) -> list[dict[str, str]]:
+        rows = connection.execute(
+            "SELECT source_operation_id, payload_json FROM quest_events "
+            "WHERE player_id = ? AND quest_key = ? AND component_key = 'completed' "
+            "AND outcome = 'success' ORDER BY id",
+            (player_id, task_key),
+        ).fetchall()
+        evidence: list[dict[str, str]] = []
+        seen_operations: set[str] = set()
+        for row in rows:
+            source_operation_id = str(row["source_operation_id"] or "")
+            if not source_operation_id or source_operation_id in seen_operations:
+                raise ContentError(f"dao-origin task evidence is duplicated: {task_key}")
+            try:
+                payload = json.loads(row["payload_json"] or "{}")
+            except (TypeError, json.JSONDecodeError) as exc:
+                raise ContentError(f"dao-origin task event cannot be read: {task_key}") from exc
+            if not isinstance(payload, dict) or payload.get("season_id") != season_id:
+                continue
+            if payload.get("source_operation_id") != source_operation_id:
+                raise ContentError(f"dao-origin task source operation is inconsistent: {task_key}")
+            source_kind = str(payload.get("source_kind") or "")
+            evidence_id = str(payload.get("evidence_id") or "")
+            occurred_at = str(payload.get("occurred_at") or "")
+            if not source_kind or not evidence_id or not occurred_at:
+                raise ContentError(f"dao-origin task evidence is incomplete: {task_key}")
+            try:
+                occurred = datetime.fromisoformat(occurred_at).astimezone(timezone.utc)
+            except (TypeError, ValueError) as exc:
+                raise ContentError(f"dao-origin task evidence timestamp is invalid: {task_key}") from exc
+            if not season_start <= occurred < season_end:
+                raise ContentError(f"dao-origin task evidence is outside its season: {task_key}")
+            if not self._dao_origin_evidence_matches_source(
+                connection,
+                player_id=player_id,
+                task_key=task_key,
+                source_kind=source_kind,
+                source_operation_id=source_operation_id,
+                evidence_id=evidence_id,
+                occurred_at=occurred,
+                source_key=payload.get("source_key"),
+            ):
+                raise ContentError(f"dao-origin task evidence source is invalid: {task_key}")
+            seen_operations.add(source_operation_id)
+            evidence.append(
+                {
+                    "source_operation_id": source_operation_id,
+                    "source_kind": source_kind,
+                    "evidence_id": evidence_id,
+                    "occurred_at": occurred_at,
+                }
+            )
+        return evidence
+
+    def _dao_origin_evidence_matches_source(
+        self,
+        connection: sqlite3.Connection,
+        *,
+        player_id: int,
+        task_key: str,
+        source_kind: str,
+        source_operation_id: str,
+        evidence_id: str,
+        occurred_at: datetime,
+        source_key: object,
+    ) -> bool:
+        """Cross-check persisted task evidence against its producing record."""
+
+        if task_key == "task.dao_origin.guard":
+            if source_kind != "battle_sessions":
+                return False
+            row = connection.execute(
+                "SELECT battle_id, starts_at, result_json FROM battle_sessions "
+                "WHERE player_id=? AND battle_type='pve.dao_union_challenge' "
+                "AND start_operation_id=? AND status='settled'",
+                (player_id, source_operation_id),
+            ).fetchone()
+            if row is None or str(row["battle_id"]) != evidence_id:
+                return False
+            result = self._json_object(row["result_json"], {})
+            if str(result.get("outcome", "")) != "won":
+                return False
+            actual_at = str(row["starts_at"])
+        elif task_key == "task.dao_origin.build":
+            if source_kind != "livelihood_project_rewards" or not isinstance(source_key, str):
+                return False
+            row = connection.execute(
+                "SELECT r.project_id, r.created_at, p.project_key FROM livelihood_project_rewards r "
+                "JOIN livelihood_projects p ON p.project_id=r.project_id "
+                "WHERE r.player_id=? AND r.operation_id=? AND r.eligible=1",
+                (player_id, source_operation_id),
+            ).fetchone()
+            if row is None or str(row["project_id"]) != evidence_id or str(row["project_key"]) != source_key:
+                return False
+            actual_at = str(row["created_at"])
+        elif task_key == "task.dao_origin.teach":
+            if source_kind != "mentor_relations":
+                return False
+            row = connection.execute(
+                "SELECT relation_id, graduated_at FROM mentor_relations "
+                "WHERE master_id=? AND graduate_operation_id=? AND status='graduated'",
+                (player_id, source_operation_id),
+            ).fetchone()
+            if row is None or str(row["relation_id"]) != evidence_id:
+                return False
+            actual_at = str(row["graduated_at"])
+        else:
+            return False
+        try:
+            return datetime.fromisoformat(actual_at).astimezone(timezone.utc) == occurred_at
+        except (TypeError, ValueError):
+            return False
+
+    def _dao_origin_qualification_snapshot(
+        self,
+        connection: sqlite3.Connection,
+        player_id: int,
+        season_id: str,
+        season_start: datetime,
+        season_end: datetime,
+        task_keys: tuple[str, ...],
+        readiness_flag: str,
+    ) -> tuple[dict[str, object], dict[str, int]]:
+        content = self.content or bundled_content()
+        tasks: list[dict[str, object]] = []
+        progress: dict[str, int] = {}
+        for task_key in task_keys:
+            definition = dao_origin_task_definition(task_key, content)
+            count, task_snapshot = self._dao_origin_task_progress(
+                connection, player_id, task_key, season_id
+            )
+            if task_snapshot is None:
+                task_snapshot = definition.snapshot(season_id)
+            if task_snapshot["key"] != task_key or task_snapshot["season_id"] != season_id:
+                raise ContentError(f"dao-origin task snapshot is inconsistent: {task_key}")
+            evidence = self._dao_origin_task_evidence(
+                connection, player_id, task_key, season_id, season_start, season_end
+            )
+            if len(evidence) != count:
+                raise ContentError(f"dao-origin task evidence differs from progress: {task_key}")
+            target = int(task_snapshot["target"])
+            progress[task_key] = count
+            tasks.append(
+                {
+                    "key": task_key,
+                    "name": str(task_snapshot["name"]),
+                    "target": target,
+                    "completed": count,
+                    "ready": count >= target,
+                    "task_snapshot": dict(task_snapshot),
+                    "evidence": evidence,
+                }
+            )
+        return (
+            {
+                "season_id": season_id,
+                "starts_at": serialize_datetime(season_start),
+                "ends_at": serialize_datetime(season_end),
+                "readiness_flag": readiness_flag,
+                "tasks": tasks,
+            },
+            progress,
+        )
+
+    def _get_dao_origin_qualification_sync(
+        self, platform: str, platform_user_id: str
+    ) -> DaoOriginSeasonQualificationRecord:
+        now = self._now()
+        season_id, season_start, season_end = final_heaven_season_window(now)
+        with self._connect() as connection:
+            player = self._require_player(connection, platform, platform_user_id, writable=False)
+            task_keys, readiness_flag = self._dao_origin_qualification_config()
+            row = connection.execute(
+                "SELECT status, readiness_flag, snapshot_json FROM dao_origin_qualifications "
+                "WHERE player_id = ? AND season_id = ?",
+                (player["id"], season_id),
+            ).fetchone()
+            if row is not None:
+                try:
+                    snapshot = json.loads(row["snapshot_json"] or "{}")
+                except (TypeError, json.JSONDecodeError) as exc:
+                    raise ContentError("dao-origin qualification snapshot cannot be read") from exc
+                if not isinstance(snapshot, dict):
+                    raise ContentError("dao-origin qualification snapshot is invalid")
+                progress = {
+                    str(task["key"]): int(task["completed"])
+                    for task in snapshot.get("tasks", ())
+                    if isinstance(task, dict) and "key" in task and "completed" in task
+                }
+                return self._dao_origin_qualification_from_payload(
+                    {
+                        "player": self._player_payload(self._row_to_player(player)),
+                        "season_id": season_id,
+                        "status": str(row["status"]),
+                        "readiness_flag": str(row["readiness_flag"]),
+                        "progress": progress,
+                        "snapshot": snapshot,
+                    }
+                )
+            snapshot, progress = self._dao_origin_qualification_snapshot(
+                connection,
+                int(player["id"]),
+                season_id,
+                season_start,
+                season_end,
+                task_keys,
+                readiness_flag,
+            )
+            status = "ready" if all(
+                int(task["completed"]) >= int(task["target"])
+                for task in snapshot["tasks"]
+            ) else "pending"
+            return self._dao_origin_qualification_from_payload(
+                {
+                    "player": self._player_payload(self._row_to_player(player)),
+                    "season_id": season_id,
+                    "status": status,
+                    "readiness_flag": readiness_flag,
+                    "progress": progress,
+                    "snapshot": snapshot,
+                }
+            )
+
+    def _claim_dao_origin_qualification_sync(
+        self, platform: str, platform_user_id: str, operation_id: str
+    ) -> DaoOriginSeasonQualificationRecord:
+        operation_name = "quest.dao_origin.qualification.claim"
+        request_hash = self._request_hash(
+            operation_name,
+            {"platform": platform, "platform_user_id": platform_user_id},
+        )
+        now = self._now()
+        now_text = serialize_datetime(now)
+        season_id, season_start, season_end = final_heaven_season_window(now)
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            replay = self._quest_operation_replay(connection, operation_id, operation_name, request_hash)
+            if replay is not None:
+                return self._dao_origin_qualification_from_payload(replay, replay=True)
+            player = self._require_player(connection, platform, platform_user_id)
+            task_keys, readiness_flag = self._dao_origin_qualification_config()
+            existing = connection.execute(
+                "SELECT 1 FROM dao_origin_qualifications WHERE player_id = ? AND season_id = ?",
+                (player["id"], season_id),
+            ).fetchone()
+            if existing is not None:
+                raise DaoOriginQualificationAlreadyClaimedError(
+                    "dao-origin qualification is already claimed for this season"
+                )
+            snapshot, progress = self._dao_origin_qualification_snapshot(
+                connection,
+                int(player["id"]),
+                season_id,
+                season_start,
+                season_end,
+                task_keys,
+                readiness_flag,
+            )
+            if any(
+                int(task["completed"]) < int(task["target"])
+                for task in snapshot["tasks"]
+            ):
+                raise DaoOriginQualificationIncompleteError(
+                    "all final-heaven dao-origin tasks must be complete"
+                )
+            snapshot["qualified_at"] = now_text
+            flags_state = self._json_object(player["intro_json"], {})
+            flags = [str(value) for value in flags_state.get("flags", ())]
+            if readiness_flag not in flags:
+                flags.append(readiness_flag)
+            flags_state["flags"] = flags
+            connection.execute(
+                "UPDATE players SET intro_json = ?, updated_at = ? WHERE id = ?",
+                (json.dumps(flags_state, ensure_ascii=False, sort_keys=True), now_text, player["id"]),
+            )
+            connection.execute(
+                "INSERT INTO dao_origin_qualifications("
+                "player_id, season_id, readiness_flag, status, snapshot_json, operation_id, created_at, updated_at) "
+                "VALUES (?, ?, ?, 'qualified', ?, ?, ?, ?)",
+                (
+                    player["id"],
+                    season_id,
+                    readiness_flag,
+                    json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
+                    operation_id,
+                    now_text,
+                    now_text,
+                ),
+            )
+            connection.execute(
+                "INSERT INTO activity_events(player_id, event_key, source_operation_id, occurred_at, payload_json) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (
+                    player["id"],
+                    "season.final_heaven.dao_origin_qualified",
+                    operation_id,
+                    now_text,
+                    json.dumps(
+                        {"season_id": season_id, "readiness_flag": readiness_flag, "snapshot": snapshot},
+                        ensure_ascii=False,
+                        sort_keys=True,
+                    ),
+                ),
+            )
+            updated = connection.execute("SELECT * FROM players WHERE id = ?", (player["id"],)).fetchone()
+            payload = {
+                "player": self._player_payload(self._row_to_player(updated)),
+                "season_id": season_id,
+                "status": "qualified",
+                "readiness_flag": readiness_flag,
+                "progress": progress,
+                "snapshot": snapshot,
+            }
+            self._insert_operation(
+                connection,
+                operation_id=operation_id,
+                operation_name=operation_name,
+                player_id=int(player["id"]),
+                request_hash=request_hash,
+                payload=payload,
+                now_text=now_text,
+            )
+            return self._dao_origin_qualification_from_payload(payload)
+
     def _dao_origin_task_seasons(
         self, connection: sqlite3.Connection, player_id: int, task_key: str
     ) -> dict[str, tuple[int, dict[str, Any]]]:
         rows = connection.execute(
-            "SELECT payload_json FROM quest_events WHERE player_id = ? AND quest_key = ? "
+            "SELECT source_operation_id, payload_json FROM quest_events WHERE player_id = ? AND quest_key = ? "
             "AND component_key = 'completed' AND outcome = 'success'",
             (player_id, task_key),
         ).fetchall()
         seasons: dict[str, tuple[int, dict[str, Any]]] = {}
+        seen_operations: set[tuple[str, str]] = set()
         for row in rows:
             try:
                 payload = json.loads(row["payload_json"])
@@ -505,6 +884,10 @@ class EndgameQuestRepositoryMixin:
                 raise ContentError(f"dao-origin task event cannot be read: {task_key}") from exc
             snapshot = dao_origin_task_snapshot_from_event(task_key, payload)
             season_id = snapshot["season_id"]
+            source_operation_id = str(row["source_operation_id"] or "")
+            if not source_operation_id or (season_id, source_operation_id) in seen_operations:
+                raise ContentError(f"dao-origin task evidence is duplicated: {task_key}")
+            seen_operations.add((season_id, source_operation_id))
             count, previous = seasons.get(season_id, (0, snapshot))
             if previous != snapshot or count >= snapshot["target"]:
                 raise ContentError(f"dao-origin task events are inconsistent: {task_key}")
@@ -624,6 +1007,25 @@ class EndgameQuestRepositoryMixin:
             progress={str(key): int(value) for key, value in dict(payload.get("progress", {})).items()},
             snapshot=dict(payload.get("snapshot", {})),
             reward={str(key): int(value) for key, value in dict(payload.get("reward", {})).items()},
+            already_completed=replay,
+        )
+
+    @staticmethod
+    def _dao_origin_qualification_from_payload(
+        payload: dict[str, Any], replay: bool = False
+    ) -> DaoOriginSeasonQualificationRecord:
+        from ..repository import SQLitePlayerRepository
+
+        return DaoOriginSeasonQualificationRecord(
+            player=SQLitePlayerRepository._row_to_player(payload["player"]),
+            season_id=str(payload["season_id"]),
+            status=str(payload.get("status", "pending")),
+            readiness_flag=str(payload.get("readiness_flag", "")),
+            progress={
+                str(key): int(value)
+                for key, value in dict(payload.get("progress", {})).items()
+            },
+            snapshot=dict(payload.get("snapshot", {})),
             already_completed=replay,
         )
 

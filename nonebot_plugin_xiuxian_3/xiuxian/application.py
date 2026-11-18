@@ -674,6 +674,9 @@ class XiuxianApplication:
                 ascension_lines = self._ascension_day_help_lines()
                 if ascension_lines:
                     body += "\n\n" + ascension_lines
+                qualification_lines = self._dao_origin_qualification_help_lines()
+                if qualification_lines:
+                    body += "\n\n" + qualification_lines
             elif category == "修炼":
                 path_lines = self._path_switch_help_lines()
                 if path_lines:
@@ -1128,6 +1131,31 @@ class XiuxianApplication:
                     f"体力 {definition.stamina_cost}，每{period} {definition.quota_limit} 次）"
                 )
             return "\n".join(lines)
+        except Exception:
+            return ""
+
+    def _dao_origin_qualification_help_lines(self) -> str:
+        """Describe the final-heaven qualification handoff from task evidence."""
+
+        try:
+            from .events.season_content import FINAL_HEAVEN_SEASON_KEY, season_record
+
+            record = season_record(FINAL_HEAVEN_SEASON_KEY, self.content)
+            qualification = record["qualification"]
+            task_labels = []
+            content = self.content or bundled_content()
+            for task_key in qualification["task_keys"]:
+                task = content.require("quest", task_key, include_locked=False)
+                task_labels.append(str(task["name"]))
+            return "\n".join(
+                [
+                    "**道源终局资格**",
+                    "> 终局天榜按当前赛季冻结三项道源证据；开始、失败、旧赛季或客户端计数都不计入。",
+                    f"- 本赛季任务：{'、'.join(task_labels)}",
+                    f"- {command_link('道源资格', '道源资格')}查看冻结目标、证据来源与剩余要求",
+                    f"- {command_link('领取道源资格', '领取道源资格')}在三项任务齐备后原子写入 {qualification['readiness_flag']}",
+                ]
+            )
         except Exception:
             return ""
 
@@ -1705,6 +1733,20 @@ class XiuxianApplication:
 
     async def complete_dao_origin_task(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.quests.complete_dao_origin_task(context), write_message="当前事件不允许完成道源任务。")
+
+    async def get_dao_origin_qualification(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.quests.get_dao_origin_qualification(context),
+            require_write=False,
+        )
+
+    async def claim_dao_origin_qualification(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.quests.claim_dao_origin_qualification(context),
+            write_message="当前事件不允许领取道源资格。",
+        )
 
     async def list_bounties(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.adventures.list_bounties(context), require_write=False)

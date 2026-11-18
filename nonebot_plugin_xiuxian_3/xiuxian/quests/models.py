@@ -50,8 +50,22 @@ class DaoUnionQualificationRecord:
     already_completed: bool = False
 
 
+@dataclass(frozen=True, slots=True)
+class DaoOriginSeasonQualificationRecord:
+    """A server-verified, season-frozen final-heaven access snapshot."""
+
+    player: PlayerView
+    season_id: str
+    status: str
+    readiness_flag: str
+    progress: dict[str, int]
+    snapshot: dict[str, object]
+    already_completed: bool = False
+
+
 __all__ = [
     "DaoUnionQualificationRecord",
+    "DaoOriginSeasonQualificationRecord",
     "QuestActionRecord",
     "QuestClaimRecord",
     "QuestStatusRecord",

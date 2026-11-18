@@ -20,6 +20,14 @@ class OperationResultMalformedError(RuntimeError):
     """An operation ledger row contains a non-object or invalid JSON result."""
 
 
+class DaoOriginQualificationIncompleteError(RuntimeError):
+    """The current final-heaven season lacks one or more origin proofs."""
+
+
+class DaoOriginQualificationAlreadyClaimedError(RuntimeError):
+    """The player already holds a qualification snapshot for this season."""
+
+
 class PlayerNotFoundError(RuntimeError):
     """The requested platform identity has no player record."""
 

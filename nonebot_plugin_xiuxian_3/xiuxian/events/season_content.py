@@ -11,6 +11,11 @@ KIND = "season"
 THREE_REALMS_SEASON_KEY = "season.three_realms"
 FINAL_HEAVEN_SEASON_KEY = "season.final_heaven"
 VOID_FRONTIER_SEASON_KEY = "season.void_frontier"
+_DAO_ORIGIN_TASK_KEYS = (
+    "task.dao_origin.guard",
+    "task.dao_origin.build",
+    "task.dao_origin.teach",
+)
 
 
 def _bundle(content: ContentBundle | None) -> ContentBundle:
@@ -49,6 +54,35 @@ def _rank_rewards(value: Any, key: str) -> tuple[dict[str, Any], ...]:
             }
         )
     return tuple(parsed)
+
+
+def _qualification(value: Any, key: str, bundle: ContentBundle) -> dict[str, Any] | None:
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise ContentError(f"{key} qualification must be an object")
+    task_keys = value.get("task_keys")
+    readiness_flag = value.get("readiness_flag")
+    if (
+        not isinstance(task_keys, list)
+        or not task_keys
+        or any(not isinstance(task_key, str) or not task_key.strip() for task_key in task_keys)
+        or len(set(task_keys)) != len(task_keys)
+    ):
+        raise ContentError(f"{key} qualification.task_keys must be a non-empty unique list")
+    if readiness_flag != "access.final_heaven":
+        raise ContentError(f"{key} qualification.readiness_flag is invalid")
+    if set(task_keys) != set(_DAO_ORIGIN_TASK_KEYS):
+        raise ContentError(
+            f"{key} qualification.task_keys must declare the three dao-origin tasks"
+        )
+    for task_key in task_keys:
+        if not bundle.has("quest", task_key, include_locked=False):
+            raise ContentError(f"{key} qualification references an inactive task: {task_key}")
+    return {
+        "task_keys": tuple(task_keys),
+        "readiness_flag": readiness_flag.strip(),
+    }
 
 
 def _positive(value: Any, field: str, key: str) -> int:
@@ -109,6 +143,9 @@ def season_record(key: str, content: ContentBundle | None = None) -> dict[str, A
         not isinstance(chapter_entitlement, str) or not chapter_entitlement.strip()
     ):
         raise ContentError(f"{key} has an invalid chapter_entitlement")
+    qualification = _qualification(row.get("qualification"), key, bundle)
+    if key == FINAL_HEAVEN_SEASON_KEY and qualification is None:
+        raise ContentError(f"{key} requires a qualification declaration")
     result: dict[str, Any] = {
         "key": key,
         "duration_days": _positive(row.get("duration_days"), "duration_days", key),
@@ -117,6 +154,7 @@ def season_record(key: str, content: ContentBundle | None = None) -> dict[str, A
         "rank_limit": _positive(row.get("rank_limit"), "rank_limit", key),
         "boards": parsed_boards,
         "chapter_entitlement": chapter_entitlement,
+        "qualification": qualification,
     }
     weekly_cap = row.get("weekly_cap")
     if weekly_cap is not None:

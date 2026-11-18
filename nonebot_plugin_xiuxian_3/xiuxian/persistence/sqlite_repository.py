@@ -444,6 +444,10 @@ class SQLitePlayerRepository(
             )
             connection.execute(
                 "INSERT OR IGNORE INTO schema_migrations(migration_key, applied_at) VALUES (?, ?)",
+                ("events.dao_origin_qualification", serialize_datetime(self._now())),
+            )
+            connection.execute(
+                "INSERT OR IGNORE INTO schema_migrations(migration_key, applied_at) VALUES (?, ?)",
                 ("production.contract", serialize_datetime(self._now())),
             )
             connection.execute(

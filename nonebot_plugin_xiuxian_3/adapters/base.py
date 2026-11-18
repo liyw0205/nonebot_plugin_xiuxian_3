@@ -233,6 +233,8 @@ def register_core_commands(router: CommandRouter, application: XiuxianApplicatio
     router.register("交付合道作品", application.deliver_dao_union_work)
     router.register("领取合道许可", application.claim_dao_union_quest)
     router.register("完成道源任务", application.complete_dao_origin_task)
+    router.register("道源资格", application.get_dao_origin_qualification, aliases=("终局资格",))
+    router.register("领取道源资格", application.claim_dao_origin_qualification)
     router.register("悬赏榜", application.list_bounties)
     router.register("接取悬赏", application.accept_bounty)
     router.register("领取悬赏", application.claim_bounty)

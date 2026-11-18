@@ -15,6 +15,13 @@ _FINAL_HEAVEN_RECORD = season_record(FINAL_HEAVEN_SEASON_KEY)
 FINAL_HEAVEN_CLAIM_DAYS = int(_FINAL_HEAVEN_RECORD["claim_days"])
 FINAL_HEAVEN_RANKED_PLACES = int(_FINAL_HEAVEN_RECORD["rank_limit"])
 FINAL_HEAVEN_CHAPTER_ENTITLEMENT = str(_FINAL_HEAVEN_RECORD["chapter_entitlement"])
+_FINAL_HEAVEN_QUALIFICATION = _FINAL_HEAVEN_RECORD["qualification"] or {}
+FINAL_HEAVEN_QUALIFICATION_TASK_KEYS = tuple(
+    str(key) for key in _FINAL_HEAVEN_QUALIFICATION.get("task_keys", ())
+)
+FINAL_HEAVEN_READINESS_FLAG = str(
+    _FINAL_HEAVEN_QUALIFICATION.get("readiness_flag", "access.final_heaven")
+)
 FINAL_HEAVEN_BOARDS = {
     board_key: dict(board)
     for board_key, board in _FINAL_HEAVEN_RECORD["boards"].items()
@@ -52,6 +59,8 @@ __all__ = [
     "FINAL_HEAVEN_CHAPTER_ENTITLEMENT",
     "FINAL_HEAVEN_CLAIM_DAYS",
     "FINAL_HEAVEN_RANKED_PLACES",
+    "FINAL_HEAVEN_QUALIFICATION_TASK_KEYS",
+    "FINAL_HEAVEN_READINESS_FLAG",
     "final_heaven_claim_expiry",
     "final_heaven_tie_breaker",
     "final_heaven_window_for_id",
