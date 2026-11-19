@@ -19,7 +19,7 @@ import tempfile
 import threading
 import time
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Iterable
@@ -160,6 +160,7 @@ def _instrument_repository(runtime: Any, *, enabled: bool | None = None) -> dict
         "idle_preview_ms": [],
         "mainline_status_ms": [],
         "travel_preview_ms": [],
+        "arena_snapshot_list_ms": [],
         "equipment_preview_ms": [],
         "arena_season_board_ms": [],
         "sql_queries": [],
@@ -186,6 +187,7 @@ def _instrument_repository(runtime: Any, *, enabled: bool | None = None) -> dict
     timed_method(repository, "_preview_idle_once", "idle_preview_ms")
     timed_method(repository, "_get_mainline_status_sync", "mainline_status_ms")
     timed_method(repository, "_preview_travel_database_state", "travel_preview_ms")
+    timed_method(repository, "_list_arena_snapshots_once", "arena_snapshot_list_ms")
     timed_method(runtime.application.equipment, "_equipment_preview_text", "equipment_preview_ms")
     timed_method(repository, "_arena_season_board_once", "arena_season_board_ms")
     timed_method(runtime.application.void_material, "_resolve_item", "item_resolution_ms")
@@ -656,6 +658,26 @@ def _seed_arena_history(runtime: Any, path: Path, users: int, now: str) -> int:
         connection.executemany(ARENA_MATCH_INSERT, matches)
         connection.commit()
     return len(matches)
+
+
+def _prepare_arena_snapshot_list_fixture(path: Path, now: str) -> int:
+    """Create a mixed-mode public pool with deterministic expiry windows."""
+
+    past = (datetime.fromisoformat(now) - timedelta(days=1)).isoformat()
+    future = (datetime.fromisoformat(now) + timedelta(days=1)).isoformat()
+    with sqlite3.connect(path) as connection:
+        connection.execute(
+            "UPDATE arena_snapshots SET status = 'published', "
+            "arena_mode_key = CASE WHEN id % 2 = 0 THEN 'arena.three_realms' ELSE 'arena.spar' END, "
+            "matchable_at = ?, expires_at = CASE WHEN id % 4 IN (0, 1) THEN ? ELSE ? END, "
+            "updated_at = ?",
+            (now, past, future, now),
+        )
+        return int(
+            connection.execute(
+                "SELECT COUNT(*) FROM arena_snapshots WHERE status = 'published'"
+            ).fetchone()[0]
+        )
 
 
 def _onebot_event(user_id: str, request_number: int, text: str) -> Any:
@@ -1500,6 +1522,184 @@ async def _run_mainline_player_projection_comparison(
         payload = {
             "comparison": {label: report(results) for label, results in variants.items()},
             "profile_results_equivalent": profile_results_equivalent,
+            "errors": sum(
+                int(item["errors"])
+                for results in variants.values()
+                for item in results
+            ),
+        }
+    cleaned = not temporary_path.exists()
+    for result in payload["comparison"].values():
+        result["temporary_database_cleaned"] = cleaned
+    return payload
+
+
+async def _run_arena_snapshot_list_comparison(
+    users: int,
+    batch_size: int,
+    total_requests: int,
+    levels: tuple[int, ...],
+    *,
+    profile_sql: bool | None = None,
+    commands: tuple[str, ...] | None = None,
+) -> dict[str, Any]:
+    """Compare global versus mode-scoped expiry work on the arena list path."""
+
+    selected_commands = commands or ("竞技场列表",)
+    if selected_commands != ("竞技场列表",):
+        raise ValueError("arena snapshot list comparison only supports 竞技场列表")
+
+    temporary_path: Path
+    with tempfile.TemporaryDirectory(prefix="xiuxian-perf-") as data_dir:
+        temporary_path = Path(data_dir)
+        now = datetime(2026, 11, 15, tzinfo=timezone.utc)
+        runtime = create_runtime(
+            data_dir=data_dir, adapters=("onebot.v11", "qq.official"), clock=lambda: now
+        )
+        await runtime.initialize()
+        seed = _seed_database(runtime, users, batch_size)
+        database_path = runtime.settings.database_path
+        snapshot_count = _prepare_arena_snapshot_list_fixture(
+            database_path, "2026-11-15T00:00:00+00:00"
+        )
+        with sqlite3.connect(database_path) as connection:
+            explain = {
+                "before_global_expiry": [
+                    str(row[3])
+                    for row in connection.execute(
+                        "EXPLAIN QUERY PLAN UPDATE arena_snapshots SET status = ?, updated_at = ? "
+                        "WHERE status = ? AND expires_at <= ?",
+                        ("expired", "2026-11-15T00:00:00+00:00", "published", "2026-11-15T00:00:00+00:00"),
+                    )
+                ],
+                "after_mode_scoped_expiry": [
+                    str(row[3])
+                    for row in connection.execute(
+                        "EXPLAIN QUERY PLAN UPDATE arena_snapshots SET status = ?, updated_at = ? "
+                        "WHERE status = ? AND arena_mode_key = ? AND expires_at <= ?",
+                        (
+                            "expired",
+                            "2026-11-15T00:00:00+00:00",
+                            "published",
+                            "arena.spar",
+                            "2026-11-15T00:00:00+00:00",
+                        ),
+                    )
+                ],
+            }
+        metrics = _instrument_repository(runtime, enabled=profile_sql)
+        restore_executor = _instrument_executor(metrics) if metrics is not None else None
+        restore_stat_helpers = _instrument_stat_helpers(metrics) if metrics is not None else None
+        repository = runtime.repository
+        original_expirer = repository._expire_arena_snapshots
+
+        def global_expirer(connection: Any, *, mode_key: str, now_text: str) -> None:
+            del mode_key
+            connection.execute(
+                "UPDATE arena_snapshots SET status = 'expired', updated_at = ? "
+                "WHERE status = 'published' AND expires_at <= ?",
+                (now_text, now_text),
+            )
+
+        def set_variant(global_expiry: bool) -> None:
+            repository._expire_arena_snapshots = global_expirer if global_expiry else original_expirer
+
+        def reset_fixture() -> None:
+            _prepare_arena_snapshot_list_fixture(
+                database_path, "2026-11-15T00:00:00+00:00"
+            )
+
+        def response_contract(result: Any) -> tuple[Any, ...]:
+            return (
+                result.ok,
+                result.code,
+                result.message,
+                result.operation_id,
+                result.data,
+                result.retryable,
+                result.actions,
+            )
+
+        async def sample_contract(global_expiry: bool) -> tuple[Any, ...]:
+            reset_fixture()
+            set_variant(global_expiry)
+            results = []
+            for request_number, adapter in enumerate(("onebot.v11", "qq.official")):
+                user_id = "perf-0000000" if adapter == "onebot.v11" else "perf-0000001"
+                normalized = _normalize(adapter, user_id, request_number, selected_commands[0])
+                result = await runtime.adapters.dispatch(adapter, normalized.context, normalized.text)
+                if not result.ok or not result.data.get("snapshots"):
+                    raise AssertionError("arena list fixture must contain live public opponents")
+                results.append(response_contract(result))
+            return tuple(results)
+
+        try:
+            before_contract = await sample_contract(True)
+            after_contract = await sample_contract(False)
+            outputs_equivalent = before_contract == after_contract
+            if not outputs_equivalent:
+                raise AssertionError("arena list responses differ between expiry variants")
+
+            variants: dict[str, list[dict[str, Any]]] = {
+                "before_global_expiry_update": [],
+                "after_mode_scoped_expiry_update": [],
+            }
+            for level_index, concurrency in enumerate(levels):
+                for repetition in range(2):
+                    before_first = (level_index + repetition) % 2 == 0
+                    order = (
+                        (
+                            ("before_global_expiry_update", True),
+                            ("after_mode_scoped_expiry_update", False),
+                        )
+                        if before_first
+                        else (
+                            ("after_mode_scoped_expiry_update", False),
+                            ("before_global_expiry_update", True),
+                        )
+                    )
+                    for label, global_expiry in order:
+                        reset_fixture()
+                        set_variant(global_expiry)
+                        result = asdict(
+                            await _measure(
+                                runtime,
+                                users,
+                                concurrency,
+                                total_requests,
+                                metrics,
+                                selected_commands,
+                            )
+                        )
+                        result["repeat"] = repetition + 1
+                        variants[label].append(result)
+        finally:
+            repository._expire_arena_snapshots = original_expirer
+            if restore_executor is not None:
+                restore_executor()
+            if restore_stat_helpers is not None:
+                restore_stat_helpers()
+            await runtime.close()
+
+        db_bytes = _db_size(database_path)
+
+        def report(results: list[dict[str, Any]]) -> dict[str, Any]:
+            return {
+                "users": users,
+                "seed": seed,
+                "arena_snapshot_count": snapshot_count,
+                "database_bytes_after_benchmark": db_bytes,
+                "sql_profile_enabled": metrics is not None,
+                "sql_profile_status": "collected" if metrics is not None else "not_collected",
+                "explain_query_plan": explain,
+                "levels": results,
+                "errors": sum(int(item["errors"]) for item in results),
+            }
+
+        payload = {
+            "comparison": {label: report(results) for label, results in variants.items()},
+            "arena_list_outputs_equivalent": outputs_equivalent,
+            "arena_list_snapshot_counts": [len(result[4]["snapshots"]) for result in after_contract],
             "errors": sum(
                 int(item["errors"])
                 for results in variants.values()
@@ -2843,6 +3043,21 @@ async def _run_void_material_item_cache_comparison(
                 "sql_profile_status": "collected" if metrics is not None else "not_collected",
                 "levels": results,
                 "errors": sum(int(item["errors"]) for item in results),
+            }
+
+        payload = {
+            "comparison": {label: report(results) for label, results in variants.items()},
+            "item_resolution_outputs_equivalent": before_contract == after_contract,
+            "errors": sum(
+                int(item["errors"])
+                for results in variants.values()
+                for item in results
+            ),
+        }
+    cleaned = not temporary_path.exists()
+    for result in payload["comparison"].values():
+        result["temporary_database_cleaned"] = cleaned
+    return payload
 
 
 async def _run_item_use_catalogue_comparison(
@@ -3009,11 +3224,135 @@ async def _run_item_use_catalogue_comparison(
     return payload
 
 
+async def _run_travel_preview_projection_comparison(
+    users: int,
+    batch_size: int,
+    total_requests: int,
+    levels: tuple[int, ...],
+    *,
+    profile_sql: bool | None = None,
+    commands: tuple[str, ...] | None = None,
+) -> dict[str, Any]:
+    """Compare repeated travel-gate decoding with one shared player projection."""
+
+    selected_commands = commands or ("移动预览 玄天近郊",)
+    if selected_commands != ("移动预览 玄天近郊",):
+        raise ValueError("travel preview comparison only supports the bounded route preview command")
+
+    temporary_path: Path
+    with tempfile.TemporaryDirectory(prefix="xiuxian-perf-") as data_dir:
+        temporary_path = Path(data_dir)
+        runtime = create_runtime(data_dir=data_dir, adapters=("onebot.v11", "qq.official"))
+        await runtime.initialize()
+        seed = _seed_database(runtime, users, batch_size)
+        database_path = runtime.settings.database_path
+        explain = _explain(database_path, 1)
+        metrics = _instrument_repository(runtime, enabled=profile_sql)
+        restore_executor = _instrument_executor(metrics) if metrics is not None else None
+        restore_stat_helpers = _instrument_stat_helpers(metrics) if metrics is not None else None
+        repository = runtime.repository
+        original_requirement_state = repository._travel_requirement_state_in
+
+        def repeated_requirement_state(
+            connection: Any,
+            row: Any,
+            now: datetime,
+            *,
+            normalized: Any = None,
+        ) -> dict[str, Any]:
+            # This is the pre-optimization path: the full PlayerView projection
+            # and the travel gate reader independently decode the same JSON.
+            return original_requirement_state(connection, row, now, normalized=None)
+
+        def set_variant(repeated: bool) -> None:
+            repository._travel_requirement_state_in = (
+                repeated_requirement_state if repeated else original_requirement_state
+            )
+
+        def response_contract(result: Any) -> tuple[Any, ...]:
+            return (
+                result.ok,
+                result.code,
+                result.message,
+                result.operation_id,
+                result.data,
+                result.retryable,
+                result.actions,
+            )
+
+        async def sample_contract(repeated: bool) -> tuple[Any, ...]:
+            set_variant(repeated)
+            results = []
+            for request_number, adapter in enumerate(("onebot.v11", "qq.official")):
+                normalized = _normalize(adapter, "perf-0000000", request_number, selected_commands[0])
+                result = await runtime.adapters.dispatch(adapter, normalized.context, normalized.text)
+                results.append(response_contract(result))
+            return tuple(results)
+
+        try:
+            before_contract = await sample_contract(True)
+            after_contract = await sample_contract(False)
+            outputs_equivalent = before_contract == after_contract
+            if not outputs_equivalent:
+                raise AssertionError("travel preview responses differ between projection variants")
+
+            variants: dict[str, list[dict[str, Any]]] = {
+                "before_repeated_travel_gate_projection": [],
+                "after_shared_travel_gate_projection": [],
+            }
+            for level_index, concurrency in enumerate(levels):
+                for repetition in range(2):
+                    before_first = (level_index + repetition) % 2 == 0
+                    order = (
+                        (
+                            ("before_repeated_travel_gate_projection", True),
+                            ("after_shared_travel_gate_projection", False),
+                        )
+                        if before_first
+                        else (
+                            ("after_shared_travel_gate_projection", False),
+                            ("before_repeated_travel_gate_projection", True),
+                        )
+                    )
+                    for label, repeated in order:
+                        set_variant(repeated)
+                        result = asdict(
+                            await _measure(
+                                runtime,
+                                users,
+                                concurrency,
+                                total_requests,
+                                metrics,
+                                selected_commands,
+                            )
+                        )
+                        result["repeat"] = repetition + 1
+                        variants[label].append(result)
+        finally:
+            repository._travel_requirement_state_in = original_requirement_state
+            if restore_executor is not None:
+                restore_executor()
+            if restore_stat_helpers is not None:
+                restore_stat_helpers()
+            await runtime.close()
+
+        db_bytes = _db_size(database_path)
+
+        def report(results: list[dict[str, Any]]) -> dict[str, Any]:
+            return {
+                "users": users,
+                "seed": seed,
+                "database_bytes_after_benchmark": db_bytes,
+                "sql_profile_enabled": metrics is not None,
+                "sql_profile_status": "collected" if metrics is not None else "not_collected",
+                "explain_query_plan": explain,
+                "levels": results,
+                "errors": sum(int(item["errors"]) for item in results),
             }
 
         payload = {
             "comparison": {label: report(results) for label, results in variants.items()},
-            "item_resolution_outputs_equivalent": before_contract == after_contract,
+            "travel_preview_outputs_equivalent": outputs_equivalent,
             "errors": sum(
                 int(item["errors"])
                 for results in variants.values()
@@ -3249,6 +3588,11 @@ def main() -> int:
         help="compare separate vs shared season history reads on one fixture",
     )
     compare.add_argument(
+        "--compare-arena-snapshot-list",
+        action="store_true",
+        help="compare global vs mode-scoped arena snapshot expiry on one fixture",
+    )
+    compare.add_argument(
         "--compare-arena-season-cache",
         action="store_true",
         help="compare repeated season history work with the per-connection cache",
@@ -3304,6 +3648,11 @@ def main() -> int:
         help="compare repeated vs shared route state on one idle-preview fixture",
     )
     compare.add_argument(
+        "--compare-travel-preview-projection",
+        action="store_true",
+        help="compare repeated vs shared player projection on one travel-preview fixture",
+    )
+    compare.add_argument(
         "--compare-connection-probe",
         action="store_true",
         help="compare the removed connection health probe without reseeding the fixture",
@@ -3326,6 +3675,7 @@ def main() -> int:
             "挂机预览",
             "主线状态",
             "移动预览 玄天近郊",
+            "竞技场列表",
             "竞技场赛季",
             "寄售物资 虚空晶体 1 100",
             "使用 灵米饭 精力",
@@ -3445,6 +3795,17 @@ def main() -> int:
                 commands=commands,
             )
         )
+    elif args.compare_travel_preview_projection:
+        payload = asyncio.run(
+            _run_travel_preview_projection_comparison(
+                args.users,
+                args.batch_size,
+                args.requests,
+                levels,
+                profile_sql=profile_sql,
+                commands=commands,
+            )
+        )
     elif args.compare_arena_season_index:
         payload = asyncio.run(
             _run_arena_season_index_comparison(
@@ -3459,6 +3820,17 @@ def main() -> int:
     elif args.compare_arena_season_events:
         payload = asyncio.run(
             _run_arena_season_event_comparison(
+                args.users,
+                args.batch_size,
+                args.requests,
+                levels,
+                profile_sql=profile_sql,
+                commands=commands,
+            )
+        )
+    elif args.compare_arena_snapshot_list:
+        payload = asyncio.run(
+            _run_arena_snapshot_list_comparison(
                 args.users,
                 args.batch_size,
                 args.requests,

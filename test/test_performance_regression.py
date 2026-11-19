@@ -537,6 +537,44 @@ def test_arena_season_index_comparison_uses_one_clean_fixture() -> None:
     )
 
 
+def test_arena_snapshot_list_comparison_scopes_expiry_by_mode() -> None:
+    import asyncio
+
+    from scripts.performance_benchmark import _run_arena_snapshot_list_comparison
+
+    report = asyncio.run(
+        _run_arena_snapshot_list_comparison(
+            users=8,
+            batch_size=8,
+            total_requests=8,
+            levels=(1,),
+            profile_sql=True,
+            commands=("竞技场列表",),
+        )
+    )
+    before = report["comparison"]["before_global_expiry_update"]
+    after = report["comparison"]["after_mode_scoped_expiry_update"]
+    assert report["errors"] == 0
+    assert report["arena_list_outputs_equivalent"] is True
+    assert report["arena_list_snapshot_counts"] == [2, 2]
+    assert before["seed"] == after["seed"]
+    assert before["arena_snapshot_count"] == after["arena_snapshot_count"] == 8
+    assert before["database_bytes_after_benchmark"] == after["database_bytes_after_benchmark"]
+    assert before["temporary_database_cleaned"] is after["temporary_database_cleaned"] is True
+    old_plan = " ".join(before["explain_query_plan"]["before_global_expiry"]).upper()
+    new_plan = " ".join(after["explain_query_plan"]["after_mode_scoped_expiry"]).upper()
+    assert "SEARCH ARENA_SNAPSHOTS" in old_plan and "(STATUS=?)" in old_plan
+    assert "ARENA_MODE_KEY=?" not in old_plan
+    assert "IDX_ARENA_SNAPSHOTS_STATUS_MODE_EXPIRY" in new_plan
+    assert "(STATUS=? AND ARENA_MODE_KEY=? AND EXPIRES_AT<?)" in new_plan
+    for old, new in zip(before["levels"], after["levels"], strict=True):
+        assert old["errors"] == new["errors"] == 0
+        assert old["command_errors"]["竞技场列表"] == new["command_errors"]["竞技场列表"] == 0
+        assert old["sql_queries"] == new["sql_queries"] > 0
+        assert old["stage_latency_ms"]["arena_snapshot_list"]["count"] == old["requests"]
+        assert new["stage_latency_ms"]["arena_snapshot_list"]["count"] == new["requests"]
+
+
 def test_idle_preview_comparison_reuses_one_fixture_and_shared_route_state() -> None:
     import asyncio
 
@@ -577,6 +615,38 @@ def test_idle_preview_comparison_reuses_one_fixture_and_shared_route_state() -> 
         assert new["executor_queue_wait_ms"]["count"] >= new["requests"]
         assert old["executor_worker_count"] > 0
         assert new["executor_worker_count"] > 0
+
+
+def test_travel_preview_comparison_reuses_one_player_projection() -> None:
+    import asyncio
+
+    from scripts.performance_benchmark import _run_travel_preview_projection_comparison
+
+    report = asyncio.run(
+        _run_travel_preview_projection_comparison(
+            users=8,
+            batch_size=8,
+            total_requests=8,
+            levels=(1,),
+            profile_sql=True,
+            commands=("移动预览 玄天近郊",),
+        )
+    )
+    before = report["comparison"]["before_repeated_travel_gate_projection"]
+    after = report["comparison"]["after_shared_travel_gate_projection"]
+    assert report["errors"] == 0
+    assert report["travel_preview_outputs_equivalent"] is True
+    assert before["seed"] == after["seed"]
+    assert before["database_bytes_after_benchmark"] == after["database_bytes_after_benchmark"]
+    assert before["temporary_database_cleaned"] is after["temporary_database_cleaned"] is True
+    assert before["sql_profile_enabled"] is after["sql_profile_enabled"] is True
+    assert len(before["levels"]) == len(after["levels"]) == 2
+    for old, new in zip(before["levels"], after["levels"], strict=True):
+        assert old["errors"] == new["errors"] == 0
+        assert old["command_errors"]["移动预览 玄天近郊"] == new["command_errors"]["移动预览 玄天近郊"] == 0
+        assert old["sql_queries"] == new["sql_queries"] > 0
+        assert old["stage_latency_ms"]["travel_preview"]["count"] == old["requests"]
+        assert new["stage_latency_ms"]["travel_preview"]["count"] == new["requests"]
 
 
 def test_thread_local_connection_reuse_skips_health_probe(tmp_path) -> None:
