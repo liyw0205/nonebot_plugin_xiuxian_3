@@ -151,6 +151,50 @@ def test_void_archive_rejects_forged_route_and_operation_conflicts() -> None:
     asyncio.run(run())
 
 
+@pytest.mark.parametrize("adapter", ["qq.official", "onebot.v11"])
+@pytest.mark.parametrize("battle_type", ["pve.archive_keeper", "pve.exploration"])
+def test_void_archive_upgrade_resumes_only_legacy_archive_guards(adapter: str, battle_type: str) -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            user = "archive-upgrade"
+            runtime = create_runtime(data_dir=data_dir)
+            await _prepare(runtime, adapter, user)
+            route_operation = next(
+                f"legacy-route-{candidate}" for candidate in range(1000)
+                if void_route_roll_bp(f"legacy-route-{candidate}") >= 1500
+            )
+            await _settle_route(runtime, adapter, user, "档案遗迹", route_operation)
+            started = await runtime.repository.start_quest_battle(
+                platform=adapter, platform_user_id=user,
+                enemy_key="enemy.archive_keeper", battle_type=battle_type,
+                operation_id="legacy-archive:battle",
+            )
+            await runtime.close()
+
+            recovered = create_runtime(data_dir=data_dir)
+            try:
+                settled = await _dispatch(
+                    recovered, _ctx(adapter, user, "legacy-archive"), "探索档案遗迹"
+                )
+                if battle_type == "pve.archive_keeper":
+                    assert settled.code == "ARCHIVE_RUN_SETTLED", settled
+                    assert settled.data["battle_id"] == started.battle_id
+                    assert settled.data["outcome"] == "won"
+                    assert settled.data["reward"] == {"item.void_archive": 1}
+                    replay = await _dispatch(
+                        recovered, _ctx(adapter, user, "legacy-archive"), "探索档案遗迹"
+                    )
+                    assert replay.data["idempotent_replay"] is True
+                else:
+                    assert settled.code == "ARCHIVE_ROUTE_REQUIRED", settled
+                    with sqlite3.connect(recovered.settings.database_path) as db:
+                        assert db.execute("SELECT COUNT(*) FROM void_archive_runs").fetchone()[0] == 0
+            finally:
+                await recovered.close()
+
+    asyncio.run(run())
+
+
 def test_void_archive_freezes_claimed_task_and_run_across_content_reload() -> None:
     async def run() -> None:
         with TemporaryDirectory() as root:

@@ -327,7 +327,7 @@ class QuestApplication:
             started = await self.repository.start_quest_battle(
                 platform=context.adapter,
                 platform_user_id=context.user_id,
-                enemy_key="enemy.cross_realm_sentinel",
+                enemy_key="enemy.cross_realm_trial_sentinel",
                 battle_type="pve.dao_union_challenge",
                 operation_id=operation_id,
             )
@@ -516,7 +516,7 @@ class QuestApplication:
             started = await self.repository.start_quest_battle(
                 platform=context.adapter,
                 platform_user_id=context.user_id,
-                enemy_key="enemy.cross_realm_sentinel",
+                enemy_key="enemy.cross_realm_trial_sentinel",
                 battle_type="pve.cross_realm",
                 operation_id=operation_id,
             )

@@ -64,7 +64,7 @@ class VoidArchiveRepositoryMixin:
             if existing is not None and str(existing["operation_name"]).startswith("battle.start.pve."):
                 return self._battle_start_from_payload(json.loads(existing["result_json"]), replay=True)
         definition = void_archive_definition(self.content)
-        battle_type = f"pve.{definition.enemy_key.removeprefix('enemy.')}"
+        battle_type = "pve.archive_keeper"
         with self._connect() as connection:
             player = self._require_player(connection, platform, platform_user_id)
             route = connection.execute(
@@ -214,7 +214,14 @@ class VoidArchiveRepositoryMixin:
                 "SELECT * FROM battle_sessions WHERE battle_id = ? AND player_id = ?",
                 (battle_id, player["id"]),
             ).fetchone()
-            if battle is None or str(battle["enemy_key"]) != definition.enemy_key:
+            # Keep server-created archive battles from before the dedicated
+            # permit enemy was introduced redeemable after an upgrade.
+            legacy_guard = (
+                battle is not None
+                and str(battle["battle_type"]) == "pve.archive_keeper"
+                and str(battle["enemy_key"]) == "enemy.archive_keeper"
+            )
+            if battle is None or (str(battle["enemy_key"]) != definition.enemy_key and not legacy_guard):
                 raise VoidArchiveRouteEvidenceError("archive keeper battle evidence is invalid")
             result = self._json_object(battle["result_json"], {})
             actual_outcome = result.get("outcome")

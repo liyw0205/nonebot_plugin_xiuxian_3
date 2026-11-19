@@ -333,6 +333,39 @@ def test_migration_manifest_targets_match_current_official_seeds() -> None:
         assert all(re.fullmatch(r"[0-9a-f]{40}:data/.+\.json", provenance) for provenance in rule["old_sha256"].values())
 
 
+def test_permit_enemy_seeds_upgrade_together_with_backup_and_repeat(host: Path) -> None:
+    seeds = {
+        Path("战斗/敌人.json"): (
+            "permit_enemies_pre_split.json",
+            "48159453465992421960a0890869c21719def9386dda50693cb3fed58f784b81",
+            "38244a9ddf34972ce43e3e8f89107e846cff4456:data/战斗/敌人.json",
+        ),
+        Path("事件/事件.json"): (
+            "archive_events_pre_split.json",
+            "fad61951779774598b571715240d666c44abe8e47eda8953d9042ccc2ffe4d5b",
+            "0de04d3378131bbb8a7a9d161bf5ad71ab820a18:data/事件/事件.json",
+        ),
+    }
+    rules = json.loads((ROOT / "scripts/seed_migrations.json").read_text(encoding="utf-8"))
+    originals = {}
+    for relative, (fixture, digest, provenance) in seeds.items():
+        old = (SEED_FIXTURES / fixture).read_bytes()
+        assert hashlib.sha256(old).hexdigest() == digest
+        assert rules[relative.as_posix()]["old_sha256"][digest] == provenance
+        originals[relative] = old
+        (host / "data" / relative).write_bytes(old)
+    result = deploy(host)
+    assert result.returncode == 0, result.stdout + result.stderr
+    backup = next((host / ".xiuxian3/backups").glob("deploy-*"))
+    for relative, old in originals.items():
+        assert (backup / "data" / relative).read_bytes() == old
+        assert (host / "data" / relative).read_bytes() == (ROOT / "data" / relative).read_bytes()
+    repeated = deploy(host)
+    assert repeated.returncode == 0, repeated.stdout + repeated.stderr
+    assert "种子更新 0 个" in repeated.stdout
+    preserved(host)
+
+
 @pytest.mark.parametrize("custom", [False, True])
 def test_cultivation_seed_upgrade_preserves_custom_and_repeats(host: Path, custom: bool) -> None:
     relative = Path("生活/生活.json")
@@ -374,7 +407,7 @@ def test_construction_seed_upgrade_from_v0136_backup_repeat_and_custom(host: Pat
     result = deploy(host)
     if custom:
         assert result.returncode != 0
-        assert "mist_lamp.2 objective watch references unknown idle route" in result.stdout + result.stderr
+        assert "relic production/delivery consumer is unavailable" in result.stdout + result.stderr
         assert "已回退" in result.stderr
         assert path.read_bytes() == original
         assert source.read_bytes() == previous_source
@@ -719,50 +752,15 @@ TRADE_FILE = Path("经济/跨界贸易.json")
 
 
 def old_official_manifest() -> bytes:
-    # The manifest before the cross-realm trade file was registered: remove
-    # only that entry from the current manifest.
-    document = json.loads((ROOT / "data" / MANIFEST_FILE).read_text(encoding="utf-8"))
-    document["files"] = [
-        entry
-        for entry in document["files"]
-        if entry
-        not in {
-            "经济/跨界贸易.json",
-            "经济/虚空集市.json",
-            "经济/贸易许可.json",
-            "生产/设施.json",
-            "生产/终局配方.json",
-            "任务/跨界任务.json",
-            "探索/地貌.json",
-            "探索/资源脉.json",
-            "特殊/竞技场.json",
-            "特殊/终局天榜.json",
-            "功业/功业.json",
-            "道历/道号.json",
-            "道历/道契.json",
-            "道历/七日目标.json",
-            "战斗/渡劫.json",
-            "社交/道统据点.json",
-            "社交/道统路线.json",
-            "事件/飞升日.json",
-            "社交/道侣协作.json",
-            "经济/虚空物资寄售.json",
-            "灵兽/互动.json",
-            "道具/转修令.json",
-            "道途/切换.json",
-            "道具/重构令.json",
-            "道途/重构.json",
-            "道途/辅修切换.json",
-            "养成/道脉重置.json",
-        }
-    ]
-    blob = (json.dumps(document, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+    # Exact eaed7115257db5a67933e8bdf833c003319d940d:data/内容清单.json;
+    # current manifest additions must never change this historical baseline.
+    blob = (ROOT / "test/fixtures/official_seeds/manifest_pre_trade.json").read_bytes()
+    digest = hashlib.sha256(blob).hexdigest()
+    assert digest == "8121ad7fa52be7f9129bb39f9408494dc8b9c4f051c03387e763831e12cb0c1d"
     rule = json.loads((ROOT / "scripts/seed_migrations.json").read_text(encoding="utf-8"))[
         MANIFEST_FILE.as_posix()
     ]
-    assert hashlib.sha256(blob).hexdigest() in rule["old_sha256"], (
-        "the reversed manifest must equal the registered old official manifest seed"
-    )
+    assert rule["old_sha256"][digest] == "eaed7115257db5a67933e8bdf833c003319d940d:data/内容清单.json"
     return blob
 
 
@@ -1192,7 +1190,11 @@ def test_unknown_bounty_source_seeds_are_preserved(host: Path) -> None:
 
 def test_unknown_livelihood_missing_story_source_fails_and_rolls_back(host: Path) -> None:
     path = host / "data/生活/生活.json"
-    custom = (SEED_FIXTURES / "livelihood_pre_reachability.json").read_bytes() + b"\n"
+    document = json.loads(path.read_text(encoding="utf-8"))
+    document["records"] = [
+        row for row in document["records"] if row["key"] != "idle.beast_habitat_patrol"
+    ]
+    custom = (json.dumps(document, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
     path.write_bytes(custom)
     previous_source = (host / "src/plugins/nonebot_plugin_xiuxian_3/__init__.py").read_bytes()
     previous_toml = (host / "pyproject.toml").read_bytes()
