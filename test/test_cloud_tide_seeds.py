@@ -23,6 +23,9 @@ def before_cloud_tide_release(relative: str, text: str) -> str:
         return "".join(line for line in text.splitlines(keepends=True) if '"codex.story.cloud_tide_handover"' not in line)
     if relative != "剧情/主线.json":
         return text
+    from test_seed_migration import pre_union_mainline_seed
+
+    text = pre_union_mainline_seed().decode("utf-8")
     stages = {row["key"]: row for row in json.loads(text)["records"]}
     trial = stages["cloud_tide.1"]["objectives"][-1]
     trial_json = json.dumps(trial, ensure_ascii=False)

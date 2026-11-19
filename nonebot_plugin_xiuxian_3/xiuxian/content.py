@@ -74,6 +74,14 @@ class ContentBundle:
             from .exploration.deposit_rules import deposit_definitions
 
             deposit_definitions(bundle)
+        if ("advancement_rule", "recovery.bloodline") in records:
+            from .progression.recovery_rules import bloodline_recovery_rule
+
+            bloodline_recovery_rule(bundle)
+        if ("advancement_rule", "recovery.endgame_stamina") in records:
+            from .progression.recovery_rules import endgame_stamina_rule
+
+            endgame_stamina_rule(bundle)
         return bundle
 
     @classmethod

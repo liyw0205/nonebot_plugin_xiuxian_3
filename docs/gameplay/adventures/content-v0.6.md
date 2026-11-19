@@ -16,6 +16,8 @@
 
 `story.mainline.dao_echoes` 的 `stage_key` 固定为 `lane.<builder|witness|traveler>.chapter.<01..10>`，内容版本为 `content-0.6`、规则版本为 `adventures-0.6.0`。`quest.dao_union` 的主线组件必须核验三个 lane 各自 10 个不同 stage 均为 `claimed`；其他 story（包括 `story.mainline.xuantian`）不能代替。旧主线记录保留作历史，不计入该资格。
 
+全部 30 关的境界前置均为炼虚 L10。建设者终关在虚空档案遗迹完成存约后，回航至虚空第一航道交还共修约本；不要求合道后的道源门行程，避免合道资格循环依赖。道源门仍独立要求合道 L6 与道果前置。
+
 玩家路径、逐关剧情摘要、图鉴旗标、顺序和幂等规则以[完整内容开发总表](../../content-development.md#542-三界回响主线)为准。运行命令：`道源主线`、`开始道源主线 <lane> <stage>`、`领取道源主线奖励 <lane> <stage>`。每关开始与领取分开记录；重复领取回放原 operation，重新挑战不再发图鉴旗标或资产。
 
 #### 5.4.3 `instance.secret_realm.dao_origin`

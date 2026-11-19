@@ -42,6 +42,10 @@ def test_dao_echoes_contract_has_three_sequential_ten_stage_lanes() -> None:
     assert tuple(dict.fromkeys(stage.lane for stage in stages)) == DAO_ECHOES_LANES
     for lane in DAO_ECHOES_LANES:
         lane_stages = [stage for stage in stages if stage.lane == lane]
+        assert all(
+            (stage.required_realm, stage.required_layer) == ("void_refining", 10)
+            for stage in lane_stages
+        )
         assert [stage.stage for stage in lane_stages] == list(range(1, 11))
         assert lane_stages[0].prerequisites == ()
         assert all(
@@ -232,4 +236,17 @@ def test_dao_echoes_rejects_incomplete_lane_contract(tmp_path: Path) -> None:
     mainline_path.write_text(json.dumps(document, ensure_ascii=False, indent=2), encoding="utf-8")
 
     with pytest.raises(ContentError, match="exactly 30"):
+        dao_echoes_definitions(ContentBundle.load(data_dir))
+
+
+def test_dao_echoes_rejects_post_permit_realm_prerequisite(tmp_path: Path) -> None:
+    data_dir = tmp_path / "cyclic-content"
+    shutil.copytree(Path(__file__).parents[1] / "data", data_dir)
+    mainline_path = data_dir / "剧情" / "主线.json"
+    document = json.loads(mainline_path.read_text(encoding="utf-8"))
+    stage = next(row for row in document["records"] if row["key"] == "lane.builder.chapter.10")
+    stage.update(required_realm="dao_union", required_layer=6)
+    mainline_path.write_text(json.dumps(document, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    with pytest.raises(ContentError, match="invalid qualification"):
         dao_echoes_definitions(ContentBundle.load(data_dir))

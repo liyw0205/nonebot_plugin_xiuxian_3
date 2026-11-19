@@ -1,4 +1,11 @@
 {
+  "养成/规则.json": {
+    "old_sha256": {
+      "ea3eade0d1a01810fd9f32998adcd2f15fb236ab832d062b022b6b0a37418cae": "5388b03390ccb1fc02677a895195b22a65b94060:data/养成/规则.json"
+    },
+    "new_sha256": "c685ddd695a3557d74834c73016c9c8b6ceed9e6762a7aee76b14f30d5613b4f",
+    "new_commit": "5388b03390ccb1fc02677a895195b22a65b94060"
+  },
   "引导/引导.json": {
     "old_sha256": {
       "ee7e3980a5ece605107cd35a59cb14d533b4cabcee305798b0440a313e12d459": "9de693077677699def1ccb53150356b9ca4fee9c:data/引导/引导.json",
@@ -129,9 +136,10 @@
       "8966738fc1e71bc6304cf5cabccd4b219263c061ac14eeb07a266d15a54cd12b": "5d8261d09ae3cd3ed33036d16c7b5dc19d3801a7:data/剧情/主线.json",
       "51a3a2c6969d4cfceee5c1ac8dbb733a05059c00a655f5a2ae0b00cd6f2cec39": "8f55e2a4872df3521d0542ae43ebad5acb073487:data/剧情/主线.json",
       "df303282c65581f376ed4a035f140fa96e158f893b1e51ccd6df71177baedacd": "3d83636536ec6223af405511c70bc21de04ae7c6:data/剧情/主线.json",
-      "75c2ddfc88e7a6d6829104f7b840d944b4bfd522704da23c4ed0140c9c0d7e5d": "c53fc1842cd5d2dd111d61bd08fee8fc3968c327:data/剧情/主线.json"
+      "75c2ddfc88e7a6d6829104f7b840d944b4bfd522704da23c4ed0140c9c0d7e5d": "c53fc1842cd5d2dd111d61bd08fee8fc3968c327:data/剧情/主线.json",
+      "993ff09ded623a5294f56cc7af09fb438bb5362a85a422ddb80b0fdacc5780f2": "e0ecd1db372097459365243fb14ea82ec3cb9d6a:data/剧情/主线.json"
     },
-    "new_sha256": "993ff09ded623a5294f56cc7af09fb438bb5362a85a422ddb80b0fdacc5780f2",
+    "new_sha256": "b9dc5476fb4455c7561f19a5f52e639e6865e5c50671fec4ba2f8de3d692872c",
     "new_commit": "e0ecd1db372097459365243fb14ea82ec3cb9d6a"
   },
   "内容清单.json": {

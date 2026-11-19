@@ -517,11 +517,12 @@ class ProgressionApplication:
         player = record.player
         message = (
             "## 状态恢复完成\n\n"
-            f"**{self._display_name(player)}**的体力、精力与虚力已按恢复规则处理。\n\n"
+            f"**{self._display_name(player)}**的体力、精力、虚力与血脉稳定已按恢复规则处理。\n\n"
             f"- **体力**：{player.stamina}/{player.stamina_max}\n"
             f"- **精力**：{player.energy}/{player.energy_max}\n"
             f"- **虚力**：{player.void_power}/{player.void_power_max}\n"
             f"- **恢复周期**：{record.periods} 个\n"
+            f"- **血脉稳定**：{player.bloodline_stability}（本次恢复 {record.recovered_bloodline_stability}）\n"
         )
         if not record.changed:
             message += "\n> 当前资源已满，或距离下一次恢复还不足 30 分钟。"
@@ -536,6 +537,7 @@ class ProgressionApplication:
                 "recovered_stamina": record.recovered_stamina,
                 "recovered_energy": record.recovered_energy,
                 "recovered_void_power": record.recovered_void_power,
+                "recovered_bloodline_stability": record.recovered_bloodline_stability,
                 "periods": record.periods,
                 "idempotent_replay": record.already_completed,
             },

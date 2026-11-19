@@ -105,6 +105,7 @@ class ResourceRecoveryRecord:
     changed: bool
     already_completed: bool = False
     recovered_void_power: int = 0
+    recovered_bloodline_stability: int = 0
 
 
 __all__ = [

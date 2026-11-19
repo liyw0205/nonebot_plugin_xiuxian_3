@@ -1939,22 +1939,22 @@
       "lane_name": "建设者",
       "name": "道统新章",
       "desc": "三界共同确认工程可以延续，也可以由后人修改。",
-      "body": "代价登记完毕，最后一步是把这一章交给道源门。建设者终关要以合道修为携道果碎片从档案遗迹启程，前往道源门：三界共同确认工程可以延续，也可以由后人修改。道源门只认合道六层与到手的道果，修为不到，门不会开。",
+      "body": "代价登记完毕，最后一步是把这一章交还三界。建设者终关要从档案遗迹回到虚空第一航道，把共修约本交给往来的三界行者：工程可以延续，也可以由后人修改。这份交接是炼虚十层的合道前见证；日后前往道源门仍须另行满足合道修为与道果要求。",
       "objectives": [
-        {"key": "open_the_new_chapter", "type": "travel_arrival", "label": "结算行程抵达道源门", "destination_key": "dao.origin_gate"}
+        {"key": "open_the_new_chapter", "type": "travel_arrival", "label": "结算行程抵达虚空第一航道", "destination_key": "void.first_route"}
       ],
       "actions": [
-        {"command": "前往", "argument": "道源门", "description": "从虚空档案遗迹启程前往道源门，等待行程结束并结算移动。"}
+        {"command": "前往", "argument": "虚空第一航道", "description": "从虚空档案遗迹回航至虚空第一航道，等待行程结束并结算移动。"}
       ],
       "state_changes": {"activity_events": ["story.mainline.dao_echoes:lane.builder.chapter.10"]},
       "retry": {
         "on_incomplete": "keep_running",
         "cooldown_seconds": 0,
-        "message": "尚未抵达道源门时关卡保持进行中，不扣主线奖励；备齐道果碎片并恢复体力后重新启程，即可开启道统新章。"
+        "message": "尚未抵达虚空第一航道时关卡保持进行中，不扣主线奖励；恢复体力与虚力后从档案遗迹回航，即可交还共修约本。"
       },
       "status": "open",
-      "required_realm": "dao_union",
-      "required_layer": 6,
+      "required_realm": "void_refining",
+      "required_layer": 10,
       "prerequisites": ["lane.builder.chapter.09"],
       "first_clear_reward": {"codex.story.dao_echoes.builder.chapter.10": 1},
       "repeat_reward": {}

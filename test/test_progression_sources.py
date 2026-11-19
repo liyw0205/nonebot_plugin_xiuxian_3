@@ -3,19 +3,30 @@ from __future__ import annotations
 import asyncio
 import json
 import sqlite3
+from collections import defaultdict, deque
 from datetime import datetime, timedelta, timezone
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 from combat_fixtures import BALANCED_QUALIFICATION, equip_damage_weapon
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
+from nonebot_plugin_xiuxian_3.xiuxian.adventures.dao_echoes import dao_echoes_definitions
+from nonebot_plugin_xiuxian_3.xiuxian.adventures.rules import _reward_outcomes
+from nonebot_plugin_xiuxian_3.xiuxian.content import bundled_content
 from nonebot_plugin_xiuxian_3.xiuxian.exploration.rules import (
     battle_roll_bp,
     cloud_boat_storm_roll_bp,
+    exploration_encounter_selection,
     settlement_result,
 )
 from nonebot_plugin_xiuxian_3.xiuxian.events.rules import final_heaven_season_window
+from nonebot_plugin_xiuxian_3.xiuxian.events.public_event_rules import (
+    public_event_definition,
+    public_event_is_open,
+)
 from nonebot_plugin_xiuxian_3.xiuxian.economy.rules import resolve_market_item
 from nonebot_plugin_xiuxian_3.xiuxian.progression.breakthrough.rules import breakthrough_roll_bp
 from nonebot_plugin_xiuxian_3.xiuxian.progression.endgame_rules import trial_roll_bp
@@ -24,6 +35,8 @@ from nonebot_plugin_xiuxian_3.xiuxian.production.endgame_rules import recipe_rol
 from nonebot_plugin_xiuxian_3.xiuxian.production.rules import random_quality_bp
 from nonebot_plugin_xiuxian_3.xiuxian.quests.rules import DAO_ORIGIN_TASKS
 from nonebot_plugin_xiuxian_3.xiuxian.social.sect_rules import SECT_DEFINITION
+from nonebot_plugin_xiuxian_3.xiuxian.specials.idle_rules import resolve_route, reward_for as idle_reward
+from nonebot_plugin_xiuxian_3.xiuxian.utils.randomness import deterministic_weighted_choice
 from nonebot_plugin_xiuxian_3.xiuxian.world.void_rules import void_route_roll_bp
 
 
@@ -91,6 +104,7 @@ def test_qq_and_onebot_can_produce_focus_pill_from_player_path() -> None:
                 advanced = await _dispatch(runtime, adapter, user, 30, "晋升境界")
                 assert advanced.data["realm_layer"] == 2
 
+                await _dispatch(runtime, adapter, user, 29, "返回新手城")
                 await _dispatch(runtime, adapter, user, 31, "前往 灵泉谷")
                 clock.advance(seconds=90)
                 await _dispatch(runtime, adapter, user, 32, "结算移动")
@@ -206,9 +220,12 @@ def test_shared_commands_can_reach_tribulation_l10_from_new_player() -> None:
                 advanced = await _dispatch(runtime, adapter, user, 30, "晋升境界")
                 assert advanced.data["realm_layer"] == 2
 
+                await _dispatch(runtime, adapter, user, 29, "返回新手城")
                 await _dispatch(runtime, adapter, user, 31, "前往 灵泉谷")
                 clock.advance(seconds=90)
                 await _dispatch(runtime, adapter, user, 32, "结算移动")
+                clock.advance(hours=1)
+                await _dispatch(runtime, adapter, user, 39, "恢复状态")
 
                 spring_operations: list[str] = []
                 for index in range(3):
@@ -308,7 +325,9 @@ def test_shared_commands_can_reach_tribulation_l10_from_new_player() -> None:
                 # Recover stamina through the public command before the next route.
                 clock.advance(hours=13)
                 recovered = await _dispatch(runtime, adapter, user, 63, "恢复状态")
-                assert recovered.code == "RESOURCES_RECOVERED"
+                assert recovered.code in {"RESOURCES_RECOVERED", "RESOURCES_ALREADY_FULL"}
+                assert recovered.data["stamina"] == recovered.data["stamina_max"]
+                assert recovered.data["energy"] == recovered.data["energy_max"]
 
                 await _dispatch(runtime, adapter, user, 64, "前往 青石镇")
                 clock.advance(seconds=30)
@@ -341,9 +360,10 @@ def test_shared_commands_can_reach_tribulation_l10_from_new_player() -> None:
                 iron_result = await _dispatch(runtime, adapter, user, 69, "结算探索")
                 assert iron_result.data["result"]["item.ore.ironstone"] >= 2
 
-                await _dispatch(runtime, adapter, user, 70, "前往 灵泉谷")
+                await _dispatch(runtime, adapter, user, 70, "返回新手城")
+                await _dispatch(runtime, adapter, user, 71, "前往 灵泉谷")
                 clock.advance(seconds=90)
-                await _dispatch(runtime, adapter, user, 71, "结算移动")
+                await _dispatch(runtime, adapter, user, 72, "结算移动")
 
                 for index in range(2):
                     operation = next(
@@ -519,6 +539,7 @@ def test_shared_commands_can_reach_tribulation_l10_from_new_player() -> None:
 
                 clock.advance(days=1)
                 await _dispatch(runtime, adapter, user, 1399, "恢复状态")
+                await _dispatch(runtime, adapter, user, 1397, "返回新手城")
                 await _dispatch(runtime, adapter, user, 1400, "前往 灵泉谷")
                 clock.advance(seconds=90)
                 await _dispatch(runtime, adapter, user, 1401, "结算移动")
@@ -542,26 +563,37 @@ def test_shared_commands_can_reach_tribulation_l10_from_new_player() -> None:
                 await _dispatch(runtime, adapter, user, 1431, "结算移动")
                 clock.advance(days=1)
                 await _dispatch(runtime, adapter, user, 1435, "恢复状态")
-                await _dispatch(runtime, adapter, user, 1432, "前往 云铁矿区")
-                clock.advance(seconds=120)
-                await _dispatch(runtime, adapter, user, 1433, "结算移动")
-                await _dispatch(runtime, adapter, user, 1434, "接取悬赏 云铁矿区悬赏")
-                for index in range(2):
-                    operation = next(
-                        f"{adapter}-core-mine-{index}-{candidate}"
-                        for candidate in range(1000)
-                        if battle_roll_bp(f"{adapter}-core-mine-{index}-{candidate}:battle") >= 3000
-                        and settlement_result(
-                            "explore.cloud_mine", f"{adapter}-core-mine-{index}-{candidate}"
-                        )["item.material.cloud_iron"] >= 3
-                    )
-                    await _dispatch(runtime, adapter, user, 1440 + index, "开始探索 云铁采集", operation_id=operation)
-                    clock.advance(seconds=120)
-                    await _dispatch(runtime, adapter, user, 1450 + index, "结算探索")
+                # Cloud city requires golden core. Prepare the public six-hour
+                # watch before accepting the two-hour bounty at foundation L10.
+                route = resolve_route("idle.cloud_mine_watch")
+                watch_seed = next(
+                    UUID(int=index) for index in range(100)
+                    if idle_reward(route, UUID(int=index).hex, fallback=False)["item.material.cloud_iron"] == 3
+                )
+                with patch(
+                    "nonebot_plugin_xiuxian_3.xiuxian.specials.idle_repository.uuid4",
+                    return_value=watch_seed,
+                ):
+                    await _dispatch(runtime, adapter, user, 1432, "开始挂机 矿区看守")
+                clock.advance(hours=5)
+                await _dispatch(runtime, adapter, user, 1438, "接取悬赏 云铁矿区悬赏")
+                clock.advance(hours=1)
+                watched = await _dispatch(runtime, adapter, user, 1440, "领取挂机")
+                assert watched.data["reward"]["item.material.cloud_iron"] == 3
+                assert watched.data["fallback"] is False
                 await _dispatch(runtime, adapter, user, 1460, "领取悬赏")
-                await _dispatch(runtime, adapter, user, 1461, "前往 青石镇")
-                clock.advance(seconds=30)
-                await _dispatch(runtime, adapter, user, 1462, "结算移动")
+                # The pill uses two iron and the breakthrough itself needs three.
+                clock.advance(days=1)
+                await _dispatch(runtime, adapter, user, 1461, "恢复状态")
+                with patch(
+                    "nonebot_plugin_xiuxian_3.xiuxian.specials.idle_repository.uuid4",
+                    side_effect=(UUID(int=100), watch_seed),
+                ):
+                    await _dispatch(runtime, adapter, user, 1462, "开始挂机 矿区看守")
+                clock.advance(hours=6)
+                reserve = await _dispatch(runtime, adapter, user, 1467, "领取挂机")
+                assert reserve.data["reward"]["item.material.cloud_iron"] == 3
+                assert reserve.data["fallback"] is False
                 production_operation = next(
                     f"{adapter}-core-pill-{candidate}"
                     for candidate in range(1000)
@@ -692,7 +724,17 @@ def test_shared_commands_can_reach_tribulation_l10_from_new_player() -> None:
                     elif index == 2:
                         clock.advance(hours=2)
                         await _dispatch(runtime, adapter, user, 2505, "恢复状态")
-                    started = await _dispatch(runtime, adapter, user, 2510 + index, "开始探索 深渊门备材")
+                    threshold_operation = next(
+                        f"{adapter}-demon-threshold-{index}-{candidate}"
+                        for candidate in range(1000)
+                        if settlement_result(
+                            "explore.demon_threshold", f"{adapter}-demon-threshold-{index}-{candidate}"
+                        ) == {"item.soul_crystal": 1, "item.demon_core": 1}
+                    )
+                    started = await _dispatch(
+                        runtime, adapter, user, 2510 + index, "开始探索 深渊门备材",
+                        operation_id=threshold_operation,
+                    )
                     assert started.code == "EXPLORATION_STARTED"
                     clock.advance(minutes=4)
                     settled = await _dispatch(runtime, adapter, user, 2520 + index, "结算探索")
@@ -894,6 +936,36 @@ def test_shared_commands_can_reach_tribulation_l10_from_new_player() -> None:
                     (adapter, user, 2892),
                     (helper_adapter, helper, 2894),
                 ):
+                    for step, (destination, seconds) in enumerate((
+                        ("云舟渡口", 60), ("云城", 180), ("青石镇", 0), ("魔界战线", 300),
+                    )):
+                        if destination == "魔界战线" and not public_event_is_open(
+                            "event.demon_invasion", clock()
+                        ):
+                            schedule = public_event_definition("event.demon_invasion").schedule
+                            starts_at = clock().replace(
+                                hour=schedule["hour_utc"], minute=schedule["minute_utc"],
+                                second=0, microsecond=0,
+                            ) + timedelta(days=(schedule["weekday_utc"] - clock().weekday()) % 7)
+                            if starts_at < clock():
+                                starts_at += timedelta(days=7)
+                            clock.current = starts_at
+                        travel_id = f"boundary-approach-{move_adapter}-{step}"
+                        await _dispatch(
+                            runtime, move_adapter, move_user, 28920 + step * 2,
+                            f"前往 {destination}", operation_id=travel_id,
+                        )
+                        clock.advance(seconds=seconds)
+                        await _dispatch(
+                            runtime, move_adapter, move_user, 28921 + step * 2, "结算移动",
+                            operation_id=f"{travel_id}-settle",
+                        )
+                    clock.advance(hours=24)
+                    recovered = await _dispatch(
+                        runtime, move_adapter, move_user, 28980, "恢复状态",
+                        operation_id=f"boundary-recover-{move_adapter}",
+                    )
+                    assert recovered.data["stamina"] >= 30
                     await _dispatch(runtime, move_adapter, move_user, offset, "前往 界隙秘境")
                     clock.advance(minutes=10)
                     await _dispatch(runtime, move_adapter, move_user, offset + 1, "结算移动")
@@ -1187,6 +1259,7 @@ def test_shared_commands_can_reach_tribulation_l10_from_new_player() -> None:
                 archive_guard = await _dispatch(runtime, adapter, user, 5122, "探索档案遗迹")
                 assert archive_guard.code == "ARCHIVE_RUN_SETTLED"
                 assert archive_guard.data["outcome"] == "won"
+                assert archive_guard.data["reward"] == {"item.void_archive": 1}
                 delivered_archive = await _dispatch(runtime, adapter, user, 5123, "交付虚空档案")
                 assert delivered_archive.code == "QUEST_ACTION_RECORDED"
                 void_permit = await _dispatch(runtime, adapter, user, 5124, "领取炼虚许可")
@@ -1204,7 +1277,7 @@ def test_shared_commands_can_reach_tribulation_l10_from_new_player() -> None:
                         (adapter, user),
                     ).fetchone()[0]
                 assert location == "void.archive_ruins"
-                assert inventory.get("item.recipe.void_refinery") == 1
+                assert inventory.get("item.void_archive", 0) == 0
                 assert inventory.get("item.void_anchor") == 2
                 assert inventory.get("item.void_crystal") == 7
 
@@ -1288,6 +1361,18 @@ def test_shared_commands_can_reach_tribulation_l10_from_new_player() -> None:
                 assert void_l10_reached, void_state
                 assert int(void_state[4]) >= 2_000, void_state
 
+                clock.advance(hours=48)
+                recovered = await _dispatch(runtime, adapter, user, 59989, "恢复状态")
+                assert recovered.data["stamina"] == recovered.data["stamina_max"]
+                for step, (destination, seconds) in enumerate((
+                    ("虚空第一航道", 1800), ("虚空门户", 300),
+                )):
+                    await _dispatch(runtime, adapter, user, 59990 + step * 2, f"前往 {destination}")
+                    clock.advance(seconds=seconds)
+                    await _dispatch(runtime, adapter, user, 59991 + step * 2, "结算移动")
+                clock.advance(hours=24)
+                recovered = await _dispatch(runtime, adapter, user, 59994, "恢复状态")
+                assert recovered.data["stamina"] >= 30
                 boundary_preview = await _dispatch(
                     runtime, adapter, user, 60001, "移动预览 界隙秘境"
                 )
@@ -1322,8 +1407,12 @@ def test_shared_commands_can_reach_tribulation_l10_from_new_player() -> None:
                     helper_inventory = json.loads(helper_row[1] or "{}")
                     for item_key, amount in work_materials.items():
                         helper_inventory[item_key] = max(
-                            int(helper_inventory.get(item_key, 0)), amount
+                            int(helper_inventory.get(item_key, 0)),
+                            amount * 2 + (26 if item_key == "item.void_crystal" else 0),
                         )
+                    helper_inventory["item.food.coarse_spirit_rice"] = max(
+                        int(helper_inventory.get("item.food.coarse_spirit_rice", 0)), 60,
+                    )
                     connection.execute(
                         "UPDATE players SET spirit_stones=1000000, inventory_json=? WHERE id=?",
                         (json.dumps(helper_inventory, ensure_ascii=False, sort_keys=True), helper_row[0]),
@@ -1525,25 +1614,255 @@ def test_shared_commands_can_reach_tribulation_l10_from_new_player() -> None:
                     )
                     assert material_purchase.code == "MARKET_ORDER_PURCHASED"
 
-                for lane_index, lane in enumerate(("建设者", "见证者", "远行者")):
-                    for stage in range(1, 11):
-                        stage_index = lane_index * 10 + stage - 1
-                        started_echo = await _dispatch(
-                            runtime,
-                            adapter,
-                            user,
-                            63000 + stage_index * 2,
-                            f"开始道源主线 {lane} {stage}",
+                # Execute the thirty real objectives without moving or promoting
+                # the main player through fixture SQL.
+                echo_content = bundled_content()
+                graph = defaultdict(list)
+                for region in echo_content.list("world_region", include_locked=False):
+                    for route in region.get("connections", []):
+                        destination = str(route["to"])
+                        if destination in {"cave.mist_grotto_2", "demon.abyss_gate"}:
+                            continue  # These arrivals require the public cloud boat.
+                        graph[str(route["from"])].append((
+                            destination,
+                            f"前往 {echo_content.label('location', destination)}",
+                            int(route["duration_seconds"]), "结算移动",
+                        ))
+                for route in echo_content.list("world_cloud_route", include_locked=False):
+                    for source in route["source_locations"]:
+                        graph[str(source)].append((
+                            str(route["destination"]), f"乘坐云舟 {route['command_name']}",
+                            int(route["duration_seconds"]), "结算云舟",
+                        ))
+
+                echo_request = 700000
+
+                async def echo_command(command, *, operation_id=""):
+                    nonlocal echo_request
+                    echo_request += 1
+                    return await _dispatch(
+                        runtime, adapter, user, echo_request, command, operation_id=operation_id,
+                    )
+
+                async def echo_recover():
+                    clock.advance(days=1)
+                    recovered = await echo_command("恢复状态")
+                    assert recovered.data["stamina"] == recovered.data["stamina_max"]
+
+                async def echo_move(destination, *, new_arrival=False):
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        source = connection.execute(
+                            "SELECT location_key FROM players WHERE platform=? AND platform_user_id=?",
+                            (adapter, user),
+                        ).fetchone()[0]
+                    queue = deque([(source, ())])
+                    visited = set()
+                    while queue:
+                        location, path = queue.popleft()
+                        if location == destination and (path or not new_arrival):
+                            break
+                        if location in visited:
+                            continue
+                        visited.add(location)
+                        for edge in graph[location]:
+                            queue.append((edge[0], (*path, edge)))
+                    else:
+                        assert source != "xuantian.new_town", ("no public route", source, destination)
+                        await echo_recover()
+                        returned = await echo_command("返回新手城")
+                        assert returned.data["destination"] == "xuantian.new_town"
+                        await echo_move(destination, new_arrival=new_arrival)
+                        return
+                    for arrival, command, seconds, settlement in path:
+                        await echo_recover()
+                        if arrival == "xuantian.war_front":
+                            schedule = public_event_definition("event.demon_invasion").schedule
+                            opens = clock().replace(
+                                hour=schedule["hour_utc"], minute=schedule["minute_utc"],
+                                second=0, microsecond=0,
+                            ) + timedelta(days=(schedule["weekday_utc"] - clock().weekday()) % 7)
+                            if opens < clock():
+                                opens += timedelta(days=7)
+                            clock.current = opens
+                        await echo_command(command)
+                        clock.advance(seconds=seconds)
+                        arrived = await echo_command(settlement)
+                        assert arrived.data["destination"] == arrival
+
+                # Obtain an actual high-realm loadout through public bounty
+                # rewards, using the same multiplayer supply as the works above.
+                outcomes = _reward_outcomes(
+                    echo_content, "reward_pool.bounty.void_anchoring", path_key="support",
+                    realm_key="void_refining", realm_layer=10,
+                    reputation_key="local.xuantian.cloud_city",
+                )
+                weighted = tuple((row["weight"], row["rewards"]) for row in outcomes)
+                for gear_index, (item_key, slot) in enumerate((
+                    ("item.weapon.support.void_refining.extra_9", "weapon"),
+                    ("item.armor.support.void_refining.extra_1", "armor"),
+                )):
+                    await echo_recover()
+                    reward_seed = next(
+                        UUID(int=candidate) for candidate in range(100000)
+                        if deterministic_weighted_choice(weighted, UUID(int=candidate).hex).get(item_key) == 1
+                    )
+                    with patch(
+                        "nonebot_plugin_xiuxian_3.xiuxian.adventures.repository.uuid4",
+                        return_value=reward_seed,
+                    ):
+                        await echo_command("接取悬赏 虚空锚定悬赏")
+                    listing = await _dispatch(
+                        runtime, helper_adapter, helper, 800000 + gear_index,
+                        "发布摆摊 item.void_crystal 3 100",
+                    )
+                    await echo_command(f"购买摆摊 {listing.data['order_id']} 3")
+                    reward = await echo_command("领取悬赏")
+                    assert reward.data["rewards"].get(item_key) == 1
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        equipped = connection.execute(
+                            "SELECT instance_id FROM equipment_instances WHERE player_id=("
+                            "SELECT id FROM players WHERE platform=? AND platform_user_id=?) "
+                            "AND slot=? AND equipped=1 AND status='active'",
+                            (adapter, user, slot),
+                        ).fetchall()
+                    for row in equipped:
+                        await echo_command(f"卸下装备 {row[0]}")
+                    worn = await echo_command(f"穿戴装备 {item_key}")
+                    assert worn.code == "EQUIPMENT_EQUIPPED"
+
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    demon_reputation = json.loads(connection.execute(
+                        "SELECT faction_reputation_json FROM players "
+                        "WHERE platform=? AND platform_user_id=?", (adapter, user),
+                    ).fetchone()[0]).get("demon", 0)
+                for reputation_run in range(20):
+                    if demon_reputation >= 200:
+                        break
+                    await echo_recover()
+                    await echo_command("接取悬赏 魔界救援")
+                    listing = await _dispatch(
+                        runtime, helper_adapter, helper, 800100 + reputation_run,
+                        "发布摆摊 item.food.coarse_spirit_rice 3 100",
+                    )
+                    await echo_command(f"购买摆摊 {listing.data['order_id']} 3")
+                    rescued = await echo_command("领取悬赏")
+                    assert rescued.data["rewards"]["faction_reputation.demon"] == 10
+                    demon_reputation += 10
+                assert demon_reputation >= 200
+
+                await echo_move("beast.ten_thousand_hills")
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    beast_reputation = json.loads(connection.execute(
+                        "SELECT faction_reputation_json FROM players "
+                        "WHERE platform=? AND platform_user_id=?", (adapter, user),
+                    ).fetchone()[0]).get("beast", 0)
+                assert beast_reputation >= 1000
+                for reputation_run in range(134):
+                    if beast_reputation >= 3000:
+                        break
+                    await echo_recover()
+                    operation = next(
+                        f"{adapter}-echo-beast-reputation-{reputation_run}-{candidate}"
+                        for candidate in range(1000)
+                        if settlement_result(
+                            "explore.beast_hunt",
+                            f"{adapter}-echo-beast-reputation-{reputation_run}-{candidate}",
+                            content=echo_content,
+                        ).get("faction_reputation.beast", 0) == 15
+                        and exploration_encounter_selection(
+                            "explore.beast_hunt",
+                            seed=f"{adapter}-echo-beast-reputation-{reputation_run}-{candidate}",
+                            realm_key="void_refining", realm_layer=10, content=echo_content,
+                        )[0] == "enemy.beast_stalker"
+                    )
+                    await echo_command("开始探索 万兽山狩猎", operation_id=operation)
+                    clock.advance(seconds=int(echo_content.require(
+                        "exploration_mode", "explore.beast_hunt"
+                    )["duration_seconds"]))
+                    hunted = await echo_command("结算探索")
+                    assert hunted.data["battle_outcome"] == "won", (reputation_run, hunted.data)
+                    assert hunted.data["result"]["faction_reputation.beast"] == 15
+                    beast_reputation += 15
+                assert beast_reputation >= 3000
+
+                await echo_recover()
+                await echo_command("返回新手城")
+                listing = await _dispatch(
+                    runtime, helper_adapter, helper, 800200,
+                    "发布摆摊 item.void_crystal 20 100",
+                )
+                await echo_command(f"购买摆摊 {listing.data['order_id']} 20")
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    worn_gear = connection.execute(
+                        "SELECT instance_id FROM equipment_instances WHERE player_id=("
+                        "SELECT id FROM players WHERE platform=? AND platform_user_id=?) "
+                        "AND equipped=1 AND slot IN ('weapon','armor') AND durability_bp<10000",
+                        (adapter, user),
+                    ).fetchall()
+                for (instance_id,) in worn_gear:
+                    preview = await echo_command(f"装备修复预览 {instance_id}")
+                    assert preview.data["shortages"] == {}
+                    repaired = await echo_command(f"修复装备 {instance_id}")
+                    assert repaired.data["durability_after"] == 10000
+                    assert repaired.data["costs_spent"] == preview.data["costs"]
+
+                for stage in dao_echoes_definitions(echo_content):
+                    started_echo = await echo_command(
+                        f"开始道源主线 {stage.lane} {stage.stage}"
+                    )
+                    assert started_echo.code == "DAO_ECHOES_STAGE_STARTED"
+                    for objective in stage.objectives:
+                        if objective["type"] == "travel_arrival":
+                            await echo_move(str(objective["destination_key"]), new_arrival=True)
+                            continue
+                        mode_key = str(objective["mode_key"])
+                        mode = echo_content.require("exploration_mode", mode_key)
+                        await echo_move(str(mode["location_key"]))
+                        await echo_recover()
+                        battle_objective = objective["type"] == "exploration_battle_victory"
+                        encounter = {
+                            "explore.ancestral_lake": "enemy.lake_warden",
+                            "explore.beast_hunt": "enemy.beast_stalker",
+                        }.get(mode_key)
+                        operation = next(
+                            f"{adapter}-echo-{stage.key}-{candidate}"
+                            for candidate in range(1000)
+                            if (int(mode["battle_chance_bp"]) == 10000 or (
+                                battle_roll_bp(f"{adapter}-echo-{stage.key}-{candidate}:battle")
+                                < int(mode["battle_chance_bp"])
+                            ) == battle_objective)
+                            and (battle_objective or settlement_result(
+                                mode_key, f"{adapter}-echo-{stage.key}-{candidate}",
+                                content=echo_content,
+                            ).get(str(objective["item_key"]), 0) >= int(objective["quantity"]))
+                            and (encounter is None or exploration_encounter_selection(
+                                mode_key, seed=f"{adapter}-echo-{stage.key}-{candidate}",
+                                realm_key="void_refining", realm_layer=10, content=echo_content,
+                            )[0] == encounter)
                         )
-                        claimed_echo = await _dispatch(
-                            runtime,
-                            adapter,
-                            user,
-                            63001 + stage_index * 2,
-                            f"领取道源主线奖励 {lane} {stage}",
-                        )
-                        assert started_echo.code == "DAO_ECHOES_STAGE_STARTED"
-                        assert claimed_echo.code == "DAO_ECHOES_STAGE_CLAIMED"
+                        with patch(
+                            "nonebot_plugin_xiuxian_3.xiuxian.exploration.repository.uuid4",
+                            return_value=uuid5(NAMESPACE_URL, operation),
+                        ):
+                            await echo_command(f"开始探索 {mode['name']}", operation_id=operation)
+                        clock.advance(seconds=int(mode["duration_seconds"]))
+                        explored = await echo_command("结算探索")
+                        if battle_objective:
+                            with sqlite3.connect(runtime.settings.database_path) as connection:
+                                battle = connection.execute(
+                                    "SELECT snapshot_json, state_json, result_json FROM battle_sessions WHERE battle_id=?",
+                                    (explored.data["battle_id"],),
+                                ).fetchone()
+                            assert explored.data["battle_outcome"] == "won", (stage.key, battle)
+                        else:
+                            assert explored.data["result"].get(str(objective["item_key"]), 0) >= int(
+                                objective["quantity"]
+                            ), (stage.key, explored.data)
+                    claimed_echo = await echo_command(
+                        f"领取道源主线奖励 {stage.lane} {stage.stage}"
+                    )
+                    assert claimed_echo.code == "DAO_ECHOES_STAGE_CLAIMED"
+                    assert claimed_echo.data["first_clear"] is True
 
                 clock.advance(days=1)
                 await _dispatch(runtime, adapter, user, 64000, "恢复状态")
@@ -1560,6 +1879,23 @@ def test_shared_commands_can_reach_tribulation_l10_from_new_player() -> None:
                         await _dispatch(
                             runtime, adapter, user, 64001 + work_index, "恢复状态"
                         )
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        inventory = json.loads(connection.execute(
+                            "SELECT inventory_json FROM players WHERE platform=? AND platform_user_id=?",
+                            (adapter, user),
+                        ).fetchone()[0])
+                    for item_key, required in echo_content.require("recipe", recipe)["inputs"].items():
+                        missing = max(0, int(required) - int(inventory.get(item_key, 0)))
+                        if not missing:
+                            continue
+                        assert item_key in work_materials and item_key != "item.domain_core", (recipe, item_key)
+                        listed = await runtime.adapters.dispatch(
+                            helper_adapter,
+                            _context(helper_adapter, helper, f"work-{recipe}-{item_key}"),
+                            f"发布摆摊 {item_key} {missing} 100",
+                        )
+                        assert listed.ok, (item_key, missing, listed.message)
+                        await echo_command(f"购买摆摊 {listed.data['order_id']} {missing}")
                     work_operation = next(
                         f"{adapter}-new-masterwork-{work_index}-{candidate}"
                         for candidate in range(1000)
@@ -1700,6 +2036,7 @@ def test_shared_commands_can_reach_tribulation_l10_from_new_player() -> None:
                         (adapter, user),
                     ).fetchone()
                 if player_row[1] != "cave.boundary_realm":
+                    await echo_move("xuantian.war_front")
                     boundary_preview = await _dispatch(
                         runtime, adapter, user, 81000, "移动预览 界隙秘境"
                     )
@@ -2025,6 +2362,99 @@ def test_shared_commands_can_reach_tribulation_l10_from_new_player() -> None:
                 )
                 assert qualification.code == "DAO_ORIGIN_QUALIFICATION_GRANTED"
 
+                clock.advance(hours=13)
+                await _dispatch(runtime, adapter, user, 907700, "恢复状态")
+                await _dispatch(runtime, adapter, user, 907701, "前往 虚空门户")
+                clock.advance(minutes=5)
+                await _dispatch(runtime, adapter, user, 907702, "结算移动")
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    main_inventory = json.loads(
+                        connection.execute(
+                            "SELECT inventory_json FROM players WHERE platform=? AND platform_user_id=?",
+                            (adapter, user),
+                        ).fetchone()[0]
+                        or "{}"
+                    )
+                missing_anchors = max(0, 4 - int(main_inventory.get("item.void_anchor", 0)))
+                if missing_anchors:
+                    with sqlite3.connect(runtime.settings.database_path) as connection:
+                        helper_row = connection.execute(
+                            "SELECT id, inventory_json FROM players WHERE platform=? AND platform_user_id=?",
+                            (helper_adapter, helper),
+                        ).fetchone()
+                        helper_inventory = json.loads(helper_row[1] or "{}")
+                        helper_inventory["item.void_anchor"] = (
+                            int(helper_inventory.get("item.void_anchor", 0)) + missing_anchors
+                        )
+                        connection.execute(
+                            "UPDATE players SET inventory_json=? WHERE id=?",
+                            (json.dumps(helper_inventory, ensure_ascii=False, sort_keys=True), helper_row[0]),
+                        )
+                    anchor_listing = await _dispatch(
+                        runtime,
+                        helper_adapter,
+                        helper,
+                        908000,
+                        f"发布摆摊 item.void_anchor {missing_anchors} 1",
+                    )
+                    anchor_purchase = await _dispatch(
+                        runtime,
+                        adapter,
+                        user,
+                        908001,
+                        f"购买摆摊 {anchor_listing.data['order_id']} {missing_anchors}",
+                    )
+                    assert anchor_purchase.code == "MARKET_ORDER_PURCHASED"
+                archive_operation = next(
+                    f"{adapter}-tribulation-archive-{candidate}"
+                    for candidate in range(1000)
+                    if void_route_roll_bp(f"{adapter}-tribulation-archive-{candidate}") >= 1500
+                )
+                clock.advance(hours=13)
+                await _dispatch(runtime, adapter, user, 908002, "恢复状态")
+                archive = await _dispatch(
+                    runtime,
+                    adapter,
+                    user,
+                    907703,
+                    "进入虚空航道 档案遗迹",
+                    operation_id=archive_operation,
+                )
+                assert archive.code == "VOID_ROUTE_STARTED"
+                clock.advance(minutes=45)
+                arrived_archive = await _dispatch(runtime, adapter, user, 907704, "结算虚空航道")
+                assert arrived_archive.data["route_key"] == "void.archive_ruins"
+                clock.advance(hours=13)
+                await _dispatch(runtime, adapter, user, 908010, "恢复状态")
+                await _dispatch(runtime, adapter, user, 907705, "前往 道源门")
+                clock.advance(hours=1)
+                arrived_gate = await _dispatch(runtime, adapter, user, 907706, "结算移动")
+                assert arrived_gate.data["destination"] == "dao.origin_gate"
+
+                clock.advance(hours=48)
+                recovered_gate = await _dispatch(runtime, adapter, user, 908011, "恢复状态")
+                assert recovered_gate.data["stamina"] == recovered_gate.data["stamina_max"]
+                entered_dao_origin = await _dispatch(
+                    runtime, adapter, user, 9077061, "进入秘境 道源秘境"
+                )
+                assert entered_dao_origin.code == "DAO_ORIGIN_ENTERED"
+                for node_index, node_label in enumerate(
+                    ("道源关隘", "道源泉眼", "三界校验印", "服务档案库", "道果痕迹", "见证台", "道源誓约", "新章门扉")
+                ):
+                    node = await _dispatch(
+                        runtime,
+                        adapter,
+                        user,
+                        9077070 + node_index,
+                        f"选择秘境节点 {node_label}",
+                    )
+                    assert node.ok, node.message
+                settled_dao_origin = await _dispatch(
+                    runtime, adapter, user, 9077079, "结算秘境"
+                )
+                assert settled_dao_origin.code == "DAO_ORIGIN_SETTLED"
+                assert settled_dao_origin.data["story_flag_written"] is True
+
                 tribulation = await _dispatch(runtime, adapter, user, 84900, "开始渡劫")
                 assert tribulation.code == "TRIBULATION_STARTED"
                 assert tribulation.data["realm_key"] == "tribulation"
@@ -2089,93 +2519,6 @@ def test_shared_commands_can_reach_tribulation_l10_from_new_player() -> None:
                 cultivation_day = await cultivate_to_layer(3, 0, 30)
                 assert cultivation_day is not None, "new character did not reach tribulation L3"
 
-                clock.advance(hours=13)
-                await _dispatch(runtime, adapter, user, 907700, "恢复状态")
-                await _dispatch(runtime, adapter, user, 907701, "前往 虚空门户")
-                clock.advance(minutes=5)
-                await _dispatch(runtime, adapter, user, 907702, "结算移动")
-                with sqlite3.connect(runtime.settings.database_path) as connection:
-                    main_inventory = json.loads(
-                        connection.execute(
-                            "SELECT inventory_json FROM players WHERE platform=? AND platform_user_id=?",
-                            (adapter, user),
-                        ).fetchone()[0]
-                        or "{}"
-                    )
-                missing_anchors = max(0, 4 - int(main_inventory.get("item.void_anchor", 0)))
-                if missing_anchors:
-                    with sqlite3.connect(runtime.settings.database_path) as connection:
-                        helper_row = connection.execute(
-                            "SELECT id, inventory_json FROM players WHERE platform=? AND platform_user_id=?",
-                            (helper_adapter, helper),
-                        ).fetchone()
-                        helper_inventory = json.loads(helper_row[1] or "{}")
-                        helper_inventory["item.void_anchor"] = (
-                            int(helper_inventory.get("item.void_anchor", 0)) + missing_anchors
-                        )
-                        connection.execute(
-                            "UPDATE players SET inventory_json=? WHERE id=?",
-                            (json.dumps(helper_inventory, ensure_ascii=False, sort_keys=True), helper_row[0]),
-                        )
-                    anchor_listing = await _dispatch(
-                        runtime,
-                        helper_adapter,
-                        helper,
-                        908000,
-                        f"发布摆摊 item.void_anchor {missing_anchors} 1",
-                    )
-                    anchor_purchase = await _dispatch(
-                        runtime,
-                        adapter,
-                        user,
-                        908001,
-                        f"购买摆摊 {anchor_listing.data['order_id']} {missing_anchors}",
-                    )
-                    assert anchor_purchase.code == "MARKET_ORDER_PURCHASED"
-                archive_operation = next(
-                    f"{adapter}-tribulation-archive-{candidate}"
-                    for candidate in range(1000)
-                    if void_route_roll_bp(f"{adapter}-tribulation-archive-{candidate}") >= 1500
-                )
-                archive = await _dispatch(
-                    runtime,
-                    adapter,
-                    user,
-                    907703,
-                    "进入虚空航道 档案遗迹",
-                    operation_id=archive_operation,
-                )
-                assert archive.code == "VOID_ROUTE_STARTED"
-                clock.advance(minutes=45)
-                arrived_archive = await _dispatch(runtime, adapter, user, 907704, "结算虚空航道")
-                assert arrived_archive.data["route_key"] == "void.archive_ruins"
-                clock.advance(hours=13)
-                await _dispatch(runtime, adapter, user, 908010, "恢复状态")
-                await _dispatch(runtime, adapter, user, 907705, "前往 道源门")
-                clock.advance(hours=1)
-                arrived_gate = await _dispatch(runtime, adapter, user, 907706, "结算移动")
-                assert arrived_gate.data["destination"] == "dao.origin_gate"
-
-                entered_dao_origin = await _dispatch(
-                    runtime, adapter, user, 9077061, "进入秘境 道源秘境"
-                )
-                assert entered_dao_origin.code == "DAO_ORIGIN_ENTERED"
-                for node_index, node_label in enumerate(
-                    ("道源关隘", "道源泉眼", "三界校验印", "服务档案库", "道果痕迹", "见证台", "道源誓约", "新章门扉")
-                ):
-                    node = await _dispatch(
-                        runtime,
-                        adapter,
-                        user,
-                        9077070 + node_index,
-                        f"选择秘境节点 {node_label}",
-                    )
-                    assert node.ok, node.message
-                settled_dao_origin = await _dispatch(
-                    runtime, adapter, user, 9077079, "结算秘境"
-                )
-                assert settled_dao_origin.code == "DAO_ORIGIN_SETTLED"
-                assert settled_dao_origin.data["story_flag_written"] is True
                 await _dispatch(runtime, adapter, user, 907707, "前往 天劫台")
                 clock.advance(minutes=30)
                 arrived_terrace = await _dispatch(runtime, adapter, user, 907708, "结算移动")
@@ -2426,6 +2769,19 @@ def test_void_archive_return_enables_qq_and_onebot_dao_union_challenge() -> None
                     )
 
                 equip_damage_weapon(runtime, adapter, user, 50000)
+                disconnected = await _dispatch(runtime, adapter, user, 40, "移动预览 界隙秘境")
+                assert disconnected.data["ready"] is False
+                assert disconnected.data["route_available"] is False
+                for step, (destination, seconds) in enumerate((
+                    ("虚空第一航道", 1800), ("虚空门户", 300),
+                )):
+                    clock.advance(days=1)
+                    await _dispatch(runtime, adapter, user, 41 + step * 3, "恢复状态")
+                    await _dispatch(runtime, adapter, user, 42 + step * 3, f"前往 {destination}")
+                    clock.advance(seconds=seconds)
+                    await _dispatch(runtime, adapter, user, 43 + step * 3, "结算移动")
+                clock.advance(days=1)
+                await _dispatch(runtime, adapter, user, 49, "恢复状态")
                 preview = await _dispatch(runtime, adapter, user, 4, "移动预览 界隙秘境")
                 assert preview.data["ready"] is True
                 assert preview.data["pass_key"] is None

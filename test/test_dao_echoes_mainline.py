@@ -40,7 +40,7 @@ STAGES = (
     ("builder", 7, "reward", ("explore.void_route", "item.void_crystal")),
     ("builder", 8, "travel", ("虚空第一航道", "虚空档案遗迹")),
     ("builder", 9, "reward", ("explore.archive_ruins", "item.archive_fragment.beta")),
-    ("builder", 10, "travel", ("虚空档案遗迹", "道源门")),
+    ("builder", 10, "travel", ("虚空档案遗迹", "虚空第一航道")),
     ("witness", 1, "travel", ("青石镇", "玄天界·云城")),
     ("witness", 2, "travel", ("魔渊入口", "魔渊集市")),
     ("witness", 3, "reward", ("explore.demon_abyss", "item.demon_core")),
@@ -235,9 +235,6 @@ def test_dao_echoes_mainline_shared_lane_runs_once() -> None:
                     position(
                         str(runtime.content.require("exploration_mode", mode_key)["location_key"])
                     )
-                if (lane, stage) == ("builder", 10):
-                    position("void.archive_ruins", realm="dao_union", layer=6)
-
                 started = await dispatch(f"{tag}-start", f"开始道源主线 {lane} {stage}", f"{tag}-start")
                 assert started.code == "DAO_ECHOES_STAGE_STARTED", started.message
                 if index == 1:
