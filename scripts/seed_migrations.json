@@ -4,7 +4,7 @@
       "ea3eade0d1a01810fd9f32998adcd2f15fb236ab832d062b022b6b0a37418cae": "5388b03390ccb1fc02677a895195b22a65b94060:data/养成/规则.json"
     },
     "new_sha256": "c685ddd695a3557d74834c73016c9c8b6ceed9e6762a7aee76b14f30d5613b4f",
-    "new_commit": "5388b03390ccb1fc02677a895195b22a65b94060"
+    "new_commit": "2918318ad0da9acca8e9c5665d57008a44293864"
   },
   "引导/引导.json": {
     "old_sha256": {
@@ -140,7 +140,7 @@
       "993ff09ded623a5294f56cc7af09fb438bb5362a85a422ddb80b0fdacc5780f2": "e0ecd1db372097459365243fb14ea82ec3cb9d6a:data/剧情/主线.json"
     },
     "new_sha256": "b9dc5476fb4455c7561f19a5f52e639e6865e5c50671fec4ba2f8de3d692872c",
-    "new_commit": "e0ecd1db372097459365243fb14ea82ec3cb9d6a"
+    "new_commit": "2918318ad0da9acca8e9c5665d57008a44293864"
   },
   "内容清单.json": {
     "old_sha256": {
