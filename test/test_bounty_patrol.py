@@ -4,6 +4,7 @@ import asyncio
 import json
 from dataclasses import replace
 from datetime import timedelta
+from types import SimpleNamespace
 
 import pytest
 
@@ -221,6 +222,56 @@ def test_patrol_bounty_realm_quota_and_malformed_baseline(tmp_path):
             with repo._connect() as db:
                 row = db.execute("SELECT * FROM players").fetchone()
                 assert all(repo._bounty_player_eligible(db, row, d, j.clock(), {}) for d in definitions)
+        finally:
+            await j.runtime.close()
+    asyncio.run(run())
+
+
+def test_patrol_bounty_material_reaches_public_production_without_inventory_fixture(tmp_path, monkeypatch):
+    async def run():
+        j = FieldJourney(_copy_content(tmp_path), "onebot.v11")
+        try:
+            await starter(j.runtime)
+            with j.runtime.repository._connect() as db:
+                db.execute(
+                    "UPDATE players SET location_key='xuantian.outskirts', realm_key='qi_sensing', "
+                    "realm_layer=2, stamina=100, energy=100"
+                )
+            available_day(j, "bounty.patrol.outskirts")
+            monkeypatch.setattr(
+                "nonebot_plugin_xiuxian_3.xiuxian.adventures.repository.uuid4",
+                lambda: SimpleNamespace(hex="bounty-consumer-4"),
+            )
+            board = await j.send("悬赏榜", writable=False)
+            offer = next(item for item in board.data["offers"] if item["bounty_key"] == "bounty.patrol.outskirts")
+            assert (await j.send(f"接取悬赏 {offer['label']}", "accept")).ok
+            with j.runtime.repository._connect() as db:
+                snapshot = json.loads(
+                    db.execute("SELECT snapshot_json FROM bounty_offers WHERE operation_id='accept'").fetchone()[0]
+                )
+            assert snapshot["reward"].get("item.mat.wood") == 3
+
+            route_operation = next(
+                f"bounty-route-{index}"
+                for index in range(100)
+                if battle_roll_bp(f"bounty-route-{index}:battle") >= 6500
+            )
+            assert (await j.send("开始探索 近郊巡路 稳行", route_operation)).ok
+            j.clock.advance(minutes=5)
+            assert (await j.send("结算探索", "route-claim")).ok
+            assert (await j.send("领取悬赏", "bounty-claim")).ok
+            assert _inventory(j.runtime).get("item.mat.wood", 0) >= 3
+
+            await j.move("青石镇")
+            before = _inventory(j.runtime)
+            assert (await j.send("生产预览 护脉木楔", writable=False)).ok
+            assert (await j.send("开始生产 护脉木楔", "craft")).ok
+            j.clock.advance(seconds=30)
+            assert (await j.send("领取生产", "craft-claim")).ok
+            after = _inventory(j.runtime)
+            assert after.get("item.mat.root_wedge", 0) - before.get("item.mat.root_wedge", 0) == 2
+            assert before["item.mat.wood"] - after["item.mat.wood"] == 1
+            assert before["item.herb.blood_grass"] - after["item.herb.blood_grass"] == 1
         finally:
             await j.runtime.close()
     asyncio.run(run())
