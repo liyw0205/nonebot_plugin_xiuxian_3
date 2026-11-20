@@ -16,21 +16,19 @@ SOURCE_OLD_SHA = "0584f524734f89520676b8369e69b122962b8440609cb36a7a55837a879e7b
 SOURCE_OLD_REF = f"2f2ec0e10b9d6639b487f9f5b02f2f8ff8eafee5:data/{SOURCE_RELATIVE}"
 
 
-def before_cloud_party_release(relative: str, text: str) -> str:
-    """Rebuild pinned pre-cooperation Git blobs, never filter the live catalogue."""
-    if relative == SOURCE_RELATIVE:
-        return "".join(line for line in text.splitlines(keepends=True) if not line.startswith('    {"key":"source.party.cloud_boat"'))
-    if relative != RELATIVE:
-        return text
-    start = text.index('      "combat_profile": {\n        "random_pool_key": "battle.enemy.cloud_boat_guardian"')
-    end = text.index('      "key": "enemy.cloud_boat_guardian"', start)
-    return text[:start] + '      "combat_profile": {"random_pool_key": "battle.enemy.cloud_boat_guardian", "reward": {}},\n' + text[end:]
+FIXTURES = {
+    RELATIVE: ROOT / "test/fixtures/official_seeds/cloud_party_pre_cooperation_enemies.json",
+    SOURCE_RELATIVE: ROOT / "test/fixtures/official_seeds/cloud_party_pre_cooperation_sources.json",
+}
 
 
 def old_cloud_party_seeds():
     result = {}
-    for relative, expected in ((RELATIVE, OLD_SHA), (SOURCE_RELATIVE, SOURCE_OLD_SHA)):
-        blob = before_cloud_party_release(relative, (ROOT / "data" / relative).read_text(encoding="utf-8")).encode("utf-8")
+    for relative, expected in (
+        (RELATIVE, OLD_SHA),
+        (SOURCE_RELATIVE, SOURCE_OLD_SHA),
+    ):
+        blob = FIXTURES[relative].read_bytes()
         assert hashlib.sha256(blob).hexdigest() == expected
         result[relative] = blob
     return result
