@@ -650,6 +650,27 @@
       "status": "active"
     },
     {
+      "name": "古渠守标",
+      "desc": "古渠水标凝成的石灵，借水纹校准阵势，以连绵刀波逼退越界者。",
+      "location_key": "xuantian.basalt_pass",
+      "requirements": [{"type": "realm", "realm_key": "qi_gathering", "min_layer": 2}],
+      "stats": {"hp": 620, "attack": 34, "initiative": 12, "agility": 10},
+      "skills": ["enemy_skill.blade_wave"],
+      "behavior": {"can_critical": false, "can_escape": false},
+      "reward_refs": [],
+      "combat_profile": {
+        "random_pool_key": "battle.enemy.basalt_canal_marker",
+        "reward": {},
+        "party_profile": {
+          "party_type": "standard_pve",
+          "entry": {"stamina": 10, "energy": 2, "daily_limit": 1},
+          "reward": {"cultivation": 75, "spirit_stones": 28, "item.ore.ironstone": 1, "item.mat.array_sand": 1}
+        }
+      },
+      "key": "enemy.basalt_canal_marker",
+      "status": "active"
+    },
+    {
       "name": "雾栖灵蜃",
       "desc": "洞天薄雾中凝成的灵蜃，避战时化雾，受击后吐出寒息。",
       "location_key": "cave.mist_grotto",

@@ -11,8 +11,13 @@ import pytest
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
-from nonebot_plugin_xiuxian_3.xiuxian.combat.party_rules import party_enemy_for_location
+from nonebot_plugin_xiuxian_3.xiuxian.combat.party_rules import (
+    party_enemy_for_location,
+    party_entry_for_enemy,
+    party_material_consumers,
+)
 from nonebot_plugin_xiuxian_3.xiuxian.content import ContentBundle, ContentError
+from nonebot_plugin_xiuxian_3.xiuxian.content_integrity import validate_source_content
 
 
 ADAPTERS = ("qq.official", "onebot.v11")
@@ -170,3 +175,26 @@ def test_standard_party_content_rejects_multiple_enemies_at_one_location(tmp_pat
         party_enemy_for_location(
             "xuantian.outskirts", content=ContentBundle.load(data_dir)
         )
+
+
+def test_basalt_canal_party_content_is_unique_costed_and_has_public_consumers() -> None:
+    bundle = ContentBundle.load(Path(__file__).parents[1] / "data")
+    enemy = party_enemy_for_location("xuantian.basalt_pass", content=bundle)
+    entry = party_entry_for_enemy(enemy.key, bundle)
+    consumers = party_material_consumers(bundle, enemy.party_reward)
+
+    assert enemy.key == "enemy.basalt_canal_marker"
+    assert (enemy.required_realm, enemy.required_layer) == ("qi_gathering", 2)
+    assert entry is not None
+    assert (entry.stamina, entry.energy, entry.daily_limit) == (10, 2, 1)
+    assert enemy.party_reward == {
+        "cultivation": 75,
+        "spirit_stones": 28,
+        "item.ore.ironstone": 1,
+        "item.mat.array_sand": 1,
+    }
+    assert {row["key"] for row in consumers} >= {
+        "recipe.equipment.repair_kit",
+        "recipe.relic.field_compass",
+    }
+    assert validate_source_content(bundle, party_only=True) == 2

@@ -109,6 +109,12 @@ def test_social_help_exposes_party_preparation_and_recovery() -> None:
                     "队伍战斗回放",
                 ):
                     assert command in result.message
+                assert "玄武岩径古渠守标" in result.message
+                assert "聚气二层" in result.message
+                assert "每日一次" in result.message
+                assert "玄武岩径古渠守标" in result.message
+                assert "聚气二层" in result.message
+                assert "每日一次" in result.message
             finally:
                 await runtime.close()
 

@@ -38,15 +38,15 @@ def _edit(root: Path, relative: str, key: str, **changes: object) -> None:
 
 def test_m9_content_references_are_closed() -> None:
     summary = validate_content_references(ContentBundle.load(DATA))
-    # Counts include relics, field repair and the new cooperative cloud-boat source.
+    # Counts include relics, field repair, cloud-boat and basalt party sources.
     assert summary["locations"] == 34
     assert summary["mainline_stages"] == 175
     assert summary["exploration_modes"] == 33
     assert summary["bounties"] == 60
     assert summary["recipes"] == 44
-    assert summary["sources"] == 35
+    assert summary["sources"] == 36
     assert summary["equipment_repair_kits"] == 1
-    assert summary["combat_enemies"] == 69
+    assert summary["combat_enemies"] == 72
 
 
 def test_exploration_rejects_missing_reward_pool(tmp_path: Path) -> None:

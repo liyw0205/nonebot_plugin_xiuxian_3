@@ -75,16 +75,16 @@ def test_combat_content_closes_current_enemy_and_encounter_data() -> None:
     ]
     assert bundle.require("exploration_mode", "explore.relic.ironwood")["enemy_pool_key"] == "encounter.relic.ironwood"
     expected_consumed_encounters = 21 if (DATA / "探索/模式.json").exists() else 0
-    # The early basalt source adds one profile; specialized tower enemies retain
-    # their existing dedicated content consumer.
+    # The basalt canal party encounter adds one content-backed enemy profile;
+    # specialized tower enemies retain their dedicated content consumer.
     assert summary == {
-        "enemies": 69,
-        "enemy_profiles": 51,
+        "enemies": 72,
+        "enemy_profiles": 54,
         "encounters": 23,
         "candidates": 40,
         "drop_pools": 8,
         "consumed_encounters": expected_consumed_encounters,
-        "enemy_skills": 16,
+        "enemy_skills": 17,
     }
 
 

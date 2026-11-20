@@ -262,3 +262,119 @@ def test_standard_pve_rejects_unsupported_location_and_keeps_other_party_types_s
             await runtime.close()
 
     asyncio.run(run())
+
+
+def test_basalt_canal_party_runs_through_shared_adapters_and_settles_materials() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            members = (
+                ("qq.official", "basalt-party-leader"),
+                ("onebot.v11", "basalt-party-two"),
+                ("qq.official", "basalt-party-three"),
+                ("onebot.v11", "basalt-party-four"),
+            )
+            for adapter, user in members:
+                await _create_standard_player(runtime, adapter, user)
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                connection.executemany(
+                    "UPDATE players SET realm_key='qi_gathering', realm_layer=2, "
+                    "location_key='xuantian.basalt_pass', energy=100, energy_max=100 "
+                    "WHERE platform=? AND platform_user_id=?",
+                    members,
+                )
+
+            adapter, leader = members[0]
+            resources_before = {}
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                for member_adapter, user in members:
+                    resources_before[user] = connection.execute(
+                        "SELECT stamina, energy FROM players WHERE platform=? AND platform_user_id=?",
+                        (member_adapter, user),
+                    ).fetchone()
+
+            preview = await runtime.adapters.dispatch(
+                adapter, _ctx(adapter, leader), "多人副本预览"
+            )
+            assert preview.code == "PARTY_BATTLE_PREVIEW"
+            assert preview.data["supported"] is True
+            assert preview.data["enemy_key"] == "enemy.basalt_canal_marker"
+            assert preview.data["cost"] == {"stamina": 10, "energy": 2}
+            assert preview.data["daily_limit"] == 1
+            assert {row["key"] for row in preview.data["consumers"]} >= {
+                "recipe.equipment.repair_kit",
+                "recipe.relic.field_compass",
+            }
+            assert set(preview.data["blockers"]) == {"no_party", "member_count"}
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                for member_adapter, user in members:
+                    assert connection.execute(
+                        "SELECT stamina, energy FROM players WHERE platform=? AND platform_user_id=?",
+                        (member_adapter, user),
+                    ).fetchone() == resources_before[user]
+
+            created = await runtime.adapters.dispatch(
+                adapter, _ctx(adapter, leader, "basalt-create"), "创建多人副本队伍"
+            )
+            assert created.code == "PARTY_CREATED"
+            party_id = str(created.data["party_id"])
+            for index, (member_adapter, user) in enumerate(members[1:], start=1):
+                await _invite_and_accept(
+                    runtime, adapter, leader, member_adapter, user, party_id, index
+                )
+            for index, (member_adapter, user) in enumerate(members):
+                confirmed = await runtime.adapters.dispatch(
+                    member_adapter,
+                    _ctx(member_adapter, user, f"basalt-confirm:{index}"),
+                    f"确认入队 {party_id}",
+                )
+                assert confirmed.code in {"PARTY_CONFIRMED", "PARTY_READY"}
+
+            ready = await runtime.adapters.dispatch(
+                adapter, _ctx(adapter, leader), "多人副本预览"
+            )
+            assert ready.data["can_start"] is True
+            started = await runtime.adapters.dispatch(
+                adapter,
+                _ctx(adapter, leader, "basalt-start"),
+                "开始队伍战斗",
+            )
+            assert started.code == "PARTY_BATTLE_SETTLED"
+            assert started.data["enemy_key"] == "enemy.basalt_canal_marker"
+            assert started.data["outcome"] == "won"
+            member_rewards = started.data["member_rewards"]
+            assert len(member_rewards) == 4
+            assert all(
+                row["reward"]
+                == {
+                    "cultivation": 75,
+                    "spirit_stones": 28,
+                    "item.ore.ironstone": 1,
+                    "item.mat.array_sand": 1,
+                }
+                for row in member_rewards
+            )
+            for member_adapter, user in members:
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    current = connection.execute(
+                        "SELECT stamina, energy FROM players WHERE platform=? AND platform_user_id=?",
+                        (member_adapter, user),
+                    ).fetchone()
+                assert current == (resources_before[user][0] - 10, resources_before[user][1] - 2)
+
+            replay = await runtime.adapters.dispatch(
+                adapter,
+                _ctx(adapter, leader, "basalt-start"),
+                "开始队伍战斗",
+            )
+            assert replay.data["idempotent_replay"] is True
+            assert replay.data["rewards"] == started.data["rewards"]
+            after_quota = await runtime.adapters.dispatch(
+                adapter, _ctx(adapter, leader), "多人副本预览"
+            )
+            assert any(
+                "daily_limit" in member["blockers"] for member in after_quota.data["members"]
+            )
+            await runtime.close()
+
+    asyncio.run(run())
