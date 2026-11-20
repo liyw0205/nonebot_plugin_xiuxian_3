@@ -22,6 +22,32 @@ FIXTURES = {
 }
 
 
+def before_cloud_party_release(relative: str, text: str) -> str:
+    """Rebuild party-specific legacy inputs without dropping unrelated enemies."""
+    if relative == SOURCE_RELATIVE:
+        party_sources = (
+            '    {"key":"source.party.cloud_boat"',
+            '    {"key":"source.party.basalt_canal"',
+        )
+        return "".join(
+            line for line in text.splitlines(keepends=True)
+            if not line.startswith(party_sources)
+        )
+    if relative != RELATIVE:
+        return text
+    document = json.loads(text)
+    historical = json.loads(FIXTURES[RELATIVE].read_bytes())
+    guardian = next(
+        row for row in historical["records"]
+        if row.get("key") == "enemy.cloud_boat_guardian"
+    )
+    document["records"] = [
+        guardian if row.get("key") == "enemy.cloud_boat_guardian" else row
+        for row in document["records"]
+    ]
+    return json.dumps(document, ensure_ascii=False, indent=2) + "\n"
+
+
 def old_cloud_party_seeds():
     result = {}
     for relative, expected in (
