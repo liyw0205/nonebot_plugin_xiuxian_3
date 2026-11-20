@@ -61,6 +61,42 @@ class EquipmentLoadoutRecord:
 
 
 @dataclass(frozen=True, slots=True)
+class EquipmentRepairRecord:
+    player: PlayerView
+    equipment: EquipmentRecord
+    durability_before: int
+    durability_after: int
+    costs_spent: dict[str, int] = field(default_factory=dict)
+    already_completed: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class EquipmentReclamationRecord:
+    player: PlayerView
+    equipment: EquipmentRecord
+    yields: dict[str, int] = field(default_factory=dict)
+    already_completed: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class EquipmentReclamationPreviewRecord:
+    player: PlayerView
+    equipment: EquipmentRecord
+    yields: dict[str, int] = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
+class EquipmentFieldRepairRecord:
+    player: PlayerView
+    equipment: EquipmentRecord
+    durability_before: int
+    durability_after: int
+    kit_key: str
+    kit_spent: int = 1
+    already_completed: bool = False
+
+
+@dataclass(frozen=True, slots=True)
 class EquipmentListRecord:
     player: PlayerView
     equipment: tuple[EquipmentRecord, ...]
@@ -69,6 +105,10 @@ class EquipmentListRecord:
 __all__ = [
     "EquipmentListRecord",
     "EquipmentLoadoutRecord",
+    "EquipmentRepairRecord",
+    "EquipmentReclamationPreviewRecord",
+    "EquipmentReclamationRecord",
+    "EquipmentFieldRepairRecord",
     "EquipmentRecord",
     "RefinementRecord",
     "TemperingRecord",

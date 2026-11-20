@@ -13,6 +13,8 @@ from ..persistence.errors import (
     GuidanceQuestNotAvailableError,
     GuidanceQuestNotCompletedError,
     DaoOriginTaskRequirementError,
+    DaoOriginQualificationAlreadyClaimedError,
+    DaoOriginQualificationIncompleteError,
     PlayerNotFoundError,
     PlayerSuspendedError,
     QuestAlreadyCompletedError,
@@ -43,6 +45,14 @@ class QuestApplication:
     @staticmethod
     def _error(context: CommandContext, operation_id: str, exc: Exception) -> CommandResult:
         errors = {
+            DaoOriginQualificationIncompleteError: (
+                "ENDGAME_EVENT_REQUIREMENT_MISSING",
+                "三项本赛季道源证据尚未齐备，未写入终局资格。",
+            ),
+            DaoOriginQualificationAlreadyClaimedError: (
+                "QUEST_ALREADY_COMPLETED",
+                "本赛季道源资格已经领取。",
+            ),
             GuidanceQuestNotAvailableError: ("GUIDANCE_QUEST_NOT_FOUND", "请先查看引路簿，再选择其中一项领取。"),
             GuidanceQuestNotCompletedError: ("QUEST_REQUIREMENT_MISSING", "这份引路嘉奖尚未齐备，暂不能领取。"),
             GuidanceQuestAlreadyClaimedError: ("QUEST_ALREADY_COMPLETED", "这份引路嘉奖已经领取。"),
@@ -83,6 +93,18 @@ class QuestApplication:
             "progress": record.progress,
             "reward": record.reward,
             "discovery": record.discovery,
+            "idempotent_replay": record.already_completed,
+        }
+
+    @staticmethod
+    def _qualification_data(record) -> dict[str, object]:
+        return {
+            "season_id": record.season_id,
+            "status": record.status,
+            "readiness_flag": record.readiness_flag,
+            "progress": record.progress,
+            "tasks": record.snapshot.get("tasks", []),
+            "snapshot": record.snapshot,
             "idempotent_replay": record.already_completed,
         }
 
@@ -305,7 +327,7 @@ class QuestApplication:
             started = await self.repository.start_quest_battle(
                 platform=context.adapter,
                 platform_user_id=context.user_id,
-                enemy_key="enemy.cross_realm_sentinel",
+                enemy_key="enemy.cross_realm_trial_sentinel",
                 battle_type="pve.dao_union_challenge",
                 operation_id=operation_id,
             )
@@ -429,6 +451,63 @@ class QuestApplication:
             data=self._data(record),
         )
 
+    async def get_dao_origin_qualification(self, context: CommandContext) -> CommandResult:
+        if context.command_args:
+            return CommandResult(False, "INVALID_QUEST_COMMAND", "查看道源资格无需附加参数。", context.request_id)
+        try:
+            record = await self.repository.get_dao_origin_qualification(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+            )
+        except Exception as exc:
+            return self._error(context, "", exc)
+        status_label = {
+            "pending": "尚未齐备",
+            "ready": "可以领取",
+            "qualified": "本赛季已领取",
+        }.get(record.status, record.status)
+        lines = [
+            "## 道源资格",
+            "",
+            f"- **赛季**：{record.season_id}",
+            f"- **状态**：{status_label}",
+            f"- **准入标记**：{record.readiness_flag}",
+        ]
+        for task in record.snapshot.get("tasks", []):
+            if isinstance(task, dict):
+                lines.append(
+                    f"- **{task.get('name', task.get('key', '道源任务'))}**："
+                    f"{task.get('completed', 0)}/{task.get('target', 0)}"
+                )
+        return CommandResult(
+            True,
+            "DAO_ORIGIN_QUALIFICATION_STATUS",
+            "\n".join(lines),
+            context.request_id,
+            data=self._qualification_data(record),
+        )
+
+    async def claim_dao_origin_qualification(self, context: CommandContext) -> CommandResult:
+        if context.command_args:
+            return CommandResult(False, "INVALID_QUEST_COMMAND", "领取道源资格无需附加参数。", context.request_id)
+        operation_id = self._operation_id(context, "quest.dao_origin.qualification.claim")
+        try:
+            record = await self.repository.claim_dao_origin_qualification(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                operation_id=operation_id,
+            )
+        except Exception as exc:
+            return self._error(context, operation_id, exc)
+        return CommandResult(
+            True,
+            "DAO_ORIGIN_QUALIFICATION_GRANTED",
+            "## 道源资格已冻结\n\n三项本赛季道源证据已核验，终局天榜准入标记已写入。",
+            context.request_id,
+            operation_id,
+            data=self._qualification_data(record),
+        )
+
     async def start_cross_realm_battle(self, context: CommandContext) -> CommandResult:
         if context.command_args:
             return CommandResult(False, "INVALID_QUEST_COMMAND", "跨界战不接受技能、目标或伤害参数。", context.request_id)
@@ -437,7 +516,7 @@ class QuestApplication:
             started = await self.repository.start_quest_battle(
                 platform=context.adapter,
                 platform_user_id=context.user_id,
-                enemy_key="enemy.cross_realm_sentinel",
+                enemy_key="enemy.cross_realm_trial_sentinel",
                 battle_type="pve.cross_realm",
                 operation_id=operation_id,
             )

@@ -109,3 +109,63 @@ def test_claiming_the_sojourner_branch_records_both_beats() -> None:
                 await runtime.close()
 
     asyncio.run(run())
+
+
+def test_merchant_route_freezes_beats_and_projects_them_once() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            user = "merchant-beats"
+            try:
+                assert (await runtime.dispatch(_context(user, "create"), "开始修仙")).ok
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE players SET stage='seeker', realm_key='qi_sensing', realm_layer=3 WHERE platform_user_id=?",
+                        (user,),
+                    )
+                    player_id = connection.execute(
+                        "SELECT id FROM players WHERE platform_user_id=?", (user,)
+                    ).fetchone()[0]
+                    for index in range(1, 4):
+                        commission_id = f"story-commission-{index}"
+                        now = f"2026-10-01T00:00:0{index}+00:00"
+                        connection.execute(
+                            "INSERT INTO town_commissions(commission_id,commission_key,business_date,status,stock_total,stock_remaining,starts_at,expires_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                            (commission_id, commission_id, "2026-10-01", "published", 1, 0, now, "2026-10-02T00:00:00+00:00", now, now),
+                        )
+                        connection.execute(
+                            "INSERT INTO town_commission_claims(claim_id,commission_id,player_id,business_date,status,accept_operation_id,deliver_operation_id,accepted_at,delivered_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                            (f"claim-{index}", commission_id, player_id, "2026-10-01", "delivered", f"accept-{index}", f"deliver-{index}", now, now, now, now),
+                        )
+                assert (await runtime.dispatch(_context(user, "start"), "开始剧情")).ok
+                chosen = await runtime.dispatch(
+                    _context(user, "choose", operation_id="story-choice-merchant"), "选择剧情 商路"
+                )
+                assert chosen.ok, chosen
+                assert chosen.data["status"] == "ending_pending"
+                assert [beat["key"] for beat in chosen.data["beats"]] == [
+                    "node.merchant.1", "node.merchant.2", "node.merchant.3"
+                ]
+                assert all(beat["content"] and beat["objective"] and beat["action"] for beat in chosen.data["beats"])
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    assert connection.execute(
+                        "SELECT COUNT(*) FROM activity_events WHERE player_id=? AND event_key LIKE 'story.beat.merchant.%'",
+                        (player_id,),
+                    ).fetchone()[0] == 3
+                replay = await runtime.dispatch(
+                    _context(user, "choose-replay", operation_id="story-choice-merchant"), "选择剧情 商路"
+                )
+                assert replay.ok and replay.data["idempotent_replay"] is True
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    assert connection.execute(
+                        "SELECT COUNT(*) FROM activity_events WHERE player_id=? AND event_key LIKE 'story.beat.merchant.%'",
+                        (player_id,),
+                    ).fetchone()[0] == 3
+                claimed = await runtime.dispatch(_context(user, "claim", operation_id="story-claim"), "领取剧情结局")
+                assert claimed.ok, claimed
+                claimed_replay = await runtime.dispatch(_context(user, "claim-replay", operation_id="story-claim"), "领取剧情结局")
+                assert claimed_replay.ok and claimed_replay.data["idempotent_replay"] is True
+            finally:
+                await runtime.close()
+
+    asyncio.run(run())

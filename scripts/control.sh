@@ -3,7 +3,7 @@ set -Eeuo pipefail
 IFS=$'\n\t'
 
 TARGET=${XIUXIAN3_TARGET:-$HOME/xiu3}
-VENV=${VENV_PATH:-$HOME/myenv}
+VENV=${VENV_PATH:-/root/myenv}
 SOURCE_ROOT=${XIUXIAN3_SOURCE_DIR:-}
 ACTION=status
 SOURCE_MODE=auto
@@ -23,7 +23,7 @@ usage() {
   --source-mode MODE  auto、release 或 source
   --mirror MODE       direct、accelerated 或 custom
   --mirror-url URL    自定义 Release 归档或 Git 仓库地址
-  --venv PATH         Python 虚拟环境（默认 $HOME/myenv）
+  --venv PATH         Python 虚拟环境（默认 /root/myenv；也可用 VENV_PATH）
   --lines N           logs 显示最近 N 行（默认 80）
   --yes               确认卸载宿主及其 SQLite 数据
 EOF

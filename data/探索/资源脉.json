@@ -1,0 +1,36 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "deposit",
+  "records": [
+    {
+      "key":"deposit.creek_roots","name":"溪崖药根","desc":"溪崖图记下的药根并非取之不尽。留根采叶可慢慢积攒药草与干木，强采能赶出一批急料，却会掏空更多根土，让下一次自然恢复等得更久。护脉木楔可以稳住松土，帮助药根重新扎下。","status":"open","survey_key":"survey.creek_cliff",
+      "capacity":6,"regen_seconds":7200,"regen_units":1,
+      "plans":[
+        {"key":"gentle","name":"留根采叶","desc":"只取外圈药叶和落枝，保住根土","costs":{"stamina":3,"energy":1},"stock_cost":1,"recovery_delay":0,"cooldown_seconds":300,"rewards":{"item.herb.blood_grass":2,"item.mat.wood":1},"text":"你剪下外圈药叶，捡起干枝，把根土按回原处；这片药根仍能慢慢恢复。"},
+        {"key":"intensive","name":"急取药丛","desc":"多取现成药叶，但扰动更多根土，推迟恢复","costs":{"stamina":7,"energy":2},"stock_cost":3,"recovery_delay":10800,"cooldown_seconds":1800,"rewards":{"item.herb.blood_grass":5,"item.mat.wood":2},"text":"你分出一大包急用药叶，也看见根土松开了一圈；药根需要更久的休养，才会重新蓄起可采储量。"}
+      ],
+      "maintenance":{"costs":{"item.mat.root_wedge":1,"stamina":1,"energy":2},"restore_units":2,"daily_limit":2,"cooldown_seconds":900,"recipe_key":"recipe.field.root_wedge","text":"你用护脉木楔固定松土，让水分留在药根附近；用掉的木楔留在土中，可采储量逐渐补回。"},
+      "recipe_keys":["recipe.field.root_wedge","recipe.pill.healing_low"]
+    },
+    {
+      "key":"deposit.ironwood_layer","name":"倒木铁层","desc":"根脉图把背风倒木与含铁浅土连在一起。沿标记取枯木、拣浅石，可以维持稳定收材；急拆倒木会暴露更多铁石，也会扰动护林边界。用木楔补牢松根，才能让背风带继续留住碎料。","status":"open","survey_key":"survey.iron_roots",
+      "capacity":6,"regen_seconds":7200,"regen_units":1,
+      "plans":[
+        {"key":"gentle","name":"循线拾材","desc":"沿护林线取枯木和浅层铁石","costs":{"stamina":4,"energy":1},"stock_cost":1,"recovery_delay":0,"cooldown_seconds":300,"rewards":{"item.mat.wood":2,"item.ore.ironstone":1},"text":"你沿根脉线取走枯木和浅石，留在风口的倒木仍稳稳挡着幼林。"},
+        {"key":"intensive","name":"拆木取铁","desc":"拆开积木集中取铁，需要更多储量与休养","costs":{"stamina":8,"energy":2},"stock_cost":3,"recovery_delay":10800,"cooldown_seconds":1800,"rewards":{"item.mat.wood":4,"item.ore.ironstone":4},"text":"倒木间的一批铁石被你带出，背风带也松动了几处；这一回收成较多，下一回必须多等些时日。"}
+      ],
+      "maintenance":{"costs":{"item.mat.root_wedge":1,"stamina":2,"energy":2},"restore_units":2,"daily_limit":2,"cooldown_seconds":900,"recipe_key":"recipe.field.root_wedge","text":"木楔补进松动的倒木根隙，背风线重新稳住，散落铁石也不再随雨流走。"},
+      "recipe_keys":["recipe.field.root_wedge","recipe.armor.patrol_vest"]
+    },
+    {
+      "key":"deposit.basalt_sand","name":"古渠砂窝","desc":"古渠底的砂线在弯道聚成浅窝，阵砂和铁石会随着山腹滴水慢慢沉积。循底淘取可以留住砂窝，强筛能一次多带走细砂，却会搅散沉积。楔牢渠边石片，才好让来水重新在这里放缓。","status":"open","survey_key":"survey.basalt_channel",
+      "capacity":6,"regen_seconds":7200,"regen_units":1,
+      "plans":[
+        {"key":"gentle","name":"循渠淘砂","desc":"顺渠底少量淘取，留下沉积底层","costs":{"stamina":4,"energy":2},"stock_cost":1,"recovery_delay":0,"cooldown_seconds":300,"rewards":{"item.mat.array_sand":2,"item.ore.ironstone":1},"text":"阵砂与铁石沉在筛底，你留下一层细砂，让滴水仍能在古渠弯处缓缓聚拢。"},
+        {"key":"intensive","name":"强筛砂窝","desc":"集中筛取急用阵砂，代价是砂窝更久不聚","costs":{"stamina":8,"energy":3},"stock_cost":3,"recovery_delay":10800,"cooldown_seconds":1800,"rewards":{"item.mat.array_sand":5,"item.ore.ironstone":2},"text":"你收起一大袋阵砂，砂窝却已被筛得见底；沉积要经过更长的来水，才能再次聚起。"}
+      ],
+      "maintenance":{"costs":{"item.mat.root_wedge":1,"stamina":2,"energy":2},"restore_units":2,"daily_limit":2,"cooldown_seconds":900,"recipe_key":"recipe.field.root_wedge","text":"护脉木楔稳住渠边石片，水流缓下来，新的砂层终于有了可以停留的地方。"},
+      "recipe_keys":["recipe.armor.patrol_vest"]
+    }
+  ]
+}

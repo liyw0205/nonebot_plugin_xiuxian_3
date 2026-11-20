@@ -1,6 +1,480 @@
 {
   "kind": "reward",
   "records": [
+    {"key":"reward_pool.relic.creek","name":"旧窑回收残件","desc":"在旧窑守护战获胜后回收陶盘残片，失败或过期无残件。","status":"active","pool_type":"weighted","outcomes":[{"weight":3,"rewards":{"item.relic.clay_disc":2}},{"weight":1,"rewards":{"item.relic.clay_disc":3}}]},
+    {"key":"reward_pool.relic.ironwood","name":"匠棚回收残件","desc":"在旧匠棚守护战获胜后回收定向铜针，失败或过期无残件。","status":"active","pool_type":"weighted","outcomes":[{"weight":3,"rewards":{"item.relic.bronze_needle":2}},{"weight":1,"rewards":{"item.relic.bronze_needle":3}}]},
+    {"key":"reward_pool.relic.basalt","name":"水工坊回收残件","desc":"在水工坊守护战获胜后回收测水刻环，失败或过期无残件。","status":"active","pool_type":"weighted","outcomes":[{"weight":3,"rewards":{"item.relic.water_ring":2}},{"weight":1,"rewards":{"item.relic.water_ring":3}}]},
+    {"key":"reward_pool.idle.camp.outskirts.meal","name":"近郊篝火营饭食交班","desc":"消耗自备补给完整交班后收下可制作的材料和营地行记。","status":"active","pool_type":"weighted","outcomes":[{"weight":3,"rewards":{"item.mat.wood":4,"item.ore.ironstone":2,"item.herb.blood_grass":2,"codex.story.camp.outskirts":1}},{"weight":1,"rewards":{"item.mat.wood":5,"item.ore.ironstone":2,"item.herb.blood_grass":2,"codex.story.camp.outskirts":1}}]},
+    {"key":"reward_pool.idle.camp.outskirts.pill","name":"近郊篝火营备药交班","desc":"消耗自备补给完整交班后收下可制作的材料和营地行记。","status":"active","pool_type":"weighted","outcomes":[{"weight":3,"rewards":{"item.mat.wood":2,"item.ore.ironstone":4,"item.herb.blood_grass":3,"codex.story.camp.outskirts":1}},{"weight":1,"rewards":{"item.mat.wood":3,"item.ore.ironstone":4,"item.herb.blood_grass":3,"codex.story.camp.outskirts":1}}]},
+    {"key":"reward_pool.idle.camp.outskirts.fallback","name":"近郊篝火营逾时留料","desc":"迟到只收少量干料，不退已用补给，不记完整交班。","status":"active","pool_type":"weighted","outcomes":[{"weight":1,"rewards":{"item.mat.wood":1}}]},
+    {"key":"reward_pool.idle.camp.ironwood.meal","name":"铁木桥畔营饭食交班","desc":"消耗自备补给完整交班后收下可制作的材料和营地行记。","status":"active","pool_type":"weighted","outcomes":[{"weight":3,"rewards":{"item.mat.wood":4,"item.ore.ironstone":2,"codex.story.camp.ironwood":1}},{"weight":1,"rewards":{"item.mat.wood":5,"item.ore.ironstone":2,"codex.story.camp.ironwood":1}}]},
+    {"key":"reward_pool.idle.camp.ironwood.pill","name":"铁木桥畔营备药交班","desc":"消耗自备补给完整交班后收下可制作的材料和营地行记。","status":"active","pool_type":"weighted","outcomes":[{"weight":3,"rewards":{"item.mat.wood":2,"item.ore.ironstone":4,"codex.story.camp.ironwood":1}},{"weight":1,"rewards":{"item.mat.wood":3,"item.ore.ironstone":4,"codex.story.camp.ironwood":1}}]},
+    {"key":"reward_pool.idle.camp.ironwood.fallback","name":"铁木桥畔营逾时留料","desc":"迟到只收少量干料，不退已用补给，不记完整交班。","status":"active","pool_type":"weighted","outcomes":[{"weight":1,"rewards":{"item.mat.wood":1}}]},
+    {"key":"reward_pool.idle.camp.basalt.meal","name":"岩径避风营饭食交班","desc":"消耗自备补给完整交班后收下可制作的材料和营地行记。","status":"active","pool_type":"weighted","outcomes":[{"weight":3,"rewards":{"item.mat.array_sand":4,"item.ore.ironstone":2,"codex.story.camp.basalt":1}},{"weight":1,"rewards":{"item.mat.array_sand":5,"item.ore.ironstone":2,"codex.story.camp.basalt":1}}]},
+    {"key":"reward_pool.idle.camp.basalt.pill","name":"岩径避风营备药交班","desc":"消耗自备补给完整交班后收下可制作的材料和营地行记。","status":"active","pool_type":"weighted","outcomes":[{"weight":3,"rewards":{"item.mat.array_sand":2,"item.ore.ironstone":4,"codex.story.camp.basalt":1}},{"weight":1,"rewards":{"item.mat.array_sand":3,"item.ore.ironstone":4,"codex.story.camp.basalt":1}}]},
+    {"key":"reward_pool.idle.camp.basalt.fallback","name":"岩径避风营逾时留料","desc":"迟到只收少量干料，不退已用补给，不记完整交班。","status":"active","pool_type":"weighted","outcomes":[{"weight":1,"rewards":{"item.mat.array_sand":1}}]},
+    {"key":"reward_pool.bounty.patrol.outskirts","name":"近郊巡路酬劳","desc":"接单时抽定酬劳，完成后由镇务簿发放灵石与制作材料。","status":"active","pool_type":"weighted","outcomes":[{"weight":3,"rewards":{"spirit_stones":35,"item.herb.blood_grass":2,"local_reputation":2}},{"weight":1,"rewards":{"spirit_stones":55,"item.mat.wood":3,"local_reputation":3}}]},
+    {"key":"reward_pool.bounty.patrol.ironwood","name":"铁木巡林酬劳","desc":"接单时抽定酬劳，完成后由镇务簿发放灵石与制作材料。","status":"active","pool_type":"weighted","outcomes":[{"weight":3,"rewards":{"spirit_stones":55,"item.mat.wood":2,"local_reputation":3}},{"weight":1,"rewards":{"spirit_stones":80,"item.ore.ironstone":3,"local_reputation":4}}]},
+    {"key":"reward_pool.bounty.patrol.basalt","name":"岩径巡标酬劳","desc":"接单时抽定酬劳，完成后由镇务簿发放灵石与制作材料。","status":"active","pool_type":"weighted","outcomes":[{"weight":3,"rewards":{"spirit_stones":75,"item.mat.array_sand":2,"local_reputation":4}},{"weight":1,"rewards":{"spirit_stones":110,"item.ore.ironstone":3,"local_reputation":5}}]},
+    {
+      "key": "reward_pool.patrol.outskirts.cart.careful",
+      "name": "断辕旧车·稳行所得",
+      "desc": "巡查完成并在遇战时获胜后取得；取消、逾时或战败不发放。",
+      "status": "active",
+      "pool_type": "weighted",
+      "outcomes": [
+        {
+          "weight": 3,
+          "rewards": {
+            "item.mat.wood": 1,
+            "item.herb.blood_grass": 1
+          }
+        },
+        {
+          "weight": 1,
+          "rewards": {
+            "item.mat.wood": 2,
+            "item.herb.blood_grass": 2
+          }
+        }
+      ]
+    },
+    {
+      "key": "reward_pool.patrol.outskirts.cart.pursuit",
+      "name": "断辕旧车·追迹所得",
+      "desc": "巡查完成并在遇战时获胜后取得；取消、逾时或战败不发放。",
+      "status": "active",
+      "pool_type": "weighted",
+      "outcomes": [
+        {
+          "weight": 3,
+          "rewards": {
+            "item.mat.wood": 2,
+            "item.herb.blood_grass": 2
+          }
+        },
+        {
+          "weight": 1,
+          "rewards": {
+            "item.mat.wood": 3,
+            "item.herb.blood_grass": 3
+          }
+        }
+      ]
+    },
+    {
+      "key": "reward_pool.patrol.outskirts.herbs.careful",
+      "name": "雨后药丛·稳行所得",
+      "desc": "巡查完成并在遇战时获胜后取得；取消、逾时或战败不发放。",
+      "status": "active",
+      "pool_type": "weighted",
+      "outcomes": [
+        {
+          "weight": 3,
+          "rewards": {
+            "item.mat.wood": 2,
+            "item.herb.blood_grass": 1
+          }
+        },
+        {
+          "weight": 1,
+          "rewards": {
+            "item.mat.wood": 2,
+            "item.herb.blood_grass": 2
+          }
+        }
+      ]
+    },
+    {
+      "key": "reward_pool.patrol.outskirts.herbs.pursuit",
+      "name": "雨后药丛·追迹所得",
+      "desc": "巡查完成并在遇战时获胜后取得；取消、逾时或战败不发放。",
+      "status": "active",
+      "pool_type": "weighted",
+      "outcomes": [
+        {
+          "weight": 3,
+          "rewards": {
+            "item.mat.wood": 3,
+            "item.herb.blood_grass": 2
+          }
+        },
+        {
+          "weight": 1,
+          "rewards": {
+            "item.mat.wood": 3,
+            "item.herb.blood_grass": 3
+          }
+        }
+      ]
+    },
+    {
+      "key": "reward_pool.patrol.outskirts.tracks.careful",
+      "name": "夜兽留痕·稳行所得",
+      "desc": "巡查完成并在遇战时获胜后取得；取消、逾时或战败不发放。",
+      "status": "active",
+      "pool_type": "weighted",
+      "outcomes": [
+        {
+          "weight": 3,
+          "rewards": {
+            "item.mat.wood": 1,
+            "item.herb.blood_grass": 1
+          }
+        },
+        {
+          "weight": 1,
+          "rewards": {
+            "item.mat.wood": 2,
+            "item.herb.blood_grass": 2
+          }
+        }
+      ]
+    },
+    {
+      "key": "reward_pool.patrol.outskirts.tracks.pursuit",
+      "name": "夜兽留痕·追迹所得",
+      "desc": "巡查完成并在遇战时获胜后取得；取消、逾时或战败不发放。",
+      "status": "active",
+      "pool_type": "weighted",
+      "outcomes": [
+        {
+          "weight": 3,
+          "rewards": {
+            "item.mat.wood": 2,
+            "item.herb.blood_grass": 2
+          }
+        },
+        {
+          "weight": 1,
+          "rewards": {
+            "item.mat.wood": 3,
+            "item.herb.blood_grass": 3
+          }
+        }
+      ]
+    },
+    {
+      "key": "reward_pool.patrol.ironwood.bridge.careful",
+      "name": "旧桥松钉·稳行所得",
+      "desc": "巡查完成并在遇战时获胜后取得；取消、逾时或战败不发放。",
+      "status": "active",
+      "pool_type": "weighted",
+      "outcomes": [
+        {
+          "weight": 3,
+          "rewards": {
+            "item.mat.wood": 1,
+            "item.ore.ironstone": 1
+          }
+        },
+        {
+          "weight": 1,
+          "rewards": {
+            "item.mat.wood": 2,
+            "item.ore.ironstone": 2
+          }
+        }
+      ]
+    },
+    {
+      "key": "reward_pool.patrol.ironwood.bridge.pursuit",
+      "name": "旧桥松钉·追迹所得",
+      "desc": "巡查完成并在遇战时获胜后取得；取消、逾时或战败不发放。",
+      "status": "active",
+      "pool_type": "weighted",
+      "outcomes": [
+        {
+          "weight": 3,
+          "rewards": {
+            "item.mat.wood": 2,
+            "item.ore.ironstone": 2
+          }
+        },
+        {
+          "weight": 1,
+          "rewards": {
+            "item.mat.wood": 3,
+            "item.ore.ironstone": 3
+          }
+        }
+      ]
+    },
+    {
+      "key": "reward_pool.patrol.ironwood.gully.careful",
+      "name": "雨沟积木·稳行所得",
+      "desc": "巡查完成并在遇战时获胜后取得；取消、逾时或战败不发放。",
+      "status": "active",
+      "pool_type": "weighted",
+      "outcomes": [
+        {
+          "weight": 3,
+          "rewards": {
+            "item.mat.wood": 2,
+            "item.ore.ironstone": 1
+          }
+        },
+        {
+          "weight": 1,
+          "rewards": {
+            "item.mat.wood": 2,
+            "item.ore.ironstone": 2
+          }
+        }
+      ]
+    },
+    {
+      "key": "reward_pool.patrol.ironwood.gully.pursuit",
+      "name": "雨沟积木·追迹所得",
+      "desc": "巡查完成并在遇战时获胜后取得；取消、逾时或战败不发放。",
+      "status": "active",
+      "pool_type": "weighted",
+      "outcomes": [
+        {
+          "weight": 3,
+          "rewards": {
+            "item.mat.wood": 3,
+            "item.ore.ironstone": 2
+          }
+        },
+        {
+          "weight": 1,
+          "rewards": {
+            "item.mat.wood": 3,
+            "item.ore.ironstone": 3
+          }
+        }
+      ]
+    },
+    {
+      "key": "reward_pool.patrol.ironwood.wind.careful",
+      "name": "风口折枝·稳行所得",
+      "desc": "巡查完成并在遇战时获胜后取得；取消、逾时或战败不发放。",
+      "status": "active",
+      "pool_type": "weighted",
+      "outcomes": [
+        {
+          "weight": 3,
+          "rewards": {
+            "item.mat.wood": 1,
+            "item.ore.ironstone": 1
+          }
+        },
+        {
+          "weight": 1,
+          "rewards": {
+            "item.mat.wood": 2,
+            "item.ore.ironstone": 2
+          }
+        }
+      ]
+    },
+    {
+      "key": "reward_pool.patrol.ironwood.wind.pursuit",
+      "name": "风口折枝·追迹所得",
+      "desc": "巡查完成并在遇战时获胜后取得；取消、逾时或战败不发放。",
+      "status": "active",
+      "pool_type": "weighted",
+      "outcomes": [
+        {
+          "weight": 3,
+          "rewards": {
+            "item.mat.wood": 2,
+            "item.ore.ironstone": 2
+          }
+        },
+        {
+          "weight": 1,
+          "rewards": {
+            "item.mat.wood": 3,
+            "item.ore.ironstone": 3
+          }
+        }
+      ]
+    },
+    {
+      "key": "reward_pool.patrol.basalt.water.careful",
+      "name": "水痕偏标·稳行所得",
+      "desc": "巡查完成并在遇战时获胜后取得；取消、逾时或战败不发放。",
+      "status": "active",
+      "pool_type": "weighted",
+      "outcomes": [
+        {
+          "weight": 3,
+          "rewards": {
+            "item.mat.array_sand": 1,
+            "item.ore.ironstone": 1
+          }
+        },
+        {
+          "weight": 1,
+          "rewards": {
+            "item.mat.array_sand": 2,
+            "item.ore.ironstone": 2
+          }
+        }
+      ]
+    },
+    {
+      "key": "reward_pool.patrol.basalt.water.pursuit",
+      "name": "水痕偏标·追迹所得",
+      "desc": "巡查完成并在遇战时获胜后取得；取消、逾时或战败不发放。",
+      "status": "active",
+      "pool_type": "weighted",
+      "outcomes": [
+        {
+          "weight": 3,
+          "rewards": {
+            "item.mat.array_sand": 2,
+            "item.ore.ironstone": 2
+          }
+        },
+        {
+          "weight": 1,
+          "rewards": {
+            "item.mat.array_sand": 3,
+            "item.ore.ironstone": 3
+          }
+        }
+      ]
+    },
+    {
+      "key": "reward_pool.patrol.basalt.rune.careful",
+      "name": "残纹石台·稳行所得",
+      "desc": "巡查完成并在遇战时获胜后取得；取消、逾时或战败不发放。",
+      "status": "active",
+      "pool_type": "weighted",
+      "outcomes": [
+        {
+          "weight": 3,
+          "rewards": {
+            "item.mat.array_sand": 2,
+            "item.ore.ironstone": 1
+          }
+        },
+        {
+          "weight": 1,
+          "rewards": {
+            "item.mat.array_sand": 2,
+            "item.ore.ironstone": 2
+          }
+        }
+      ]
+    },
+    {
+      "key": "reward_pool.patrol.basalt.rune.pursuit",
+      "name": "残纹石台·追迹所得",
+      "desc": "巡查完成并在遇战时获胜后取得；取消、逾时或战败不发放。",
+      "status": "active",
+      "pool_type": "weighted",
+      "outcomes": [
+        {
+          "weight": 3,
+          "rewards": {
+            "item.mat.array_sand": 3,
+            "item.ore.ironstone": 2
+          }
+        },
+        {
+          "weight": 1,
+          "rewards": {
+            "item.mat.array_sand": 3,
+            "item.ore.ironstone": 3
+          }
+        }
+      ]
+    },
+    {
+      "key": "reward_pool.patrol.basalt.scree.careful",
+      "name": "碎坡新径·稳行所得",
+      "desc": "巡查完成并在遇战时获胜后取得；取消、逾时或战败不发放。",
+      "status": "active",
+      "pool_type": "weighted",
+      "outcomes": [
+        {
+          "weight": 3,
+          "rewards": {
+            "item.mat.array_sand": 1,
+            "item.ore.ironstone": 1
+          }
+        },
+        {
+          "weight": 1,
+          "rewards": {
+            "item.mat.array_sand": 2,
+            "item.ore.ironstone": 2
+          }
+        }
+      ]
+    },
+    {
+      "key": "reward_pool.patrol.basalt.scree.pursuit",
+      "name": "碎坡新径·追迹所得",
+      "desc": "巡查完成并在遇战时获胜后取得；取消、逾时或战败不发放。",
+      "status": "active",
+      "pool_type": "weighted",
+      "outcomes": [
+        {
+          "weight": 3,
+          "rewards": {
+            "item.mat.array_sand": 2,
+            "item.ore.ironstone": 2
+          }
+        },
+        {
+          "weight": 1,
+          "rewards": {
+            "item.mat.array_sand": 3,
+            "item.ore.ironstone": 3
+          }
+        }
+      ]
+    },
+    {"key": "reward_pool.idle.leaf_watch", "name": "守圃交班所得", "desc": "六小时守圃收回灵叶、阵砂与手记。", "status": "active", "pool_type": "weighted", "outcomes": [
+      {"weight": 3, "rewards": {"item.herb.spirit_leaf": 2, "item.mat.array_sand": 1, "codex.story.leaf_watch": 1}},
+      {"weight": 1, "rewards": {"item.herb.spirit_leaf": 3, "item.mat.array_sand": 2, "codex.story.leaf_watch": 1}}
+    ]},
+    {"key": "reward_pool.idle.leaf_watch.leaf", "name": "护叶引露所得", "desc": "多费精力护叶，收下更多灵叶与一份阵砂。", "status": "active", "pool_type": "weighted", "outcomes": [
+      {"weight": 3, "rewards": {"item.herb.spirit_leaf": 3, "item.mat.array_sand": 1, "codex.story.leaf_watch": 1}},
+      {"weight": 1, "rewards": {"item.herb.spirit_leaf": 4, "item.mat.array_sand": 1, "codex.story.leaf_watch": 1}}
+    ]},
+    {"key": "reward_pool.idle.leaf_watch.sand", "name": "理沟收砂所得", "desc": "多费体力理沟，收下更多阵砂与两份灵叶。", "status": "active", "pool_type": "weighted", "outcomes": [
+      {"weight": 3, "rewards": {"item.herb.spirit_leaf": 2, "item.mat.array_sand": 2, "codex.story.leaf_watch": 1}},
+      {"weight": 1, "rewards": {"item.herb.spirit_leaf": 2, "item.mat.array_sand": 3, "codex.story.leaf_watch": 1}}
+    ]},
+    {"key": "reward_pool.idle.leaf_watch.fallback", "name": "守圃逾时所得", "desc": "沈青代为收圃，只留一束灵叶，没有完整交班手记。", "status": "active", "pool_type": "weighted", "outcomes": [
+      {"weight": 1, "rewards": {"item.herb.spirit_leaf": 1}}
+    ]},
+    {"key": "reward_pool.idle.mist_lamp", "name": "守灯所得", "desc": "完整守灯收回阵砂与灯簿。", "status": "active", "pool_type": "weighted", "outcomes": [
+      {"weight": 3, "rewards": {"item.mat.array_sand": 2, "codex.story.mist_lamp": 1}},
+      {"weight": 1, "rewards": {"item.mat.array_sand": 3, "codex.story.mist_lamp": 1}}
+    ]},
+    {"key": "reward_pool.idle.mist_lamp.sand", "name": "固灯筛砂所得", "desc": "多费体力，筛出较多阵砂。", "status": "active", "pool_type": "weighted", "outcomes": [
+      {"weight": 3, "rewards": {"item.mat.array_sand": 3, "codex.story.mist_lamp": 1}},
+      {"weight": 1, "rewards": {"item.mat.array_sand": 4, "codex.story.mist_lamp": 1}}
+    ]},
+    {"key": "reward_pool.idle.mist_lamp.leaf", "name": "照壁辨叶所得", "desc": "多费精力，兼取灵叶与布阵干砂。", "status": "active", "pool_type": "weighted", "outcomes": [
+      {"weight": 3, "rewards": {"item.mat.array_sand": 2, "item.herb.spirit_leaf": 1, "codex.story.mist_lamp": 1}},
+      {"weight": 1, "rewards": {"item.mat.array_sand": 2, "item.herb.spirit_leaf": 2, "codex.story.mist_lamp": 1}}
+    ]},
+    {"key": "reward_pool.idle.mist_lamp.fallback", "name": "守灯逾时所得", "desc": "潮雾过后只留少量干砂，无完整灯簿。", "status": "active", "pool_type": "weighted", "outcomes": [
+      {"weight": 1, "rewards": {"item.mat.array_sand": 1}}
+    ]},
+    {"key": "reward_pool.idle.cloud_dock", "name": "候潮所得", "desc": "完整候潮交班收回云铁、阵砂与航簿。", "status": "active", "pool_type": "weighted", "outcomes": [
+      {"weight": 3, "rewards": {"item.material.cloud_iron": 2, "item.mat.array_sand": 1, "codex.story.cloud_tide": 1}},
+      {"weight": 1, "rewards": {"item.material.cloud_iron": 3, "item.mat.array_sand": 2, "codex.story.cloud_tide": 1}}
+    ]},
+    {"key": "reward_pool.idle.cloud_dock.iron", "name": "扶舷搬铁所得", "desc": "多费体力，偏重云铁而保留一份阵砂。", "status": "active", "pool_type": "weighted", "outcomes": [
+      {"weight": 3, "rewards": {"item.material.cloud_iron": 3, "item.mat.array_sand": 1, "codex.story.cloud_tide": 1}},
+      {"weight": 1, "rewards": {"item.material.cloud_iron": 4, "item.mat.array_sand": 1, "codex.story.cloud_tide": 1}}
+    ]},
+    {"key": "reward_pool.idle.cloud_dock.sand", "name": "护袋理砂所得", "desc": "多费精力，偏重阵砂而保留两份云铁。", "status": "active", "pool_type": "weighted", "outcomes": [
+      {"weight": 3, "rewards": {"item.material.cloud_iron": 2, "item.mat.array_sand": 3, "codex.story.cloud_tide": 1}},
+      {"weight": 1, "rewards": {"item.material.cloud_iron": 2, "item.mat.array_sand": 4, "codex.story.cloud_tide": 1}}
+    ]},
+    {"key": "reward_pool.idle.cloud_dock.fallback", "name": "候潮逾时所得", "desc": "舟工代为交班后留下一份云铁，无完整航簿。", "status": "active", "pool_type": "weighted", "outcomes": [
+      {"weight": 1, "rewards": {"item.material.cloud_iron": 1}}
+    ]},
     {"key": "reward_pool.idle.event.herb_shelter", "name": "扶徒归棚所得", "desc": "送学徒归棚，药材与镇中人情二者兼得，但不采坡顶灵叶。", "status": "active", "pool_type": "weighted", "outcomes": [
       {"weight": 3, "rewards": {"item.herb.blood_grass": 2, "local.xuantian.new_town": 1, "codex.story.herb_vale_gather": 1}},
       {"weight": 1, "rewards": {"item.herb.blood_grass": 3, "local.xuantian.new_town": 1, "codex.story.herb_vale_gather": 1}}]},

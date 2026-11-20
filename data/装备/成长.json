@@ -5,10 +5,12 @@
     {
       "key": "equipment.growth.common",
       "name": "凡品祭炼",
-      "desc": "适用于凡品装备的祭炼、重铸与锻造耐久规则。",
+      "desc": "适用于凡品装备的修缮、祭炼、重铸与锻造耐久规则。",
       "status": "active",
       "growth": {
         "craft_durability": {"base_bp": 8000, "quality_divisor": 5, "minimum_bp": 8000, "maximum_bp": 10000},
+        "repair": {"location_key": "xuantian.new_town", "durability_chunk_bp": 2000, "cost_per_chunk": {"item.ore.ironstone": 1, "currency.spirit_stone": 20}},
+        "reclamation": {"yields": {"item.ore.ironstone": 1}},
         "temper": {
           "max_level": 3,
           "costs": {
@@ -40,10 +42,12 @@
     {
       "key": "equipment.growth.uncommon",
       "name": "良品祭炼",
-      "desc": "适用于良品装备的祭炼、重铸与锻造耐久规则。",
+      "desc": "适用于良品装备的修缮、祭炼、重铸与锻造耐久规则。",
       "status": "active",
       "growth": {
         "craft_durability": {"base_bp": 8200, "quality_divisor": 5, "minimum_bp": 8200, "maximum_bp": 10000},
+        "repair": {"location_key": "xuantian.new_town", "durability_chunk_bp": 2000, "cost_per_chunk": {"item.ore.ironstone": 2, "currency.spirit_stone": 40}},
+        "reclamation": {"yields": {"item.ore.ironstone": 2}},
         "temper": {
           "max_level": 4,
           "costs": {
@@ -85,10 +89,12 @@
     {
       "key": "equipment.growth.rare",
       "name": "珍品祭炼",
-      "desc": "适用于珍品装备的祭炼、重铸与锻造耐久规则。",
+      "desc": "适用于珍品装备的修缮、祭炼、重铸与锻造耐久规则。",
       "status": "active",
       "growth": {
         "craft_durability": {"base_bp": 8500, "quality_divisor": 10, "minimum_bp": 8500, "maximum_bp": 10000},
+        "repair": {"location_key": "xuantian.new_town", "durability_chunk_bp": 1000, "cost_per_chunk": {"item.material.cloud_iron": 1, "currency.spirit_stone": 80}},
+        "reclamation": {"yields": {"item.material.cloud_iron": 1}},
         "temper": {
           "max_level": 5,
           "costs": {
@@ -131,10 +137,12 @@
     {
       "key": "equipment.growth.heaven",
       "name": "天品祭炼",
-      "desc": "适用于天品装备的祭炼、重铸与锻造耐久规则。",
+      "desc": "适用于天品装备的修缮、祭炼、重铸与锻造耐久规则。",
       "status": "active",
       "growth": {
         "craft_durability": {"base_bp": 9000, "quality_divisor": 20, "minimum_bp": 9000, "maximum_bp": 10000},
+        "repair": {"location_key": "xuantian.new_town", "durability_chunk_bp": 1000, "cost_per_chunk": {"item.soul_crystal": 1, "currency.spirit_stone": 250}},
+        "reclamation": {"yields": {"item.soul_crystal": 1}},
         "temper": {
           "max_level": 6,
           "costs": {
@@ -178,10 +186,12 @@
     {
       "key": "equipment.growth.mythic",
       "name": "仙品祭炼",
-      "desc": "适用于仙品装备的祭炼、重铸与锻造耐久规则。",
+      "desc": "适用于仙品装备的修缮、祭炼、重铸与锻造耐久规则。",
       "status": "active",
       "growth": {
         "craft_durability": {"base_bp": 9500, "quality_divisor": 25, "minimum_bp": 9500, "maximum_bp": 10000},
+        "repair": {"location_key": "xuantian.new_town", "durability_chunk_bp": 1000, "cost_per_chunk": {"item.void_crystal": 1, "currency.spirit_stone": 1000}},
+        "reclamation": {"yields": {"item.void_crystal": 1}},
         "temper": {
           "max_level": 7,
           "costs": {

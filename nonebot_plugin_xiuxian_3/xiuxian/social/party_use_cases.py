@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from ...contracts import CommandContext, CommandResult
+from ...contracts import CommandAction, CommandContext, CommandResult
+from ..content import ContentError, bundled_content
+from ..utils.text import command_link
 from ..repository import (
     OperationConflictError,
     PartyAlreadyMemberError,
@@ -17,6 +19,8 @@ from ..repository import (
     PartyBattleNotReadyError,
     PartyBattlePermissionError,
     PartyBattleRequirementError,
+    PartyBattleResourceError,
+    PartyBattleDailyLimitError,
     BoundaryRealmRequirementError,
     BoundaryRealmResourceError,
     CrossRealmPartyRequirementError,
@@ -48,6 +52,7 @@ class PartyApplication:
 
     def __init__(self, repository: SQLitePlayerRepository):
         self.repository = repository
+        self.content = repository.content if repository.content is not None else bundled_content()
 
     @staticmethod
     def _operation_id(context: CommandContext, name: str) -> str:
@@ -145,6 +150,51 @@ class PartyApplication:
             title="多人副本队伍",
             invite_hint="三至四名同地点道友",
         )
+
+    def _reward_text(self, reward: dict[str, int]) -> str:
+        labels = {"cultivation": "修为", "spirit_stones": "灵石", "world_merit": "功勋", "soul_power": "神魂"}
+        parts = []
+        for key, amount in reward.items():
+            item = self.content.get("item", key, include_locked=True) if key.startswith("item.") else None
+            parts.append(f"{item['name'] if item else labels.get(key, key)} ×{amount}")
+        return "、".join(parts) or "无"
+
+    async def preview_standard_party(self, context: CommandContext) -> CommandResult:
+        if context.command_args:
+            return CommandResult(False, "INVALID_PARTY_COMMAND", "多人副本预览无需附加参数。", context.request_id)
+        try:
+            view = await self.repository.preview_standard_party(platform=context.adapter, platform_user_id=context.user_id)
+        except Exception as exc:
+            return self._party_battle_error(context, "", exc)
+        if not view["supported"]:
+            names = "、".join(row["name"] for row in view["locations"])
+            return CommandResult(True, "PARTY_BATTLE_PREVIEW", f"此处没有开放的多人副本。可前往：{names}。", context.request_id, data=view)
+        realm = self.content.require("realm", view["required_realm"], include_locked=True)
+        reason_labels = {"unavailable": "当前不可行动", "unconfirmed": "尚未确认", "location": "不在集结地", "realm": "境界不足",
+                         "stamina": "体力不足", "energy": "精力不足", "daily_limit": "今日次数已用尽", "busy": "另有行程或战斗",
+                         "no_party": "尚未组队", "party_type": "须使用多人副本队伍", "not_leader": "须由队长开战",
+                         "not_ready": "队伍尚未就绪", "expired": "队伍确认已过期，请重新集结", "member_count": "人数不足或超限"}
+        limit = f"每日 {view['daily_limit']} 次（UTC 零时重置）" if view["daily_limit"] else "不设每日入场次数"
+        lines = ["## 多人副本战备", f"对手：{view['enemy_name']}｜{realm['name']} {view['required_layer']} 层起",
+                 f"人数：{view['min_members']} 至 {view['max_members']} 人，全员确认、同地集结。",
+                 f"每人入场：体力 {view['cost']['stamina']}、精力 {view['cost']['energy']}；{limit}。",
+                 f"每名获奖成员：{self._reward_text(view['reward'])}。"]
+        for member in view["members"]:
+            state = "、".join(reason_labels[key] for key in member["blockers"]) or "已备妥"
+            quota = f"，今日已出战 {member['daily_used']}/{view['daily_limit']}" if view["daily_limit"] else ""
+            lines.append(f"- {member['name']}：{state}；体力 {member['stamina']}、精力 {member['energy']}{quota}")
+        if view["blockers"]:
+            lines.append("待办：" + "、".join(reason_labels[key] for key in view["blockers"]) + "。")
+        if view["consumers"]:
+            lines.append("材料去处：" + "、".join(command_link(row["name"], f"{row['command']} {row['name']}" if row["command"] == "生产预览" else row["command"]) for row in view["consumers"]) + "。")
+        if view["daily_limit"]:
+            lines.append("开战即计次，战败或超时不退入场消耗且不发胜利材料。断线后任一参战成员可结算原战斗。")
+        actions = [CommandAction("我的队伍", "我的队伍")]
+        if "no_party" in view["blockers"]:
+            actions.insert(0, CommandAction("创建队伍", "创建多人副本队伍"))
+        elif view["can_start"]:
+            actions.insert(0, CommandAction("开始战斗", "开始队伍战斗"))
+        return CommandResult(True, "PARTY_BATTLE_PREVIEW", "\n\n".join(lines), context.request_id, data=view, actions=tuple(actions))
 
     async def create_three_realms_tower_duo_party(self, context: CommandContext) -> CommandResult:
         return await self._create_party(
@@ -314,6 +364,7 @@ class PartyApplication:
     @staticmethod
     def _party_battle_error(context: CommandContext, operation_id: str, exc: Exception) -> CommandResult:
         errors = {
+            ContentError: ("CONTENT_INVALID", "此处副本资料有误，暂时不能启程。"),
             BoundaryRealmRequirementError: ("BATTLE_CROSS_REALM_REQUIREMENT_MISSING", "队伍成员必须满足元婴、三界主线和界隙地点要求。"),
             BoundaryRealmResourceError: ("SOUL_CRYSTAL_INSUFFICIENT", "队伍需要全员 30 体力，并由队长支付 1 枚神魂晶。"),
             CrossRealmPartyRequirementError: ("BATTLE_CROSS_REALM_REQUIREMENT_MISSING", "队伍成员未满足该跨界副本的地点、资格或体力要求。"),
@@ -322,7 +373,9 @@ class PartyApplication:
             SoulExhaustionActiveError: ("SOUL_EXHAUSTION_ACTIVE", "队伍成员的神魂疲劳尚未结束，暂时不能进入跨界副本。"),
             SoulPowerInsufficientError: ("BATTLE_SOUL_POWER_INSUFFICIENT", "队伍成员神魂不足，暂时不能进入跨界副本。"),
             PartyBattlePermissionError: ("PARTY_BATTLE_PERMISSION_DENIED", "只有队长可以发起队伍战斗，已确认成员可以结算。"),
-            PartyBattleRequirementError: ("PARTY_BATTLE_REQUIREMENT_MISSING", "队伍必须在支持的地点完成双方确认。"),
+            PartyBattleResourceError: ("PARTY_BATTLE_RESOURCE_INSUFFICIENT", "有成员入场体力或精力不足，请查看 `多人副本预览`。"),
+            PartyBattleDailyLimitError: ("PARTY_BATTLE_DAILY_LIMIT", "有成员今日出战次数已用尽，请查看 `多人副本预览`。"),
+            PartyBattleRequirementError: ("PARTY_BATTLE_REQUIREMENT_MISSING", "队伍人数、确认、地点或境界尚未满足，请查看 `多人副本预览`。"),
             PartyBattleBusyError: ("PARTY_BATTLE_BUSY", "队伍或成员已有锁定中的战斗资产。"),
             PartyBattleNotFoundError: ("PARTY_BATTLE_NOT_FOUND", "当前没有可查看的队伍战斗。"),
             PartyBattleNotReadyError: ("PARTY_BATTLE_NOT_READY", "队伍战斗仍在由服务器自动推进。"),
@@ -357,7 +410,7 @@ class PartyApplication:
             )
         except Exception as exc:
             return self._party_battle_error(context, operation_id, exc)
-        return self._party_battle_result(context, operation_id, resolved)
+        return await self._party_battle_result(context, operation_id, resolved)
 
     async def settle_party_battle(self, context: CommandContext) -> CommandResult:
         if len(context.command_args) > 1:
@@ -372,26 +425,21 @@ class PartyApplication:
             )
         except Exception as exc:
             return self._party_battle_error(context, operation_id, exc)
-        return self._party_battle_result(context, operation_id, resolved)
+        return await self._party_battle_result(context, operation_id, resolved)
 
-    @staticmethod
-    def _party_battle_result(context: CommandContext, operation_id: str, record) -> CommandResult:
+    async def _party_battle_result(self, context: CommandContext, operation_id: str, record) -> CommandResult:
         outcome = "胜利" if record.outcome == "won" else ("失败" if record.outcome == "lost" else "超时")
-        rewards = next(iter(record.rewards.values()), {})
-        reward_text = "、".join(
-            (
-                f"修为 +{value}"
-                if key == "cultivation"
-                else f"灵石 ×{value}"
-                if key == "spirit_stones"
-                else f"{key} ×{value}"
-            )
-            for key, value in rewards.items()
-        ) or "无"
+        replay = await self.repository.replay_party_battle(platform=context.adapter, platform_user_id=context.user_id, battle_id=record.battle_id)
+        member_rewards = [{"player_id": member["player_id"], "name": member.get("dao_name", member["player_id"]),
+                           "reward": record.rewards.get(str(member["database_id"]), {})} for member in replay.snapshot["members"]]
+        reward_text = "\n".join(f"- {member['name']}：{self._reward_text(member['reward'])}" for member in member_rewards)
+        actions = [CommandAction("战斗回放", f"队伍战斗回放 {record.battle_id}"), CommandAction("战备预览", "多人副本预览")]
+        if any(key.startswith("item.") for reward in record.rewards.values() for key in reward):
+            actions.append(CommandAction("城镇委托", "城镇委托"))
         return CommandResult(
             True,
             "PARTY_BATTLE_SETTLED",
-            f"## 队伍战斗结束\n\n- **结果**：{outcome}\n- **回合**：{record.round_no}\n- **每名成员奖励**：{reward_text}\n\n> 服务端已保存全体成员快照与行动回放。",
+            f"## 队伍战斗结束\n\n- **结果**：{outcome}\n- **回合**：{record.round_no}\n\n成员所得：\n{reward_text}\n\n{command_link('查看行动回放', f'队伍战斗回放 {record.battle_id}')}。",
             context.request_id,
             operation_id,
             data={
@@ -401,11 +449,13 @@ class PartyApplication:
                 "outcome": record.outcome,
                 "round_no": record.round_no,
                 "rewards": record.rewards,
+                "member_rewards": member_rewards,
                 "contributions": record.contributions,
                 "reward_order": list(record.reward_order),
                 "reward_rolls": record.reward_rolls,
                 "idempotent_replay": record.already_completed,
             },
+            actions=tuple(actions),
         )
 
     async def replay_party_battle(self, context: CommandContext) -> CommandResult:

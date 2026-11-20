@@ -1,6 +1,7 @@
 {
   "kind": "item",
   "records": [
+    {"key":"item.armor.patrol_vest","name":"巡山护甲","desc":"以铁片和木衬缝成的行山护甲，阵砂填缝，可承受巡路时的擦碰。","item_type":"armor","quality":"common","stack_limit":1,"instance_mode":"unique","bind_type":"unbound","tradeable":true,"durability_bp":10000,"equipment_slot":"armor","effects":[{"type":"flat_stat","stat":"max_hp","value":35}],"growth_profile_key":"equipment.growth.common","requirements":[{"type":"realm","realm_key":"qi_sensing","min_layer":2}],"source_recipe_key":"recipe.armor.patrol_vest","status":"active"},
     {
       "name": "棉袍",
       "desc": "以厚棉织成的基础护袍，能抵挡寻常风寒与擦伤。",

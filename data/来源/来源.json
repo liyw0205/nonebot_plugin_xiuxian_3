@@ -2,6 +2,126 @@
   "schema": "xiuxian.content",
   "kind": "source",
   "records": [
+    {"key":"source.party.cloud_boat","name":"云舟合力护航材料","desc":"四至五名金丹修士在云舟渡口共同战胜守灵，每名有贡献的成员各得一份云铁与阵砂，供云纹剑、聚灵阵和候潮备材使用。","asset_keys":["item.material.cloud_iron","item.mat.array_sand"],"channels":[{"operation":"battle.party.resolve","reference":"enemy.cloud_boat_guardian"}],"status":"active"},
+    {"key":"source.relic.fragments","name":"三地古迹残件","desc":"完成当地勘察、拆用行囊并战胜真实守护者后，从溪崖旧窑、铁木旧匠棚与岩径水工坊带回三种残件。","asset_keys":["item.relic.clay_disc","item.relic.bronze_needle","item.relic.water_ring"],"channels":[{"operation":"exploration.settle_combat","reference":"reward_pool.relic.creek"},{"operation":"exploration.settle_combat","reference":"reward_pool.relic.ironwood"},{"operation":"exploration.settle_combat","reference":"reward_pool.relic.basalt"}],"status":"active"},
+    {"key":"source.relic.supplies","name":"勘掘行装制作","desc":"青石镇以可再生木材、铁石和止血草制作行囊，供公开寻遗路线使用。","asset_keys":["item.relic.excavation_kit"],"channels":[{"operation":"production.complete","reference":"recipe.relic.excavation_kit"}],"status":"active"},
+    {"key":"source.relic.restoration","name":"山河罗盘复原","desc":"三种真实寻遗残件与阵砂在青石镇合成可穿戴罗盘。","asset_keys":["item.accessory.field_compass"],"channels":[{"operation":"production.complete","reference":"recipe.relic.field_compass"}],"status":"active"},
+    {"key":"source.deposit.materials","name":"资源脉留养取材","desc":"真实完成三处地貌后，按个人可恢复储量取材，强采多得材料但推迟恢复；木药可制木楔继续维护，铁砂可供护甲制作。","asset_keys":["item.mat.wood","item.herb.blood_grass","item.ore.ironstone","item.mat.array_sand"],"channels":[{"operation":"deposit.extract","reference":"deposit.creek_roots"},{"operation":"deposit.extract","reference":"deposit.ironwood_layer"},{"operation":"deposit.extract","reference":"deposit.basalt_sand"}],"status":"active"},
+    {"key":"source.deposit.upkeep","name":"护脉木楔制作","desc":"在青石镇以公开木材和止血草制作两枚木楔，养护任一已发现的资源脉时实际消耗。","asset_keys":["item.mat.root_wedge"],"channels":[{"operation":"production.complete","reference":"recipe.field.root_wedge"}],"status":"active"},
+    {"key":"source.survey.discoveries","name":"山野首勘材料","desc":"溪崖、铁木与岩径地貌逐点完成后取得一次材料，分别投入公开木剑、疗伤丹和巡山护甲配方。","asset_keys":["item.mat.wood","item.herb.blood_grass","item.ore.ironstone","item.mat.array_sand"],"channels":[{"operation":"survey.choose","reference":"survey.creek_cliff"},{"operation":"survey.choose","reference":"survey.iron_roots"},{"operation":"survey.choose","reference":"survey.basalt_channel"}],"status":"active"},
+    {"key":"source.idle.camp.outskirts","name":"近郊篝火营材料","desc":"携带公开配方可制作的饭食或疗伤丹，完整交班收材；材料供巡山护甲和现有生产使用。","asset_keys":["item.mat.wood","item.ore.ironstone","item.herb.blood_grass"],"channels":[{"operation":"specials.claim_idle","reference":"reward_pool.idle.camp.outskirts.meal"},{"operation":"specials.claim_idle","reference":"reward_pool.idle.camp.outskirts.pill"},{"operation":"specials.claim_idle","reference":"reward_pool.idle.camp.outskirts.fallback"}],"status":"active"},
+    {"key":"source.idle.camp.ironwood","name":"铁木桥畔营材料","desc":"携带公开配方可制作的饭食或疗伤丹，完整交班收材；材料供巡山护甲和现有生产使用。","asset_keys":["item.mat.wood","item.ore.ironstone"],"channels":[{"operation":"specials.claim_idle","reference":"reward_pool.idle.camp.ironwood.meal"},{"operation":"specials.claim_idle","reference":"reward_pool.idle.camp.ironwood.pill"},{"operation":"specials.claim_idle","reference":"reward_pool.idle.camp.ironwood.fallback"}],"status":"active"},
+    {"key":"source.idle.camp.basalt","name":"岩径避风营材料","desc":"携带公开配方可制作的饭食或疗伤丹，完整交班收材；材料供巡山护甲和现有生产使用。","asset_keys":["item.mat.array_sand","item.ore.ironstone"],"channels":[{"operation":"specials.claim_idle","reference":"reward_pool.idle.camp.basalt.meal"},{"operation":"specials.claim_idle","reference":"reward_pool.idle.camp.basalt.pill"},{"operation":"specials.claim_idle","reference":"reward_pool.idle.camp.basalt.fallback"}],"status":"active"},
+    {"key":"source.armor.patrol_vest","name":"巡山护甲制作","desc":"巡营回收材料在青石镇装配为可穿戴护甲。","asset_keys":["item.armor.patrol_vest"],"channels":[{"operation":"production.complete","reference":"recipe.armor.patrol_vest"}],"status":"active"},
+    {"key":"source.bounty.patrol","name":"巡查悬赏酬劳","desc":"完成接单后的成功巡查，由镇务簿发放灵石与制作材料。","asset_keys":["item.herb.blood_grass","item.mat.wood","item.ore.ironstone","item.mat.array_sand"],"channels":[{"operation":"bounty.claim","reference":"reward_pool.bounty.patrol.outskirts"},{"operation":"bounty.claim","reference":"reward_pool.bounty.patrol.ironwood"},{"operation":"bounty.claim","reference":"reward_pool.bounty.patrol.basalt"}],"status":"active"},
+    {
+      "key": "source.patrol.outskirts",
+      "name": "近郊巡路材料",
+      "desc": "稳行或追迹完成巡查、遇战获胜后发放；材料供公开炼器、炼丹或布阵配方消费。",
+      "asset_keys": [
+        "item.mat.wood",
+        "item.herb.blood_grass"
+      ],
+      "channels": [
+        {
+          "operation": "exploration.settle",
+          "reference": "reward_pool.patrol.outskirts.cart.careful"
+        },
+        {
+          "operation": "exploration.settle",
+          "reference": "reward_pool.patrol.outskirts.cart.pursuit"
+        },
+        {
+          "operation": "exploration.settle",
+          "reference": "reward_pool.patrol.outskirts.herbs.careful"
+        },
+        {
+          "operation": "exploration.settle",
+          "reference": "reward_pool.patrol.outskirts.herbs.pursuit"
+        },
+        {
+          "operation": "exploration.settle",
+          "reference": "reward_pool.patrol.outskirts.tracks.careful"
+        },
+        {
+          "operation": "exploration.settle",
+          "reference": "reward_pool.patrol.outskirts.tracks.pursuit"
+        }
+      ],
+      "status": "active"
+    },
+    {
+      "key": "source.patrol.ironwood",
+      "name": "铁木巡林材料",
+      "desc": "稳行或追迹完成巡查、遇战获胜后发放；材料供公开炼器、炼丹或布阵配方消费。",
+      "asset_keys": [
+        "item.mat.wood",
+        "item.ore.ironstone"
+      ],
+      "channels": [
+        {
+          "operation": "exploration.settle",
+          "reference": "reward_pool.patrol.ironwood.bridge.careful"
+        },
+        {
+          "operation": "exploration.settle",
+          "reference": "reward_pool.patrol.ironwood.bridge.pursuit"
+        },
+        {
+          "operation": "exploration.settle",
+          "reference": "reward_pool.patrol.ironwood.gully.careful"
+        },
+        {
+          "operation": "exploration.settle",
+          "reference": "reward_pool.patrol.ironwood.gully.pursuit"
+        },
+        {
+          "operation": "exploration.settle",
+          "reference": "reward_pool.patrol.ironwood.wind.careful"
+        },
+        {
+          "operation": "exploration.settle",
+          "reference": "reward_pool.patrol.ironwood.wind.pursuit"
+        }
+      ],
+      "status": "active"
+    },
+    {
+      "key": "source.patrol.basalt",
+      "name": "岩径巡标材料",
+      "desc": "稳行或追迹完成巡查、遇战获胜后发放；材料供公开炼器、炼丹或布阵配方消费。",
+      "asset_keys": [
+        "item.mat.array_sand",
+        "item.ore.ironstone"
+      ],
+      "channels": [
+        {
+          "operation": "exploration.settle",
+          "reference": "reward_pool.patrol.basalt.water.careful"
+        },
+        {
+          "operation": "exploration.settle",
+          "reference": "reward_pool.patrol.basalt.water.pursuit"
+        },
+        {
+          "operation": "exploration.settle",
+          "reference": "reward_pool.patrol.basalt.rune.careful"
+        },
+        {
+          "operation": "exploration.settle",
+          "reference": "reward_pool.patrol.basalt.rune.pursuit"
+        },
+        {
+          "operation": "exploration.settle",
+          "reference": "reward_pool.patrol.basalt.scree.careful"
+        },
+        {
+          "operation": "exploration.settle",
+          "reference": "reward_pool.patrol.basalt.scree.pursuit"
+        }
+      ],
+      "status": "active"
+    },
     {
       "key": "source.item.herb.blood_grass",
       "name": "止血草来源",
@@ -17,11 +137,14 @@
     {
       "key": "source.item.herb.spirit_leaf",
       "name": "灵叶来源",
-      "desc": "灵泉采集、百草坡与灵圃看护提供公开取得路径。",
+      "desc": "灵泉采集、百草坡、灵圃看护与洞天照壁辨叶提供公开取得路径。",
       "asset_keys": ["item.herb.spirit_leaf"],
       "channels": [
         {"operation": "exploration.settle", "reference": "reward_pool.exploration.spring_gather"},
         {"operation": "livelihood.settle", "reference": "reward_pool.idle.herb_watch"},
+        {"operation": "specials.claim_idle", "reference": "reward_pool.idle.mist_lamp.leaf"},
+        {"operation": "specials.claim_idle", "reference": "reward_pool.idle.leaf_watch.leaf"},
+        {"operation": "specials.claim_idle", "reference": "reward_pool.idle.leaf_watch.sand"},
         {"operation": "bounty.claim", "reference": "reward_pool.bounty.herb_supply"}
       ],
       "status": "active"
@@ -29,12 +152,18 @@
     {
       "key": "source.item.common_materials",
       "name": "基础材料来源",
-      "desc": "铁木林、玄武岩径和作坊生活路线提供木材、铁石与阵砂。",
+      "desc": "铁木林、玄武岩径和作坊生活路线提供木材、铁石与阵砂；洞天守灯与渡口候潮也可收取阵砂。",
       "asset_keys": ["item.mat.wood", "item.ore.ironstone", "item.mat.array_sand"],
       "channels": [
         {"operation": "exploration.settle", "reference": "reward_pool.exploration.ironwood"},
         {"operation": "exploration.settle", "reference": "reward_pool.exploration.basalt_pass"},
         {"operation": "livelihood.settle", "reference": "reward_pool.idle.workshop_care"},
+        {"operation": "specials.claim_idle", "reference": "reward_pool.idle.mist_lamp.sand"},
+        {"operation": "specials.claim_idle", "reference": "reward_pool.idle.leaf_watch.leaf"},
+        {"operation": "specials.claim_idle", "reference": "reward_pool.idle.leaf_watch.sand"},
+        {"operation": "specials.claim_idle", "reference": "reward_pool.idle.mist_lamp.leaf"},
+        {"operation": "specials.claim_idle", "reference": "reward_pool.idle.cloud_dock.iron"},
+        {"operation": "specials.claim_idle", "reference": "reward_pool.idle.cloud_dock.sand"},
         {"operation": "livelihood.settle_route", "reference": "route.town_ironwood_grove"}
       ],
       "status": "active"
@@ -53,12 +182,24 @@
     {
       "key": "source.item.cloud_iron",
       "name": "云铁来源",
-      "desc": "云铁矿区采集、矿区守卫掉落和云城公开悬赏。",
+      "desc": "云铁矿区采集、矿区守卫掉落、云城公开悬赏和云舟渡口候潮。",
       "asset_keys": ["item.material.cloud_iron"],
       "channels": [
         {"operation": "exploration.settle", "reference": "reward_pool.exploration.cloud_mine"},
         {"operation": "battle.claim", "reference": "reward_pool.enemy.cloud_mine"},
-        {"operation": "bounty.claim", "reference": "reward_pool.bounty.cloud_mine"}
+        {"operation": "bounty.claim", "reference": "reward_pool.bounty.cloud_mine"},
+        {"operation": "specials.claim_idle", "reference": "reward_pool.idle.cloud_dock.iron"},
+        {"operation": "specials.claim_idle", "reference": "reward_pool.idle.cloud_dock.sand"}
+      ],
+      "status": "active"
+    },
+    {
+      "key": "source.item.cave_pass_basic",
+      "name": "基础洞天凭证来源",
+      "desc": "在青石镇或灵泉谷以木材、止血草与灵石制作洞天验行牌，成功领取后可用于一次入洞移动。",
+      "asset_keys": ["item.cave_pass_basic"],
+      "channels": [
+        {"operation": "production.complete", "reference": "recipe.permit.mist_grotto"}
       ],
       "status": "active"
     },
@@ -178,6 +319,28 @@
         {"operation": "exploration.settle", "reference": "reward_pool.exploration.war_front_patrol"},
         {"operation": "battle.claim", "reference": "reward_pool.enemy.war_front"},
         {"operation": "production.settle", "reference": "recipe.array.war_front_ward"}
+      ],
+      "status": "active"
+    },
+    {
+      "key": "source.item.foundation_exploration_routes",
+      "name": "基础探索路线来源",
+      "desc": "云城、灵田与阵堂的公开探索路线提供基础修为、灵石及可核验材料产出。",
+      "asset_keys": [
+        "item.food.coarse_spirit_rice",
+        "item.spirit_water",
+        "item.mat.wood",
+        "item.herb.spirit_leaf",
+        "item.mat.array_sand",
+        "item.material.ward_plate",
+        "item.material.cloud_iron"
+      ],
+      "channels": [
+        {"operation": "exploration.settle", "reference": "reward_pool.exploration.cloud_city_patrol"},
+        {"operation": "exploration.settle", "reference": "reward_pool.exploration.cloud_city_escort"},
+        {"operation": "exploration.settle", "reference": "reward_pool.exploration.spirit_field_tending"},
+        {"operation": "exploration.settle", "reference": "reward_pool.exploration.array_hall_drill"},
+        {"operation": "exploration.settle", "reference": "reward_pool.exploration.war_front_patrol"}
       ],
       "status": "active"
     },

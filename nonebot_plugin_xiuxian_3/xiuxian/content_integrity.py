@@ -30,11 +30,17 @@ def validate_reward_content(bundle: ContentBundle) -> int:
     return pools
 
 
-def validate_source_content(bundle: ContentBundle) -> int:
+def validate_source_content(bundle: ContentBundle, *, party_only: bool = False) -> int:
     """Validate source declarations without treating them as new producers."""
 
     source_count = 0
     for row in bundle.list("source", include_locked=False):
+        channels_value = row.get("channels")
+        if party_only and not (
+            isinstance(channels_value, list)
+            and any(isinstance(channel, dict) and channel.get("operation") == "battle.party.resolve" for channel in channels_value)
+        ):
+            continue
         key = _record_key(row, "source")
         _labels(row, f"source {key}")
         assets = row.get("asset_keys")
@@ -69,13 +75,26 @@ def validate_source_content(bundle: ContentBundle) -> int:
             if not isinstance(channel, dict):
                 raise ContentError(f"source {key} has a malformed channel")
             operation = channel.get("operation")
+            if party_only and operation != "battle.party.resolve":
+                continue
             reference = channel.get("reference")
             if not isinstance(operation, str) or not operation.strip():
                 raise ContentError(f"source {key} channel operation is required")
             if not isinstance(reference, str) or not reference.strip():
                 raise ContentError(f"source {key} channel reference is required")
             _validate_source_reference(bundle, key, reference)
+            if operation == "battle.party.resolve":
+                from .combat.party_rules import party_entry_for_enemy
+
+                enemy = bundle.get("enemy", reference, include_locked=False)
+                if enemy is None or party_entry_for_enemy(reference, bundle) is None:
+                    raise ContentError(f"source {key} references unavailable costed party enemy {reference}")
+                reward = enemy["combat_profile"]["party_profile"]["reward"]
+                if not assets or not set(assets) <= set(reward):
+                    raise ContentError(f"source {key} party enemy does not pay its declared assets")
         source_count += 1
+    if party_only and not source_count:
+        raise ContentError("no active costed party source")
     return source_count
 
 
@@ -99,6 +118,14 @@ def validate_exploration_content(bundle: ContentBundle) -> int:
     return len(definitions)
 
 
+def validate_mainline_content(bundle: ContentBundle) -> int:
+    """Validate every story stage and its executable cross-domain references."""
+
+    from .adventures.mainline import mainline_definitions
+
+    return len(mainline_definitions(bundle))
+
+
 def validate_content_references(bundle: ContentBundle) -> dict[str, int]:
     """Run the release-time validation for all currently active content domains."""
 
@@ -110,13 +137,27 @@ def validate_content_references(bundle: ContentBundle) -> dict[str, int]:
     from .production.rules import recipe_definitions
     from .world_content import validate_world_content
     from .exploration.rules import _definitions
+    from .advancement.equipment_rules import (
+        validate_equipment_reclamation_consumers,
+        validate_equipment_repair_kit_consumers,
+    )
+    from .economy.batch_commission_content import batch_commission_definitions
 
     world = validate_world_content(bundle)
     combat = validate_combat_content(bundle)
+    mainline = validate_mainline_content(bundle)
     modes = validate_exploration_content(bundle)
     rewards = validate_reward_content(bundle)
     bounties = len(bounty_definitions(bundle))
-    recipes = len(recipe_definitions(bundle))
+    recipe_definitions_by_key = recipe_definitions(bundle)
+    equipment_reclamation_assets = validate_equipment_reclamation_consumers(
+        bundle, recipe_definitions_by_key
+    )
+    equipment_repair_kits = validate_equipment_repair_kit_consumers(
+        bundle, recipe_definitions_by_key
+    )
+    recipes = len(recipe_definitions_by_key)
+    batch_commissions = len(batch_commission_definitions(bundle))
     materials = validate_material_content(bundle)
     sources = validate_source_content(bundle)
     crop_definitions(bundle)
@@ -124,10 +165,14 @@ def validate_content_references(bundle: ContentBundle) -> dict[str, int]:
     dispatch_definitions(bundle)
     return {
         **world,
+        "mainline_stages": mainline,
         "exploration_modes": modes,
         "reward_pools": rewards,
         "bounties": bounties,
         "recipes": recipes,
+        "batch_commissions": batch_commissions,
+        "equipment_reclamation_assets": equipment_reclamation_assets,
+        "equipment_repair_kits": equipment_repair_kits,
         "sources": sources,
         **{f"materials_{key}": value for key, value in materials.items()},
         **{f"combat_{key}": value for key, value in combat.items()},
@@ -148,6 +193,20 @@ def _validate_manifest_files(bundle: ContentBundle) -> None:
 
 
 def _validate_source_reference(bundle: ContentBundle, source_key: str, reference: str) -> None:
+    if reference.startswith("deposit."):
+        from .exploration.deposit_rules import deposit_definitions
+
+        deposit = deposit_definitions(bundle).get(reference)
+        if deposit is None or deposit["status"] not in _OPEN:
+            raise ContentError(f"source {source_key} references unavailable deposit {reference}")
+        return
+    if reference.startswith("survey."):
+        from .exploration.survey_rules import survey_definitions
+
+        site = survey_definitions(bundle).get(reference)
+        if site is None or site["status"] not in _OPEN:
+            raise ContentError(f"source {source_key} references unavailable survey {reference}")
+        return
     if reference.startswith("reward_pool."):
         from .rewards.rules import reward_pool_outcomes
 
@@ -194,6 +253,7 @@ def _labels(row: dict[str, Any], context: str) -> None:
 __all__ = [
     "validate_content_references",
     "validate_exploration_content",
+    "validate_mainline_content",
     "validate_reward_content",
     "validate_source_content",
 ]

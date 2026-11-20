@@ -16,6 +16,7 @@ from nonebot_plugin_xiuxian_3.xiuxian.items.manual_rules import (
     manual_effect_totals,
     manual_grants_permission,
 )
+from nonebot_plugin_xiuxian_3.xiuxian.items import manual_rules
 from nonebot_plugin_xiuxian_3.xiuxian.progression.breakthrough.rules import breakthrough_roll_bp
 
 
@@ -132,6 +133,12 @@ def test_same_quality_manuals_share_cultivation_bonus_but_offer_distinct_combat_
     assert rare_defensive["cultivation_gain_bp"] == rare_reflective["cultivation_gain_bp"]
     assert rare_defensive["combat_stat_bonus_bp"] != rare_reflective["combat_stat_bonus_bp"]
     assert rare_reflective["damage_reflection_bp"] > 0
+
+
+def test_manual_rule_cache_excludes_non_manual_items() -> None:
+    records = manual_rules._item_records(bundled_content())
+    assert records
+    assert all(record.get("item_type") == "manual" for record in records)
 
 
 def test_manual_catalog_has_multiple_methods_for_each_open_realm() -> None:

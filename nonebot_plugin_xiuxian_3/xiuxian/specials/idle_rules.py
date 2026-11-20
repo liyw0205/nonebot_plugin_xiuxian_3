@@ -51,6 +51,8 @@ class IdleRouteDefinition:
     companion_progress: dict[str, int] = field(default_factory=dict)
     patrol_journal: dict[str, str] = field(default_factory=dict)
     wilderness_event: dict[str, Any] = field(default_factory=dict)
+    required_mainline_stage: str | None = None
+    supply_cost: dict[str, int] = field(default_factory=dict)
 
 
 _STAGE_ORDER = {
@@ -113,6 +115,8 @@ def resolve_route(value: str | None, content: ContentBundle | None = None) -> Id
 
 
 def select_wilderness_choice(definition: IdleRouteDefinition, selector: str | None) -> IdleRouteDefinition:
+    if not selector and definition.wilderness_event and any(c.get("supplies") for c in definition.wilderness_event["choices"]):
+        raise IdleRequirementError("请先选择补给方案：" + "、".join(c["name"] for c in definition.wilderness_event["choices"]))
     if not selector or not definition.wilderness_event:
         return definition
     for choice in definition.wilderness_event["choices"]:
@@ -121,6 +125,7 @@ def select_wilderness_choice(definition: IdleRouteDefinition, selector: str | No
                 definition, pool_key=choice["reward_pool_key"],
                 stamina_cost=definition.stamina_cost + choice["cost"]["stamina"],
                 energy_cost=definition.energy_cost + choice["cost"]["energy"],
+                supply_cost=dict(choice.get("supplies", {})),
                 gathering_journal={
                     **choice["journal"],
                     "start_text": f"{definition.wilderness_event['scene']}\n抉择：{choice['name']}\n{choice['journal']['start_text']}",
@@ -263,6 +268,9 @@ def _parse_route(row: dict[str, Any], bundle: ContentBundle) -> IdleRouteDefinit
         required_realm = str(realm_key)
         required_layer = layer
     required_permit = requirements.get("required_permit")
+    required_mainline_stage = requirements.get("mainline_stage")
+    if "mainline_stage" in requirements:
+        _require_active_record(bundle, "mainline", required_mainline_stage, key, "requirements.mainline_stage")
     if required_permit is not None:
         if not isinstance(required_permit, str) or not required_permit:
             raise ContentError(
@@ -399,6 +407,7 @@ def _parse_route(row: dict[str, Any], bundle: ContentBundle) -> IdleRouteDefinit
         companion_progress=progress,
         patrol_journal=patrol_journal,
         wilderness_event=event,
+        required_mainline_stage=required_mainline_stage,
     )
 
 
@@ -415,8 +424,17 @@ def _parse_wilderness_event(value: Any, bundle: ContentBundle, key: str, fallbac
     selectors: set[str] = set()
     fields = {"key", "name", "cost", "reward_pool_key", "start_text", "complete_text", "expired_text", "recipe_keys"}
     for choice in choices:
-        if not isinstance(choice, dict) or set(choice) != fields:
+        if not isinstance(choice, dict) or set(choice) not in (fields, fields | {"supplies"}):
             raise ContentError(f"idle route {key} wilderness_event choice has invalid fields")
+        supplies = choice.get("supplies", {})
+        if not isinstance(supplies, dict) or ("supplies" in choice and not supplies):
+            raise ContentError(f"idle route {key} supplies must be a nonempty item map")
+        for item_key, quantity in supplies.items():
+            _require_active_record(bundle, "item", item_key, key, "supplies")
+            _positive_integer(quantity, key, "supplies.quantity")
+            if not any(type(r.get("outputs", {}).get(item_key)) is int and r["outputs"][item_key] > 0
+                       for r in bundle.list("recipe", include_locked=False)):
+                raise ContentError(f"idle route {key} supply {item_key} has no active production source")
         names = [_required_string(choice[f], key, f"wilderness_event.{f}").strip() for f in ("key", "name")]
         if any(not n or any(c.isspace() for c in n) or n in selectors for n in names):
             raise ContentError(f"idle route {key} wilderness_event choice selectors are invalid or duplicated")
@@ -431,7 +449,9 @@ def _parse_wilderness_event(value: Any, bundle: ContentBundle, key: str, fallbac
             {f: choice[f] for f in ("start_text", "complete_text", "expired_text", "recipe_keys")},
             bundle, key, pool, fallback_pool,
         )
-        parsed.append({"key": names[0], "name": names[1], "cost": cost, "reward_pool_key": pool, "journal": journal})
+        parsed.append({"key": names[0], "name": names[1], "cost": cost, "reward_pool_key": pool, "journal": journal, "supplies": dict(supplies)})
+    if any(c["supplies"] for c in parsed) and not all(c["supplies"] for c in parsed):
+        raise ContentError(f"idle route {key} supplied choices must all consume supplies")
     return {"scene": scene, "choices": parsed}
 
 

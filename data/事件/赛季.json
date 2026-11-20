@@ -73,6 +73,14 @@
       "claim_days": 7,
       "rank_limit": 10,
       "chapter_entitlement": "chapter.final_heaven",
+      "qualification": {
+        "task_keys": [
+          "task.dao_origin.guard",
+          "task.dao_origin.build",
+          "task.dao_origin.teach"
+        ],
+        "readiness_flag": "access.final_heaven"
+      },
       "boards": {
         "ascension": {
           "label": "飞升榜",

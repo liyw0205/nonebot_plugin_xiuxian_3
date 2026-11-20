@@ -9,10 +9,64 @@ from tempfile import TemporaryDirectory
 
 import pytest
 
+from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
 from nonebot_plugin_xiuxian_3.xiuxian.specials.arena_federation import freeze_arena_season_snapshot
 
 from test_arena import MutableClock, _adapter_contexts, _cultivator
+
+
+def _direct_context(adapter: str, user: str, request_id: str, operation_id: str) -> CommandContext:
+    return CommandContext(
+        adapter=adapter,
+        user_id=user,
+        request_id=request_id,
+        operation_id=operation_id,
+    )
+
+
+def test_arena_parameter_chain_is_adapter_neutral_without_host_event_objects() -> None:
+    async def run() -> None:
+        clock = MutableClock(datetime(2026, 9, 25, tzinfo=timezone.utc))
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir, clock=clock)
+            try:
+                for adapter in ("onebot.v11", "qq.official"):
+                    publisher_user = f"direct-{adapter}-publisher"
+                    challenger_user = f"direct-{adapter}-challenger"
+                    await _cultivator(
+                        runtime,
+                        _direct_context(adapter, publisher_user, "create", "create"),
+                        publisher_user,
+                    )
+                    await _cultivator(
+                        runtime,
+                        _direct_context(adapter, challenger_user, "create", "create"),
+                        challenger_user,
+                    )
+                    published = await runtime.adapters.dispatch(
+                        adapter,
+                        _direct_context(adapter, publisher_user, "publish", f"{publisher_user}-publish"),
+                        "发布竞技场快照",
+                    )
+                    assert published.code == "ARENA_SNAPSHOT_PUBLISHED", (adapter, published)
+                    clock.advance(minutes=31)
+                    challenged = await runtime.adapters.dispatch(
+                        adapter,
+                        _direct_context(adapter, challenger_user, "challenge", f"{challenger_user}-challenge"),
+                        f"挑战竞技场 {published.data['snapshot_id']}",
+                    )
+                    assert challenged.code == "ARENA_MATCH_SETTLED", (adapter, challenged)
+                    replay = await runtime.adapters.dispatch(
+                        adapter,
+                        _direct_context(adapter, challenger_user, "challenge-replay", f"{challenger_user}-challenge"),
+                        f"挑战竞技场 {published.data['snapshot_id']}",
+                    )
+                    assert replay.data["idempotent_replay"] is True, (adapter, replay)
+            finally:
+                await runtime.close()
+
+    asyncio.run(run())
 
 
 def test_qq_onebot_arena_recovery_restores_federation_inputs_and_replays_operation() -> None:

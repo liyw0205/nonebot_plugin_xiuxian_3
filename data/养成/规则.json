@@ -2,6 +2,25 @@
   "kind": "advancement_rule",
   "records": [
     {
+      "key": "recovery.endgame_stamina",
+      "name": "合道静养上限规则",
+      "desc": "合道起恢复状态时将体力上限补足至终局秘境所需容量，保留既有更高上限。",
+      "minimum_capacity": 60,
+      "required_realm": "dao_union",
+      "required_layer": 1,
+      "status": "active"
+    },
+    {
+      "key": "recovery.bloodline",
+      "name": "血脉静养规则",
+      "desc": "元婴起可在恢复状态时随静养周期恢复血脉稳定。",
+      "per_period": 1,
+      "maximum": 100,
+      "required_realm": "nascent_soul",
+      "required_layer": 1,
+      "status": "active"
+    },
+    {
       "key": "stats.formula",
       "name": "角色属性推演规则",
       "desc": "由六项资质、当前境界和层数推演修士的基础属性。",

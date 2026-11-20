@@ -141,6 +141,8 @@ class AdventuresApplication:
             )
             if action:
                 lines.append(f"- **操作**：{action}")
+            if offer.next_actions and offer.status in {"available", "accepted"}:
+                lines.append("- **巡查**：" + "、".join(command_link(a["label"], a["command"]) for a in offer.next_actions))
             lines.append("")
             offer_data.append(
                 {
@@ -152,6 +154,7 @@ class AdventuresApplication:
                     "reward": offer.reward,
                     "reward_labels": offer.reward_labels,
                     "expires_at": offer.expires_at,
+                    "next_actions": offer.next_actions,
                 }
             )
         lines.append(
@@ -206,6 +209,8 @@ class AdventuresApplication:
                 f"- **进度**：{record.progress}/{record.target}\n"
                 f"- **有效期**：{self._deadline_text(record.expires_at)}\n\n"
                 "> 完成目标后发送 `领取悬赏`；同一悬赏不会重复发奖。"
+                + ("\n\n巡查安排：" + "、".join(command_link(a["label"], a["command"]) for a in record.next_actions)
+                   + "。接单后再出发；取消、逾时或败退不计进度。材料仍归你，可继续制作或交付。" if record.next_actions else "")
             ),
             context.request_id,
             operation_id,
@@ -216,6 +221,7 @@ class AdventuresApplication:
                 "target": record.target,
                 "expires_at": record.expires_at,
                 "idempotent_replay": record.already_completed,
+                "next_actions": record.next_actions,
             },
         )
 

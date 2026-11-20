@@ -36,6 +36,14 @@ CLOUD_MINE_ACCESS_ITEMS = frozenset({
     "item.tool.mining_pickaxe",
     "item.tool.mining_pickaxe_t2",
 })
+
+
+def cloud_boat_storm_payment_reward(frozen_reward: dict[str, int]) -> dict[str, int]:
+    result = dict(frozen_reward)
+    result["cultivation"] = result.get("cultivation", 0) + 200
+    return result
+
+
 def _content(content: ContentBundle | None = None) -> ContentBundle:
     return content or bundled_content()
 
@@ -87,6 +95,11 @@ def _definitions(content: ContentBundle | None = None) -> dict[str, ExplorationD
             pool = bundle.get("encounter_pool", enemy_pool_key, include_locked=False)
             if pool is None or not isinstance(pool.get("candidates"), list) or not pool["candidates"]:
                 raise ContentError(f"exploration mode {key} references an empty encounter pool")
+        from .patrol_rules import patrol_definition
+        from .relic_rules import relic_definition
+
+        patrol_definition(row, bundle)
+        relic_definition(row, bundle)
         definitions[key] = ExplorationDefinition(
             key=key,
             label=row["name"].strip(),

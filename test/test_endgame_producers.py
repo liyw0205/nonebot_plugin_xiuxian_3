@@ -14,6 +14,10 @@ from nonebot_plugin_xiuxian_3.runtime import create_runtime
 from nonebot_plugin_xiuxian_3.xiuxian.events.rules import final_heaven_season_window
 from nonebot_plugin_xiuxian_3.xiuxian.production.endgame_rules import ENDGAME_RECIPES, recipe_roll_bp
 from nonebot_plugin_xiuxian_3.xiuxian.production.rules import random_quality_bp
+from nonebot_plugin_xiuxian_3.xiuxian.adventures.dao_echoes import (
+    DAO_ECHOES_STORY_KEY,
+    dao_echoes_definitions,
+)
 from nonebot_plugin_xiuxian_3.xiuxian.quests.rules import (
     DAO_ORIGIN_TASKS,
     DAO_UNION_MAINLINE_LANES,
@@ -55,6 +59,42 @@ def _set_player(runtime, adapter: str, user: str, **values: object) -> None:
             f"UPDATE players SET {assignments} WHERE platform = ? AND platform_user_id = ?",
             (*values.values(), adapter, user),
         )
+
+
+def _seed_claimed_dao_echoes(runtime, adapter: str, user: str) -> None:
+    """Seed an unrelated completed-story prerequisite for producer coverage.
+
+    The complete travel/exploration route is exercised by
+    ``test_dao_echoes_mainline``.  This test focuses on the three public
+    producer paths, so it uses the same persisted prerequisite shape rather
+    than replaying thirty story actions with a stale shortcut.
+    """
+
+    now = runtime.repository._now().isoformat()
+    with sqlite3.connect(runtime.settings.database_path) as connection:
+        player_id = int(
+            connection.execute(
+                "SELECT id FROM players WHERE platform=? AND platform_user_id=?",
+                (adapter, user),
+            ).fetchone()[0]
+        )
+        for definition in dao_echoes_definitions(runtime.content):
+            connection.execute(
+                "INSERT INTO mainline_runs("
+                "player_id, story_key, chapter, stage, stage_key, status, attempt_count, "
+                "first_clear_claimed, first_clear_key, snapshot_json, result_json, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, 'claimed', 1, 1, ?, '{}', '{}', ?, ?)",
+                (
+                    player_id,
+                    DAO_ECHOES_STORY_KEY,
+                    definition.chapter,
+                    definition.stage,
+                    definition.key,
+                    f"fixture:{player_id}:{definition.key}",
+                    now,
+                    now,
+                ),
+            )
 
 
 def _insert_origin_evidence(
@@ -324,19 +364,7 @@ def test_real_player_producers_feed_dao_origin_tasks_on_qq_and_onebot() -> None:
                     ),
                 )
                 equip_damage_weapon(runtime, adapter, user, 50000)
-
-                for lane in ("建设者", "见证者", "远行者"):
-                    for stage in range(1, 11):
-                        started = await runtime.dispatch(
-                            _ctx(adapter, user, f"{user}-echo-start-{lane}-{stage}"),
-                            f"开始道源主线 {lane} {stage}",
-                        )
-                        claimed = await runtime.dispatch(
-                            _ctx(adapter, user, f"{user}-echo-claim-{lane}-{stage}"),
-                            f"领取道源主线奖励 {lane} {stage}",
-                        )
-                        assert started.code == "DAO_ECHOES_STAGE_STARTED"
-                        assert claimed.code == "DAO_ECHOES_STAGE_CLAIMED"
+                _seed_claimed_dao_echoes(runtime, adapter, user)
 
                 for index in range(3):
                     challenge = await runtime.dispatch(

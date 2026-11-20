@@ -23,6 +23,10 @@ from ..world.repository import WorldRepositoryMixin
 from ..world.travel_repository import TravelRepositoryMixin
 from ..world.cloud_repository import CloudRepositoryMixin
 from ..exploration.repository import ExplorationRepositoryMixin
+from ..exploration.survey_repository import SurveyRepositoryMixin
+from ..exploration.survey_migration import ensure_survey_schema
+from ..exploration.deposit_repository import DepositRepositoryMixin
+from ..exploration.deposit_migration import ensure_deposit_schema
 from ..combat.repository import CombatRepositoryMixin
 from ..combat.party_repository import PartyCombatRepositoryMixin
 from ..companions.repository import CompanionRepositoryMixin
@@ -141,6 +145,8 @@ class SQLitePlayerRepository(
     ProgressionRepositoryMixin,
     RoutineRepositoryMixin,
     ExplorationRepositoryMixin,
+    SurveyRepositoryMixin,
+    DepositRepositoryMixin,
     CompanionRepositoryMixin,
     CombatRepositoryMixin,
     PartyCombatRepositoryMixin,
@@ -275,11 +281,10 @@ class SQLitePlayerRepository(
             raise RuntimeError("repository connections are closed")
         connection = getattr(self._connection_local, "connection", None)
         if connection is not None:
-            try:
-                connection.execute("SELECT 1")
-                return connection
-            except sqlite3.ProgrammingError:
-                self._connection_local.connection = None
+            # Executor-thread connections remain owned by this repository until
+            # runtime shutdown; probing them on every read only adds a SQLite
+            # round trip.  ``close`` flips the guard before releasing the registry.
+            return connection
         connection = connect_sqlite(
             self.settings.database_path,
             busy_timeout_ms=self.settings.busy_timeout_ms,
@@ -347,6 +352,7 @@ class SQLitePlayerRepository(
             self._migrate_cultivation_session_status(connection)
             self._migrate_economy_ledger_asset_kind(connection)
             self._migrate_facility_schema(connection)
+            self._migrate_production_commission_schema(connection)
             self._migrate_companion_schema(connection)
             self._migrate_field_plot_schema(connection)
             self._migrate_sect_war_schema(connection)
@@ -367,6 +373,8 @@ class SQLitePlayerRepository(
             ensure_legacy_manor_schema(connection)
             ensure_idle_schema(connection)
             ensure_dispatch_schema(connection)
+            ensure_survey_schema(connection)
+            ensure_deposit_schema(connection)
             ensure_codex_schema(connection)
             ensure_tower_schema(connection)
             ensure_void_spire_schema(connection)
@@ -379,6 +387,24 @@ class SQLitePlayerRepository(
                 "CREATE TABLE IF NOT EXISTS schema_migrations ("
                 "migration_key TEXT PRIMARY KEY, applied_at TEXT NOT NULL)"
             )
+            if connection.execute(
+                "SELECT 1 FROM schema_migrations WHERE migration_key=?",
+                ("arena.snapshot_status_mode_expiry_index",),
+            ).fetchone() is None:
+                self._migrate_arena_snapshot_expiry_index(connection)
+                connection.execute(
+                    "INSERT INTO schema_migrations(migration_key, applied_at) VALUES (?, ?)",
+                    ("arena.snapshot_status_mode_expiry_index", serialize_datetime(self._now())),
+                )
+            if connection.execute(
+                "SELECT 1 FROM schema_migrations WHERE migration_key=?",
+                ("world.travel_requirement_indexes",),
+            ).fetchone() is None:
+                self._migrate_travel_requirement_indexes(connection)
+                connection.execute(
+                    "INSERT INTO schema_migrations(migration_key, applied_at) VALUES (?, ?)",
+                    ("world.travel_requirement_indexes", serialize_datetime(self._now())),
+                )
             if connection.execute(
                 "SELECT 1 FROM schema_migrations WHERE migration_key=?",
                 ("world.void_route_discoveries",),
@@ -418,6 +444,10 @@ class SQLitePlayerRepository(
             )
             connection.execute(
                 "INSERT OR IGNORE INTO schema_migrations(migration_key, applied_at) VALUES (?, ?)",
+                ("events.dao_origin_qualification", serialize_datetime(self._now())),
+            )
+            connection.execute(
+                "INSERT OR IGNORE INTO schema_migrations(migration_key, applied_at) VALUES (?, ?)",
                 ("production.contract", serialize_datetime(self._now())),
             )
             connection.execute(
@@ -448,6 +478,38 @@ class SQLitePlayerRepository(
                 "CREATE UNIQUE INDEX IF NOT EXISTS idx_players_dao_name "
                 "ON players(dao_name) WHERE dao_name <> ''"
             )
+
+    @staticmethod
+    def _migrate_production_commission_schema(connection: sqlite3.Connection) -> None:
+        columns = {str(row["name"]) for row in connection.execute("PRAGMA table_info(production_commission_orders)")}
+        if "batch_count" not in columns:
+            connection.execute(
+                "ALTER TABLE production_commission_orders ADD COLUMN batch_count INTEGER NOT NULL DEFAULT 1"
+            )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_production_commissions_batch_status "
+            "ON production_commission_orders(batch_count, status, expires_at)"
+        )
+
+    @staticmethod
+    def _migrate_arena_snapshot_expiry_index(connection: sqlite3.Connection) -> None:
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_arena_snapshots_status_mode_expiry "
+            "ON arena_snapshots(status, arena_mode_key, expires_at)"
+        )
+
+    @staticmethod
+    def _migrate_travel_requirement_indexes(connection: sqlite3.Connection) -> None:
+        """Add covering gate indexes while keeping existing player databases readable."""
+
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_quest_progress_player_status "
+            "ON quest_progress(player_id, status, quest_key)"
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_mentor_relations_apprentice_status_expiry "
+            "ON mentor_relations(apprentice_id, status, expires_at)"
+        )
 
     def _materialize_redemption_codes(
         self,

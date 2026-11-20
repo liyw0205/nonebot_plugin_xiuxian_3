@@ -326,3 +326,22 @@ def test_constitution_keeps_explicit_high_tier_scale(content: ContentBundle) -> 
     assert result["max_hp"] == 88_000
     assert result["attack"] == 8_000
     assert stats["max_hp"] == 80_000
+
+
+def test_repository_formula_cache_is_scoped_to_content_bundle_identity(content: ContentBundle) -> None:
+    from nonebot_plugin_xiuxian_3.xiuxian.stats.repository import StatsRepositoryMixin
+
+    repository = object.__new__(StatsRepositoryMixin)
+    original = repository._stats_formula_for_snapshot(content)
+    assert repository._stats_formula_for_snapshot(content) is original
+
+    changed = _changed_content(
+        content,
+        lambda record: record["formulas"].__setitem__(
+            "max_hp_body", record["formulas"]["max_hp_body"] + 1
+        ),
+    )
+    replacement = repository._stats_formula_for_snapshot(changed)
+    assert replacement is not original
+    assert replacement.fingerprint != original.fingerprint
+    assert repository._stats_formula_for_snapshot(changed) is replacement

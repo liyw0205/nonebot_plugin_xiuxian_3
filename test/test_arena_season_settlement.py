@@ -107,6 +107,112 @@ def test_the_board_orders_by_rating_then_wins_and_breaks_ties_stably() -> None:
     assert [entry.player_id for entry in board] == [2, 1, 3]
     assert [entry.rank for entry in board] == [1, 2, 3]
     assert board[0].rating == 1050 and board[0].wins == 1 and board[0].losses == 1
+    assert build_board(events, start=start, end=end, limit=2) == board[:2]
+    assert build_board(events, start=start, end=end, limit=0) == ()
+
+
+def test_season_board_reuses_one_history_read_for_current_and_previous_weeks() -> None:
+    async def run() -> None:
+        clock = MutableClock(datetime(2026, 9, 24, 12, tzinfo=timezone.utc))
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir, clock=clock)
+            challenger, defender = "arena-history-a", "arena-history-b"
+            await _prepare_pair(runtime, challenger, defender)
+            await _ranked_match(runtime, challenger, defender, prefix="history", clock=clock)
+
+            original = runtime.repository._season_events
+            reads: list[datetime] = []
+
+            def counted_read(connection: sqlite3.Connection, end: datetime):
+                reads.append(end)
+                return original(connection, end)
+
+            runtime.repository._season_events = counted_read
+            board = await runtime.repository.arena_season_board(
+                platform="web", platform_user_id=challenger, week=None
+            )
+            assert len(reads) == 1
+            assert board["mine"] is not None
+            assert sum(board["mine"][key] for key in ("wins", "losses", "draws")) == 1
+            assert board["previous"]["mine"] is None
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_live_season_board_cache_invalidates_after_a_new_match() -> None:
+    async def run() -> None:
+        clock = MutableClock(datetime(2026, 9, 24, 12, tzinfo=timezone.utc))
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir, clock=clock)
+            challenger, defender = "arena-cache-a", "arena-cache-b"
+            await _prepare_pair(runtime, challenger, defender)
+            await _ranked_match(runtime, challenger, defender, prefix="cache-first", clock=clock)
+            before = await runtime.repository.arena_season_board(
+                platform="web", platform_user_id=challenger, week=None
+            )
+            before_mine = before["mine"]
+            assert before_mine is not None
+
+            await _ranked_match(runtime, defender, challenger, prefix="cache-second", clock=clock)
+            after = await runtime.repository.arena_season_board(
+                platform="web", platform_user_id=challenger, week=None
+            )
+            after_mine = after["mine"]
+            assert after_mine is not None
+            assert after_mine["rating"] != before_mine["rating"]
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_existing_arena_history_gets_season_index_on_restart_without_row_changes() -> None:
+    async def run() -> None:
+        clock = MutableClock(datetime(2026, 9, 24, 12, tzinfo=timezone.utc))
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir, clock=clock)
+            await _prepare_pair(runtime, "index-history-a", "index-history-b")
+            await _ranked_match(
+                runtime,
+                "index-history-a",
+                "index-history-b",
+                prefix="index-history",
+                clock=clock,
+            )
+            database_path = runtime.settings.database_path
+            with sqlite3.connect(database_path) as db:
+                matches_before = db.execute(
+                    "SELECT match_id, challenger_id, defender_id, outcome, score_counted, "
+                    "challenger_rating_delta, defender_rating_delta, settled_at "
+                    "FROM arena_matches ORDER BY id"
+                ).fetchall()
+                db.execute("DROP INDEX idx_arena_matches_settled_events")
+            await runtime.close()
+
+            restarted = create_runtime(data_dir=data_dir, clock=clock)
+            await restarted.initialize()
+            with sqlite3.connect(database_path) as db:
+                matches_after = db.execute(
+                    "SELECT match_id, challenger_id, defender_id, outcome, score_counted, "
+                    "challenger_rating_delta, defender_rating_delta, settled_at "
+                    "FROM arena_matches ORDER BY id"
+                ).fetchall()
+                index = db.execute(
+                    "SELECT 1 FROM sqlite_master WHERE type='index' "
+                    "AND name='idx_arena_matches_settled_events'"
+                ).fetchone()
+                plan = db.execute(
+                    "EXPLAIN QUERY PLAN SELECT challenger_id, defender_id, outcome, "
+                    "score_counted, settled_at, challenger_rating_delta, defender_rating_delta "
+                    "FROM arena_matches WHERE settled_at < ?",
+                    ("2026-10-01T00:00:00+00:00",),
+                ).fetchall()
+            assert matches_after == matches_before
+            assert index is not None
+            assert any("COVERING INDEX IDX_ARENA_MATCHES_SETTLED_EVENTS" in row[3].upper() for row in plan)
+            await restarted.close()
+
+    asyncio.run(run())
 
 
 def test_practice_and_uncounted_matches_never_enter_the_board() -> None:

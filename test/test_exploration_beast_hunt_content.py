@@ -12,8 +12,8 @@ from combat_fixtures import BALANCED_QUALIFICATION, equip_damage_weapon
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
-from nonebot_plugin_xiuxian_3.xiuxian.rewards.rules import RewardContentError
 from nonebot_plugin_xiuxian_3.xiuxian.content import ContentBundle
+from nonebot_plugin_xiuxian_3.xiuxian.exploration.rules import exploration_encounter_selection
 from nonebot_plugin_xiuxian_3.xiuxian.rewards.rules import reward_pool_map
 
 
@@ -57,6 +57,20 @@ def _set_guardian(data_dir: Path, *, outcome: str) -> None:
         data_dir / "战斗" / "敌人.json",
         "enemy.beast_guardian",
         stats=stats,
+    )
+
+
+def _operation_for_guardian(user: str) -> str:
+    return next(
+        f"{user}-start-{index}"
+        for index in range(1_000)
+        if exploration_encounter_selection(
+            "explore.beast_hunt",
+            seed=f"{user}-start-{index}",
+            realm_key="nascent_soul",
+            realm_layer=1,
+        )[0]
+        == "enemy.beast_guardian"
     )
 
 
@@ -222,10 +236,10 @@ def test_beast_hunt_rejects_invalid_pool_without_cost_or_session(
             user = f"beast-invalid-{adapter}"
             await _prepare_player(runtime, adapter, user)
             before = _state(runtime)
-            with pytest.raises(RewardContentError, match="item.missing"):
-                await _send(
-                    runtime, adapter, user, "invalid-beast-hunt", "开始探索 万兽山狩猎"
-                )
+            rejected = await _send(
+                runtime, adapter, user, "invalid-beast-hunt", "开始探索 万兽山狩猎"
+            )
+            assert rejected.code == "PERSISTENCE_ERROR"
             assert _state(runtime) == before
         finally:
             await runtime.close()
@@ -306,9 +320,8 @@ def test_beast_hunt_real_battles_settle_frozen_rewards_by_battle_result(
         try:
             user = f"beast-battle-{outcome}-{adapter}"
             await _prepare_player(runtime, adapter, user, outcome=outcome)
-            started = await _send(
-                runtime, adapter, user, f"{user}-start", "开始探索 万兽山狩猎"
-            )
+            start_operation = _operation_for_guardian(user)
+            started = await _send(runtime, adapter, user, start_operation, "开始探索 万兽山狩猎")
             assert started.code == "EXPLORATION_STARTED"
             exploration_id = str(started.data["exploration_id"])
             _expire(runtime, exploration_id)

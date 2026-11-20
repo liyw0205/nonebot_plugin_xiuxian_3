@@ -2,7 +2,7 @@
 
 ## 玩家与安装
 
-- [当前可用能力](availability.md)：v0.1.46 的开放玩法与能力边界。
+- [当前可用能力](availability.md)：v0.1.56 的开放玩法与能力边界。
 - [安装、配置与更新](installation.md)：Linux、Termux、Windows、Docker 和已有 NoneBot 宿主。
 - [玩家使用指南](usage.md)：角色创建、修炼、探索、挂机、剧情与委托流程。
 - [运行与安全](operations.md)：配置优先级、备份、恢复、权限与运行安全。
@@ -15,6 +15,7 @@
 - [通用行为合同](content-development-contract.md)：事务、幂等、快照、错误处理和数据库变更。
 - [消息文案规范](messaging-copywriting.md)：玩家消息的语气、错误提示和适配器降级。
 - [测试与验收](testing.md)：按变更范围选择的本地验证规则。
+- [有界性能验证](performance.md)：临时数据库比较入口、结果合同与测量边界。
 - [发布与种子迁移](release-distribution.md)：Release 资产、用户数据保护与迁移回退。
 - [开发与维护指南](development-guide.md)：代码/内容边界、运行链路与扩展流程。
 - [运行能力状态判定](current-status.md)：区分玩家可用能力、合同状态和验收证据。

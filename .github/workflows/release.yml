@@ -48,7 +48,7 @@ jobs:
           python-version: "3.12"
           cache: pip
       - name: Install from checkout
-        run: bash scripts/onekey.sh install --target "$RUNNER_TEMP/xiu3" --source-mode source --mirror direct --index-url https://pypi.org/simple
+        run: bash scripts/onekey.sh install --target "$RUNNER_TEMP/xiu3" --venv "$HOME/myenv" --source-mode source --mirror direct --index-url https://pypi.org/simple
       - name: Verify isolated runtime and preserved files
         run: |
           test -x "$RUNNER_TEMP/xiu3/xiu3"
@@ -74,7 +74,7 @@ jobs:
       - name: Build release asset
         run: |
           asset_path="$RUNNER_TEMP/project.tar.gz"
-          tar --exclude=.git --exclude=.github --exclude=project.tar.gz -czf "$asset_path" .
+          tar --exclude=.git --exclude=.github --exclude='.codex-*' --exclude=project.tar.gz -czf "$asset_path" .
           tar -tzf "$asset_path" | grep -Fx './pyproject.toml'
           tar -tzf "$asset_path" | grep -Fx './scripts/onekey.sh'
       - name: Publish GitHub Release

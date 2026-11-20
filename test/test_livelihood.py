@@ -283,7 +283,7 @@ def test_town_commission_defers_materials_until_delivery_and_settles_once() -> N
             await runtime.dispatch(context, "寻仙问道")
             listed = await runtime.dispatch(_context(user), "城镇委托")
             assert listed.code == "COMMISSION_LIST"
-            assert len(listed.data["commissions"]) == 3
+            assert len(listed.data["commissions"]) == 11
             accepted = await runtime.dispatch(
                 _context(user, "accept-herb"), "接取委托 止血草供应"
             )

@@ -8,7 +8,7 @@ import json
 import sqlite3
 import time
 from datetime import date, datetime, timedelta, timezone
-from typing import Any, Callable
+from typing import Any, Callable, Mapping
 from uuid import uuid4
 
 from ...contracts import PlayerView, serialize_datetime
@@ -1030,17 +1030,41 @@ class PlayerRepositoryMixin:
                 except ValueError:
                     pass
             connection.execute("BEGIN IMMEDIATE" if needs_refresh else "BEGIN")
-            row = self._profile_player_row(connection, platform, platform_user_id)
+            # The initial lookup is already inside this short-lived request.
+            # Refreshes deliberately reload after BEGIN IMMEDIATE so a state
+            # mutation still returns the committed row.
+            row = self._profile_player_row(
+                connection,
+                platform,
+                platform_user_id,
+                initial=initial if not needs_refresh else None,
+            )
             if row is None:
                 return None, {}
-            stats = {} if row["stage"] == STAGE_NEW_USER else self._build_player_stat_snapshot(connection, row)
-            return self._row_to_player(row), stats
+            if row["stage"] == STAGE_NEW_USER:
+                return self._row_to_player(row), {}
+            normalized = player_values(row)
+            stats = self._build_player_stat_snapshot(
+                connection,
+                row,
+                normalized=normalized,
+            )
+            return self._row_to_player(row, normalized=normalized), stats
 
-    def _profile_player_row(self, connection: sqlite3.Connection, platform: str, platform_user_id: str) -> sqlite3.Row | None:
-        row = connection.execute(
-            "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
-            (platform, platform_user_id),
-        ).fetchone()
+    def _profile_player_row(
+        self,
+        connection: sqlite3.Connection,
+        platform: str,
+        platform_user_id: str,
+        *,
+        initial: sqlite3.Row | None = None,
+    ) -> sqlite3.Row | None:
+        row = initial
+        if row is None:
+            row = connection.execute(
+                "SELECT * FROM players WHERE platform = ? AND platform_user_id = ?",
+                (platform, platform_user_id),
+            ).fetchone()
         if row is None:
             return None
         if str(row["realm_key"]) == "soul_transformation" and player_integer(row, "domain_charge_max") > 0:
@@ -1071,8 +1095,12 @@ class PlayerRepositoryMixin:
         return row
 
     @staticmethod
-    def _row_to_player(row: sqlite3.Row | dict[str, Any]) -> PlayerView:
-        normalized = player_values(row)
+    def _row_to_player(
+        row: sqlite3.Row | dict[str, Any],
+        *,
+        normalized: Mapping[str, Any] | None = None,
+    ) -> PlayerView:
+        normalized = normalized or player_values(row)
         qualification = normalized["qualification"]
         inventory = normalized["inventory"]
         intro_state = {"flags": normalized["intro_flags"]}
@@ -1153,7 +1181,7 @@ class PlayerRepositoryMixin:
                 if player_field(row, "domain_crack_until") else None
             ),
             initiative=normalized["initiative"],
-            faction_reputation=player_reputation(row),
+            faction_reputation=dict(normalized["faction_reputation"]),
             domain_level=normalized["domain_level"],
             void_power=normalized["void_power"],
             void_power_max=normalized["void_power_max"],

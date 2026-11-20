@@ -16,6 +16,8 @@ from .progression.final_battle_use_cases import FinalBattleApplication
 from .progression.breakthrough.use_cases import BreakthroughApplication
 from .world.use_cases import WorldApplication
 from .exploration.use_cases import ExplorationApplication
+from .exploration.survey_use_cases import SurveyApplication
+from .exploration.deposit_use_cases import DepositApplication
 from .combat.use_cases import CombatApplication
 from .adventures.use_cases import AdventuresApplication
 from .adventures.mainline_use_cases import AdventuresMainlineApplication
@@ -30,6 +32,12 @@ from .adventures.mainline import (
     SPRING_SUPPER_STORY_KEY,
     IRONWOOD_CRAFT_STORY_KEY,
     BASALT_WAYMARKER_STORY_KEY,
+    HERB_SHELTER_STORY_KEY,
+    MIST_LAMP_STORY_KEY,
+    CLOUD_TIDE_STORY_KEY,
+    FIELD_SEEDS_STORY_KEY,
+    RICE_TABLE_STORY_KEY,
+    LEAF_WATCH_STORY_KEY,
     DAO_SETTLEMENT_STORY_KEY,
     DOMAIN_FRONTIER_STORY_KEY,
     VOID_ARCHIVE_STORY_KEY,
@@ -108,6 +116,91 @@ _HELP_OVERVIEW = (
     f"- {command_link('生活', '修仙帮助 生活')}：生产、灵田、灵兽与日常收支。\n"
     f"- {command_link('社交', '修仙帮助 社交')}：宗门、道侣与道友切磋。"
 )
+_HERB_SHELTER_HELP = (
+    "\n\n感气二层后，可接"
+    f"{command_link('百草坡药棚主线', '百草坡药棚主线')}，先"
+    f"{command_link('开始百草坡药棚主线 雨棚辨药', '开始百草坡药棚主线 雨棚辨药')}；"
+    f"在百草坡{command_link('挂机预览 百草坡采药', '挂机预览 百草坡采药')}，"
+    "选择扶徒归棚或辨叶上坡并完整领取四小时采药。领取本关奖励后，"
+    f"{command_link('开始百草坡药棚主线 丹火济伤', '开始百草坡药棚主线 丹火济伤')}，由炼丹辅修用两草一米新开炉，"
+    f"{command_link('生产预览 低阶疗伤丹', '生产预览 低阶疗伤丹')}后成功收丹；"
+    "缺米可到灵泉谷拾穗，缺药可另日再采。回青石镇"
+    f"{command_link('接取委托 药棚救治', '接取委托 药棚救治')}并"
+    f"{command_link('交付委托 药棚救治', '交付委托 药棚救治')}。领取后"
+    f"{command_link('开始百草坡药棚主线 留根归铺', '开始百草坡药棚主线 留根归铺')}，"
+    f"{command_link('接取委托 止血草供应', '接取委托 止血草供应')}并"
+    f"{command_link('交付委托 止血草供应', '交付委托 止血草供应')}，交足三草后领取留根簿图鉴。"
+    "旧安排、失败炼制、逾时保底、关前接单和旧交单都不计；两关须在青石镇新接并交单，先备材料再看公示期限，重启后主线恢复行动与重试说明。"
+)
+_MIST_LAMP_HELP = (
+    "\n\n聚气境达到四层时，用"
+    f"{command_link('雾隐守灯主线', '雾隐守灯主线')}查看三页灯簿，"
+    f"{command_link('开始雾隐守灯主线 验牌入雾', '开始雾隐守灯主线 验牌入雾')}后先"
+    f"{command_link('生产预览 洞天验行牌', '生产预览 洞天验行牌')}，"
+    "以铁木林木材和百草坡止血草在青石镇或灵泉谷制牌，入洞会消耗凭证。"
+    "本关新制领牌、抵达一层并探索取得阵砂，领取本关奖励，再"
+    f"{command_link('开始雾隐守灯主线 长灯照壁', '开始雾隐守灯主线 长灯照壁')}，查看"
+    f"{command_link('挂机预览 雾隐洞天守灯', '挂机预览 雾隐洞天守灯')}，"
+    "选择固灯筛砂或照壁辨叶，六小时完整领取并领奖。最后"
+    f"{command_link('开始雾隐守灯主线 归谷续灯', '开始雾隐守灯主线 归谷续灯')}，"
+    "用布阵辅修在灵泉谷新制基础聚灵阵，回青石镇"
+    f"{command_link('接取委托 灯阵续灵', '接取委托 灯阵续灵')}并"
+    f"{command_link('交付委托 灯阵续灵', '交付委托 灯阵续灵')}，首通登记归谷续灯录。"
+    "旧炉、旧行程、未结算、战败、取消、逾时保底、关前接单和旧交单不替代相应目标；先看当日公示截止再接单，按原日限补料重试，重启用主线恢复剧情、行动和重试说明。"
+)
+_CLOUD_TIDE_HELP = (
+    "\n\n金丹一层后，用"
+    f"{command_link('云舟候潮主线', '云舟候潮主线')}查看三页航簿，"
+    f"{command_link('开始云舟候潮主线 问潮登舟', '开始云舟候潮主线 问潮登舟')}后先真实抵达云舟渡口并完成"
+    f"{command_link('云舟试炼', '开始探索 云舟试炼')}取得新碎票，再"
+    f"{command_link('开始云舟候潮主线 候潮交班', '开始云舟候潮主线 候潮交班')}，"
+    f"{command_link('挂机预览 云舟渡口候潮', '挂机预览 云舟渡口候潮')}，"
+    "选择扶舷搬铁（多耗三点体力）或护袋理砂（多耗三点精力），八小时完整领取；两种选择的云铁与阵砂比例不同。"
+    f"完成后{command_link('开始云舟候潮主线 航材归镇', '开始云舟候潮主线 航材归镇')}，经云城返回青石镇，先看当日公示再"
+    f"{command_link('接取委托 候潮备材', '接取委托 候潮备材')}并"
+    f"{command_link('交付委托 候潮备材', '交付委托 候潮备材')}，实际交两份云铁和一份阵砂，首通登记候潮归航录。"
+    "旧行程、未结算、风暴无票、取消、逾时保底、关前接单和旧交单不算相应目标，十二小时公示截止按原规则，重启后用主线与挂机状态继续。"
+)
+_FIELD_SEEDS_HELP = (
+    "\n\n感气二层后可走"
+    f"{command_link('药畦换种主线', '药畦换种主线')}：先归镇认畦，再租客房，"
+    f"在分苗换种关开始后{command_link('灵田播种 止血草 精耕', '灵田播种 止血草 精耕')}，"
+    "照料两次，四小时成熟后完整收获，取得云纹稻种。最后在青石镇交付止血草供应。"
+    "旧田、本关才收的旧苗、少照料与枯萎都不算；用我的灵田看窗口，保留种子按日限重种。"
+    "换种后可积累镇中名望，租灵圃小院，继续种云纹稻。"
+)
+_RICE_TABLE_HELP = (
+    "\n\n感气二层后可从"
+    f"{command_link('云稻炊香主线', '云稻炊香主线')}接稻畦起穗：镇中名望六十、租得灵圃小院，"
+    "本关新播云纹稻，精耕或缓养均须充分照料收获。稻种可从精耕止血草换来。"
+    "下一关用烹饪辅修新做云纹灵米饭并实际恢复体力或精力，最后交付云饭待客。"
+    "旧田、旧锅、失败生产、满状态吃饭和旧交单不替代目标；用我的灵田、生产状态与主线接续。"
+)
+_LEAF_WATCH_HELP = (
+    "\n\n感气二层后，"
+    f"{command_link('灵叶守圃主线', '灵叶守圃主线')}从灵泉采集开始：实收灵叶，"
+    "再于本关新播精耕灵叶、照料三次并收获，领取疏枝养叶奖励后才开放"
+    f"{command_link('挂机预览 灵泉守圃', '挂机预览 灵泉守圃')}。"
+    "在灵泉谷选择护叶引露或理沟收砂，六小时完整交班后回镇交付圃夜备材。"
+    "未领奖不解锁；取消、旧安排与逾时保底不算守夜，重启后用主线和挂机状态接续。"
+)
+_EQUIPMENT_CARE_HELP = (
+    "\n\n装备护理沿同一条生产与战斗回收线：先用"
+    f"{command_link('我的装备', '我的装备')}选择具体实例；在青石镇用"
+    f"{command_link('装备修复预览 实例编号', '装备修复预览 实例编号')}查看缺口和成本，再"
+    f"{command_link('修复装备 实例编号', '修复装备 实例编号')}确认。"
+    "已穿戴装备保留槽位，破损装备修复后收纳；不需要修复的装备不会扣费。\n\n"
+    f"已卸下或破损的旧器可先{command_link('装备回收预览 实例编号', '装备回收预览 实例编号')}，"
+    f"再{command_link('回收装备 实例编号', '回收装备 实例编号')}；回收只归档指定实例，词条和祭炼投入不返还，"
+    "所得回收材料会进入开放配方。\n\n"
+    f"要在行途中护理，回镇后用{command_link('生产预览 野外修缮包', '生产预览 野外修缮包')}"
+    "选择铁石与木材，或铁石与止血草制作修缮包；出发后用"
+    f"{command_link('野外修缮预览 实例编号', '野外修缮预览 实例编号')}确认库存，再"
+    f"{command_link('野外修缮装备 实例编号', '野外修缮装备 实例编号')}消耗一包。"
+    "战斗、生产或其他长时行动进行中不能修缮；多余修缮包可接取并"
+    f"{command_link('接取委托 修缮包回收', '接取委托 修缮包回收')}，完成后用"
+    f"{command_link('交付委托 修缮包回收', '交付委托 修缮包回收')}换取灵石与名望。"
+)
 _HELP_PAGES = {
     "启程": (
         "**启程**\n\n"
@@ -129,6 +222,15 @@ _HELP_PAGES = {
     ),
     "探索": (
         "**探索**\n\n"
+        f"{command_link('山野手札', '山野手札')}记录溪崖石层、铁木根脉和岩径古渠。"
+        "抵达现场后勘察地貌，逐处选稳妥观察或省力尝试；每次真实消耗，查验间隔与进度留存。"
+        "可暂离再继续，首次查明才发材料，并依次解开下一处地貌。\n\n"
+        f"勘察完成后用{command_link('资源脉预览', '资源脉预览')}回访取材：留养耗一格，强采耗三格且推迟恢复。"
+        "每处储量独立随时间恢复；木材与药草可在青石镇制成护脉木楔，带回现场养护。\n\n"
+        f"{command_link('巡查预览', '巡查预览')}可查看近郊巡路、铁木巡林与岩径巡标："
+        "选稳行或追迹，途中随机遇到不同人物与路况，真实战败无收成；完整材料可继续制作。\n\n"
+        f"{command_link('寻遗预览', '寻遗预览')}可查看三处已查地貌所指向的古迹；青石镇用可再生资源制作勘掘行囊，"
+        "现场必经真实守护战，胜利带回的三类残件可复原可穿戴山河罗盘，余料可交全天委托换取灵石。\n\n"
         f"用{command_link('我的状态', '我的状态')}确认所在地，"
         f"再{command_link('开始探索', '开始探索')}；途中所得在{command_link('结算探索', '结算探索')}时领取。\n\n"
         "备下药材、木石或阵砂后，可在山野现场承接勘务，选择踏勘或整治："
@@ -178,6 +280,12 @@ _HELP_PAGES = {
         f"{command_link('派遣预览 玄武岩径水标勘务', '派遣预览 玄武岩径水标勘务')}选择踏勘或整治，"
         "只以本关开始后的本人成功派遣回执交卷；取消、部分、失败、延误、逾时保底、旧记录或他人记录不推进，"
         "重启后可用挂机状态、派遣状态继续。"
+        + _HERB_SHELTER_HELP
+        + _MIST_LAMP_HELP
+        + _CLOUD_TIDE_HELP
+        + _FIELD_SEEDS_HELP
+        + _RICE_TABLE_HELP
+        + _LEAF_WATCH_HELP
     ),
     "悬赏": (
         "**悬赏**\n\n"
@@ -187,6 +295,9 @@ _HELP_PAGES = {
         f"达标后{command_link('领取悬赏', '领取悬赏')}，领回酬劳。\n\n"
         "每条悬赏按 UTC 自然日分别计次，同一时间只能承接一桩。"
         "接取时确定本次目标和奖励，需在有效期内完成并领取。"
+        f"\n\n近郊、铁木林与岩径各有单程和双程巡查合同；接单时冻结酬劳，分别须在两小时或三小时内完成。"
+        f"接单后再用{command_link('巡查预览', '巡查预览')}选路出发，只有本人的新路线成功结算才计次；"
+        "旧行程、取消、逾时、失败与战败均不计。巡查材料归你，可在青石镇制作护脉木楔或交付公开委托。"
     ),
     "生活": (
         "**生活**\n\n"
@@ -209,6 +320,10 @@ _HELP_PAGES = {
         f"用{command_link('开始运输', '开始运输')}锁定货物；途中用{command_link('运输状态', '运输状态')}查看抵达窗口，"
         f"抵达后{command_link('结算运输', '结算运输')}。事件结果会在出发时冻结，成功所得可用于生产或公共项目。\n\n"
         f"想离线安排，可{command_link('挂机预览', '挂机预览')}查看闲居路线；"
+        f"近郊、铁木林和岩径营地可带饭食或疗伤丹轮值，先看{command_link('近郊营地', '挂机预览 近郊篝火营')}、"
+        f"{command_link('林桥营地', '挂机预览 铁木桥畔营')}和{command_link('岩径营地', '挂机预览 岩径避风营')}选方案；"
+        f"补给可用{command_link('灵米饭配方', '生产预览 灵米饭')}或{command_link('疗伤丹配方', '生产预览 低阶疗伤丹')}准备。"
+        f"收齐木材铁石阵砂后回镇{command_link('制作巡山护甲', '生产预览 巡山护甲')}，或{command_link('巡营备材', '城镇委托 巡营备材')}交付余材。"
         f"选定后{command_link('开始挂机', '开始挂机')}填写路线名，到时可{command_link('领取挂机', '领取挂机')}，"
         f"开始后六十秒内还能{command_link('取消挂机', '取消挂机')}。\n\n"
         f"{command_link('公共项目', '公共项目')}可查看本周建设；完成运输后，用"
@@ -311,9 +426,26 @@ _HELP_PAGES = {
         f"已结缘的灵兽可在玄天近郊参与{command_link('挂机预览 灵兽栖地巡护', '挂机预览 灵兽栖地巡护')}；"
         f"安排时填写灵兽编号，完整领取会让它获得经验与亲和，逾时只收保底物资。\n\n"
         f"买卖所需物资时，先看{command_link('摆摊列表', '摆摊列表')}了解货物与标价。"
+        f"生产者可先用{command_link('批量委托预览', '批量委托预览 疗伤丹')}核对整批投入、报酬和时限，"
+        f"再用{command_link('发布批量生产委托', '发布批量生产委托 疗伤丹 2 30 生产者供料')}发布；"
+        f"公开订单用{command_link('批量生产委托列表', '批量生产委托列表')}查看，依次{command_link('接取批量生产委托', '接取批量生产委托 委托号')}、"
+        f"{command_link('交付批量生产委托', '交付批量生产委托 委托号')}，委托人再{command_link('确认批量生产委托', '确认批量生产委托 委托号')}；"
+        "发布前可取消，未接取订单可清理，生产超时可恢复，均按冻结批量快照释放或结算托管。"
+        + _HERB_SHELTER_HELP
+        + _MIST_LAMP_HELP
+        + _CLOUD_TIDE_HELP
+        + _FIELD_SEEDS_HELP
+        + _RICE_TABLE_HELP
+        + _LEAF_WATCH_HELP
+        + _EQUIPMENT_CARE_HELP
     ),
     "社交": (
         "**社交**\n\n"
+        f"结伴迎战可先{command_link('多人副本预览', '多人副本预览')}，再{command_link('创建多人副本队伍', '创建多人副本队伍')}；"
+        f"用{command_link('邀请入队', '邀请入队')}填写平台与用户 ID，受邀者发送{command_link('接受入队 队伍号', '接受入队 队伍号')}后全员"
+        f"{command_link('确认入队 队伍号', '确认入队 队伍号')}完成确认，"
+        f"队长{command_link('开始队伍战斗', '开始队伍战斗')}。断线后参战者可{command_link('结算队伍战斗', '结算队伍战斗')}恢复，"
+        f"并用{command_link('队伍战斗回放', '队伍战斗回放')}查看原战局。云舟渡口金丹一层起四至五人同行，战备页列明每人入场成本、今日次数与材料去处。\n\n"
         f"{command_link('我的宗门', '我的宗门')}可查看归属。想自立门户，用{command_link('创建宗门', '创建宗门')}填写名称；"
         f"想拜入已有宗门，用{command_link('申请入宗', '申请入宗')}填写宗门号或名称。\n\n"
         f"掌门可用{command_link('审批入宗', '审批入宗')}填写申请号与同意或拒绝，处理入宗申请。\n\n"
@@ -343,6 +475,8 @@ class XiuxianApplication:
         self.items = ItemApplication(repository)
         self.world = WorldApplication(repository)
         self.exploration = ExplorationApplication(repository)
+        self.surveys = SurveyApplication(repository)
+        self.deposits = DepositApplication(repository)
         self.combat = CombatApplication(repository)
         self.adventures = AdventuresApplication(repository)
         self.mainline = AdventuresMainlineApplication(repository)
@@ -438,6 +572,33 @@ class XiuxianApplication:
             claim_command="领取玄武岩径水标回响主线奖励",
         )
         self.dao_echoes = DaoEchoesApplication(repository)
+        self.herb_shelter_mainline = AdventuresMainlineApplication(
+            repository,
+            story_key=HERB_SHELTER_STORY_KEY,
+            title="百草坡药棚主线",
+            start_command="开始百草坡药棚主线",
+            claim_command="领取百草坡药棚主线奖励",
+        )
+        self.mist_lamp_mainline = AdventuresMainlineApplication(
+            repository, story_key=MIST_LAMP_STORY_KEY, title="雾隐守灯主线",
+            start_command="开始雾隐守灯主线", claim_command="领取雾隐守灯主线奖励",
+        )
+        self.cloud_tide_mainline = AdventuresMainlineApplication(
+            repository, story_key=CLOUD_TIDE_STORY_KEY, title="云舟候潮主线",
+            start_command="开始云舟候潮主线", claim_command="领取云舟候潮主线奖励",
+        )
+        self.field_seeds_mainline = AdventuresMainlineApplication(
+            repository, story_key=FIELD_SEEDS_STORY_KEY, title="药畦换种主线",
+            start_command="开始药畦换种主线", claim_command="领取药畦换种主线奖励",
+        )
+        self.rice_table_mainline = AdventuresMainlineApplication(
+            repository, story_key=RICE_TABLE_STORY_KEY, title="云稻炊香主线",
+            start_command="开始云稻炊香主线", claim_command="领取云稻炊香主线奖励",
+        )
+        self.leaf_watch_mainline = AdventuresMainlineApplication(
+            repository, story_key=LEAF_WATCH_STORY_KEY, title="灵叶守圃主线",
+            start_command="开始灵叶守圃主线", claim_command="领取灵叶守圃主线奖励",
+        )
         self.three_realms = ThreeRealmsApplication(repository)
         self.secret_realms = SecretRealmApplication(repository)
         self.legacy_manor = LegacyManorApplication(repository)
@@ -531,6 +692,9 @@ class XiuxianApplication:
                 ascension_lines = self._ascension_day_help_lines()
                 if ascension_lines:
                     body += "\n\n" + ascension_lines
+                qualification_lines = self._dao_origin_qualification_help_lines()
+                if qualification_lines:
+                    body += "\n\n" + qualification_lines
             elif category == "修炼":
                 path_lines = self._path_switch_help_lines()
                 if path_lines:
@@ -988,6 +1152,31 @@ class XiuxianApplication:
         except Exception:
             return ""
 
+    def _dao_origin_qualification_help_lines(self) -> str:
+        """Describe the final-heaven qualification handoff from task evidence."""
+
+        try:
+            from .events.season_content import FINAL_HEAVEN_SEASON_KEY, season_record
+
+            record = season_record(FINAL_HEAVEN_SEASON_KEY, self.content)
+            qualification = record["qualification"]
+            task_labels = []
+            content = self.content or bundled_content()
+            for task_key in qualification["task_keys"]:
+                task = content.require("quest", task_key, include_locked=False)
+                task_labels.append(str(task["name"]))
+            return "\n".join(
+                [
+                    "**道源终局资格**",
+                    "> 终局天榜按当前赛季冻结三项道源证据；开始、失败、旧赛季或客户端计数都不计入。",
+                    f"- 本赛季任务：{'、'.join(task_labels)}",
+                    f"- {command_link('道源资格', '道源资格')}查看冻结目标、证据来源与剩余要求",
+                    f"- {command_link('领取道源资格', '领取道源资格')}在三项任务齐备后原子写入 {qualification['readiness_flag']}",
+                ]
+            )
+        except Exception:
+            return ""
+
     async def _invoke(
         self,
         context: CommandContext,
@@ -1402,6 +1591,33 @@ class XiuxianApplication:
             write_message="当前事件不允许开始探索。",
         )
 
+    async def preview_patrol(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.exploration.preview_patrol(context), require_write=False)
+
+    async def preview_relic(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.exploration.preview_relic(context), require_write=False)
+
+    async def survey_journal(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.surveys.execute(context, "journal"), require_write=False)
+
+    async def start_survey(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.surveys.execute(context, "start"))
+
+    async def choose_survey(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.surveys.execute(context, "choose"))
+
+    async def rest_survey(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.surveys.execute(context, "rest"))
+
+    async def deposit_preview(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.deposits.execute(context, "preview"), require_write=False)
+
+    async def extract_deposit(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.deposits.execute(context, "extract"))
+
+    async def maintain_deposit(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.deposits.execute(context, "maintain"))
+
     async def settle_exploration(self, context: CommandContext) -> CommandResult:
         return await self._invoke(
             context,
@@ -1535,6 +1751,20 @@ class XiuxianApplication:
 
     async def complete_dao_origin_task(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.quests.complete_dao_origin_task(context), write_message="当前事件不允许完成道源任务。")
+
+    async def get_dao_origin_qualification(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.quests.get_dao_origin_qualification(context),
+            require_write=False,
+        )
+
+    async def claim_dao_origin_qualification(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.quests.claim_dao_origin_qualification(context),
+            write_message="当前事件不允许领取道源资格。",
+        )
 
     async def list_bounties(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.adventures.list_bounties(context), require_write=False)
@@ -1827,6 +2057,84 @@ class XiuxianApplication:
         return await self._invoke(
             context, lambda: self.basalt_waymarker_mainline.claim_reward(context),
             write_message="此刻无法领取玄武岩径水标回响所得。",
+        )
+
+    async def get_herb_shelter_mainline_status(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.herb_shelter_mainline.get_status(context), require_write=False)
+
+    async def get_leaf_watch_mainline_status(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.leaf_watch_mainline.get_status(context), require_write=False)
+
+    async def start_leaf_watch_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.leaf_watch_mainline.start_stage(context), write_message="此刻无法开始灵叶守圃。")
+
+    async def claim_leaf_watch_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.leaf_watch_mainline.claim_reward(context), write_message="此刻无法领取灵叶守圃所得。")
+
+    async def get_rice_table_mainline_status(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.rice_table_mainline.get_status(context), require_write=False)
+
+    async def start_rice_table_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.rice_table_mainline.start_stage(context), write_message="此刻无法开始云稻炊香。")
+
+    async def claim_rice_table_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.rice_table_mainline.claim_reward(context), write_message="此刻无法领取云稻炊香所得。")
+
+    async def get_field_seeds_mainline_status(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.field_seeds_mainline.get_status(context), require_write=False)
+
+    async def start_field_seeds_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context, lambda: self.field_seeds_mainline.start_stage(context),
+            write_message="此刻无法开始药畦换种。",
+        )
+
+    async def claim_field_seeds_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context, lambda: self.field_seeds_mainline.claim_reward(context),
+            write_message="此刻无法领取药畦换种所得。",
+        )
+
+    async def start_herb_shelter_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context, lambda: self.herb_shelter_mainline.start_stage(context),
+            write_message="此刻无法开始百草坡药棚之约。",
+        )
+
+    async def claim_herb_shelter_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context, lambda: self.herb_shelter_mainline.claim_reward(context),
+            write_message="此刻无法领取百草坡药棚所得。",
+        )
+
+    async def get_mist_lamp_mainline_status(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.mist_lamp_mainline.get_status(context), require_write=False)
+
+    async def start_mist_lamp_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context, lambda: self.mist_lamp_mainline.start_stage(context),
+            write_message="此刻无法开始雾隐守灯。",
+        )
+
+    async def claim_mist_lamp_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context, lambda: self.mist_lamp_mainline.claim_reward(context),
+            write_message="此刻无法领取雾隐守灯所得。",
+        )
+
+    async def get_cloud_tide_mainline_status(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.cloud_tide_mainline.get_status(context), require_write=False)
+
+    async def start_cloud_tide_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context, lambda: self.cloud_tide_mainline.start_stage(context),
+            write_message="此刻无法开始云舟候潮。",
+        )
+
+    async def claim_cloud_tide_mainline(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context, lambda: self.cloud_tide_mainline.claim_reward(context),
+            write_message="此刻无法领取云舟候潮所得。",
         )
 
     async def preview_final_arena(self, context: CommandContext) -> CommandResult:
@@ -2299,6 +2607,9 @@ class XiuxianApplication:
     async def create_standard_pve_party(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.party.create_standard_pve_party(context), write_message="当前事件不允许创建多人副本队伍。")
 
+    async def preview_standard_party(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.party.preview_standard_party(context), require_write=False)
+
     async def create_three_realms_tower_duo_party(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.party.create_three_realms_tower_duo_party(context), write_message="当前事件不允许创建三界塔双人队伍。")
 
@@ -2471,6 +2782,40 @@ class XiuxianApplication:
             context,
             lambda: self.equipment.refine(context),
             write_message="当前事件不允许重铸法器。",
+        )
+
+    async def preview_equipment_repair(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.equipment.preview_repair(context), require_write=False)
+
+    async def repair_equipment(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.equipment.repair(context),
+            write_message="当前事件不允许修缮装备。",
+        )
+
+    async def preview_equipment_reclamation(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.equipment.preview_reclamation(context), require_write=False)
+
+    async def reclaim_equipment(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.equipment.reclaim(context),
+            write_message="当前事件不允许回收装备。",
+        )
+
+    async def field_repair_equipment(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.equipment.field_repair(context),
+            write_message="当前事件不允许野外修缮装备。",
+        )
+
+    async def preview_field_repair_equipment(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.equipment.field_repair_preview(context),
+            require_write=False,
         )
 
     async def list_equipment(self, context: CommandContext) -> CommandResult:
@@ -3266,3 +3611,30 @@ class XiuxianApplication:
 
     async def recover_production_commission(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.economy.recover_production_commission(context), write_message="当前事件不允许恢复生产委托。")
+
+    async def preview_batch_production_commission(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.economy.preview_batch_production_commission(context), require_write=False)
+
+    async def create_batch_production_commission(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.economy.create_batch_production_commission(context), write_message="当前事件不允许发布批量生产委托。")
+
+    async def list_batch_production_commissions(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.economy.list_batch_production_commissions(context), require_write=False)
+
+    async def accept_batch_production_commission(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.economy.accept_batch_production_commission(context), write_message="当前事件不允许接取批量生产委托。")
+
+    async def deliver_batch_production_commission(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.economy.deliver_batch_production_commission(context), write_message="当前事件不允许交付批量生产委托。")
+
+    async def settle_batch_production_commission(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.economy.settle_batch_production_commission(context), write_message="当前事件不允许确认批量生产委托。")
+
+    async def cancel_batch_production_commission(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.economy.cancel_batch_production_commission(context), write_message="当前事件不允许取消批量生产委托。")
+
+    async def expire_batch_production_commission(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.economy.expire_batch_production_commission(context), write_message="当前事件不允许清理批量生产委托。")
+
+    async def recover_batch_production_commission(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.economy.recover_batch_production_commission(context), write_message="当前事件不允许恢复批量生产委托。")

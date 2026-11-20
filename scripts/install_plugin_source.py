@@ -351,14 +351,18 @@ def validate(target: Path) -> None:
     except ModuleNotFoundError:
         mainline = None
     if mainline is not None:
-        for story in (
-            mainline.MAINLINE_STORY_KEY,
-            mainline.DOMAIN_FRONTIER_STORY_KEY,
-            mainline.VOID_ARCHIVE_STORY_KEY,
-        ):
-            mainline.mainline_definitions(story_key=story)
+        content = importlib.import_module(f"{expected_module}.xiuxian.content")
+        bundle = content.ContentBundle.load(target / "data")
+        mainline.mainline_definitions(bundle)
         livelihood = importlib.import_module(f"{expected_module}.xiuxian.livelihood.rules")
-        livelihood.public_project_definitions()
+        livelihood.public_project_definitions(bundle)
+        # Old custom stories may never invoke the lazy idle-source validator.
+        idle = importlib.import_module(f"{expected_module}.xiuxian.specials.idle_rules")
+        idle.idle_route_definitions(bundle)
+        party_rules = importlib.import_module(f"{expected_module}.xiuxian.combat.party_rules")
+        party_rules.validate_standard_party_content(bundle)
+        integrity = importlib.import_module(f"{expected_module}.xiuxian.content_integrity")
+        integrity.validate_source_content(bundle, party_only=True)
     print(
         f"NoneBot 已加载 {expected_module} "
         f"module_file={module_file} matchers={len(plugin.matcher)} handlers={handlers}"

@@ -301,7 +301,7 @@ def test_rendering_and_help() -> None:
                     actions=page.actions,
                 )
                 assert fallback.sent_format == "text" and fallback.degraded is True
-                assert str(bot.sent[0]).endswith("可发送：购入寄售 1")
+                assert "购入寄售（购入寄售 1）" in str(bot.sent[0])
 
                 class FakeQQBot(FakeBot):
                     __module__ = "nonebot.adapters.qq.bot"

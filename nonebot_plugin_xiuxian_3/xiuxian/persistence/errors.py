@@ -20,6 +20,14 @@ class OperationResultMalformedError(RuntimeError):
     """An operation ledger row contains a non-object or invalid JSON result."""
 
 
+class DaoOriginQualificationIncompleteError(RuntimeError):
+    """The current final-heaven season lacks one or more origin proofs."""
+
+
+class DaoOriginQualificationAlreadyClaimedError(RuntimeError):
+    """The player already holds a qualification snapshot for this season."""
+
+
 class PlayerNotFoundError(RuntimeError):
     """The requested platform identity has no player record."""
 
@@ -1285,6 +1293,26 @@ class EquipmentDurabilityZeroError(RuntimeError):
     """An equipment instance with no remaining durability cannot be worn."""
 
 
+class EquipmentRepairLocationError(RuntimeError):
+    """The player is not at the configured equipment repair location."""
+
+
+class EquipmentRepairNotNeededError(RuntimeError):
+    """The equipment already has full durability."""
+
+
+class EquipmentReclamationEquippedError(RuntimeError):
+    """Equipped equipment must be removed before reclamation."""
+
+
+class EquipmentFieldRepairNotNeededError(RuntimeError):
+    """The equipment has no missing durability for field repair."""
+
+
+class EquipmentRepairKitInsufficientError(RuntimeError):
+    """The player has no repair kit available."""
+
+
 class RealmCultivationInsufficientError(RuntimeError):
     """The player has not reached the next layer threshold."""
 
@@ -1520,6 +1548,14 @@ class PartyBattlePermissionError(RuntimeError):
 
 class PartyBattleRequirementError(RuntimeError):
     """The party is not ready for its location or enemy encounter."""
+
+
+class PartyBattleResourceError(PartyBattleRequirementError):
+    """A member lacks the configured standard party entry resources."""
+
+
+class PartyBattleDailyLimitError(PartyBattleRequirementError):
+    """A member has used the encounter's daily entry quota."""
 
 
 class BoundaryRealmRequirementError(PartyBattleRequirementError):

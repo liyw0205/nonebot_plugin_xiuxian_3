@@ -20,6 +20,9 @@ class MainlineStageView:
     repeat_reward: dict[str, int | str] = field(default_factory=dict)
     completed: bool = False
     claimed: bool = False
+    body: str = ""
+    actions: tuple[dict[str, str], ...] = ()
+    retry_message: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,6 +69,7 @@ class MainlineClaimRecord:
     next_stage_key: str | None = None
     source_operation_id: str | None = None
     already_completed: bool = False
+    completion_actions: tuple[dict[str, str], ...] = ()
 
 
 __all__ = [

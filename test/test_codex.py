@@ -297,7 +297,7 @@ def test_codex_place_milestone_claim_unlocks_extra_commission_on_both_adapters()
                 assert achievement.data["achievement_key"] == "achievement.codex_5"
                 assert achievement_replay.data["idempotent_replay"] is True
                 offers_before = await _send(runtime, adapter, user, f"{prefix}-offers-before", "城镇委托")
-                assert len(offers_before.data["commissions"]) == 3
+                assert len(offers_before.data["commissions"]) == 11
                 assert all(
                     item["commission_key"] != "town_commission.spirit_leaf"
                     for item in offers_before.data["commissions"]
@@ -329,7 +329,7 @@ def test_codex_place_milestone_claim_unlocks_extra_commission_on_both_adapters()
                 assert duplicate.code == "CODEX_MILESTONE_ALREADY_CLAIMED"
 
                 offers_after = await _send(runtime, adapter, user, f"{prefix}-offers-after", "城镇委托")
-                assert len(offers_after.data["commissions"]) == 4
+                assert len(offers_after.data["commissions"]) == 12
                 assert any(
                     item["commission_key"] == "town_commission.spirit_leaf"
                     for item in offers_after.data["commissions"]

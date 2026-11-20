@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Any
 
 from ...contracts import PlayerView
 
@@ -41,6 +42,8 @@ class ExplorationStartRecord:
     cross_realm_penalty_bp: int = 0
     bloodline_stability_before: int = 0
     bloodline_stability_after: int = 0
+    patrol: dict[str, Any] = field(default_factory=dict)
+    relic: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,3 +71,5 @@ class ExplorationSettlementRecord:
     soul_fatigue_until: str | None = None
     bloodline_stability_before: int = 0
     bloodline_stability_after: int = 0
+    patrol: dict[str, Any] = field(default_factory=dict)
+    relic: dict[str, Any] = field(default_factory=dict)

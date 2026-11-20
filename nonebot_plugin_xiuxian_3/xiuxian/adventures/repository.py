@@ -7,6 +7,7 @@ import hashlib
 import json
 import sqlite3
 import time
+from collections.abc import Mapping
 from dataclasses import replace
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Callable
@@ -104,6 +105,7 @@ from ..adventures.mainline import (
     mainline_definitions,
     mainline_first_clear_key,
     mainline_prerequisites_met,
+    mainline_prerequisites_met_many,
     mainline_reward,
     mainline_stage_status,
     resolve_mainline,
@@ -175,9 +177,12 @@ from ..utils.player import (
     player_integer,
     player_inventory,
     player_reputation_state,
+    player_values,
     split_player_rewards,
 )
 from ..rewards.rules import local_reputation_maximum
+from .rules import bounty_next_actions
+from .exploration_evidence import exploration_completion_count
 
 
 def _bounty_snapshot(raw_value: Any) -> dict[str, Any]:
@@ -231,6 +236,7 @@ def _bounty_snapshot(raw_value: Any) -> dict[str, Any]:
         "inventory_delivery",
         "production_completed",
         "exploration_battle_wins",
+        "exploration_completions",
         "tribulation_trial_wins",
         "dispatch_successes",
         "public_service_completions",
@@ -241,6 +247,13 @@ def _bounty_snapshot(raw_value: Any) -> dict[str, Any]:
         not isinstance(snapshot["target_key"], str) or not snapshot["target_key"]
     ):
         raise ValueError("bounty snapshot contains an invalid target key")
+    if snapshot["target_kind"] == "exploration_completions":
+        baseline = snapshot.get("baseline_operation_rowid")
+        actions = snapshot.get("next_actions")
+        if type(baseline) is not int or baseline < 0 or not isinstance(actions, list) or not actions:
+            raise ValueError("bounty exploration baseline or actions are invalid")
+        if any(not isinstance(a, dict) or set(a) != {"label", "command"} or any(not isinstance(v, str) or not v for v in a.values()) for a in actions):
+            raise ValueError("bounty exploration actions are invalid")
     for key in ("target_amount", "local_reputation_maximum"):
         if (
             isinstance(snapshot[key], bool)
@@ -420,6 +433,19 @@ def _bounty_daily_counts(
     return {str(row["bounty_key"]): int(row["count"]) for row in rows}
 
 
+def _bounty_local_reputation(
+    connection: sqlite3.Connection,
+    player_id: int,
+    definitions: tuple[Any, ...],
+) -> dict[str, int]:
+    if any(
+        item.runtime_status == "open" and item.target_kind == "idle_claims"
+        for item in definitions
+    ):
+        return dict(player_reputation_state(connection, player_id).local)
+    return {}
+
+
 class AdventuresRepositoryMixin:
     async def get_bounty_board(
         self,
@@ -438,6 +464,9 @@ class AdventuresRepositoryMixin:
         business_date: str,
         refresh_seed: str,
         daily_counts: dict[str, int],
+        *,
+        definitions: tuple[Any, ...] | None = None,
+        local_reputation: dict[str, int] | None = None,
     ) -> list[Any]:
         """Return today's stable batch: eligible open definitions in the
         player's seeded order, truncated to the batch size. Ineligible
@@ -445,11 +474,18 @@ class AdventuresRepositoryMixin:
         slots, so a fresh player always sees actionable offers."""
 
         batch_size = 3
+        definitions = definitions or tuple(bounty_definitions(self.content))
+        if local_reputation is None:
+            local_reputation = _bounty_local_reputation(
+                connection, int(row["id"]), definitions
+            )
         open_definitions = [
             definition
-            for definition in bounty_definitions(self.content)
+            for definition in definitions
             if definition.runtime_status == "open"
-            and self._bounty_player_eligible(connection, row, definition, now)
+            and self._bounty_player_eligible(
+                connection, row, definition, now, local_reputation
+            )
             and daily_counts.get(definition.key, 0) < definition.daily_limit
         ]
         return list(refresh_bounty_candidates(open_definitions, seed=refresh_seed))[:batch_size]
@@ -476,6 +512,10 @@ class AdventuresRepositoryMixin:
                     (row["id"], serialize_datetime(now)),
                 ).fetchone()
             daily_counts = _bounty_daily_counts(connection, int(row["id"]), business_date)
+            definitions = tuple(bounty_definitions(self.content))
+            local_reputation = _bounty_local_reputation(
+                connection, int(row["id"]), definitions
+            )
             # The board shows a stable daily batch. Ineligible bounties
             # (realm/permit prerequisites not yet met) never consume batch
             # slots — the board keeps them out so a fresh player always sees
@@ -483,7 +523,14 @@ class AdventuresRepositoryMixin:
             # (appended if outside the batch), and claimed/expired ones stay
             # visible through it.
             batched_definitions = self._bounty_daily_batch(
-                connection, row, now, business_date, refresh_seed, daily_counts
+                connection,
+                row,
+                now,
+                business_date,
+                refresh_seed,
+                daily_counts,
+                definitions=definitions,
+                local_reputation=local_reputation,
             )
             batch_keys = {definition.key for definition in batched_definitions}
             accepted_key = accepted["bounty_key"] if accepted is not None else None
@@ -491,7 +538,7 @@ class AdventuresRepositoryMixin:
                 accepted_definition = next(
                     (
                         definition
-                        for definition in bounty_definitions(self.content)
+                        for definition in definitions
                         if definition.key == accepted_key
                     ),
                     None,
@@ -548,7 +595,9 @@ class AdventuresRepositoryMixin:
                     status = "daily_limit"
                 elif definition.runtime_status != "open":
                     status = "locked"
-                elif not self._bounty_player_eligible(connection, row, definition, now):
+                elif not self._bounty_player_eligible(
+                    connection, row, definition, now, local_reputation
+                ):
                     status = "requirement"
                 elif daily_counts.get(definition.key, 0) >= definition.daily_limit:
                     status = "daily_limit"
@@ -565,6 +614,7 @@ class AdventuresRepositoryMixin:
                         reward=reward,
                         reward_labels=reward_labels,
                         expires_at=expires_at,
+                        next_actions=accepted_snapshot.get("next_actions", []) if is_accepted else bounty_next_actions(definition, self.content),
                     )
                 )
             if accepted is not None and not any(item.key == accepted["bounty_key"] for item in offers):
@@ -591,6 +641,7 @@ class AdventuresRepositoryMixin:
                         reward=accepted_snapshot["reward"],
                         reward_labels=accepted_snapshot["reward_labels"],
                         expires_at=str(accepted["expires_at"]),
+                        next_actions=accepted_snapshot.get("next_actions", []),
                     )
                 )
             return BountyBoardRecord(
@@ -606,6 +657,7 @@ class AdventuresRepositoryMixin:
         row: sqlite3.Row | dict[str, Any],
         definition,
         now: datetime,
+        local_reputation: dict[str, int],
     ) -> bool:
         stage = str(row["stage"] if isinstance(row, sqlite3.Row) else row.get("stage", ""))
         if stage not in {STAGE_MORTAL, "seeker", "cultivator"}:
@@ -619,6 +671,15 @@ class AdventuresRepositoryMixin:
             player_inventory(row), str(definition.target_key)
         ) < definition.target_amount:
             return False
+        if definition.target_kind == "exploration_completions":
+            content = self.content or default_content_bundle()
+            mode = content.require("exploration_mode", definition.target_key, include_locked=False)
+            used = connection.execute(
+                "SELECT COUNT(*) FROM exploration_sessions WHERE player_id=? AND mode_key=? AND business_date=?",
+                (row["id"], definition.target_key, now.date().isoformat()),
+            ).fetchone()[0]
+            if mode["daily_limit"] - used < definition.target_amount:
+                return False
         if definition.target_kind == "tribulation_trial_wins":
             event = tribulation_definition(self.content)
             won_trials = {
@@ -642,7 +703,11 @@ class AdventuresRepositoryMixin:
             ) < definition.target_amount:
                 return False
         if definition.target_kind == "idle_claims" and self._idle_requirements_missing(
-            connection, row, resolve_route(definition.target_key, self.content), now
+            connection,
+            row,
+            resolve_route(definition.target_key, self.content),
+            now,
+            local_reputation,
         ):
             return False
         if definition.required_intro_flag:
@@ -709,6 +774,16 @@ class AdventuresRepositoryMixin:
         snapshot: dict[str, Any],
     ) -> int:
         target_amount = int(snapshot["target_amount"])
+        if snapshot["target_kind"] == "exploration_completions":
+            receipt = connection.execute(
+                "SELECT result_json FROM operations WHERE operation_id=? AND player_id=? AND operation_name='bounty.accept'",
+                (offer["operation_id"], row["id"]),
+            ).fetchone()
+            evidence = {k: snapshot[k] for k in ("target_key", "target_amount", "baseline_operation_rowid")}
+            if receipt is None or decode_json_strict(receipt["result_json"]).get("exploration_evidence") != evidence:
+                raise ValueError("bounty exploration baseline disagrees with its acceptance receipt")
+            return min(target_amount, exploration_completion_count(connection, int(row["id"]),
+                snapshot["target_key"], snapshot["baseline_operation_rowid"], str(offer["expires_at"])))
         if snapshot["target_kind"] in {"inventory_gain", "inventory_delivery"}:
             inventory = player_inventory(row)
             current = inventory_amount(inventory, str(snapshot["target_key"]))
@@ -847,6 +922,10 @@ class AdventuresRepositoryMixin:
             if active is not None:
                 raise BountyDailyLimitError("player already has an active bounty")
 
+            definitions = tuple(bounty_definitions(self.content))
+            local_reputation = _bounty_local_reputation(
+                connection, int(row["id"]), definitions
+            )
             daily_counts = _bounty_daily_counts(
                 connection, int(row["id"]), business_date
             )
@@ -855,13 +934,22 @@ class AdventuresRepositoryMixin:
             refresh_seed = bounty_refresh_seed(int(row["id"]), business_date)
             if bounty_key is None:
                 candidates = self._bounty_daily_batch(
-                    connection, row, now, business_date, refresh_seed, daily_counts
+                    connection,
+                    row,
+                    now,
+                    business_date,
+                    refresh_seed,
+                    daily_counts,
+                    definitions=definitions,
+                    local_reputation=local_reputation,
                 )
                 if not candidates:
                     if any(
                         item.runtime_status == "open"
-                        and self._bounty_player_eligible(connection, row, item, now)
-                        for item in bounty_definitions(self.content)
+                        and self._bounty_player_eligible(
+                            connection, row, item, now, local_reputation
+                        )
+                        for item in definitions
                     ):
                         raise BountyDailyLimitError("daily bounty limit reached")
                     raise BountyRequirementError("no eligible bounty candidates")
@@ -882,7 +970,9 @@ class AdventuresRepositoryMixin:
             expires_at = serialize_datetime(now + timedelta(seconds=definition.duration_seconds))
             if definition.runtime_status != "open":
                 raise BountyContentClosedError("bounty runtime is closed")
-            if not self._bounty_player_eligible(connection, row, definition, now):
+            if not self._bounty_player_eligible(
+                connection, row, definition, now, local_reputation
+            ):
                 raise BountyRequirementError("bounty requirements are not met")
             if daily_counts.get(definition.key, 0) >= definition.daily_limit:
                 raise BountyDailyLimitError("daily bounty limit reached")
@@ -996,6 +1086,9 @@ class AdventuresRepositoryMixin:
                 },
             }
             offer_id = uuid4().hex
+            if definition.target_kind == "exploration_completions":
+                snapshot["baseline_operation_rowid"] = int(connection.execute("SELECT COALESCE(MAX(rowid), 0) FROM operations").fetchone()[0])
+                snapshot["next_actions"] = bounty_next_actions(definition, self.content)
             connection.execute(
                 """
                 INSERT INTO bounty_offers(
@@ -1027,6 +1120,9 @@ class AdventuresRepositoryMixin:
                 "target": definition.target_amount,
                 "starts_at": starts_at,
                 "expires_at": expires_at,
+                "next_actions": snapshot.get("next_actions", []),
+                **({"exploration_evidence": {k: snapshot[k] for k in ("target_key", "target_amount", "baseline_operation_rowid")}}
+                   if definition.target_kind == "exploration_completions" else {}),
             }
             connection.execute(
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -1053,6 +1149,7 @@ class AdventuresRepositoryMixin:
             starts_at=str(payload["starts_at"]),
             expires_at=str(payload["expires_at"]),
             already_completed=replay,
+            next_actions=payload.get("next_actions", []),
         )
     async def claim_bounty(
         self,
@@ -1502,100 +1599,115 @@ class AdventuresRepositoryMixin:
         player: sqlite3.Row,
         *,
         now: datetime | None = None,
+        mainline_rows: tuple[sqlite3.Row, ...] | None = None,
+        normalized: Mapping[str, Any] | None = None,
     ) -> set[str]:
         """Build server-owned evidence shared by status and start checks."""
 
-        intro = SQLitePlayerRepository._json_object(player["intro_json"], {})
+        intro_flags = (
+            normalized.get("intro_flags", ())
+            if normalized is not None
+            else SQLitePlayerRepository._json_object(player["intro_json"], {}).get("flags", ())
+        )
         # The time-fort story flag is only a projection of a first clear.  It
         # must be rebuilt from the settlement table so a stale flag cannot
         # unlock the returner's route by itself.
         events = {
             str(item)
-            for item in intro.get("flags", [])
+            for item in intro_flags
             if str(item) != "story.mainline.void_archive.time_fort"
         }
         # Cross-story progress comes from first clears, not projected event flags.
+        # These evidence tables are all player-scoped and indexed. Fetching
+        # their positive evidence in one UNION keeps the same gate semantics
+        # while avoiding a dozen executor/SQLite round trips per status read.
+        unlock_condition = " AND ends_at > ?" if now is not None else ""
+        evidence_query = f"""
+            SELECT ? AS event_key
+            WHERE EXISTS (
+                SELECT 1 FROM town_commission_claims
+                WHERE player_id = ? AND status = 'delivered'
+            )
+            UNION ALL
+            SELECT ? AS event_key
+            WHERE EXISTS (
+                SELECT 1 FROM domain_front_participants WHERE player_id = ?
+            )
+            UNION ALL
+            SELECT ? AS event_key
+            WHERE EXISTS (
+                SELECT 1
+                FROM domain_front_battle_links AS links
+                JOIN battle_sessions AS sessions
+                  ON sessions.battle_id = links.battle_id
+                WHERE links.player_id = ?
+                  AND sessions.player_id = links.player_id
+                  AND sessions.battle_type = 'pve.domain_front'
+                  AND sessions.status = 'settled'
+                  AND json_extract(sessions.result_json, '$.outcome') = 'won'
+            )
+            UNION ALL
+            SELECT ? AS event_key
+            WHERE EXISTS (
+                SELECT 1 FROM domain_front_contributions WHERE player_id = ?
+            )
+            UNION ALL
+            SELECT ? AS event_key
+            WHERE EXISTS (
+                SELECT 1 FROM domain_front_claims WHERE player_id = ?
+            )
+            UNION ALL
+            SELECT ? AS event_key
+            WHERE EXISTS (
+                SELECT 1 FROM void_archive_unlocks
+                WHERE player_id = ? AND event_key = ?{unlock_condition}
+            )
+        """
+        evidence_params: list[Any] = [MAINLINE_TOWN_COMMISSION_DELIVERED, player["id"]]
+        evidence_params.extend(("event.domain_front.joined", player["id"]))
+        evidence_params.extend(("event.domain_front.battle", player["id"]))
+        evidence_params.extend(("event.domain_front.contribution", player["id"]))
+        evidence_params.extend(("event.domain_front.claimed", player["id"]))
+        evidence_params.extend(("event.archive_unlock", player["id"], "event.archive_unlock"))
+        if now is not None:
+            evidence_params.append(serialize_datetime(now))
+        evidence_query += """
+            UNION ALL
+            SELECT ? AS event_key
+            WHERE EXISTS (
+                SELECT 1 FROM void_archive_runs
+                WHERE player_id = ? AND outcome = 'won'
+            )
+            UNION ALL
+            SELECT ? AS event_key
+            WHERE EXISTS (
+                SELECT 1 FROM time_fort_members
+                WHERE player_id = ? AND status = 'settled' AND first_clear = 1
+            )
+            UNION ALL
+            SELECT 'livelihood.project.' || p.project_key || '.completed' AS event_key
+            FROM livelihood_project_rewards AS r
+            JOIN livelihood_projects AS p ON p.project_id = r.project_id
+            WHERE r.player_id = ? AND r.eligible = 1
+        """
+        evidence_params.extend(("event.archive_guard.won", player["id"]))
+        evidence_params.extend(("story.mainline.void_archive.time_fort", player["id"]))
+        evidence_params.append(player["id"])
+        if mainline_rows is None:
+            mainline_rows = tuple(
+                connection.execute(
+                    "SELECT story_key, stage_key, first_clear_claimed FROM mainline_runs WHERE player_id = ?",
+                    (player["id"],),
+                ).fetchall()
+            )
         events.update(
             f"{row['story_key']}:{row['stage_key']}"
-            for row in connection.execute(
-                "SELECT story_key, stage_key FROM mainline_runs "
-                "WHERE player_id = ? AND first_clear_claimed = 1",
-                (player["id"],),
-            ).fetchall()
+            for row in mainline_rows
+            if bool(row["first_clear_claimed"])
         )
+        events.update(str(row["event_key"]) for row in connection.execute(evidence_query, evidence_params).fetchall())
         if str(player["stage"]) != STAGE_NEW_USER:
             events.add("player.start_seeking")
-        if connection.execute(
-            """
-            SELECT 1
-            FROM town_commission_claims
-            WHERE player_id = ? AND status = 'delivered'
-            LIMIT 1
-            """,
-            (player["id"],),
-        ).fetchone() is not None:
-            events.add(MAINLINE_TOWN_COMMISSION_DELIVERED)
-        if connection.execute(
-            "SELECT 1 FROM domain_front_participants WHERE player_id = ? LIMIT 1",
-            (player["id"],),
-        ).fetchone() is not None:
-            events.add("event.domain_front.joined")
-        if connection.execute(
-            """
-            SELECT 1
-            FROM domain_front_battle_links AS links
-            JOIN battle_sessions AS sessions ON sessions.battle_id = links.battle_id
-            WHERE links.player_id = ?
-              AND sessions.player_id = links.player_id
-              AND sessions.battle_type = 'pve.domain_front'
-              AND sessions.status = 'settled'
-              AND json_extract(sessions.result_json, '$.outcome') = 'won'
-            LIMIT 1
-            """,
-            (player["id"],),
-        ).fetchone() is not None:
-            events.add("event.domain_front.battle")
-        if connection.execute(
-            "SELECT 1 FROM domain_front_contributions WHERE player_id = ? LIMIT 1",
-            (player["id"],),
-        ).fetchone() is not None:
-            events.add("event.domain_front.contribution")
-        if connection.execute(
-            "SELECT 1 FROM domain_front_claims WHERE player_id = ? LIMIT 1",
-            (player["id"],),
-        ).fetchone() is not None:
-            events.add("event.domain_front.claimed")
-        unlock_query = (
-            "SELECT 1 FROM void_archive_unlocks "
-            "WHERE player_id = ? AND event_key = ?"
-        )
-        unlock_params: tuple[Any, ...] = (player["id"], "event.archive_unlock")
-        if now is not None:
-            unlock_query += " AND ends_at > ?"
-            unlock_params += (serialize_datetime(now),)
-        if connection.execute(unlock_query, unlock_params).fetchone() is not None:
-            events.add("event.archive_unlock")
-        if connection.execute(
-            "SELECT 1 FROM void_archive_runs WHERE player_id = ? AND outcome = 'won' LIMIT 1",
-            (player["id"],),
-        ).fetchone() is not None:
-            events.add("event.archive_guard.won")
-        if connection.execute(
-            "SELECT 1 FROM time_fort_members WHERE player_id = ? AND status = 'settled' AND first_clear = 1 LIMIT 1",
-            (player["id"],),
-        ).fetchone() is not None:
-            events.add("story.mainline.void_archive.time_fort")
-        project_rows = connection.execute(
-            """
-            SELECT DISTINCT p.project_key
-            FROM livelihood_project_rewards r
-            JOIN livelihood_projects p ON p.project_id = r.project_id
-            WHERE r.player_id = ? AND r.eligible = 1
-            """,
-            (player["id"],),
-        ).fetchall()
-        for project in project_rows:
-            events.add(f"livelihood.project.{project['project_key']}.completed")
         return events
 
     @staticmethod
@@ -1607,37 +1719,68 @@ class AdventuresRepositoryMixin:
         content=None,
         replay: bool = False,
         now: datetime | None = None,
+        normalized: Mapping[str, Any] | None = None,
     ) -> MainlineStatusRecord:
+        normalized = dict(normalized) if normalized is not None else player_values(player)
+        all_runs = tuple(
+            connection.execute(
+                "SELECT * FROM mainline_runs WHERE player_id = ?",
+                (player["id"],),
+            ).fetchall()
+        )
         runs = {
             str(item["stage_key"]): item
-            for item in connection.execute(
-                "SELECT * FROM mainline_runs WHERE player_id = ? AND story_key = ?",
-                (player["id"], story_key),
-            ).fetchall()
+            for item in all_runs
+            if str(item["story_key"]) == story_key
         }
         completed_stages = {
             str(item["stage_key"])
             for item in runs.values()
             if bool(item["first_clear_claimed"])
         }
-        completed_events = AdventuresRepositoryMixin._mainline_completed_events(connection, player, now=now)
+        completed_events = AdventuresRepositoryMixin._mainline_completed_events(
+            connection,
+            player,
+            now=now,
+            mainline_rows=all_runs,
+            normalized=normalized,
+        )
         views: list[MainlineStageView] = []
-        for current_definition in mainline_definitions(content, story_key=story_key, validate_sources=False):
+        definitions = mainline_definitions(
+            content, story_key=story_key, validate_sources=False
+        )
+        effective_definitions: list[MainlineStageDefinition] = []
+        runs_by_key: dict[str, Any] = {}
+        for current_definition in definitions:
             run = runs.get(current_definition.key)
+            runs_by_key[current_definition.key] = run
             definition = (
                 AdventuresRepositoryMixin._mainline_definition_from_snapshot(run, current_definition)
-                if run is not None
-                else None
-            ) or current_definition
-            prerequisites_met = mainline_prerequisites_met(
-                definition,
-                completed_stages=completed_stages,
-                completed_events=completed_events,
-                flags=completed_events,
-                realm_key=str(player["realm_key"]),
-                realm_layer=player_integer(player, "realm_layer"),
-                content=content,
+                if run is not None else current_definition
             )
+            if definition is None:
+                # Pre-snapshot completed rows carry no resumable work or reward.
+                if (
+                    run["status"] == "claimed" and bool(run["first_clear_claimed"])
+                    and decode_json_strict(run["snapshot_json"] or "{}") == {}
+                ):
+                    definition = current_definition
+                else:
+                    raise ValueError("mainline run snapshot is invalid")
+            effective_definitions.append(definition)
+        prerequisite_results = mainline_prerequisites_met_many(
+            effective_definitions,
+            completed_stages=completed_stages,
+            completed_events=completed_events,
+            flags=completed_events,
+            realm_key=str(player["realm_key"]),
+            realm_layer=player_integer(player, "realm_layer"),
+            content=content,
+        )
+        for current_definition, definition, prerequisites_met in zip(
+            definitions, effective_definitions, prerequisite_results, strict=True
+        ):
+            run = runs_by_key[current_definition.key]
             run_status = str(run["status"]) if run is not None else ""
             status = mainline_stage_status(
                 definition,
@@ -1660,6 +1803,9 @@ class AdventuresRepositoryMixin:
                     repeat_reward=definition.repeat_reward_map(),
                     completed=bool(run and run["status"] in {"cleared", "reward_pending", "claimed"}),
                     claimed=bool(run and run["status"] == "claimed"),
+                    body=definition.body,
+                    actions=tuple(dict(item) for item in definition.actions),
+                    retry_message=definition.retry_message,
                 )
             )
         current = next((item for item in views if not item.claimed), views[-1])
@@ -1669,7 +1815,7 @@ class AdventuresRepositoryMixin:
         elif any(item.status == MAINLINE_REWARD_PENDING for item in views):
             overall = MAINLINE_REWARD_PENDING
         return MainlineStatusRecord(
-            player=SQLitePlayerRepository._row_to_player(player),
+            player=SQLitePlayerRepository._row_to_player(player, normalized=normalized),
             story_key=story_key,
             chapter=current.chapter,
             current_stage=current.stage,
@@ -1809,6 +1955,18 @@ class AdventuresRepositoryMixin:
                 if has_local_reputation_reward
                 else None
             )
+            codex_categories = {}
+            from ..content import bundled_content
+
+            reward_content = self.content or bundled_content()
+            for reward_key in set(definition.first_clear_reward_map()) | set(definition.repeat_reward_map()):
+                if not reward_key.startswith("codex.") or reward_key == "codex.observation":
+                    continue
+                entry = reward_content.require("codex_entry", reward_key, include_locked=False)
+                category = entry.get("category")
+                if not isinstance(category, str) or not reward_content.has("codex_category", category, include_locked=False):
+                    raise ValueError("mainline codex category is invalid")
+                codex_categories[reward_key] = category
             snapshot = {
                 "started_at": now_text,
                 "baseline_operation_rowid": int(connection.execute(
@@ -1845,6 +2003,7 @@ class AdventuresRepositoryMixin:
                     "body": definition.body,
                     "objectives": [dict(item) for item in definition.objectives],
                     "actions": [dict(item) for item in definition.actions],
+                    "completion_actions": [dict(item) for item in definition.completion_actions],
                     "state_events": list(definition.state_events),
                     "next_stage_key": definition.next_stage_key,
                     "retry_message": definition.retry_message,
@@ -1852,6 +2011,7 @@ class AdventuresRepositoryMixin:
                     "repeat_reward": definition.repeat_reward_map(),
                     "reputation_key": definition.reputation_key,
                     "local_reputation_maximum": reputation_maximum,
+                    "codex_categories": codex_categories,
                 },
             }
             if run is None:
@@ -2078,6 +2238,7 @@ class AdventuresRepositoryMixin:
                 "label": definition.label,
                 "next_stage_key": definition.next_stage_key,
                 "source_operation_id": operation_id,
+                "completion_actions": [dict(item) for item in definition.completion_actions],
             }
             connection.execute(
                 """
@@ -2099,7 +2260,7 @@ class AdventuresRepositoryMixin:
         run: sqlite3.Row,
     ) -> tuple[str, ...]:
         try:
-            snapshot = json.loads(run["snapshot_json"] or "{}")
+            snapshot = decode_json_strict(run["snapshot_json"] or "{}")
             definition = snapshot.get("definition")
             if not isinstance(definition, dict):
                 raise ValueError("mainline snapshot definition is missing")
@@ -2120,6 +2281,8 @@ class AdventuresRepositoryMixin:
             if isinstance(idle_baseline, bool) or not isinstance(idle_baseline, int) or idle_baseline < 0:
                 raise ValueError("mainline idle baseline is invalid")
             operation_baseline = snapshot.get("baseline_operation_rowid", 0)
+            if any(item.get("type") == "field_harvest" for item in objectives):
+                operation_baseline = snapshot.get("baseline_operation_rowid")
             if (
                 isinstance(operation_baseline, bool)
                 or not isinstance(operation_baseline, int)
@@ -2137,21 +2300,11 @@ class AdventuresRepositoryMixin:
             raise ValueError("mainline run snapshot is invalid") from exc
 
         def completed_production(objective: dict) -> int | None:
-            item_path = '$.outputs.' + json.dumps(objective["item_key"])
-            completed = connection.execute(
-                "SELECT o.rowid FROM production_orders p JOIN operations o "
-                "ON o.player_id=p.player_id AND json_extract(o.result_json, '$.order_id')=p.order_id "
-                "WHERE p.player_id=? AND p.recipe_key=? AND p.id>? AND p.starts_at>=? "
-                "AND p.status='completed' AND o.operation_name IN ('production.complete','production.recover') "
-                "AND o.rowid>? AND json_type(o.result_json, '$.success')='true' "
-                "AND json_type(o.result_json, ?)='integer' "
-                "AND json_extract(o.result_json, ?)>=1 ORDER BY o.rowid LIMIT 1",
-                (
-                    player_id, objective["recipe_key"], production_baseline, started_at,
-                    operation_baseline, item_path, item_path,
-                ),
-            ).fetchone()
-            return int(completed[0]) if completed is not None else None
+            from .work_evidence import completed_production_rowid
+
+            return completed_production_rowid(
+                connection, player_id, objective, production_baseline, operation_baseline, started_at,
+            )
 
         missing: list[str] = []
         for objective in objectives:
@@ -2182,6 +2335,12 @@ class AdventuresRepositoryMixin:
                 if objective.get("entry_key") in baseline:
                     found = None
             elif kind == "exploration_reward":
+                if objective.get("owned_receipts") is True:
+                    from .exploration_evidence import has_owned_exploration_reward
+
+                    if not has_owned_exploration_reward(connection, player_id, objective, operation_baseline, started_at):
+                        missing.append(str(objective["label"]))
+                    continue
                 rows = connection.execute(
                     "SELECT result_json FROM exploration_sessions WHERE player_id=? "
                     "AND status='settled' AND mode_key=? AND location_key=? AND starts_at>=?",
@@ -2226,6 +2385,12 @@ class AdventuresRepositoryMixin:
                     ),
                 ).fetchone()
             elif kind == "commission_delivery":
+                if "delivery_evidence" in objective:
+                    from .commission_evidence import has_commission_delivery
+
+                    if not has_commission_delivery(connection, player_id, objective, operation_baseline, started_at):
+                        missing.append(str(objective["label"]))
+                    continue
                 found = connection.execute(
                     "SELECT 1 FROM town_commission_claims AS claims "
                     "JOIN town_commissions AS commissions ON commissions.commission_id=claims.commission_id "
@@ -2244,11 +2409,11 @@ class AdventuresRepositoryMixin:
                 ).fetchone()
                 found = progress if progress[0] >= objective["min_points"] else None
             elif kind == "idle_claim":
-                found = connection.execute(
-                    "SELECT 1 FROM idle_assignments WHERE player_id=? AND route_key=? "
-                    "AND status='claimed' AND starts_at>=? AND id>? LIMIT 1",
-                    (player_id, objective["route_key"], started_at, idle_baseline),
-                ).fetchone()
+                from .work_evidence import has_full_idle_claim
+
+                found = True if has_full_idle_claim(
+                    connection, player_id, objective["route_key"], idle_baseline, operation_baseline, started_at,
+                ) else None
             elif kind in {"companion_bond", "companion_feed"}:
                 operation_name = "companion.bond" if kind == "companion_bond" else "companion.feed"
                 alternative = "companion.company" if objective.get("allow_company") is True else operation_name
@@ -2279,6 +2444,10 @@ class AdventuresRepositoryMixin:
                     if isinstance(amount, int) and not isinstance(amount, bool) and amount > 0:
                         found = operation
                         break
+            elif kind == "field_harvest":
+                from .field_objectives import has_field_harvest
+
+                found = True if has_field_harvest(connection, player_id, objective, operation_baseline) else None
             elif kind == "production_complete":
                 found = completed_production(objective)
             elif kind == "item_use":
@@ -2333,7 +2502,7 @@ class AdventuresRepositoryMixin:
         current: MainlineStageDefinition,
     ) -> MainlineStageDefinition | None:
         try:
-            snapshot = json.loads(run["snapshot_json"] or "{}")
+            snapshot = decode_json_strict(run["snapshot_json"] or "{}")
             payload = snapshot.get("definition")
             if not isinstance(payload, dict):
                 return None
@@ -2342,9 +2511,20 @@ class AdventuresRepositoryMixin:
             reputation_maximum = payload["local_reputation_maximum"]
             objectives = payload.get("objectives", [])
             actions = payload.get("actions", [])
+            completion_actions = payload.get("completion_actions", [])
             state_events = payload.get("state_events", [])
             next_stage_key = payload.get("next_stage_key")
             retry_message = payload.get("retry_message", "")
+            codex_categories = payload.get("codex_categories", {})
+            if (
+                not isinstance(codex_categories, dict)
+                or any(not isinstance(value, str) or not value.strip() for value in codex_categories.values())
+                or ("codex_categories" in payload and set(codex_categories) != {
+                    key for key in set(first_clear) | set(repeat)
+                    if key.startswith("codex.") and key != "codex.observation"
+                })
+            ):
+                return None
             started_at = snapshot.get("started_at")
             def valid_reward(reward: object) -> bool:
                 if not isinstance(reward, dict) or not reward:
@@ -2386,9 +2566,10 @@ class AdventuresRepositoryMixin:
                     )
                 if objective["type"] == "exploration_reward":
                     quantity = objective.get("quantity")
+                    fields = {"key", "type", "label", "mode_key", "location_key", "item_key", "quantity"}
                     return (
-                        set(objective)
-                        == {"key", "type", "label", "mode_key", "location_key", "item_key", "quantity"}
+                        set(objective) in (fields, fields | {"owned_receipts"})
+                        and ("owned_receipts" not in objective or objective["owned_receipts"] is True)
                         and all(
                             isinstance(objective.get(field), str) and objective[field].strip()
                             for field in ("mode_key", "location_key", "item_key")
@@ -2405,12 +2586,16 @@ class AdventuresRepositoryMixin:
                             for field in ("mode_key", "location_key")
                         )
                     )
+                if objective["type"] == "field_harvest":
+                    from .field_objectives import field_harvest_objective
+
+                    field_harvest_objective(objective)
+                    return True
                 if objective["type"] == "commission_delivery":
-                    return (
-                        set(objective) == {"key", "type", "label", "commission_key"}
-                        and isinstance(objective["commission_key"], str)
-                        and bool(objective["commission_key"].strip())
-                    )
+                    from .commission_evidence import commission_delivery_objective
+
+                    commission_delivery_objective(objective)
+                    return True
                 if objective["type"] == "public_project_contribution":
                     points = objective.get("min_points")
                     return (
@@ -2448,8 +2633,11 @@ class AdventuresRepositoryMixin:
                     )
                 if objective["type"] in {"production_complete", "item_use"}:
                     extra = "route_key" if objective["type"] == "production_complete" else "resources"
+                    if objective["type"] == "production_complete" and "crop_source" in objective:
+                        extra = "crop_source"
+                    optional = {"additional_route_keys"} if extra == "route_key" else set()
                     if (
-                        set(objective) != {"key", "type", "label", "recipe_key", "item_key", extra}
+                        set(objective) - optional != {"key", "type", "label", "recipe_key", "item_key", extra}
                         or not all(
                             isinstance(objective.get(field), str) and objective[field].strip()
                             for field in ("recipe_key", "item_key")
@@ -2457,8 +2645,21 @@ class AdventuresRepositoryMixin:
                     ):
                         return False
                     value = objective[extra]
+                    if extra == "crop_source":
+                        from .field_objectives import crop_source_yields
+
+                        crop_source_yields(value)
+                        return True
                     if extra == "route_key":
-                        return isinstance(value, str) and bool(value.strip())
+                        additional = objective.get("additional_route_keys", [])
+                        return (
+                            isinstance(value, str) and bool(value.strip())
+                            and isinstance(additional, list)
+                            and ("additional_route_keys" not in objective or bool(additional))
+                            and all(isinstance(item, str) and item.strip() for item in additional)
+                            and len(set(additional)) == len(additional)
+                            and value not in additional
+                        )
                     return (
                         isinstance(value, list) and bool(value)
                         and all(isinstance(item, str) and item.strip() for item in value)
@@ -2506,6 +2707,9 @@ class AdventuresRepositoryMixin:
                 or not isinstance(actions, list)
                 or any(not valid_objective(item) for item in objectives)
                 or any(not valid_action(item) for item in actions)
+                or not isinstance(completion_actions, list)
+                or len(completion_actions) > 3
+                or any(not valid_action(item) for item in completion_actions)
                 or not isinstance(state_events, list)
                 or any(not isinstance(item, str) or not item for item in state_events)
                 or (next_stage_key is not None and not isinstance(next_stage_key, str))
@@ -2553,9 +2757,11 @@ class AdventuresRepositoryMixin:
                 body=str(payload.get("body", payload["description"])),
                 objectives=tuple(dict(item) for item in objectives if isinstance(item, dict)),
                 actions=tuple(dict(item) for item in actions if isinstance(item, dict)),
+                completion_actions=tuple(dict(item) for item in completion_actions),
                 state_events=tuple(state_events),
                 next_stage_key=next_stage_key,
                 retry_message=retry_message,
+                codex_categories=tuple(codex_categories.items()),
             )
         except (KeyError, TypeError, ValueError, json.JSONDecodeError):
             return None
@@ -2607,6 +2813,14 @@ class AdventuresRepositoryMixin:
                 quantity = int(raw_value)
                 actual[key] = quantity
                 event_keys.append(key)
+                category = dict(definition.codex_categories).get(key)
+                if category is not None:
+                    record_codex_discovery(
+                        connection, player_id=int(player["id"]), entry_key=key,
+                        operation_id=operation_id, occurred_at=now_text,
+                        category_snapshot=category,
+                        snapshot={"stage_key": definition.key, "story_key": definition.story_key},
+                    )
             else:
                 raise ValueError(f"unsupported mainline reward: {key}")
         reputation_before = (
@@ -2700,5 +2914,6 @@ class AdventuresRepositoryMixin:
             label=str(payload.get("label", "")),
             next_stage_key=payload.get("next_stage_key"),
             source_operation_id=payload.get("source_operation_id"),
+            completion_actions=tuple(dict(item) for item in payload.get("completion_actions", [])),
             already_completed=replay,
         )

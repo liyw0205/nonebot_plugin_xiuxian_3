@@ -457,6 +457,9 @@ def town_commission_definitions(
             )
         ):
             raise ContentError(f"commission {key} has invalid inputs")
+        input_keys = [_item_reference(bundle, item["item_key"], f"commission {key}") for item in inputs]
+        if len(set(input_keys)) != len(input_keys):
+            raise ContentError(f"commission {key} has duplicate inputs")
         reward = row.get("reward")
         if not isinstance(reward, dict) or reward.get("currency_key") != "currency.spirit_stone":
             raise ContentError(f"commission {key} has an unsupported reward currency")

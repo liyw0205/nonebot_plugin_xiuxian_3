@@ -1,0 +1,75 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "survey",
+  "records": [
+    {
+      "key": "survey.creek_cliff", "name": "溪崖石层", "status": "open",
+      "desc": "近郊溪水切开了低崖，泥层里露出细细的砂线。药农只肯指出入口，真正的水痕、根网与石缝仍须亲手查明。记准地貌，往后才知道哪里可以取材、哪里必须留养。",
+      "location_key": "xuantian.outskirts", "required_realm": "qi_sensing", "required_layer": 2,
+      "prerequisite": null,
+      "nodes": [
+        {"key":"water","name":"辨认水痕","body":"崖脚同时留着深浅两道水印。浅印旁泥沙松动，深印边的草根却已经干透，先辨出新水才好落脚。","choices":[
+          {"key":"measure_water","name":"量痕探水","desc":"沿水印逐寸量探，确认稳定落脚处","costs":{"stamina":3,"energy":2},"success_bp":10000,"seconds":45,"success_text":"你循湿泥量出水位，标下不会再被溪水冲散的第一枚石记。","failure_text":"水势遮断了刻度，需要重新量探。"},
+          {"key":"jump_water","name":"跃石试路","desc":"省下辨识功夫，凭脚感快速试出落点","costs":{"stamina":2},"success_bp":5500,"seconds":15,"success_text":"你踩住露水的石面，赶在泥沙滑落前看清了新水痕。","failure_text":"石面松动，你退回岸边；只耗了这次试路的体力，水痕还须重查。"}
+        ]},
+        {"key":"roots","name":"查看根网","body":"止血草的细根把两片碎土连在一起，一侧可以取叶，另一侧却是维系崖面的活根，不能一并挖走。","choices":[
+          {"key":"trace_roots","name":"循根辨土","desc":"拨开表土，只在活根外做记号","costs":{"stamina":2,"energy":2},"success_bp":10000,"seconds":45,"success_text":"活根与旧根被你分清，手札上添了一处可以留根采叶的小药坡。","failure_text":"根须被泥遮住，还需再辨。"},
+          {"key":"brush_roots","name":"拂泥看叶","desc":"只凭地表叶色推断根网位置","costs":{"stamina":1},"success_bp":4500,"seconds":20,"success_text":"叶色与土纹恰好对应，你确认了根网的外缘。","failure_text":"地表叶色相近，没能辨明根网；不推进勘察，稍后可换稳妥做法。"}
+        ]},
+        {"key":"seam","name":"连缀石记","body":"最后一枚石记要与岸上的旧木桩对齐。把三处记号连起来，才不会在下次涨水后误入悬空的崖脚。","choices":[
+          {"key":"align_stones","name":"牵线定标","desc":"反复校对木桩与石记，绘成完整路径","costs":{"stamina":3,"energy":1},"success_bp":10000,"seconds":30,"success_text":"你将水痕、根网与石缝连成一页清楚的溪崖图。","failure_text":"线绳偏斜，需重新校对。"},
+          {"key":"sight_stones","name":"凭目连标","desc":"从高处直接连看三枚记号","costs":{"stamina":1},"success_bp":6000,"seconds":15,"success_text":"三枚石记一线相承，溪崖路径终于清楚。","failure_text":"视线被芦苇遮挡，记号未能连成；体力已用，勘察仍停在原处。"}
+        ]}
+      ],
+      "rewards":{"item.mat.wood":2,"item.herb.blood_grass":2},
+      "recipe_keys":["recipe.weapon.wood_sword","recipe.pill.healing_low"],
+      "completion_text":"溪崖的可取材处与留养边界已经记牢。收好的落木和药叶能制木剑、炼疗伤丹；接着可到铁木林，沿这页根网图查访铁木根脉。"
+    },
+    {
+      "key": "survey.iron_roots", "name": "铁木根脉", "status": "open",
+      "desc": "铁木林的老树下压着细碎铁石，倒木之间还留有旧伐痕。先按溪崖所学辨清活根，再查风倒口和含铁土层，才能把可取的材料与护林界线分别标在手札上。",
+      "location_key": "xuantian.ironwood_grove", "required_realm": "qi_sensing", "required_layer": 4,
+      "prerequisite": "survey.creek_cliff",
+      "nodes": [
+        {"key":"bark","name":"分辨老伐痕","body":"树皮上的旧刀痕和新兽爪挨得很近，只有已经枯死的倒枝能够取走，先认清林中哪些痕迹仍有生气。","choices":[
+          {"key":"read_bark","name":"辨纹验枝","desc":"沿枝梢验明死活，稳妥划出取木边界","costs":{"stamina":3,"energy":2},"success_bp":10000,"seconds":60,"success_text":"你辨出干枯倒枝，把仍会抽芽的活枝留在原处。","failure_text":"枝纹不明，稍后再验。"},
+          {"key":"tap_bark","name":"叩木听声","desc":"凭回声快速辨认空枯倒木","costs":{"stamina":2},"success_bp":6000,"seconds":20,"success_text":"空声与实声分明，你找到了安全的枯木带。","failure_text":"林风盖住叩声，这次未能确认枯木，待风稍歇再试。"}
+        ]},
+        {"key":"soil","name":"查含铁土层","body":"树根外露的红土被雨水分成三层，铁石只夹在中间薄薄的一线，乱挖会把稳树的根土一起掀翻。","choices":[
+          {"key":"sift_soil","name":"分层筛土","desc":"从松土处分层筛看，不伤主根","costs":{"stamina":4,"energy":2},"success_bp":10000,"seconds":60,"success_text":"一层层筛去浮土，含铁细线完整显现出来。","failure_text":"土样混杂，需要重新分层。"},
+          {"key":"weigh_soil","name":"掂砂寻铁","desc":"掂量松砂轻重，节省查验精力","costs":{"stamina":2},"success_bp":5000,"seconds":20,"success_text":"沉砂聚在同一条线，你标下浅层铁石的位置。","failure_text":"湿土轻重相近，尚未找到含铁层；所耗体力不返，仍可重试。"}
+        ]},
+        {"key":"wind","name":"定下护林界","body":"风倒口正对一片幼树，若把所有倒木都拖走，下一阵山风就会直扑幼林。需要留下挡风的一列，只取背风材料。","choices":[
+          {"key":"map_wind","name":"察风留木","desc":"绕幼林观风，划出留木护林带","costs":{"stamina":3,"energy":2},"success_bp":10000,"seconds":45,"success_text":"背风取材线与挡风留养线分明，根脉图在你手中合拢。","failure_text":"风向未稳，需要继续观察。"},
+          {"key":"follow_leaves","name":"随叶判风","desc":"从落叶流向判断风口边界","costs":{"stamina":1},"success_bp":5500,"seconds":15,"success_text":"落叶绕过倒木成弧，护林边界被你捕捉下来。","failure_text":"一股乱风吹散落叶，边界仍不清楚，不能贸然取材。"}
+        ]}
+      ],
+      "rewards":{"item.mat.wood":3,"item.ore.ironstone":2},
+      "recipe_keys":["recipe.armor.patrol_vest"],
+      "completion_text":"铁木根脉与浅层铁石的位置已经查明，落木、铁石可留作护甲。手札还指向玄武岩径的古渠：那里的碎砂与这片铁层同出一脉，聚气三层后可继续查访。"
+    },
+    {
+      "key": "survey.basalt_channel", "name": "岩径古渠", "status": "open",
+      "desc": "玄武岩径的干渠断断续续延到山腹，渠壁一侧嵌着旧陶片，另一侧是阵砂凝结的细白线。循铁木根脉的走向查来，先排虚石、再认渠底，古人的取水道路才会显现。",
+      "location_key": "xuantian.basalt_pass", "required_realm": "qi_gathering", "required_layer": 3,
+      "prerequisite": "survey.iron_roots",
+      "nodes": [
+        {"key":"hollow","name":"排查虚石","body":"渠口几块黑石外表完整，底下却有流水冲出的空腔。每一步落点都必须避开空腔，才能接近内壁。","choices":[
+          {"key":"probe_hollow","name":"探缝量空","desc":"逐处探缝，找出能承重的石脊","costs":{"stamina":4,"energy":3},"success_bp":10000,"seconds":60,"success_text":"你量出空腔边缘，沿石脊走到干渠内壁。","failure_text":"石缝未明，需要再探。"},
+          {"key":"hear_hollow","name":"叩石辨空","desc":"凭石声辨认空腔，快速寻找石脊","costs":{"stamina":2},"success_bp":5000,"seconds":20,"success_text":"清脆与闷响交替，稳固的石脊终于被你找出。","failure_text":"山腹回声交错，空腔仍未排明；这次只耗体力，不冒进。"}
+        ]},
+        {"key":"sand","name":"辨渠底白线","body":"白线有的只是水垢，有的却在掌心微微发热。只有顺着原渠底走向沉积的细砂，才是可以使用的阵砂。","choices":[
+          {"key":"wash_sand","name":"淘线验砂","desc":"少量取样，分辨水垢与阵砂","costs":{"stamina":3,"energy":3},"success_bp":10000,"seconds":60,"success_text":"水垢散尽，细砂沉在掌心，古渠的真实底线清楚起来。","failure_text":"样砂不清，需要重验。"},
+          {"key":"feel_sand","name":"触砂寻温","desc":"直接沿渠壁寻找发热的砂线","costs":{"stamina":2},"success_bp":5500,"seconds":20,"success_text":"温热砂线沿旧渠底相连，你记下了可取砂的弯道。","failure_text":"日晒也让渠壁发热，这次没能分出阵砂，仍须再辨。"}
+        ]},
+        {"key":"gate","name":"复描渠门","body":"渠门上残存的三条凿痕被碎石截断。把水势、砂线和门槽连起来，就能确定古渠通向哪里，而不必强行撬门。","choices":[
+          {"key":"copy_gate","name":"逐痕复描","desc":"顺门槽补齐水路图，记下古迹方向","costs":{"stamina":4,"energy":2},"success_bp":10000,"seconds":45,"success_text":"三条凿痕在纸上相连，渠门背后的旧作坊方向终于显现。","failure_text":"凿痕仍未接齐，可以重新描看。"},
+          {"key":"sight_gate","name":"远观合痕","desc":"退到渠口，从整体走势推测门槽","costs":{"stamina":2},"success_bp":6000,"seconds":15,"success_text":"远望时断痕恰好相接，旧作坊的入口方向清晰可辨。","failure_text":"断痕被投影遮住，方向仍不可信；保留手札，再选做法重查。"}
+        ]}
+      ],
+      "rewards":{"item.mat.array_sand":3,"item.ore.ironstone":2},
+      "recipe_keys":["recipe.armor.patrol_vest"],
+      "completion_text":"古渠的位置、阵砂带与旧作坊方向已经留在手札。阵砂和铁石可继续用于护甲；三处地貌共同构成一条能回访取材、留养并追索古物的山野路线。"
+    }
+  ]
+}

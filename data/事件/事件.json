@@ -240,7 +240,7 @@
       "archive": {
         "unlock_duration_seconds": 604800,
         "route_key": "void.archive_ruins",
-        "enemy_key": "enemy.archive_keeper",
+        "enemy_key": "enemy.archive_permit_keeper",
         "weekly_cap": 1,
         "first_reward_key": "reward.event.archive.first",
         "repeat_reward_key": "reward.event.archive.repeat",

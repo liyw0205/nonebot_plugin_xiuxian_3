@@ -1,0 +1,439 @@
+{
+  "kind": "event",
+  "records": [
+    {
+      "name": "灵泉事件",
+      "desc": "灵泉谷泉眼涌动，修士可贡献灵叶，共同换取修为与名望。",
+      "status": "open",
+      "location_key": "xuantian.spirit_field",
+      "duration_seconds": 1800,
+      "schedule": {
+        "weekdays": [
+          3,
+          7
+        ],
+        "local_time": "20:00"
+      },
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "qi_sensing",
+          "min_layer": 1
+        }
+      ],
+      "contribution": {
+        "source_item_key": "item.herb.spirit_leaf",
+        "per_quantity": 1,
+        "max_per_player": 30
+      },
+      "global_goal": {
+        "item_key": "item.herb.spirit_leaf",
+        "quantity": 100
+      },
+      "claim": {
+        "min_contribution": 10,
+        "window_seconds": 86400,
+        "reward_key": "reward.event.spirit_spring.base",
+        "completion_bonus_key": "reward.event.spirit_spring.completion"
+      },
+      "key": "event.spirit_spring"
+    },
+    {
+      "name": "魔界入侵",
+      "desc": "魔界战线烽烟四起，修士可凭已结算的战斗、运输与设施维护共守前线。",
+      "status": "active",
+      "public_event": {
+        "location_key": "xuantian.war_front",
+        "schedule": {
+          "kind": "weekly",
+          "weekday_utc": 2,
+          "hour_utc": 20,
+          "minute_utc": 0,
+          "duration_seconds": 10800,
+          "claim_window_seconds": 86400
+        },
+        "target_quantity": 1000,
+        "requirement": {
+          "realm_key": "nascent_soul",
+          "min_layer": 1
+        },
+        "contributions": {
+          "battle": {
+            "source": "battle_damage",
+            "damage_per_point": 100
+          },
+          "transport": {
+            "source": "settled_transport",
+            "quantity": 10
+          },
+          "maintenance": {
+            "source": "paid_active_personal_maintenance",
+            "quantity": 15
+          }
+        },
+        "claim": {
+          "min_contribution": 50,
+          "reward_key": "reward.event.demon_invasion"
+        }
+      },
+      "key": "event.demon_invasion",
+      "action_aliases": {
+        "战斗": "battle",
+        "运输": "transport",
+        "维修": "maintenance"
+      }
+    },
+    {
+      "name": "妖界贸易",
+      "desc": "三界贸易口往来不息，修士可凭跨界贸易与妖血助益万兽山。",
+      "status": "active",
+      "public_event": {
+        "location_key": "beast.three_realms_trade_port",
+        "schedule": {
+          "kind": "weekly",
+          "weekday_utc": 0,
+          "hour_utc": 0,
+          "minute_utc": 0,
+          "duration_seconds": 604800,
+          "claim_window_seconds": 86400
+        },
+        "target_quantity": 300,
+        "requirement": null,
+        "contributions": {
+          "trade": {
+            "source": "completed_cross_realm_trade",
+            "quantity": 10,
+            "trade_keys": [
+              "trade.xuantian_to_demon",
+              "trade.xuantian_to_beast",
+              "trade.three_realms"
+            ]
+          },
+          "blood": {
+            "source": "consume_item",
+            "item_key": "item.beast_blood",
+            "item_quantity": 1,
+            "quantity": 5
+          }
+        },
+        "claim": {
+          "min_contribution": 30,
+          "reward_key": "reward.event.beast_trade"
+        }
+      },
+      "key": "event.beast_trade",
+      "action_aliases": {
+        "贸易": "trade",
+        "跨界贸易": "trade",
+        "妖血": "blood",
+        "提交妖血": "blood"
+      }
+    },
+    {
+      "name": "界隙裂痕",
+      "desc": "界隙裂痕动荡不休，修士可凭已结算的队伍胜利稳定边界。",
+      "status": "active",
+      "public_event": {
+        "location_key": "cave.boundary_realm",
+        "schedule": {
+          "kind": "utc_block",
+          "block_hours": 2,
+          "duration_seconds": 7200,
+          "claim_window_seconds": 86400
+        },
+        "target_quantity": 400,
+        "requirement": null,
+        "contributions": {
+          "route": {
+            "source": "settled_boundary_party_battle",
+            "quantity": 20,
+            "party_types": [
+              "boundary_realm",
+              "party_boundary"
+            ]
+          },
+          "boss": {
+            "source": "settled_boundary_party_battle",
+            "quantity": 30,
+            "party_types": [
+              "boundary_realm",
+              "party_boundary"
+            ]
+          },
+          "complete": {
+            "source": "settled_boundary_party_battle",
+            "quantity": 50,
+            "party_types": [
+              "boundary_realm",
+              "party_boundary"
+            ]
+          }
+        },
+        "claim": {
+          "min_contribution": 40,
+          "reward_key": "reward.event.boundary_rift"
+        }
+      },
+      "key": "event.boundary_rift",
+      "action_aliases": {
+        "路线": "route",
+        "首领": "boss",
+        "完成": "complete"
+      }
+    },
+    {
+      "name": "远古洞天开门",
+      "desc": "远古洞天重现世间，已完成秘境历练的修士可为洞天开门积累声势。",
+      "status": "active",
+      "public_event": {
+        "location_key": "xuantian.domain_front",
+        "schedule": {
+          "kind": "weekly",
+          "weekday_utc": 5,
+          "hour_utc": 0,
+          "minute_utc": 0,
+          "duration_seconds": 604800,
+          "claim_window_seconds": 86400
+        },
+        "target_quantity": 5,
+        "requirement": {
+          "realm_key": "soul_transformation",
+          "min_layer": 1
+        },
+        "contributions": {
+          "complete": {
+            "source": "completed_ancient_domain",
+            "quantity": 1
+          }
+        },
+        "claim": {
+          "min_contribution": 5,
+          "reward_key": "reward.event.ancient_domain_open"
+        }
+      },
+      "key": "event.ancient_domain_open",
+      "action_aliases": {
+        "完成": "complete",
+        "远古洞天": "complete"
+      }
+    },
+    {
+      "name": "心魔试炼",
+      "desc": "突破受挫后心魔乘隙而起，修士须在限期内直面它、净化心神或寻求化解。",
+      "status": "open",
+      "trigger": {
+        "operation": "progression.breakthrough_nascent_soul",
+        "result": "failed"
+      },
+      "choices": [
+        "heart_demon.face",
+        "heart_demon.purify",
+        "heart_demon.bargain"
+      ],
+      "timeout_seconds": 86400,
+      "key": "event.heart_demon_trial"
+    },
+    {
+      "name": "虚空档案",
+      "desc": "档案遗迹留下每周可追索的碎片线索，集齐线索后方可再入档案航道。",
+      "status": "active",
+      "archive": {
+        "unlock_duration_seconds": 604800,
+        "route_key": "void.archive_ruins",
+        "enemy_key": "enemy.archive_keeper",
+        "weekly_cap": 1,
+        "first_reward_key": "reward.event.archive.first",
+        "repeat_reward_key": "reward.event.archive.repeat",
+        "unlock_reward_key": "reward.event.archive.unlock",
+        "tasks": [
+          {
+            "key": "task.archive_fragment.alpha",
+            "name": "初入航道",
+            "target": 2,
+            "reward_key": "reward.event.archive.fragment.alpha"
+          },
+          {
+            "key": "task.archive_fragment.beta",
+            "name": "守卫遗迹",
+            "target": 1,
+            "reward_key": "reward.event.archive.fragment.beta"
+          },
+          {
+            "key": "task.archive_fragment.gamma",
+            "name": "炼制虚空晶",
+            "target": 1,
+            "reward_key": "reward.event.archive.fragment.gamma"
+          }
+        ]
+      },
+      "key": "event.archive_unlock"
+    },
+    {
+      "name": "领域前线",
+      "desc": "领域裂痕附近战事渐起，各方修士集结守望，稳住动荡的天地边界。",
+      "status": "active",
+      "location_key": "xuantian.domain_front",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "soul_transformation",
+          "min_layer": 1
+        }
+      ],
+      "schedule": {
+        "activity_hours": 4,
+        "anchor_hour": 0,
+        "round_minutes": 30,
+        "claim_days": 1
+      },
+      "participation": {
+        "participant_cap": 20,
+        "join_stamina_cost": 20,
+        "sect_level_min": 4
+      },
+      "contribution": {
+        "battle": 100,
+        "point_per_minute": 10,
+        "point_minutes_min": 1,
+        "point_minutes_max": 30
+      },
+      "global_goal": 1000,
+      "personal_claim_threshold": 100,
+      "reward_key": "reward.event.domain_front",
+      "codex_entry_key": "codex.domain.frontline",
+      "key": "event.domain_front"
+    },
+    {
+      "name": "虚空风暴",
+      "desc": "虚空乱流骤然增强，航行者需在风暴平息前守住航路。",
+      "status": "open",
+      "duration_seconds": 7200,
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "void_refining",
+          "min_layer": 1
+        }
+      ],
+      "random_pool": "void.route.storm",
+      "key": "event.void_storm"
+    },
+    {
+      "name": "道源任务",
+      "desc": "合道修士受托守护边界、建设道场并传承所学，以此积累飞升道果。",
+      "status": "open",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "dao_union",
+          "min_layer": 1
+        }
+      ],
+      "task_keys": [
+        "task.dao_origin.guard",
+        "task.dao_origin.build",
+        "task.dao_origin.teach"
+      ],
+      "random_pool": "dao.origin",
+      "key": "event.dao_origin"
+    },
+    {
+      "name": "天劫试炼台",
+      "desc": "渡劫修士在此依次磨炼身心、守望三界并作出最终抉择。",
+      "status": "open",
+      "requirements": [
+        {
+          "type": "realm",
+          "realm_key": "tribulation",
+          "min_layer": 3
+        }
+      ],
+      "trial_order": [
+        "trial.body_and_mind",
+        "trial.three_realms",
+        "trial.dao_choice"
+      ],
+      "duration_seconds": 1800,
+      "trials": [
+        {
+          "key": "trial.body_and_mind",
+          "name": "身心劫",
+          "desc": "以身心承受雷火磨炼，稳住道基后再向下一劫行进。",
+          "required_layer": 3,
+          "token_cost": 1,
+          "progress_reward": 100,
+          "merit_reward": 100,
+          "world_merit_reward": 0,
+          "debt_delta": 10,
+          "cooldown_seconds": 86400,
+          "random_pool": "battle.enemy.tribulation_heaven",
+          "reward_items": {
+            "item.dao_fruit_fragment": 1
+          },
+          "choice": null
+        },
+        {
+          "key": "trial.three_realms",
+          "name": "三界劫",
+          "desc": "守望三界风云，承受更重的天劫压力并积累世界功勋。",
+          "required_layer": 6,
+          "token_cost": 1,
+          "progress_reward": 180,
+          "merit_reward": 200,
+          "world_merit_reward": 500,
+          "debt_delta": 15,
+          "cooldown_seconds": 172800,
+          "random_pool": "battle.enemy.tribulation_heaven",
+          "reward_items": {},
+          "choice": null
+        },
+        {
+          "key": "trial.dao_choice",
+          "name": "道果劫",
+          "desc": "在道果劫中作出与主道途相合的最终选择。",
+          "required_layer": 9,
+          "token_cost": 1,
+          "progress_reward": 250,
+          "merit_reward": 250,
+          "world_merit_reward": 0,
+          "debt_delta": 20,
+          "cooldown_seconds": 259200,
+          "random_pool": "battle.enemy.tribulation_heaven",
+          "reward_items": {},
+          "choice": {
+            "minimum_progress": 280,
+            "match_path_fruit": true
+          }
+        }
+      ],
+      "key": "event.heaven_tribulation"
+    },
+    {
+      "name": "每日修行",
+      "desc": "每日七项修行与历练，完成其中三项可领取一份嘉奖。",
+      "status": "active",
+      "daily_tasks": {
+        "timezone": "UTC",
+        "claim_window_seconds": 86400,
+        "completion_threshold": 3,
+        "selection": [
+          {
+            "group": "cultivation_exploration",
+            "count": 2
+          },
+          {
+            "group": "daily_life",
+            "count": 2
+          },
+          {
+            "group": "other",
+            "count": 3
+          }
+        ],
+        "reward_key": "reward.daily_task_claim"
+      },
+      "key": "event.daily_tasks"
+    }
+  ],
+  "schema": "xiuxian.content"
+}

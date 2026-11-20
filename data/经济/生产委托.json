@@ -1,0 +1,34 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "batch_commission",
+  "records": [
+    {
+      "key": "batch_commission.healing_low",
+      "name": "疗伤丹批量委托",
+      "desc": "以公开疗伤丹配方承接二至五份的批量制作，按整批快照验收。",
+      "aliases": ["批量疗伤丹委托"],
+      "recipe_key": "recipe.pill.healing_low",
+      "source_recipe_key": "recipe.pill.healing_low",
+      "max_quantity": 5,
+      "min_reward_per_unit": 20,
+      "max_reward_per_unit": 100,
+      "ttl_seconds": 86400,
+      "recovery_grace_seconds": 86400,
+      "status": "open"
+    },
+    {
+      "key": "batch_commission.wood_sword",
+      "name": "木纹剑批量委托",
+      "desc": "以公开木纹剑配方承接二至五份的批量制作，成品统一交付。",
+      "aliases": ["批量木纹剑委托"],
+      "recipe_key": "recipe.weapon.wood_sword",
+      "source_recipe_key": "recipe.weapon.wood_sword",
+      "max_quantity": 5,
+      "min_reward_per_unit": 20,
+      "max_reward_per_unit": 100,
+      "ttl_seconds": 86400,
+      "recovery_grace_seconds": 86400,
+      "status": "open"
+    }
+  ]
+}

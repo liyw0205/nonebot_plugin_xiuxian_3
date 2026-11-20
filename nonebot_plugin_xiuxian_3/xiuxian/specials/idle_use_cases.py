@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import sqlite3
 
 from ...contracts import CommandAction, CommandContext, CommandResult
 from ..content import bundled_content
@@ -73,6 +74,8 @@ class IdleApplication:
             command, context.adapter, context.request_id, operation_id, context.command_args,
             exc_info=(type(exc), exc, exc.__traceback__),
         )
+        if isinstance(exc, sqlite3.Error):
+            return CommandResult(False, "PERSISTENCE_ERROR", "挂机操作暂未完成，资源未改变，请稍后重试。", context.request_id, operation_id or None, retryable=True)
         raise exc
 
     @staticmethod
@@ -168,17 +171,19 @@ class IdleApplication:
                 journal = conditions["gathering_journal"]
                 if journal:
                     lines.extend(["", journal["start_text"], f"材料去向：{self._uses_text(journal)}"])
-                if record.ready:
+                supplied = any(c.get("supplies") for c in conditions.get("wilderness_event", {}).get("choices", []))
+                if record.ready and not supplied:
                     suffix = " <灵兽编号>" if conditions.get("required_companion_kind") else ""
                     label = "按原安排开始" if conditions.get("wilderness_event") else "安排此项闲居"
                     actions = (CommandAction(label, f"开始挂机 {record.label}{suffix}", enter=True),)
                 event = conditions.get("wilderness_event", {})
                 if event:
-                    lines.extend(["", event["scene"], "选择其一开始安排；旧命令省略选择仍按原路线。额外投入逾时不返还。"])
+                    lines.extend(["", event["scene"], "选择补给方案后出发，60秒内撤回原额返还，逾时不退补给。" if supplied else "选择其一开始安排；旧命令省略选择仍按原路线。额外投入逾时不返还。"])
                     for choice in event["choices"]:
                         cost = choice["cost"]
                         lines.extend([
                             f"{choice['name']}：额外体力 {cost['stamina']}、精力 {cost['energy']}",
+                            *( ["补给：" + "、".join(f"{self._reward_label(k)} ×{n}" for k, n in choice["supplies"].items())] if choice.get("supplies") else []),
                             f"完整所得：{self._ranges_text(reward_ranges(choice['reward_pool_key'], self.repository.content))}",
                             choice["journal"]["start_text"],
                             f"材料去向：{self._uses_text(choice['journal'])}",
@@ -248,7 +253,8 @@ class IdleApplication:
             True,
             "IDLE_STARTED",
             f"**闲居安排已定**\n\n{record.label}\n{record.journal.get('start_text', '')}\n"
-            f"可领取：{record.claim_at}\n完整领取截止：{record.max_claim_at}\n\n{command_link('当前安排', '挂机状态')}",
+            + ("已备补给：" + "、".join(f"{self._reward_label(k)} ×{n}" for k, n in record.cost.items() if k.startswith("item.")) + "\n" if any(k.startswith("item.") for k in record.cost) else "")
+            + f"可领取：{record.claim_at}\n完整领取截止：{record.max_claim_at}\n\n{command_link('当前安排', '挂机状态')}",
             context.request_id,
             operation_id,
             data=self._assignment_data(record),

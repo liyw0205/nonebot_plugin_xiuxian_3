@@ -52,7 +52,7 @@ class DaoOriginApplication:
         except PlayerSuspendedError:
             return CommandResult(False, "PLAYER_SUSPENDED", "当前角色暂时不能进入道源秘境。", context.request_id, operation_id)
         except DaoOriginRequirementError:
-            return CommandResult(False, "DAO_ORIGIN_REQUIREMENT_MISSING", "需要位于道源门、合道 L1 且持有道源许可，未扣除体力。", context.request_id, operation_id)
+            return CommandResult(False, "DAO_ORIGIN_REQUIREMENT_MISSING", "需要位于道源门、合道 L1 且持有当前赛季道源资格，未扣除体力。", context.request_id, operation_id)
         except DaoOriginBusyError:
             return CommandResult(False, "DAO_ORIGIN_BUSY", "当前已有其他进行中的行动或秘境。", context.request_id, operation_id)
         except DaoOriginQuotaError:

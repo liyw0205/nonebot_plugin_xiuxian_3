@@ -58,3 +58,58 @@ def test_help_overview_and_bounty_category_use_unprefixed_commands() -> None:
                 await runtime.close()
 
     asyncio.run(run())
+
+
+def test_life_help_exposes_complete_equipment_care_loop() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            try:
+                result = await runtime.dispatch(
+                    CommandContext(adapter="onebot.v11", user_id="equipment-help"),
+                    "修仙帮助 生活",
+                )
+                assert result.ok
+                for token in (
+                    "装备修复预览 实例编号",
+                    "修复装备 实例编号",
+                    "装备回收预览 实例编号",
+                    "回收装备 实例编号",
+                    "生产预览 野外修缮包",
+                    "野外修缮预览 实例编号",
+                    "野外修缮装备 实例编号",
+                    "接取委托 修缮包回收",
+                    "交付委托 修缮包回收",
+                ):
+                    assert token in result.message, token
+            finally:
+                await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_social_help_exposes_party_preparation_and_recovery() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            try:
+                result = await runtime.dispatch(
+                    CommandContext(adapter="onebot.v11", user_id="party-help"),
+                    "修仙帮助 社交",
+                )
+                assert result.ok
+                for command in (
+                    "多人副本预览",
+                    "创建多人副本队伍",
+                    "邀请入队",
+                    "接受入队",
+                    "确认入队",
+                    "开始队伍战斗",
+                    "结算队伍战斗",
+                    "队伍战斗回放",
+                ):
+                    assert command in result.message
+            finally:
+                await runtime.close()
+
+    asyncio.run(run())

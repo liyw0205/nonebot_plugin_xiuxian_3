@@ -19,7 +19,7 @@ from ..rewards.rules import (
 from ..utils.json import json_object
 from ..utils.player import grant_player_reward, player_reputation_state
 from .codex_projection import record_codex_discovery
-from .story_models import StoryBranchView, StoryRecord
+from .story_models import StoryBeatView, StoryBranchView, StoryRecord
 from .codex_rules import category_for_entry
 from .story_rules import (
     CLAIM_OPERATION,
@@ -217,7 +217,27 @@ class StoryRepositoryMixin:
                         "description": branch.description,
                         "required_source_count": branch.required_source_count,
                         "source_label": branch.source_label,
+                        "beats": [
+                            {
+                                "key": beat.key,
+                                "title": beat.title,
+                                "content": beat.content,
+                                "objective": beat.objective,
+                                "action": beat.action,
+                            }
+                            for beat in branch.beats
+                        ],
                     },
+                    "beats": [
+                        {
+                            "key": beat.key,
+                            "title": beat.title,
+                            "content": beat.content,
+                            "objective": beat.objective,
+                            "action": beat.action,
+                        }
+                        for beat in branch.beats
+                    ],
                     "ending_key": branch.ending_key,
                     "flag_key": branch.flag_key,
                     "codex_entry_key": branch.codex_entry_key,
@@ -228,6 +248,29 @@ class StoryRepositoryMixin:
                     "reputation_name": str(reputation_record["name"]),
                     "local_reputation_maximums": {definition.reputation_key: maximum},
                 }
+                for beat in branch.beats:
+                    connection.execute(
+                        "INSERT OR IGNORE INTO activity_events(player_id,event_key,source_operation_id,occurred_at,payload_json) VALUES (?,?,?,?,?)",
+                        (
+                            player["id"],
+                            f"story.beat.{route_key}.{beat.key}",
+                            f"{operation_id}:{beat.key}",
+                            now_text,
+                            json.dumps(
+                                {
+                                    "story_key": STORY_KEY,
+                                    "route_key": route_key,
+                                    "beat_key": beat.key,
+                                    "title": beat.title,
+                                    "content": beat.content,
+                                    "objective": beat.objective,
+                                    "action": beat.action,
+                                },
+                                ensure_ascii=False,
+                                sort_keys=True,
+                            ),
+                        ),
+                    )
                 connection.execute(
                     """
                     UPDATE story_runs SET status='ending_pending',current_node=?,selected_route=?,
@@ -491,6 +534,16 @@ class StoryRepositoryMixin:
                     required_source_count=branch["required_source_count"],
                     source_label=branch["source_label"],
                     evidence_operation_ids=tuple(frozen_choice["source_operation_ids"]),
+                    beats=tuple(
+                        StoryBeatView(
+                            key=str(beat["key"]),
+                            title=str(beat["title"]),
+                            content=str(beat["content"]),
+                            objective=str(beat["objective"]),
+                            action=str(beat["action"]),
+                        )
+                        for beat in frozen_choice["beats"]
+                    ),
                 ),
             )
             ending_key = frozen_choice["ending_key"]
@@ -504,6 +557,16 @@ class StoryRepositoryMixin:
                     required_source_count=branch.required_source_count,
                     source_label=branch.source_label,
                     evidence_operation_ids=tuple(evidence.get(branch.key, ())),
+                    beats=tuple(
+                        StoryBeatView(
+                            key=beat.key,
+                            title=beat.title,
+                            content=beat.content,
+                            objective=beat.objective,
+                            action=beat.action,
+                        )
+                        for beat in branch.beats
+                    ),
                 )
                 for branch in definition.branches
             )
@@ -545,6 +608,16 @@ class StoryRepositoryMixin:
                     "required_source_count": branch.required_source_count,
                     "source_label": branch.source_label,
                     "evidence_operation_ids": list(branch.evidence_operation_ids),
+                    "beats": [
+                        {
+                            "key": beat.key,
+                            "title": beat.title,
+                            "content": beat.content,
+                            "objective": beat.objective,
+                            "action": beat.action,
+                        }
+                        for beat in branch.beats
+                    ],
                 }
                 for branch in record.branches
             ],
@@ -575,6 +648,16 @@ class StoryRepositoryMixin:
                     source_label=str(item["source_label"]),
                     evidence_operation_ids=tuple(
                         str(value) for value in item.get("evidence_operation_ids", ())
+                    ),
+                    beats=tuple(
+                        StoryBeatView(
+                            key=str(beat["key"]),
+                            title=str(beat["title"]),
+                            content=str(beat["content"]),
+                            objective=str(beat["objective"]),
+                            action=str(beat["action"]),
+                        )
+                        for beat in item.get("beats", ())
                     ),
                 )
                 for item in payload.get("branches", ())
@@ -631,6 +714,7 @@ def _frozen_story_choice(snapshot: dict[str, Any]) -> dict[str, Any]:
         "route_key",
         "source_operation_ids",
         "completed_nodes",
+        "beats",
         "branch",
         "ending_key",
         "flag_key",
@@ -679,6 +763,21 @@ def _frozen_story_choice(snapshot: dict[str, Any]) -> dict[str, Any]:
             or any(not isinstance(item, str) or not item for item in values)
         ):
             raise StoryContentError(f"frozen story choice {field} is invalid")
+    beats = choice["beats"]
+    if not isinstance(beats, list):
+        raise StoryContentError("frozen story choice beats are invalid")
+    if choice["route_key"] == "merchant" and len(beats) != int(branch["required_source_count"]):
+        raise StoryContentError("frozen story choice beats are invalid")
+    for index, beat in enumerate(beats, 1):
+        if (
+            not isinstance(beat, dict)
+            or beat.get("key") != f"node.{choice['route_key']}.{index}"
+            or any(
+                not isinstance(beat.get(field), str) or not beat[field]
+                for field in ("title", "content", "objective", "action")
+            )
+        ):
+            raise StoryContentError("frozen story beat is invalid")
     maximums = choice["local_reputation_maximums"]
     if (
         not isinstance(maximums, dict)

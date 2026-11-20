@@ -45,6 +45,8 @@ class ProgressionRepositoryMixin:
 
     def _recover_resources_once(self, platform: str, platform_user_id: str, operation_id: str) -> ResourceRecoveryRecord:
         from .rules import RECOVERY_PERIOD_SECONDS
+        from .recovery_rules import bloodline_recovery_rule, endgame_stamina_rule
+        from ..world.rules import meets_realm
         from ..repository import OperationConflictError
 
         operation_payload = {"platform": platform, "platform_user_id": platform_user_id}
@@ -71,6 +73,7 @@ class ProgressionRepositoryMixin:
                     recovered_energy=int(payload["recovered_energy"]),
                     changed=bool(payload["changed"]),
                     recovered_void_power=int(payload.get("recovered_void_power", 0)),
+                    recovered_bloodline_stability=int(payload.get("recovered_bloodline_stability", 0)),
                     already_completed=True,
                 )
             row = self._require_player(connection, platform, platform_user_id)
@@ -80,23 +83,46 @@ class ProgressionRepositoryMixin:
                 last_update = now
             elapsed = max(0, int((now - last_update).total_seconds()))
             periods = elapsed // RECOVERY_PERIOD_SECONDS
+            bloodline_rule = bloodline_recovery_rule(self.content)
+            stamina_rule = endgame_stamina_rule(self.content)
             resources = player_numeric_values(
                 row,
-                ("stamina", "stamina_max", "energy", "energy_max", "void_power", "void_power_max"),
+                ("stamina", "stamina_max", "energy", "energy_max", "void_power", "void_power_max", "bloodline_stability"),
             )
             stamina_before = resources["stamina"]
             energy_before = resources["energy"]
+            stamina_capacity = resources["stamina_max"]
+            if meets_realm(
+                str(row["realm_key"]), int(row["realm_layer"]),
+                stamina_rule["required_realm"], stamina_rule["required_layer"],
+            ):
+                stamina_capacity = max(stamina_capacity, stamina_rule["minimum_capacity"])
+            capacity_changed = stamina_capacity != resources["stamina_max"]
+            resources["stamina_max"] = stamina_capacity
             stamina_after = min(resources["stamina_max"], stamina_before + periods)
             energy_after = min(resources["energy_max"], energy_before + periods)
             recovered_stamina = stamina_after - stamina_before
             recovered_energy = energy_after - energy_before
+            recovered_bloodline = 0
+            exploring = connection.execute(
+                "SELECT 1 FROM exploration_sessions WHERE player_id=? "
+                "AND status IN ('created','running','combat_pending') LIMIT 1", (row["id"],),
+            ).fetchone()
+            if exploring is None and meets_realm(
+                str(row["realm_key"]), int(row["realm_layer"]),
+                bloodline_rule["required_realm"], bloodline_rule["required_layer"],
+            ):
+                recovered_bloodline = max(0, min(
+                    bloodline_rule["maximum"] - resources["bloodline_stability"],
+                    periods * bloodline_rule["per_period"],
+                ))
             void_before = resources["void_power"]
             void_after = void_before
             recovered_void_power = 0
             if resources["void_power_max"] > 0 and str(row["void_power_reset_date"] or "") != now.date().isoformat():
                 void_after = resources["void_power_max"]
                 recovered_void_power = max(0, void_after - void_before)
-            changed = recovered_stamina > 0 or recovered_energy > 0 or recovered_void_power > 0
+            changed = any((recovered_stamina, recovered_energy, recovered_void_power, recovered_bloodline, capacity_changed))
             if periods > 0:
                 advanced_update = last_update + timedelta(seconds=periods * RECOVERY_PERIOD_SECONDS)
                 change_player_state(
@@ -106,19 +132,22 @@ class ProgressionRepositoryMixin:
                     value_delta={
                         "stamina": recovered_stamina,
                         "energy": recovered_energy,
+                        "bloodline_stability": recovered_bloodline,
                     },
                     maximums={"stamina": resources["stamina_max"], "energy": resources["energy_max"]},
                     player_values={
+                        "stamina_max": stamina_capacity,
                         "void_power": void_after,
                         "void_power_reset_date": now.date().isoformat(),
                     },
                 )
-            elif recovered_void_power > 0:
+            elif recovered_void_power > 0 or capacity_changed:
                 change_player_state(
                     connection,
                     row,
-                    updated_at=now_text,
+                    updated_at=now_text if recovered_void_power > 0 else serialize_datetime(last_update),
                     player_values={
+                        "stamina_max": stamina_capacity,
                         "void_power": void_after,
                         "void_power_reset_date": now.date().isoformat(),
                     },
@@ -134,6 +163,7 @@ class ProgressionRepositoryMixin:
                 "recovered_energy": recovered_energy,
                 "changed": changed,
                 "recovered_void_power": recovered_void_power,
+                "recovered_bloodline_stability": recovered_bloodline,
             }
             connection.execute(
                 "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -153,6 +183,7 @@ class ProgressionRepositoryMixin:
                 recovered_energy=recovered_energy,
                 changed=changed,
                 recovered_void_power=recovered_void_power,
+                recovered_bloodline_stability=recovered_bloodline,
             )
 
 

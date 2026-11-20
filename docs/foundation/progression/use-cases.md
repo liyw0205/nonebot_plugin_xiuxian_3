@@ -56,6 +56,12 @@ success_bp = clamp(base_bp + preparation_bp + foundation_bp + support_bp - risk_
 飞升凭证，战斗胜利消耗，失败或取消返还。胜利直接写入 `ascension_ready` 并将角色放至
 `ascension.heaven_path`，无需再次移动或扣第二张凭证；之后仍须通过 `选择结局` 留下个人结局。
 
+开发分支的 `道源资格` 与 `领取道源资格` 是 `season.final_heaven` 的服务端资格交接入口。
+当前赛季的 `task.dao_origin.guard`、`task.dao_origin.build` 和 `task.dao_origin.teach` 只接受
+已结算合道挑战、已发放公共项目奖励和已毕业师徒关系作为证据；任务快照、来源 operation、
+赛季窗口和准入标记在领取事务中冻结。重复 operation 可安全重放，另一 operation 的重复领取、
+损坏快照、旧赛季或伪造来源均拒绝，资格只写入 `access.final_heaven`，不发放普通资产。
+
 聚气突破命令映射为 `突破预览 聚气`、`开始突破 聚气`、`结算突破` 和 `恢复虚弱`（可追加
 `护脉` 或 `提前`）。金丹突破使用 `突破预览 金丹`、`开始突破 金丹`、`结算突破` 和
 `恢复道基震荡`（可追加保护或提前恢复）。开始突破独立使用对应的

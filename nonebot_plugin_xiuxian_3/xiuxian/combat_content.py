@@ -93,6 +93,10 @@ def validate_combat_content(bundle: ContentBundle) -> dict[str, int]:
     if enemy_skill_keys - skill_keys:
         raise ContentError(f"enemy skills are not registered: {sorted(enemy_skill_keys - skill_keys)}")
 
+    from .combat.party_rules import validate_standard_party_content
+
+    validate_standard_party_content(bundle)
+
     encounter_count = 0
     candidate_count = 0
     for row in encounters:

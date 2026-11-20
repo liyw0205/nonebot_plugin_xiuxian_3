@@ -1939,22 +1939,22 @@
       "lane_name": "建设者",
       "name": "道统新章",
       "desc": "三界共同确认工程可以延续，也可以由后人修改。",
-      "body": "代价登记完毕，最后一步是把这一章交给道源门。建设者终关要以合道修为携道果碎片从档案遗迹启程，前往道源门：三界共同确认工程可以延续，也可以由后人修改。道源门只认合道六层与到手的道果，修为不到，门不会开。",
+      "body": "代价登记完毕，最后一步是把这一章交还三界。建设者终关要从档案遗迹回到虚空第一航道，把共修约本交给往来的三界行者：工程可以延续，也可以由后人修改。这份交接是炼虚十层的合道前见证；日后前往道源门仍须另行满足合道修为与道果要求。",
       "objectives": [
-        {"key": "open_the_new_chapter", "type": "travel_arrival", "label": "结算行程抵达道源门", "destination_key": "dao.origin_gate"}
+        {"key": "open_the_new_chapter", "type": "travel_arrival", "label": "结算行程抵达虚空第一航道", "destination_key": "void.first_route"}
       ],
       "actions": [
-        {"command": "前往", "argument": "道源门", "description": "从虚空档案遗迹启程前往道源门，等待行程结束并结算移动。"}
+        {"command": "前往", "argument": "虚空第一航道", "description": "从虚空档案遗迹回航至虚空第一航道，等待行程结束并结算移动。"}
       ],
       "state_changes": {"activity_events": ["story.mainline.dao_echoes:lane.builder.chapter.10"]},
       "retry": {
         "on_incomplete": "keep_running",
         "cooldown_seconds": 0,
-        "message": "尚未抵达道源门时关卡保持进行中，不扣主线奖励；备齐道果碎片并恢复体力后重新启程，即可开启道统新章。"
+        "message": "尚未抵达虚空第一航道时关卡保持进行中，不扣主线奖励；恢复体力与虚力后从档案遗迹回航，即可交还共修约本。"
       },
       "status": "open",
-      "required_realm": "dao_union",
-      "required_layer": 6,
+      "required_realm": "void_refining",
+      "required_layer": 10,
       "prerequisites": ["lane.builder.chapter.09"],
       "first_clear_reward": {"codex.story.dao_echoes.builder.chapter.10": 1},
       "repeat_reward": {}
@@ -4610,6 +4610,358 @@
       "lane": "basalt_waymarker", "lane_name": "玄武岩径水标回响",
       "first_clear_reward": {"spirit_stones": 30, "service_reputation": 4},
       "repeat_reward": {"spirit_stones": 8}
+    },
+    {
+      "key": "mist_lamp.1", "story_key": "story.mainline.mist_lamp", "chapter": 1, "stage": 1,
+      "name": "验牌入雾", "desc": "亲制洞天验行牌，沿灵泉谷旧径入洞，取回一份探索阵砂。",
+      "body": "陆灯的来信压着一片干苔：洞口旧灯将熄，守灯人却不让没有准备的人贸然入雾。你先在本关开始后制作洞天验行牌，木材可从铁木林拾材取得，两份止血草可从百草坡采药取得；在青石镇或灵泉谷缴费刻牌，成功领取一次凭证。再从灵泉谷沿公开石径进入雾隐洞天一层，入洞会消耗凭证，回头再进仍须重备。等真实抵达，安排雾隐洞天探索，结算取得至少一份阵砂，才算摸清灯阵的地气。探索有遭遇风险，战败与未取到阵砂都按原次数重试，旧炉、旧脚印和旧库存不能替你交这页行记。",
+      "objectives": [
+        {"key": "make_pass", "type": "production_complete", "label": "本关新制并成功领取洞天验行牌", "route_key": "idle.herb_vale_gather", "additional_route_keys": ["idle.ironwood_gather"], "recipe_key": "recipe.permit.mist_grotto", "item_key": "item.cave_pass_basic"},
+        {"key": "arrive", "type": "travel_arrival", "label": "本关真实抵达雾隐洞天一层", "destination_key": "cave.mist_grotto"},
+        {"key": "survey", "type": "exploration_reward", "label": "本关洞天探索结算取得阵砂", "mode_key": "explore.mist_grotto", "location_key": "cave.mist_grotto", "item_key": "item.mat.array_sand", "quantity": 1, "owned_receipts": true}
+      ],
+      "actions": [
+        {"command": "生产预览", "argument": "洞天验行牌", "description": "聚气四层后在青石镇或灵泉谷，以一木两草和十灵石制牌。"},
+        {"command": "开始生产", "argument": "洞天验行牌", "description": "新开制牌订单，三十秒后成功领取生产。"},
+        {"command": "领取生产", "argument": "", "description": "收下基础洞天凭证；失败按原返料和次数补做。"},
+        {"command": "前往", "argument": "雾隐洞天", "description": "从灵泉谷启程，实际扣除一张凭证，等两分钟结算移动。"},
+        {"command": "开始探索", "argument": "雾隐洞天探索", "description": "五分钟后结算探索；须成功取得阵砂，未得时按每日两次重试。"},
+        {"command": "结算探索", "argument": "", "description": "以服务端结算的阵砂为凭，旧库存不算。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.mist_lamp:mist_lamp.1"]}, "next_stage_key": "mist_lamp.2",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "本关须新制并领牌、实际入洞和探索取得阵砂。未出牌、旧行程、未结算、战败或没有阵砂都不算；补足材料按制牌与探索原日限重试，进度保留。"},
+      "status": "open", "aliases": ["验牌入雾"], "prerequisites": ["player.start_seeking"], "required_realm": "qi_gathering", "required_layer": 4,
+      "lane": "mist_lamp", "lane_name": "雾隐守灯", "first_clear_reward": {"spirit_stones": 15, "service_reputation": 1}, "repeat_reward": {"spirit_stones": 3}
+    },
+    {
+      "key": "mist_lamp.2", "story_key": "story.mainline.mist_lamp", "chapter": 1, "stage": 2,
+      "name": "长灯照壁", "desc": "在一层选择固灯筛砂或照壁辨叶，完整守过六小时。",
+      "body": "陆灯摸过你带回的阵砂，才将一盏旧灯递给你。灯脚松了，壁上药叶也快落入湿苔；你不能一夜兼顾所有地方。固灯筛砂多费体力，留下较多干砂；照壁辨叶多费精力，另收灵叶，干砂也够下一页布阵。先开始这一关，再在洞天一层查看守灯预览，安排六小时并在完整窗口领取。关前的夜值、取消、提前和逾时保底都不能替陆灯守住这一夜。离线与重启不会改动已定的选择和收获；满时回来收灯，灯簿才记下你的名字，陆灯也才敢让你带干砂回谷续阵。",
+      "objectives": [{"key": "watch", "type": "idle_claim", "label": "本关完整领取六小时雾隐洞天守灯", "route_key": "idle.mist_lamp_watch"}],
+      "actions": [
+        {"command": "挂机预览", "argument": "雾隐洞天守灯", "description": "确认身在洞天一层、聚气四层与每日一次。"},
+        {"command": "开始挂机", "argument": "雾隐洞天守灯 固灯筛砂", "description": "多费体力，收回较多阵砂。"},
+        {"command": "开始挂机", "argument": "雾隐洞天守灯 照壁辨叶", "description": "或多费精力，兼取灵叶与足够布阵的阵砂。"},
+        {"command": "领取挂机", "argument": "", "description": "六小时后完整领取，逾时只有一份阵砂，不记完整守灯。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.mist_lamp:mist_lamp.2"]}, "next_stage_key": "mist_lamp.3",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "只认本关新安排的完整守灯，旧安排、取消、提前或逾时保底不算。先处理当前安排，再按原每日名额续守；重启后用挂机状态查看冻结选择。"},
+      "status": "open", "aliases": ["长灯照壁"], "prerequisites": ["mist_lamp.1"], "required_realm": "qi_gathering", "required_layer": 4,
+      "lane": "mist_lamp", "lane_name": "雾隐守灯", "first_clear_reward": {"spirit_stones": 18, "service_reputation": 2}, "repeat_reward": {"spirit_stones": 4}
+    },
+    {
+      "key": "mist_lamp.3", "story_key": "story.mainline.mist_lamp", "chapter": 1, "stage": 3,
+      "name": "归谷续灯", "desc": "回灵泉谷制成基础聚灵阵，再向青石镇交付灯阵续灵。",
+      "body": "守夜结束，陆灯没有让你继续添油。他把两份干砂包进旧布，说灯要长明，得把灵机引回来。离开洞天回到灵泉谷，先看布阵辅修与基础聚灵阵预览，在这一页开始后用两份阵砂新开制作，成功收下一座阵；尚未习得布阵时按原有辅修规则选择，不会替你改业。随后到青石镇接灯阵续灵，实交一座基础聚灵阵，由航铺随下一班物资送回洞口。只收旧阵、制作失败、订单未交都不算续灯。阵砂不足可再回洞守夜，重新入洞仍须备凭证；若错过订单截止，等次日公示，陆灯会留着这页灯簿等你。",
+      "objectives": [
+        {"key": "make_array", "type": "production_complete", "label": "本关新制并成功领取基础聚灵阵", "route_key": "idle.mist_lamp_watch", "recipe_key": "recipe.array.gathering_basic", "item_key": "item.array.gathering_basic"},
+        {"key": "deliver", "type": "commission_delivery", "label": "本关新接并交付灯阵续灵，实交聚灵阵", "commission_key": "town_commission.lamp_array", "delivery_evidence": {"inputs": {"item.array.gathering_basic": 1}, "location_key": "xuantian.new_town", "fresh_acceptance": true}}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "灵泉谷", "description": "结算离洞，在灵泉谷制作聚灵阵。"},
+        {"command": "辅修预览", "argument": "布阵", "description": "确认辅修；已有其他辅修按原切换规则办理。"},
+        {"command": "开始生产", "argument": "基础聚灵阵", "description": "两份阵砂与二十灵石，新制九十秒后领取。"},
+        {"command": "领取生产", "argument": "", "description": "须成功出阵，失败按原规则补料再试。"},
+        {"command": "前往", "argument": "青石镇", "description": "实到镇中，先备阵再接十二小时公示订单。"},
+        {"command": "接取委托", "argument": "灯阵续灵", "description": "本关开始后在青石镇查看公示并新接订单，关前接单不计。"},
+        {"command": "交付委托", "argument": "灯阵续灵", "description": "实交一座聚灵阵，完成灯簿最后一页。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.mist_lamp:mist_lamp.3"]}, "next_stage_key": null,
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "需要本关新制成功的聚灵阵，以及本关开始后在青石镇新接并交付的灯阵续灵订单。旧阵、失败、关前接单、只接未交和过期订单不能交卷；材料不足补给，过期次日重接，重启后保留剧情与下一步行动。"},
+      "status": "open", "aliases": ["归谷续灯"], "prerequisites": ["mist_lamp.2"], "required_realm": "qi_gathering", "required_layer": 4,
+      "lane": "mist_lamp", "lane_name": "雾隐守灯", "reputation_key": "local.xuantian.new_town",
+      "first_clear_reward": {"spirit_stones": 35, "local_reputation": 4, "service_reputation": 3, "codex.story.mist_lamp_handover": 1}, "repeat_reward": {"spirit_stones": 6}
+    },
+    {
+      "key": "cloud_tide.1", "story_key": "story.mainline.cloud_tide", "chapter": 1, "stage": 1,
+      "name": "问潮登舟", "desc": "真实抵达云舟渡口，在云舟试炼中取回一片验航碎票。",
+      "body": "云城航铺收到晏潮的木牌，说渡口的潮汐又乱了一回。金丹修士走得远，却也得亲自认清这一段水路。先记下本关，再从云城沿公开相邻航路到云舟渡口，等行程真实结束，完成一轮云舟试炼并结算取得云舟碎票。旧行程、旧票和未结算的试航都不能替你认潮；遇上风暴时按试炼原规则处理，未得票则按每日额度重试。晏潮看过新票上的潮痕，才肯把交班木牌交到你手里。下一页不是再闯一场险境，而是留在渡口八小时，替往来舟工稳住压舱铁和封舱砂。",
+      "objectives": [
+        {"key": "arrive", "type": "travel_arrival", "label": "本关真实抵达云舟渡口", "destination_key": "xuantian.floating_boat"},
+        {"key": "trial", "type": "exploration_reward", "label": "本关云舟试炼结算取得云舟碎票", "mode_key": "explore.cloud_boat_trial", "location_key": "xuantian.floating_boat", "item_key": "item.ticket.cloud_boat_fragment", "quantity": 1, "owned_receipts": true}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "云舟渡口", "description": "从云城沿公开山路登舟，行程结束后结算移动。"},
+        {"command": "开始探索", "argument": "云舟试炼", "description": "五分钟后结算，风暴按既有规则处理，须取得新碎票。"},
+        {"command": "结算探索", "argument": "", "description": "以真实试航收获交卷，旧票不能推进。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.cloud_tide:cloud_tide.1"]}, "next_stage_key": "cloud_tide.2",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "需要本关新行程抵达渡口和试炼取得碎票。旧行程、旧库存、风暴无票或未结算都不能交卷，按原每日额度继续，进度保留。"},
+      "status": "open", "aliases": ["问潮登舟"], "prerequisites": ["player.start_seeking"], "required_realm": "golden_core", "required_layer": 1,
+      "lane": "cloud_tide", "lane_name": "云舟候潮", "first_clear_reward": {"spirit_stones": 25, "service_reputation": 1}, "repeat_reward": {"spirit_stones": 5}
+    },
+    {
+      "key": "cloud_tide.2", "story_key": "story.mainline.cloud_tide", "chapter": 1, "stage": 2,
+      "name": "候潮交班", "desc": "在渡口选择扶舷搬铁或护袋理砂，八小时后完整交班。",
+      "body": "晏潮把木牌挂到你的腰间，指向侧风里的货舱：铁松了绳，砂也漏了袋，总得先照应一头。扶舷搬铁多耗体力，收回较多云铁；护袋理砂多费精力，留下较多阵砂，两头都保留足够交一份候潮备材的材料。先开始这一页，再在渡口查看挂机预览，确认八小时、每日一次与实际气力后安排。完整领取才在航簿记下交班，旧安排、取消、提前和逾时只领的少量云铁都不算。断线与重启后继续看挂机状态即可，潮汐不会因为再点一次木牌就多发一份物资。",
+      "objectives": [{"key": "tide", "type": "idle_claim", "label": "本关完整领取八小时云舟渡口候潮", "route_key": "idle.cloud_dock_tide"}],
+      "actions": [
+        {"command": "挂机预览", "argument": "云舟渡口候潮", "description": "确认金丹一层、渡口地点与每日一次。"},
+        {"command": "开始挂机", "argument": "云舟渡口候潮 扶舷搬铁", "description": "多费三点体力，偏重云铁。"},
+        {"command": "开始挂机", "argument": "云舟渡口候潮 护袋理砂", "description": "或多费三点精力，偏重阵砂。"},
+        {"command": "领取挂机", "argument": "", "description": "八小时后在完整窗口交班，逾时保底不记剧情。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.cloud_tide:cloud_tide.2"]}, "next_stage_key": "cloud_tide.3",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "只认本关新安排的完整候潮，旧安排、取消、提前和逾时保底都不算。先处理当前安排，再按原每日名额重接，重启用挂机状态恢复。"},
+      "status": "open", "aliases": ["候潮交班"], "prerequisites": ["cloud_tide.1"], "required_realm": "golden_core", "required_layer": 1,
+      "lane": "cloud_tide", "lane_name": "云舟候潮", "first_clear_reward": {"spirit_stones": 28, "service_reputation": 2}, "repeat_reward": {"spirit_stones": 5}
+    },
+    {
+      "key": "cloud_tide.3", "story_key": "story.mainline.cloud_tide", "chapter": 1, "stage": 3,
+      "name": "航材归镇", "desc": "将候潮材料带回青石镇，交付两份云铁与一份阵砂。",
+      "body": "晏潮收好航簿，却把装着云铁和干砂的小包又推回你面前。渡口的安稳不能只守一班，镇中航铺得知道下一班船还缺什么。先开始最后一页，再沿云城、青石镇的公开路线返回，等实际抵达，查看候潮备材的当日库存与期限，接单后实交两份云铁和一份阵砂。完整候潮的两种选择都够这份用料；若材料已另作他用，可回渡口按原日限补给，也可保留多出的云铁炼剑、阵砂布阵。旧交单不算这次回镇，缺料时不会扣一半，错过截止就等次日。航铺验过实物，才将下一班的物资栏填满，这段潮路也才真正接回镇中的日常。",
+      "objectives": [
+        {"key": "arrive", "type": "travel_arrival", "label": "本关真实返回青石镇", "destination_key": "xuantian.new_town"},
+        {"key": "deliver", "type": "commission_delivery", "label": "本关新接并交付候潮备材，实交两云铁一阵砂", "commission_key": "town_commission.tide_supplies", "delivery_evidence": {"inputs": {"item.material.cloud_iron": 2, "item.mat.array_sand": 1}, "location_key": "xuantian.new_town", "fresh_acceptance": true}}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "云城", "description": "离开渡口，行程结束后结算移动。"},
+        {"command": "前往", "argument": "青石镇", "description": "从云城回镇，实际抵达才可交卷。"},
+        {"command": "城镇委托", "argument": "", "description": "先备两云铁一阵砂，再看当日十二小时公示期限。"},
+        {"command": "接取委托", "argument": "候潮备材", "description": "本关开始后在青石镇查看公示并新接订单，关前接单不计。"},
+        {"command": "交付委托", "argument": "候潮备材", "description": "实交全部材料，取得航铺灵石与名望。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.cloud_tide:cloud_tide.3"]}, "next_stage_key": null,
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "需要本关实际回镇，以及本关开始后在青石镇新接并交付的候潮备材订单。旧行程、关前接单、只接未交、过期或缺料不算；补足两云铁一阵砂，过期次日重接，重启后保留剧情与下一步行动。"},
+      "status": "open", "aliases": ["航材归镇"], "prerequisites": ["cloud_tide.2"], "required_realm": "golden_core", "required_layer": 1,
+      "lane": "cloud_tide", "lane_name": "云舟候潮", "reputation_key": "local.xuantian.new_town",
+      "first_clear_reward": {"spirit_stones": 45, "local_reputation": 5, "service_reputation": 4, "codex.story.cloud_tide_handover": 1}, "repeat_reward": {"spirit_stones": 8}
+    },
+    {
+      "key": "herb_shelter.1", "story_key": "story.mainline.herb_shelter",
+      "chapter": 1, "stage": 1, "name": "雨棚辨药",
+      "desc": "随姜婆采一篓药，亲自决定先扶学徒归棚还是上坡辨叶。",
+      "body": "百草坡的雨棚漏了一角，姜婆用药篓垫住湿地，仍不肯让学徒踩进松软的坡顶。她请你先辨认成叶，再决定怎样分配这一趟工夫：扶徒归棚要多费一点体力，带回止血草和镇中人情；辨叶上坡要多费精力，另得灵叶却没有送药人情。先记下这一页，再从近郊来到百草坡，安排四小时采药，并在完整窗口收篓。旧药篓、取消和受潮保底不能算作这一趟劳作。两种选择都能交卷，药性与用处却不相同；姜婆会在下一页教你把止血草炼成送给伤者的药。",
+      "objectives": [{"key": "gather_full", "type": "idle_claim", "label": "本关开始后完整领取百草坡采药", "route_key": "idle.herb_vale_gather"}],
+      "actions": [
+        {"command": "前往", "argument": "百草坡", "description": "从近郊沿公开山路入坡；到时结算移动。"},
+        {"command": "挂机预览", "argument": "百草坡采药", "description": "查看四小时、每日一次及两种采药选择。"},
+        {"command": "开始挂机", "argument": "百草坡采药 扶徒归棚", "description": "多花一点体力，带回止血草与镇中人情。"},
+        {"command": "开始挂机", "argument": "百草坡采药 辨叶上坡", "description": "或多花精力取得灵叶；止血草不够时另日再采。"},
+        {"command": "领取挂机", "argument": "", "description": "四小时后完整收篓；逾时只留保底，不能交卷。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.herb_shelter:herb_shelter.1"]},
+      "next_stage_key": "herb_shelter.2",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "旧安排、提前、取消或逾时保底都不算完整采药。先处理当前安排，按原每日名额重新采药；两种选择均可，主线进度保留。"},
+      "status": "open", "aliases": ["雨棚辨药"],
+      "prerequisites": ["player.start_seeking"], "required_realm": "qi_sensing", "required_layer": 2,
+      "lane": "herb_shelter", "lane_name": "百草坡药棚",
+      "first_clear_reward": {"spirit_stones": 8, "service_reputation": 1},
+      "repeat_reward": {"spirit_stones": 2}
+    },
+    {
+      "key": "herb_shelter.2", "story_key": "story.mainline.herb_shelter",
+      "chapter": 1, "stage": 2, "name": "丹火济伤",
+      "desc": "备齐止血草与灵米，炼成疗伤丹，回青石镇交付药棚救治委托。",
+      "body": "姜婆把湿布从学徒肩头取下，露出一道擦伤。她不许你把灵叶混进止血药，却指着药篓说：两份止血草配一份粗糙灵米，可以炼一枚低阶疗伤丹。米不足时先到灵泉谷拾穗；止血草不足时按百草坡原日限再采。你须有炼丹辅修和基础炉具，先看辅修与生产预览，再在这一页开始后新开丹炉，等炼制成功并领取。旧炉、失败返料和只点火未收丹都不计炼药。带着可用的疗伤丹回青石镇，查看药棚救治公示，接单后在期限内交出实物。药铺只验真药，不认一句救人的承诺，交单和炼药都完成后，姜婆才会收下这一页。",
+      "objectives": [
+        {"key": "brew_medicine", "type": "production_complete", "label": "本关新开炉并成功领取低阶疗伤丹", "route_key": "idle.herb_vale_gather", "additional_route_keys": ["idle.spring_gleaning"], "recipe_key": "recipe.pill.healing_low", "item_key": "item.pill.healing_low"},
+        {"key": "deliver_medicine", "type": "commission_delivery", "label": "本关在青石镇新接并交付药棚救治，实交一枚疗伤丹", "commission_key": "town_commission.shelter_medicine", "delivery_evidence": {"inputs": {"item.pill.healing_low": 1}, "location_key": "xuantian.new_town", "fresh_acceptance": true}}
+      ],
+      "actions": [
+        {"command": "辅修预览", "argument": "炼丹", "description": "确认辅修与基础炉具；不自动改变既有辅修。"},
+        {"command": "挂机预览", "argument": "灵泉谷拾穗", "description": "缺米可沿近郊、青石镇到灵泉谷，完整拾穗取得粗糙灵米。"},
+        {"command": "生产预览", "argument": "低阶疗伤丹", "description": "确认两份止血草、一份粗糙灵米和炼制风险。"},
+        {"command": "开始生产", "argument": "低阶疗伤丹", "description": "本关新开炉；失败可补料再炼。"},
+        {"command": "领取生产", "argument": "", "description": "丹熟后领取；逾期按生产状态恢复，仍需成功出丹。"},
+        {"command": "前往", "argument": "青石镇", "description": "沿公开通路回镇并结算移动，备好实物后接单。"},
+        {"command": "接取委托", "argument": "药棚救治", "description": "回青石镇查看期限后新接单，炼药、接单与交付都须在本关发生。"},
+        {"command": "交付委托", "argument": "药棚救治", "description": "真实扣除一枚低阶疗伤丹，取得药铺付酬与名望。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.herb_shelter:herb_shelter.2"]},
+      "next_stage_key": "herb_shelter.3",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "需要本关新炉成功出丹和本人在青石镇新接并交付药棚救治两项记录。旧炉、失败、尚未领取、只接未交、关前接单和旧交单不算；缺料按采药与拾穗日限补给，过期委托次日重接，主线保留。"},
+      "status": "open", "aliases": ["丹火济伤"],
+      "prerequisites": ["herb_shelter.1"], "required_realm": "qi_sensing", "required_layer": 2,
+      "lane": "herb_shelter", "lane_name": "百草坡药棚",
+      "first_clear_reward": {"spirit_stones": 18, "service_reputation": 2},
+      "repeat_reward": {"spirit_stones": 4}
+    },
+    {
+      "key": "herb_shelter.3", "story_key": "story.mainline.herb_shelter",
+      "chapter": 1, "stage": 3, "name": "留根归铺",
+      "desc": "把三份止血草交回青石镇药铺，让救治不止于一枚丹药。",
+      "body": "学徒的伤口已经包好，雨棚下却还有下一位背药人。姜婆把空篓翻过来，篓底留着一截未剪的根：今天有药，是因为昨日有人留下来年的新芽。最后一页不是把余药换成一句称赞，而是在本关开始后，亲自给青石镇药铺交一份止血草供应。你须备齐三份止血草，再看当日公示，接单并在期限内真实交付；药草不足可以返回百草坡另日采药，两种选择的所得不同，要按背包实数备料。旧交单与未完成的订单不能充数。药铺把新的干药收进柜里，姜婆才将你的名字记入留根簿，今后山路上的劳作便有了可以续下去的去处。",
+      "objectives": [{"key": "deliver_herbs", "type": "commission_delivery", "label": "本关在青石镇新接并交付止血草供应，实交三份止血草", "commission_key": "town_commission.herb_supply", "delivery_evidence": {"inputs": {"item.herb.blood_grass": 3}, "location_key": "xuantian.new_town", "fresh_acceptance": true}}],
+      "actions": [
+        {"command": "挂机预览", "argument": "百草坡采药", "description": "药草不足时按原日限补给；先备料再接十二小时委托。"},
+        {"command": "城镇委托", "argument": "", "description": "身在青石镇查看止血草供应的库存与期限。"},
+        {"command": "接取委托", "argument": "止血草供应", "description": "备妥三份止血草后接取。"},
+        {"command": "交付委托", "argument": "止血草供应", "description": "本人真实交单，取得灵石与地方名望后领取本关奖励。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.herb_shelter:herb_shelter.3"]},
+      "next_stage_key": null,
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "只认本关开始后本人在青石镇新接并交付的止血草供应；关前接单、旧交单、缺药和过期订单不能交卷。材料不足不扣药，过期按原委托规则次日重接，主线进度保留。"},
+      "status": "open", "aliases": ["留根归铺"],
+      "prerequisites": ["herb_shelter.2"], "required_realm": "qi_sensing", "required_layer": 2,
+      "lane": "herb_shelter", "lane_name": "百草坡药棚", "reputation_key": "local.xuantian.new_town",
+      "first_clear_reward": {"spirit_stones": 24, "local_reputation": 3, "service_reputation": 3, "codex.story.herb_shelter": 1},
+      "repeat_reward": {"spirit_stones": 5}
+    },
+    {
+      "key": "field_seeds.1", "story_key": "story.mainline.field_seeds", "chapter": 1, "stage": 1,
+      "name": "归镇认畦", "desc": "回青石镇找姜婆认田，把山路上采来的药根留在院中。",
+      "body": "山路上的药草总有采尽的一天，姜婆在青石镇门口摊开一张田畦图，请你把一小段止血草根留下来。先记下这一页，再沿公开山路回镇，行程抵达后到她的苗盘前认一认行距。若你已经在镇中，可以去近郊看看药根，再回来交卷。她指着客房后的空地说，租住期间也有一垄小田，不必等到买下大院才学种药。先查看居所和租金，把药种与照料的精力留好；下一页才正式分苗，旧田不能代替这一次练习。",
+      "objectives": [{"key": "return", "type": "travel_arrival", "label": "本关实际抵达青石镇", "destination_key": "xuantian.new_town"}],
+      "actions": [
+        {"command": "前往", "argument": "青石镇", "description": "从近郊回镇，到时结算移动；已在镇中可先走近郊再返回。"},
+        {"command": "结算移动", "argument": "", "description": "真实抵达后交卷。"},
+        {"command": "居所预览", "argument": "", "description": "核对租金与田垄；客房即可种止血草。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.field_seeds:field_seeds.1"]}, "next_stage_key": "field_seeds.2",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "需在本关开始后亲自抵达青石镇。旧行程不算；用移动状态查看途中安排，再结算移动，已完成行动保留。"},
+      "status": "open", "aliases": ["归镇认畦"], "prerequisites": ["player.start_seeking"], "required_realm": "qi_sensing", "required_layer": 2,
+      "lane": "field_seeds", "lane_name": "药畦换种", "first_clear_reward": {"spirit_stones": 10}, "repeat_reward": {"spirit_stones": 2}
+    },
+    {
+      "key": "field_seeds.2", "story_key": "story.mainline.field_seeds", "chapter": 1, "stage": 2,
+      "name": "分苗换种", "desc": "精耕一畦新药苗，照料两次，以成熟药苗换来云纹稻种。",
+      "body": "姜婆将两只苗盘摆在田边，一只装药根，一只空着等阿禾的稻种。她要看的是你从下种到收苗亲手做完一回，而不是把旧田的收成拿来应付。先在青石镇租下客房或已有带田居所，本页开始后用一份止血草新播精耕田，成熟前照料两次。四小时后、收割窗口内收下充分照料的药苗，阿禾才会照约送来一份云纹稻种。缓养虽能收药，却没有换种之约；漏了照料、放到枯萎或领取旧田都不算。这一页会一直留着，缺药种可去近郊采集或百草坡采药，按每日名额再种一畦。",
+      "objectives": [{"key": "seed_exchange", "type": "field_harvest", "label": "本关新播精耕止血草并充分照料收获云纹稻种", "crop_key": "crop.blood_grass", "plan_keys": ["intensive"], "item_key": "item.grain.cloud_rice", "quantity": 1}],
+      "actions": [
+        {"command": "租住居所", "argument": "客房", "description": "已有有效带田居所无需重租；租金以居所预览为准。"},
+        {"command": "灵田预览", "argument": "止血草", "description": "核对种子、精力、每日名额和精耕窗口。"},
+        {"command": "灵田播种", "argument": "止血草 精耕", "description": "本关新播；旧田即使现在收获也不计。"},
+        {"command": "灵田维护", "argument": "1", "description": "成熟前照料两次；多垄居所按实际田垄选择。"},
+        {"command": "灵田收获", "argument": "1", "description": "四小时后在窗口内收获，实际取得稻种。"},
+        {"command": "我的灵田", "argument": "", "description": "断线重启后查看照料次数和剩余窗口。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.field_seeds:field_seeds.2"]}, "next_stage_key": "field_seeds.3",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "只认本关新播精耕止血草的充分照料收获。旧田、缓养、少照料与枯萎都不算；用我的灵田查看窗口，补药种和精力，按日限重种，已完成剧情不丢失。"},
+      "status": "open", "aliases": ["分苗换种"], "prerequisites": ["field_seeds.1"], "required_realm": "qi_sensing", "required_layer": 2,
+      "lane": "field_seeds", "lane_name": "药畦换种", "first_clear_reward": {"spirit_stones": 18, "service_reputation": 2}, "repeat_reward": {"spirit_stones": 3}
+    },
+    {
+      "key": "field_seeds.3", "story_key": "story.mainline.field_seeds", "chapter": 1, "stage": 3,
+      "name": "药畦入铺", "desc": "将三份止血草交给镇中药铺，留下稻种，准备下一季的饭。",
+      "body": "阿禾把稻种扎紧，提醒你别把这一小袋当成眼前的饭吃掉。姜婆则将余下药草摊开晾干，让你给镇中药铺送三份能用的止血草。这一页开始后先看当日公示，备齐材料再接止血草供应，按期限亲自交货。药铺给的是实物报酬与地方认可，不会因为你曾经种过药就免去交付；库存不够时可以继续养药，也可以沿山路补采。交卷后田垄仍归你照看，云纹稻种也仍在行囊里。日后镇中名望达到六十，租得灵圃小院，便能和阿禾试种云纹稻，把一袋种子养成下一桌热饭。",
+      "objectives": [{"key": "supply", "type": "commission_delivery", "label": "本关实际交付止血草供应", "commission_key": "town_commission.herb_supply"}],
+      "actions": [
+        {"command": "城镇委托", "argument": "", "description": "备齐三份止血草，再查看公示截止时间。"},
+        {"command": "接取委托", "argument": "止血草供应", "description": "在青石镇接单；逾期次日重接。"},
+        {"command": "交付委托", "argument": "止血草供应", "description": "交出实物后领取本关奖励。"},
+        {"command": "灵田预览", "argument": "云纹稻", "description": "保留换来的稻种，积累名望租灵圃小院后继续养稻。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.field_seeds:field_seeds.3"]}, "next_stage_key": null,
+      "completion_actions": [{"command": "云稻炊香主线", "argument": "", "description": "保留稻种，积累六十镇中名望租灵圃小院，接着种稻做饭。"}],
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "需要本关的止血草供应交单；旧交单和只接未交不算。缺料不扣物，先补三份止血草，公示过期次日重接。"},
+      "status": "open", "aliases": ["药畦入铺"], "prerequisites": ["field_seeds.2"], "required_realm": "qi_sensing", "required_layer": 2,
+      "lane": "field_seeds", "lane_name": "药畦换种", "reputation_key": "local.xuantian.new_town",
+      "first_clear_reward": {"spirit_stones": 24, "local_reputation": 4, "service_reputation": 2}, "repeat_reward": {"spirit_stones": 5}
+    },
+    {
+      "key": "rice_table.1", "story_key": "story.mainline.rice_table", "chapter": 1, "stage": 1,
+      "name": "稻畦起穗", "desc": "把换来的云纹稻种播进灵圃，充分照料一季新稻。",
+      "body": "阿禾打开药苗换来的稻种袋，让你听谷粒在掌心落下的声音。云纹稻需要灵圃小院的田气，先在青石镇积累六十名望，再按居所预览备好租金。没有稻种时，回药畦用精耕止血草、充分照料的收成换一份。本页开始后再播云纹稻：精耕六小时，成熟前照料三次；缓养十小时，只需照料一次，两种都要在各自窗口内收获。阿禾只认新田的实收，不认旧袋中的稻谷。漏了照料或等到枯萎，这页不会消失，保留种子按日限重播即可；收成妥当后，他会陪你回灶边蒸饭。",
+      "objectives": [{"key": "rice", "type": "field_harvest", "label": "本关新播云纹稻并充分照料收获至少四份稻谷", "crop_key": "crop.cloud_rice", "plan_keys": ["intensive", "patient"], "item_key": "item.grain.cloud_rice", "quantity": 4}],
+      "actions": [
+        {"command": "药畦换种主线", "argument": "", "description": "缺稻种可先完成精耕止血草的换种劳作。"},
+        {"command": "居所预览", "argument": "", "description": "查看灵圃小院的六十名望与租金条件。"},
+        {"command": "租住居所", "argument": "灵圃小院", "description": "在青石镇租院，已有有效小院无需重租。"},
+        {"command": "灵田播种", "argument": "云纹稻 1 缓养", "description": "也可选精耕，按方案在成熟前完成照料。"},
+        {"command": "灵田维护", "argument": "1", "description": "缓养一次、精耕三次，不能等成熟后补。"},
+        {"command": "灵田收获", "argument": "1", "description": "用我的灵田看成熟时刻与窗口。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.rice_table:rice_table.1"]}, "next_stage_key": "rice_table.2",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "只认本关新播且充分照料的云纹稻实收；旧田、少照料和枯萎不算。用我的灵田看窗口，缺种先精耕止血草换种，按日限重播。"},
+      "status": "open", "aliases": ["稻畦起穗"], "prerequisites": ["player.start_seeking"], "required_realm": "qi_sensing", "required_layer": 2,
+      "lane": "rice_table", "lane_name": "云稻炊香", "first_clear_reward": {"spirit_stones": 15, "service_reputation": 1}, "repeat_reward": {"spirit_stones": 3}
+    },
+    {
+      "key": "rice_table.2", "story_key": "story.mainline.rice_table", "chapter": 1, "stage": 2,
+      "name": "新米开甑", "desc": "以新锅成功蒸出云纹灵米饭，吃一份恢复劳作消耗。",
+      "body": "稻穗已晾干，阿禾把三份稻谷淘净放进甑里，灶边便有了淡淡的米香。你需要烹饪辅修，先看生产预览，再在本页开始后新开一锅云纹灵米饭，等成功领取才算做成。旧锅、未收的饭与失败返料都不是这一桌的成品。熟饭有两份，留一份给客人，自己吃一份补回种田和开灶耗去的精力或体力；若状态已满，先做真实劳作再用饭，零恢复不能交卷。阿禾不急着催客人进门，只请你先尝过自己煮的米。火候不成时保留返料，回田里补足三份谷，再开新锅便是。",
+      "objectives": [
+        {"key": "cook", "type": "production_complete", "label": "本关新开锅成功领取云纹灵米饭", "crop_source": {"crop_key": "crop.cloud_rice", "plan_keys": ["intensive", "patient"]}, "recipe_key": "recipe.food.cloud_rice_meal", "item_key": "item.food.cloud_rice_meal"},
+        {"key": "eat", "type": "item_use", "label": "新锅成功出饭后实际恢复体力或精力", "recipe_key": "recipe.food.cloud_rice_meal", "item_key": "item.food.cloud_rice_meal", "resources": ["stamina", "energy"]}
+      ],
+      "actions": [
+        {"command": "辅修预览", "argument": "烹饪", "description": "不自动改变辅修；按公开条件准备烹饪资格。"},
+        {"command": "生产预览", "argument": "云纹灵米饭", "description": "查看三份谷的投入与失败返料。"},
+        {"command": "开始生产", "argument": "云纹灵米饭", "description": "本关新开锅，旧锅不算。"},
+        {"command": "领取生产", "argument": "", "description": "到时成功领取；过期可按生产状态恢复。"},
+        {"command": "使用物品", "argument": "云纹灵米饭 精力", "description": "成功出饭后恢复劳作消耗，留一份饭待客。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.rice_table:rice_table.2"]}, "next_stage_key": "rice_table.3",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "需本关新锅成功出饭，再实际恢复体力或精力。旧锅、失败和零恢复不算；用生产状态接续，缺谷再种，进度保留。"},
+      "status": "open", "aliases": ["新米开甑"], "prerequisites": ["rice_table.1"], "required_realm": "qi_sensing", "required_layer": 2,
+      "lane": "rice_table", "lane_name": "云稻炊香", "first_clear_reward": {"spirit_stones": 20, "service_reputation": 2}, "repeat_reward": {"spirit_stones": 4}
+    },
+    {
+      "key": "rice_table.3", "story_key": "story.mainline.rice_table", "chapter": 1, "stage": 3,
+      "name": "一饭留客", "desc": "给食肆交一份云纹灵米饭，让田里的收成走到旅人桌上。",
+      "body": "暮色落到青石镇的门楼，赶路的人在食肆门口停住脚步。阿禾请你把留好的那份云纹灵米饭交给柜上的云饭待客公示。先开始这一页，再备实物、看十二小时公示的期限，接单后交出一份饭。旧交单与口头许诺不算，食肆会真实扣物、付酬并记下服务名望。若饭已经吃完，可以用留下的谷另蒸一锅；谷不足就回小院再养一季，不必重做前两页。交卷后阿禾收起空甑，请你去灵泉谷看看沈青的苗圃：饭香可以待客，灵叶也能给来年的药田留下一夜安稳。",
+      "objectives": [{"key": "meal", "type": "commission_delivery", "label": "本关交付云饭待客，实际交出一份云纹灵米饭", "commission_key": "town_commission.rice_hospitality"}],
+      "actions": [
+        {"command": "城镇委托", "argument": "", "description": "在青石镇查看当日云饭待客。"},
+        {"command": "接取委托", "argument": "云饭待客", "description": "先备一份云纹灵米饭，过期次日重接。"},
+        {"command": "交付委托", "argument": "云饭待客", "description": "实交饭食后领取本关奖励。"},
+        {"command": "前往", "argument": "灵泉谷", "description": "交卷后可去灵泉采集、继续养灵叶。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.rice_table:rice_table.3"]}, "next_stage_key": null,
+      "completion_actions": [{"command": "灵叶守圃主线", "argument": "", "description": "下一程到灵泉谷辨叶，再亲自养叶，领取夜灯守护苗圃。"}],
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "需本关的云饭待客交单。缺饭不扣物，用生产预览补锅；过期次日重接，已完成田作与用餐记录保留。"},
+      "status": "open", "aliases": ["一饭留客"], "prerequisites": ["rice_table.2"], "required_realm": "qi_sensing", "required_layer": 2,
+      "lane": "rice_table", "lane_name": "云稻炊香", "reputation_key": "local.xuantian.new_town",
+      "first_clear_reward": {"spirit_stones": 28, "local_reputation": 4, "service_reputation": 2}, "repeat_reward": {"spirit_stones": 5}
+    },
+    {
+      "key": "leaf_watch.1", "story_key": "story.mainline.leaf_watch", "chapter": 1, "stage": 1,
+      "name": "泉边识叶", "desc": "到灵泉谷采回一束灵叶，向圃师沈青辨认适合下种的叶脉。",
+      "body": "沈青的苗圃在灵泉谷最靠水的一侧，叶背上有一层细细的银光。他不急着教你引灵，先请你在本页开始后实际完成一次灵泉采集，结算收下一束灵叶，再看清叶脉与草根的区别。只带旧叶来，或还在采集途中，都不能证明你见过泉边的生长处。所得可以留下作种，不必马上交掉。下一页要在带田的庭院或灵圃小院精耕灵叶，先看居所条件、种子和精力。沈青说，知道叶从哪里长出来，才能在夜里分清该护哪一枝，该让哪一条水沟继续流。",
+      "objectives": [{"key": "leaf_source", "type": "exploration_reward", "label": "本关结算灵泉采集并实得灵叶", "mode_key": "explore.spring_gather", "location_key": "xuantian.spirit_field", "item_key": "item.herb.spirit_leaf", "quantity": 1}],
+      "actions": [
+        {"command": "前往", "argument": "灵泉谷", "description": "从青石镇启程，到时结算移动。"},
+        {"command": "开始探索", "argument": "灵泉采集", "description": "本关新采一束灵叶，保留作种。"},
+        {"command": "结算探索", "argument": "", "description": "到时结算，实收灵叶后交卷。"},
+        {"command": "灵田预览", "argument": "灵叶", "description": "确认下一关的居所、精力与精耕条件。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.leaf_watch:leaf_watch.1"]}, "next_stage_key": "leaf_watch.2",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "需要本关真实结算灵泉采集并取得灵叶；库存、旧探索和未结算不算。前往灵泉谷，按探索状态完成行程，保留所得作种。"},
+      "status": "open", "aliases": ["泉边识叶"], "prerequisites": ["player.start_seeking"], "required_realm": "qi_sensing", "required_layer": 2,
+      "lane": "leaf_watch", "lane_name": "灵叶守圃", "first_clear_reward": {"spirit_stones": 12}, "repeat_reward": {"spirit_stones": 2}
+    },
+    {
+      "key": "leaf_watch.2", "story_key": "story.mainline.leaf_watch", "chapter": 1, "stage": 2,
+      "name": "疏枝养叶", "desc": "在新田精耕灵叶，照料三次，收下成熟灵叶后获得守圃资格。",
+      "body": "沈青带来几根细绳，要你先学会顺着枝叶引灵。回青石镇准备有效庭院或灵圃小院，本页开始后新播一畦精耕灵叶，在六小时成熟前照料三次，再于窗口内收下至少三束灵叶。精耕落下的阵砂也归你，可留作以后布阵或护根；缓养虽然更从容，却不能代替这次疏枝练习。旧田、漏照料与枯萎不能交卷，失败时保留能用的种子按日限再来。收成妥当并领取这一页奖励后，沈青才把夜灯交给你，开放灵泉守圃。会收叶还不够，真正守夜的人须先证明自己也能把叶养好。",
+      "objectives": [{"key": "leaf_crop", "type": "field_harvest", "label": "本关精耕新灵叶并充分照料收获至少三束", "crop_key": "crop.spirit_leaf", "plan_keys": ["intensive"], "item_key": "item.herb.spirit_leaf", "quantity": 3}],
+      "actions": [
+        {"command": "前往", "argument": "青石镇", "description": "回镇查看居所；旧租约到期不丢弃已种作物。"},
+        {"command": "居所预览", "argument": "", "description": "庭院或灵圃小院可种灵叶，按名望和租金准备。"},
+        {"command": "灵田播种", "argument": "灵叶 1 精耕", "description": "本关新播，消耗实际灵叶作种。"},
+        {"command": "灵田维护", "argument": "1", "description": "成熟前照料三次，具体次数见我的灵田。"},
+        {"command": "灵田收获", "argument": "1", "description": "六小时后收获，随后领取本关奖励解锁守圃。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.leaf_watch:leaf_watch.2"]}, "next_stage_key": "leaf_watch.3",
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "只认本关新播精耕灵叶并充分照料的收成。旧田、缓养、少照料与枯萎都不算；缺种再到灵泉采集，按每日名额重播，领奖后才解锁守圃。"},
+      "status": "open", "aliases": ["疏枝养叶"], "prerequisites": ["leaf_watch.1"], "required_realm": "qi_sensing", "required_layer": 2,
+      "lane": "leaf_watch", "lane_name": "灵叶守圃", "first_clear_reward": {"spirit_stones": 18, "service_reputation": 2}, "repeat_reward": {"spirit_stones": 3}
+    },
+    {
+      "key": "leaf_watch.3", "story_key": "story.mainline.leaf_watch", "chapter": 1, "stage": 3,
+      "name": "圃夜交灯", "desc": "在灵泉谷完整守夜，再把两叶一砂交给镇中苗圃备材公示。",
+      "body": "夜灯亮起，沈青把苗圃的两处缺口指给你看：风口的叶子需要引露，浅沟的水需要理砂。本页开始后到灵泉谷安排六小时守圃，护叶引露多费精力、偏得灵叶，理沟收砂多费体力、偏得阵砂，两种都能备足两叶一砂。你须完整交班，取消、旧安排与逾时保底不算；逾时只留一束叶，沈青会替你照看这一夜，却不会替你写劳作手记。完整收灯后回青石镇，接取并交付圃夜备材，真实交出两束灵叶和一份阵砂。此后守圃继续开放，余料可炼药、布阵或再次支援苗圃，田里的功夫有了每天都能接续的去处。",
+      "objectives": [
+        {"key": "watch", "type": "idle_claim", "label": "本关新安排并完整领取六小时灵泉守圃", "route_key": "idle.leaf_nursery_watch"},
+        {"key": "supply", "type": "commission_delivery", "label": "本关交付圃夜备材，实交两叶一砂", "commission_key": "town_commission.nursery_supplies"}
+      ],
+      "actions": [
+        {"command": "前往", "argument": "灵泉谷", "description": "实际抵达，已领取疏枝养叶奖励才可新安排守圃。"},
+        {"command": "挂机预览", "argument": "灵泉守圃", "description": "查看六小时、每日名额、两种选择与逾时窗口。"},
+        {"command": "开始挂机", "argument": "灵泉守圃 护叶引露", "description": "多费精力，多收灵叶。"},
+        {"command": "开始挂机", "argument": "灵泉守圃 理沟收砂", "description": "或多费体力，多收阵砂。"},
+        {"command": "领取挂机", "argument": "", "description": "六小时后完整交班，重启可用挂机状态接续。"},
+        {"command": "前往", "argument": "青石镇", "description": "收好两叶一砂，回镇看公示期限。"},
+        {"command": "接取委托", "argument": "圃夜备材", "description": "备齐材料后接单，过期次日重接。"},
+        {"command": "交付委托", "argument": "圃夜备材", "description": "实交物资，再领取本关奖励；守圃仍可另日继续。"}
+      ],
+      "state_changes": {"activity_events": ["story.mainline.leaf_watch:leaf_watch.3"]}, "next_stage_key": null,
+      "completion_actions": [{"command": "挂机预览", "argument": "灵泉守圃", "description": "守圃已常驻开放；按每日名额安排下一夜，余料可炼药、布阵或继续圃夜备材。"}],
+      "retry": {"on_incomplete": "keep_running", "cooldown_seconds": 0, "message": "需要本关完整守圃和圃夜备材交付。旧安排、取消、逾时与旧交单不算；按日限重开守圃，先备两叶一砂再接公示，断线不丢进度。"},
+      "status": "open", "aliases": ["圃夜交灯"], "prerequisites": ["leaf_watch.2"], "required_realm": "qi_sensing", "required_layer": 2,
+      "lane": "leaf_watch", "lane_name": "灵叶守圃", "reputation_key": "local.xuantian.new_town",
+      "first_clear_reward": {"spirit_stones": 30, "local_reputation": 4, "service_reputation": 3}, "repeat_reward": {"spirit_stones": 6}
     }
   ]
 }

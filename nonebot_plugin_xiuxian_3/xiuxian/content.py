@@ -66,6 +66,22 @@ class ContentBundle:
             from .world_content import validate_world_content
 
             validate_world_content(bundle)
+        if any(kind == "survey" for kind, _ in records):
+            from .exploration.survey_rules import survey_definitions
+
+            survey_definitions(bundle)
+        if any(kind == "deposit" for kind, _ in records):
+            from .exploration.deposit_rules import deposit_definitions
+
+            deposit_definitions(bundle)
+        if ("advancement_rule", "recovery.bloodline") in records:
+            from .progression.recovery_rules import bloodline_recovery_rule
+
+            bloodline_recovery_rule(bundle)
+        if ("advancement_rule", "recovery.endgame_stamina") in records:
+            from .progression.recovery_rules import endgame_stamina_rule
+
+            endgame_stamina_rule(bundle)
         return bundle
 
     @classmethod

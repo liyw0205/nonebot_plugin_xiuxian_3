@@ -2,7 +2,7 @@
 
 ## 用例
 
-`credit_wallet`、`debit_wallet`、`create_market_order`、`buy_market_order`、`cancel_market_order`、`expire_market_order`、`create_service_order`、`settle_order`、`execute_cross_realm_trade`、`preview_void_market`、`purchase_void_market_offer`、`create_purchase_order`、`match_purchase_order`、`deliver_purchase_order`、`cancel_purchase_order`、`expire_purchase_order`、`create_auction`、`bid_auction`、`settle_auction`、`list_auctions`。
+`credit_wallet`、`debit_wallet`、`create_market_order`、`buy_market_order`、`cancel_market_order`、`expire_market_order`、`create_service_order`、`settle_order`、`execute_cross_realm_trade`、`preview_void_market`、`purchase_void_market_offer`、`create_purchase_order`、`match_purchase_order`、`deliver_purchase_order`、`cancel_purchase_order`、`expire_purchase_order`、`create_auction`、`bid_auction`、`settle_auction`、`list_auctions`、`preview_batch_production_commission`、`create_batch_production_commission`、`list_batch_production_commissions`、`accept_batch_production_commission`、`deliver_batch_production_commission`、`settle_batch_production_commission`、`cancel_batch_production_commission`、`expire_batch_production_commission`、`recover_batch_production_commission`。
 
 ## 错误码
 
@@ -13,6 +13,9 @@
 `AUCTION_ITEM_LOCKED`。
 虚空集市另有 `VOID_MARKET_REQUIREMENT_MISSING`、`VOID_DAILY_PURCHASE_CAP`、`VOID_STOCK_SOLD_OUT`、
 `VOID_MARKET_OFFER_NOT_FOUND`、`INVALID_VOID_MARKET_COMMAND`。
+批量生产委托另有 `BATCH_COMMISSION_PREVIEW`、`BATCH_COMMISSION_CREATED`、`BATCH_COMMISSION_ACCEPT`、
+`BATCH_COMMISSION_DELIVER`、`BATCH_COMMISSION_SETTLE`、`BATCH_COMMISSION_CANCEL`、`BATCH_COMMISSION_EXPIRE`、
+`BATCH_COMMISSION_RECOVER`；批量输入、托管、资源锁或关闭目录不满足时复用生产委托错误码并保持零写。
 物品使用若数量全部由摆摊、求购或拍卖保留，返回 `ITEM_RESERVED`，不扣除背包物品。
 
 ## 风控

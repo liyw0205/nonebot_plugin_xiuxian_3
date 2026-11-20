@@ -1,6 +1,6 @@
 # NoneBot 修仙 3
 
-`nonebot_plugin_xiuxian_3` 是面向 NoneBot 2 的文字修仙游戏插件。正式版本为 `v0.1.46`。玩家从青石镇起步，完成引导、选择道途、修炼突破，并通过移动、探索、剧情、挂机、悬赏、生产与社交逐步深入三界。角色进度保存在 SQLite，游戏内容由宿主 `data/` 下的 JSON 提供。
+`nonebot_plugin_xiuxian_3` 是面向 NoneBot 2 的文字修仙游戏插件。项目版本为 `0.1.56`；安装示例使用同名版本 tag，正式资产和发布时间以 GitHub Releases 为准。玩家从青石镇起步，完成引导、选择道途、修炼突破，并通过移动、探索、剧情、挂机、悬赏、生产与社交逐步深入三界。角色进度保存在 SQLite，游戏内容由宿主 `data/` 下的 JSON 提供。
 
 QQ 官方机器人与 OneBot V11 共用游戏服务。QQ 的 Markdown、蓝字与键盘按账号能力和平台权限呈现；OneBot 使用等价文本命令。发送 `修仙帮助` 可查看启程、修炼、探索、悬赏、生活和社交分类。
 
@@ -18,7 +18,7 @@ Linux/Termux 可直接安装正式 Release，无需预先下载源码。要求 P
 ### Linux 一键 Release 安装
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/liyw0205/nonebot_plugin_xiuxian_3/v0.1.46/scripts/onekey.sh \
+curl -fsSL https://raw.githubusercontent.com/liyw0205/nonebot_plugin_xiuxian_3/v0.1.56/scripts/onekey.sh \
   | bash -s -- install --source-mode release --mirror accelerated
 ${EDITOR:-vi} "$HOME/xiu3/.env"
 xiu3 start
@@ -29,7 +29,7 @@ xiu3 start
 ```bash
 pkg update -y
 pkg install -y curl
-curl -fsSL https://raw.githubusercontent.com/liyw0205/nonebot_plugin_xiuxian_3/v0.1.46/scripts/onekey.sh \
+curl -fsSL https://raw.githubusercontent.com/liyw0205/nonebot_plugin_xiuxian_3/v0.1.56/scripts/onekey.sh \
   | bash -s -- install --source-mode release --mirror accelerated
 termux-wake-lock
 ```
@@ -37,13 +37,18 @@ termux-wake-lock
 Termux 安装器会使用 `pkg` 准备 Python、Git 和构建工具。不要混用 Termux 与 `proot-distro`
 的 Python/虚拟环境；在容器内单独执行安装流程。
 
-Release 一键安装不需要先 clone 仓库。安装器默认使用 `$HOME/xiu3` 宿主及 `$HOME/myenv` 虚拟环境，
-可通过 `--target` 和 `--venv` 指定独立路径。
+Release 一键安装不需要先 clone 仓库。Linux 安装器默认使用 `$HOME/xiu3` 宿主及
+`/root/myenv` Python 环境，可通过 `--venv` 或 `VENV_PATH` 指定独立路径；
+安装生成的 `xiu3` 命令会把同一路径传给 install/update/start/status/login。Termux 与
+`proot-distro` 也应显式传入可用的 `--venv PATH`，不要混用不同系统的 Python 环境。
+
+本机远程开发、定向测试和性能基准统一使用 `/home/nonebot-shared-venv/bin/python`；这只是
+开发工具环境，不改变 Linux 安装器或宿主运行时的 `/root/myenv` 默认。
 
 ### 手动获取脚本或源码安装
 
 ```bash
-git clone --branch v0.1.46 --single-branch \
+git clone --branch v0.1.56 --single-branch \
   https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git xiuxian3-src
 cd xiuxian3-src
 bash scripts/onekey.sh install --source-mode source --mirror direct
@@ -105,7 +110,7 @@ xiu3 start
 Windows PowerShell、Docker Compose 和已有 NoneBot 宿主也可使用正式版本。Windows 与 Docker 示例需先取得发布脚本和部署文件：
 
 ```bash
-git clone --branch v0.1.46 --single-branch \
+git clone --branch v0.1.56 --single-branch \
   https://github.com/liyw0205/nonebot_plugin_xiuxian_3.git xiuxian3-src
 ```
 

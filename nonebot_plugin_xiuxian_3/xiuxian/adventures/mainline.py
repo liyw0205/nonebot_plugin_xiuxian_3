@@ -24,6 +24,12 @@ COMPANION_OLD_TRAIL_STORY_KEY = "story.mainline.companion_old_trail"
 SPRING_SUPPER_STORY_KEY = "story.mainline.spring_supper"
 IRONWOOD_CRAFT_STORY_KEY = "story.mainline.ironwood_craft"
 BASALT_WAYMARKER_STORY_KEY = "story.mainline.basalt_waymarker"
+HERB_SHELTER_STORY_KEY = "story.mainline.herb_shelter"
+MIST_LAMP_STORY_KEY = "story.mainline.mist_lamp"
+CLOUD_TIDE_STORY_KEY = "story.mainline.cloud_tide"
+FIELD_SEEDS_STORY_KEY = "story.mainline.field_seeds"
+RICE_TABLE_STORY_KEY = "story.mainline.rice_table"
+LEAF_WATCH_STORY_KEY = "story.mainline.leaf_watch"
 MAINLINE_TOWN_COMMISSION_DELIVERED = "livelihood.town_commission.delivered"
 
 MAINLINE_LOCKED = "locked"
@@ -70,6 +76,8 @@ class MainlineStageDefinition:
     state_events: tuple[str, ...] = ()
     next_stage_key: str | None = None
     retry_message: str = ""
+    completion_actions: tuple[Mapping[str, str], ...] = ()
+    codex_categories: tuple[tuple[str, str], ...] = ()
 
     @property
     def codex_flag(self) -> str:
@@ -237,6 +245,24 @@ _VERTICAL_SLICE_STAGES = frozenset(
         "basalt_waymarker.1",
         "basalt_waymarker.2",
         "basalt_waymarker.3",
+        "herb_shelter.1",
+        "herb_shelter.2",
+        "herb_shelter.3",
+        "mist_lamp.1",
+        "mist_lamp.2",
+        "mist_lamp.3",
+        "cloud_tide.1",
+        "cloud_tide.2",
+        "cloud_tide.3",
+        "field_seeds.1",
+        "field_seeds.2",
+        "field_seeds.3",
+        "rice_table.1",
+        "rice_table.2",
+        "rice_table.3",
+        "leaf_watch.1",
+        "leaf_watch.2",
+        "leaf_watch.3",
         "lane.builder.chapter.01",
         "lane.builder.chapter.02",
         "lane.builder.chapter.03",
@@ -378,8 +404,11 @@ def _story_objectives(
                 "key": str(objective_key), "type": kind, "label": label.strip(), "entry_key": entry_key,
             }
         elif kind == "exploration_reward":
-            if set(objective) != {"key", "type", "label", "mode_key", "location_key", "item_key", "quantity"}:
+            fields = {"key", "type", "label", "mode_key", "location_key", "item_key", "quantity"}
+            if set(objective) not in (fields, fields | {"owned_receipts"}):
                 raise ContentError(f"mainline {key} objective {objective_key} has an invalid exploration shape")
+            if "owned_receipts" in objective and objective["owned_receipts"] is not True:
+                raise ContentError(f"mainline {key} objective {objective_key} requires owned receipts")
             mode_key = objective.get("mode_key")
             location_key = objective.get("location_key")
             item_key = objective.get("item_key")
@@ -419,6 +448,8 @@ def _story_objectives(
                 "mode_key": mode_key, "location_key": location_key,
                 "item_key": item_key, "quantity": quantity,
             }
+            if "owned_receipts" in objective:
+                normalized["owned_receipts"] = True
         elif kind == "exploration_battle_victory":
             if set(objective) != {"key", "type", "label", "mode_key", "location_key"}:
                 raise ContentError(f"mainline {key} objective {objective_key} has an invalid battle shape")
@@ -446,20 +477,14 @@ def _story_objectives(
                 "key": str(objective_key), "type": kind, "label": label.strip(),
                 "mode_key": mode_key, "location_key": location_key,
             }
+        elif kind == "field_harvest":
+            from .field_objectives import field_harvest_objective
+
+            normalized = field_harvest_objective(objective, bundle)
         elif kind == "commission_delivery":
-            if set(objective) != {"key", "type", "label", "commission_key"}:
-                raise ContentError(f"mainline {key} objective {objective_key} has an invalid commission shape")
-            commission_key = objective.get("commission_key")
-            if not isinstance(commission_key, str) or not commission_key.strip():
-                raise ContentError(f"mainline {key} objective {objective_key} requires commission_key")
-            if bundle is not None:
-                commission = bundle.get("livelihood", commission_key, include_locked=False)
-                if commission is None or commission.get("record_type") != "commission":
-                    raise ContentError(f"mainline {key} objective {objective_key} references unknown commission")
-            normalized = {
-                "key": str(objective_key), "type": kind, "label": label.strip(),
-                "commission_key": commission_key,
-            }
+            from .commission_evidence import commission_delivery_objective
+
+            normalized = commission_delivery_objective(objective, bundle)
         elif kind == "public_project_contribution":
             if set(objective) != {"key", "type", "label", "project_key", "min_points"}:
                 raise ContentError(f"mainline {key} objective {objective_key} has an invalid project shape")
@@ -582,14 +607,30 @@ def _story_objectives(
             }
         elif kind in {"production_complete", "item_use"}:
             extra = "route_key" if kind == "production_complete" else "resources"
-            if set(objective) != {"key", "type", "label", "recipe_key", "item_key", extra}:
+            if kind == "production_complete" and "crop_source" in objective:
+                extra = "crop_source"
+            optional = {"additional_route_keys"} if extra == "route_key" else set()
+            if set(objective) - optional != {"key", "type", "label", "recipe_key", "item_key", extra}:
                 raise ContentError(f"mainline {key} objective {objective_key} has an invalid {kind} shape")
             recipe_key, item_key = objective.get("recipe_key"), objective.get("item_key")
             if any(not isinstance(item, str) or not item.strip() for item in (recipe_key, item_key)):
                 raise ContentError(f"mainline {key} objective {objective_key} requires recipe and item keys")
-            if kind == "production_complete":
+            if extra == "crop_source":
+                from .field_objectives import crop_source_yields
+
+                guaranteed_crop = crop_source_yields(objective[extra], bundle)
+            elif kind == "production_complete":
                 if not isinstance(objective[extra], str) or not objective[extra].strip():
                     raise ContentError(f"mainline {key} objective {objective_key} requires route_key")
+                additional_routes = objective.get("additional_route_keys", [])
+                if (
+                    not isinstance(additional_routes, list)
+                    or ("additional_route_keys" in objective and not additional_routes)
+                    or any(not isinstance(item, str) or not item.strip() for item in additional_routes)
+                    or len(set(additional_routes)) != len(additional_routes)
+                    or objective[extra] in additional_routes
+                ):
+                    raise ContentError(f"mainline {key} objective {objective_key} has invalid additional routes")
             else:
                 resources = objective[extra]
                 if (
@@ -607,21 +648,29 @@ def _story_objectives(
                     raise ContentError(f"mainline {key} objective {objective_key} references an inactive recipe") from exc
                 if recipe.outputs.get(item_key, 0) < 1:
                     raise ContentError(f"mainline {key} objective {objective_key} recipe does not produce its item")
-                if kind == "production_complete":
-                    route = bundle.get("livelihood", objective[extra], include_locked=False)
-                    if route is None or route.get("record_type") != "idle_route":
-                        raise ContentError(f"mainline {key} objective {objective_key} references an unknown idle source")
-                    pool = bundle.get("reward", str(route.get("reward_pool_key", "")), include_locked=False)
-                    outcomes = pool.get("outcomes") if pool is not None else None
-                    if not isinstance(outcomes, list) or not outcomes or any(
-                        not isinstance(outcome, dict) or not isinstance(outcome.get("rewards"), dict)
-                        or any(
-                            type(outcome["rewards"].get(asset)) is not int
-                            or outcome["rewards"][asset] < quantity
-                            for asset, quantity in recipe.inputs.items()
-                        )
-                        for outcome in outcomes
-                    ):
+                if extra == "crop_source":
+                    if any(guaranteed_crop.get(asset, 0) < amount for asset, amount in recipe.inputs.items()):
+                        raise ContentError(f"mainline {key} objective {objective_key} crop ingredients are not guaranteed")
+                elif kind == "production_complete":
+                    from ..specials.idle_rules import idle_route_definitions
+                    from ..rewards.rules import reward_pool_outcomes
+
+                    routes = idle_route_definitions(bundle)
+                    guaranteed: dict[str, int] = {}
+                    for route_key in (objective[extra], *additional_routes):
+                        route = routes.get(route_key)
+                        if route is None:
+                            raise ContentError(f"mainline {key} objective {objective_key} references an unknown idle source")
+                        outcomes = reward_pool_outcomes(route.pool_key, bundle)
+                        minimums = {
+                            asset: min(reward.get(asset, 0) for _, reward in outcomes)
+                            for asset in recipe.inputs
+                        }
+                        if not any(minimums.values()):
+                            raise ContentError(f"mainline {key} objective {objective_key} has an unrelated ingredient source")
+                        for asset, amount in minimums.items():
+                            guaranteed[asset] = guaranteed.get(asset, 0) + amount
+                    if any(guaranteed.get(asset, 0) < quantity for asset, quantity in recipe.inputs.items()):
                         raise ContentError(f"mainline {key} objective {objective_key} ingredients are not guaranteed")
                 else:
                     from ..items.rules import resolve_item
@@ -637,6 +686,8 @@ def _story_objectives(
                 "recipe_key": recipe_key, "item_key": item_key,
                 extra: list(objective[extra]) if kind == "item_use" else objective[extra],
             }
+            if "additional_route_keys" in objective:
+                normalized["additional_route_keys"] = list(additional_routes)
         elif kind == "dispatch_success":
             if set(objective) != {"key", "type", "label", "dispatch_key"}:
                 raise ContentError(f"mainline {key} objective {objective_key} has an invalid dispatch shape")
@@ -675,6 +726,7 @@ def _reward_map(
     key: str,
     *,
     allow_empty: bool = False,
+    validate_sources: bool = True,
 ) -> tuple[tuple[str, int | str], ...]:
     if not isinstance(value, dict) or (not allow_empty and not value):
         expected = "object" if allow_empty else "non-empty object"
@@ -700,7 +752,7 @@ def _reward_map(
             raise ContentError(f"mainline {key} contains forbidden reward {reward_key}")
         if reward_key.startswith("item."):
             try:
-                bundle.require("item", reward_key, include_locked=False)
+                bundle.require("item", reward_key, include_locked=not validate_sources)
             except KeyError as exc:
                 raise ContentError(f"mainline {key} references unknown item {reward_key}") from exc
         if reward_key == "title_key":
@@ -710,7 +762,7 @@ def _reward_map(
                 honor_title(reward_value)
             except ValueError as exc:
                 raise ContentError(f"mainline {key} references unknown title {reward_value}") from exc
-        if reward_key.startswith("codex.") and bundle.get("codex_entry", reward_key, include_locked=False) is None:
+        if reward_key.startswith("codex.") and bundle.get("codex_entry", reward_key, include_locked=not validate_sources) is None:
             if reward_key != "codex.observation":
                 raise ContentError(f"mainline {key} references unknown codex entry {reward_key}")
         result.append((reward_key, reward_value))
@@ -783,6 +835,11 @@ def _parse_mainline_definitions(
             required=is_vertical_slice_stage,
         )
         actions = _story_actions(row.get("actions"), key, required=is_vertical_slice_stage)
+        completion_actions = _story_actions(
+            row.get("completion_actions"), key, required="completion_actions" in row,
+        )
+        if len(completion_actions) > 3:
+            raise ContentError(f"mainline {key} completion_actions must contain at most three actions")
         state_changes = row.get("state_changes")
         if state_changes is None and not is_vertical_slice_stage:
             state_events: tuple[str, ...] = ()
@@ -872,9 +929,9 @@ def _parse_mainline_definitions(
         reputation_key = row.get("reputation_key")
         if reputation_key is not None and (not isinstance(reputation_key, str) or not reputation_key.strip()):
             raise ContentError(f"mainline {key} reputation_key must be a non-empty string")
-        first_clear_reward = _reward_map(bundle, row.get("first_clear_reward"), "first_clear_reward", key)
+        first_clear_reward = _reward_map(bundle, row.get("first_clear_reward"), "first_clear_reward", key, validate_sources=validate_sources)
         repeat_reward = _reward_map(
-            bundle, row.get("repeat_reward"), "repeat_reward", key, allow_empty=True
+            bundle, row.get("repeat_reward"), "repeat_reward", key, allow_empty=True, validate_sources=validate_sources
         )
         if ("local_reputation" in dict(first_clear_reward) or "local_reputation" in dict(repeat_reward)) and reputation_key is None:
             raise ContentError(f"mainline {key} requires reputation_key for local_reputation")
@@ -903,6 +960,7 @@ def _parse_mainline_definitions(
                 state_events=state_events,
                 next_stage_key=next_stage_key.strip() if isinstance(next_stage_key, str) else None,
                 retry_message=retry_message,
+                completion_actions=completion_actions,
             )
         )
     definitions.sort(key=lambda item: (item.chapter, item.stage, item.key))
@@ -1158,6 +1216,116 @@ def mainline_prerequisites_met(
     return definition.runtime_status == "open"
 
 
+def mainline_prerequisites_met_many(
+    definitions: Iterable[MainlineStageDefinition],
+    *,
+    completed_stages: Iterable[str] = (),
+    completed_events: Iterable[str] = (),
+    flags: Iterable[str] = (),
+    realm_key: str | None = None,
+    realm_layer: int = 0,
+    content: ContentBundle | None = None,
+) -> tuple[bool, ...]:
+    """Evaluate many stages while preparing shared prerequisite state once."""
+
+    requested = tuple(definitions)
+    if not requested:
+        return ()
+    bundle = _content(content)
+    all_definitions = mainline_definitions(
+        bundle, story_key=None, validate_sources=False
+    )
+    aliases = {
+        alias: definition.key
+        for definition in all_definitions
+        for alias in definition.aliases
+    }
+    labels: dict[str, list[str]] = {}
+    stage_keys_by_story: dict[str, set[str]] = {}
+    for definition in all_definitions:
+        labels.setdefault(definition.label, []).append(definition.key)
+        stage_keys_by_story.setdefault(definition.story_key, set()).add(definition.key)
+
+    def normalize_stage(value: object) -> str:
+        if isinstance(value, bool):
+            raise ValueError("mainline stage must be an integer or stable key")
+        if isinstance(value, int):
+            return f"chapter.1.stage.{value}"
+        candidate = str(value).strip()
+        if candidate in aliases:
+            return aliases[candidate]
+        named = labels.get(candidate, ())
+        if len(named) == 1:
+            return named[0]
+        if candidate.isdigit():
+            return f"chapter.1.stage.{int(candidate)}"
+        return candidate
+
+    completed_stage_keys = {
+        normalize_stage(str(value)) for value in completed_stages
+    }
+    events = {str(value) for value in completed_events}
+    events.update(str(value) for value in flags)
+
+    prepared: list[tuple[MainlineStageDefinition, tuple[tuple[bool, str], ...]]] = []
+    for definition in requested:
+        stage_keys = stage_keys_by_story.get(definition.story_key)
+        if stage_keys is None:
+            stage_keys = {
+                item.key
+                for item in mainline_definitions(
+                    bundle,
+                    story_key=definition.story_key,
+                    validate_sources=False,
+                )
+            }
+            stage_keys_by_story[definition.story_key] = stage_keys
+        requirements = tuple(
+            (
+                True,
+                normalize_stage(prerequisite),
+            )
+            if prerequisite.startswith("chapter.") or prerequisite in stage_keys
+            else (False, prerequisite)
+            for prerequisite in definition.prerequisites
+        )
+        prepared.append((definition, requirements))
+
+    current_rank: int | None = None
+    required_ranks: dict[str, int] = {}
+
+    def meets_required_realm(definition: MainlineStageDefinition) -> bool:
+        nonlocal current_rank
+        if definition.required_realm is None:
+            return True
+        if current_rank is None:
+            current_rank = realm_rank(str(realm_key), bundle)
+        required_rank = required_ranks.get(definition.required_realm)
+        if required_rank is None:
+            required_rank = realm_rank(definition.required_realm, bundle)
+            required_ranks[definition.required_realm] = required_rank
+        return (current_rank, int(realm_layer)) >= (
+            required_rank,
+            int(definition.required_layer),
+        )
+
+    results: list[bool] = []
+    for definition, requirements in prepared:
+        satisfied = all(
+            key in completed_stage_keys if is_stage else key in events
+            for is_stage, key in requirements
+        )
+        if satisfied and definition.alternative_prerequisites:
+            has_alternative_event = any(
+                item in events for item in definition.alternative_prerequisites
+            )
+            satisfied = has_alternative_event or meets_required_realm(definition)
+        elif satisfied:
+            satisfied = meets_required_realm(definition)
+        results.append(satisfied and definition.runtime_status == "open")
+    return tuple(results)
+
+
 def mainline_stage_status(
     value: str | int | MainlineStageDefinition,
     *,
@@ -1244,6 +1412,12 @@ __all__ = [
     "SPRING_SUPPER_STORY_KEY",
     "IRONWOOD_CRAFT_STORY_KEY",
     "BASALT_WAYMARKER_STORY_KEY",
+    "HERB_SHELTER_STORY_KEY",
+    "MIST_LAMP_STORY_KEY",
+    "CLOUD_TIDE_STORY_KEY",
+    "FIELD_SEEDS_STORY_KEY",
+    "RICE_TABLE_STORY_KEY",
+    "LEAF_WATCH_STORY_KEY",
     "MAINLINE_TOWN_COMMISSION_DELIVERED",
     "MainlineDefinition",
     "MainlineStageDefinition",
@@ -1253,6 +1427,7 @@ __all__ = [
     "mainline_first_clear_reward",
     "mainline_prerequisite_met",
     "mainline_prerequisites_met",
+    "mainline_prerequisites_met_many",
     "mainline_repeat_reward",
     "mainline_reward",
     "mainline_stage",

@@ -31,6 +31,9 @@ class VoidMaterialApplication:
 
     def __init__(self, repository: SQLitePlayerRepository):
         self.repository = repository
+        self._item_alias_cache: tuple[ContentBundle, dict[str, str]] | None = None
+        self._item_alias_cache_build_count = 0
+        self._item_alias_cache_enabled = True
 
     def _content(self) -> ContentBundle:
         content = getattr(self.repository, "content", None)
@@ -368,14 +371,23 @@ class VoidMaterialApplication:
 
     def _resolve_item(self, value: str) -> str | None:
         content = self._content()
-        if content.get("item", value, include_locked=False) is not None:
-            return value
-        for item_key in content.list("item", include_locked=False):
-            key = str(item_key.get("key", ""))
-            if not key:
+        cached = self._item_alias_cache
+        if (
+            self._item_alias_cache_enabled
+            and cached is not None
+            and cached[0] is content
+        ):
+            return cached[1].get(value)
+        aliases: dict[str, str] = {}
+        for item in content.list("item", include_locked=False):
+            key = item.get("key")
+            if not isinstance(key, str) or not key:
                 continue
-            label = str(item_key.get("name", ""))
-            aliases = item_key.get("aliases") or []
-            if value == label or value in aliases:
-                return key
-        return None
+            candidates = (key, item.get("name"), *(item.get("aliases") or ()))
+            for candidate in candidates:
+                if isinstance(candidate, str) and candidate not in aliases:
+                    aliases[candidate] = key
+        self._item_alias_cache_build_count += 1
+        if self._item_alias_cache_enabled:
+            self._item_alias_cache = (content, aliases)
+        return aliases.get(value)

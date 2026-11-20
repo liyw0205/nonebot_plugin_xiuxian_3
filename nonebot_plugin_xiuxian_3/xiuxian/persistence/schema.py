@@ -979,6 +979,8 @@ CREATE INDEX IF NOT EXISTS idx_mentor_relations_master
     ON mentor_relations(master_id, status, created_at);
 CREATE INDEX IF NOT EXISTS idx_mentor_relations_apprentice
     ON mentor_relations(apprentice_id, status, created_at);
+CREATE INDEX IF NOT EXISTS idx_mentor_relations_apprentice_status_expiry
+    ON mentor_relations(apprentice_id, status, expires_at);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_mentor_relations_active_master
     ON mentor_relations(master_id, apprentice_id) WHERE status IN ('invited', 'active');
 CREATE UNIQUE INDEX IF NOT EXISTS idx_mentor_relations_active_apprentice
@@ -1245,6 +1247,64 @@ CREATE TABLE IF NOT EXISTS equipment_refinement_events (
 
 CREATE INDEX IF NOT EXISTS idx_equipment_refinement_events_player
     ON equipment_refinement_events(player_id, created_at);
+
+CREATE TABLE IF NOT EXISTS equipment_repair_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id TEXT NOT NULL UNIQUE,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    equipment_id INTEGER NOT NULL REFERENCES equipment_instances(id),
+    operation_id TEXT NOT NULL UNIQUE,
+    status_before TEXT NOT NULL CHECK (status_before IN ('active', 'broken')),
+    status_after TEXT NOT NULL CHECK (status_after = 'active'),
+    equipped_before INTEGER NOT NULL CHECK (equipped_before IN (0, 1)),
+    equipped_after INTEGER NOT NULL CHECK (equipped_after IN (0, 1)),
+    durability_before INTEGER NOT NULL CHECK (durability_before BETWEEN 0 AND 10000),
+    durability_after INTEGER NOT NULL CHECK (durability_after BETWEEN 1 AND 10000),
+    costs_json TEXT NOT NULL DEFAULT '{}',
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_equipment_repair_events_player
+    ON equipment_repair_events(player_id, created_at);
+
+CREATE TABLE IF NOT EXISTS equipment_reclamation_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id TEXT NOT NULL UNIQUE,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    equipment_id INTEGER NOT NULL REFERENCES equipment_instances(id),
+    operation_id TEXT NOT NULL UNIQUE,
+    status_before TEXT NOT NULL CHECK (status_before IN ('active', 'broken')),
+    status_after TEXT NOT NULL CHECK (status_after = 'archived'),
+    equipped_before INTEGER NOT NULL CHECK (equipped_before = 0),
+    yields_json TEXT NOT NULL DEFAULT '{}',
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_equipment_reclamation_events_player
+    ON equipment_reclamation_events(player_id, created_at);
+
+CREATE TABLE IF NOT EXISTS equipment_field_repair_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id TEXT NOT NULL UNIQUE,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    equipment_id INTEGER NOT NULL REFERENCES equipment_instances(id),
+    operation_id TEXT NOT NULL UNIQUE,
+    status_before TEXT NOT NULL CHECK (status_before IN ('active', 'broken')),
+    status_after TEXT NOT NULL CHECK (status_after IN ('active', 'broken')),
+    equipped_before INTEGER NOT NULL CHECK (equipped_before IN (0, 1)),
+    equipped_after INTEGER NOT NULL CHECK (equipped_after IN (0, 1)),
+    durability_before INTEGER NOT NULL CHECK (durability_before BETWEEN 0 AND 9999),
+    durability_after INTEGER NOT NULL CHECK (durability_after BETWEEN 1 AND 10000),
+    kit_key TEXT NOT NULL,
+    kit_spent INTEGER NOT NULL CHECK (kit_spent = 1),
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_equipment_field_repair_events_player
+    ON equipment_field_repair_events(player_id, created_at);
 
 CREATE TABLE IF NOT EXISTS production_orders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2174,6 +2234,8 @@ CREATE TABLE IF NOT EXISTS arena_snapshots (
 
 CREATE INDEX IF NOT EXISTS idx_arena_snapshots_pool
     ON arena_snapshots(status, rating, matchable_at, expires_at);
+CREATE INDEX IF NOT EXISTS idx_arena_snapshots_status_mode_expiry
+    ON arena_snapshots(status, arena_mode_key, expires_at);
 CREATE INDEX IF NOT EXISTS idx_arena_snapshots_player
     ON arena_snapshots(player_id, status, created_at);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_arena_snapshots_active_player
@@ -2205,6 +2267,16 @@ CREATE INDEX IF NOT EXISTS idx_arena_matches_challenger
     ON arena_matches(challenger_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_arena_matches_defender_snapshot
     ON arena_matches(challenger_id, defender_snapshot_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_arena_matches_settled_events
+    ON arena_matches(
+        settled_at,
+        challenger_id,
+        defender_id,
+        outcome,
+        score_counted,
+        challenger_rating_delta,
+        defender_rating_delta
+    );
 
 CREATE TABLE IF NOT EXISTS arena_actions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2651,6 +2723,7 @@ CREATE TABLE IF NOT EXISTS production_commission_orders (
     producer_player_id INTEGER REFERENCES players(id),
     recipe_key TEXT NOT NULL,
     reward_stones INTEGER NOT NULL CHECK (reward_stones BETWEEN 1 AND 500),
+    batch_count INTEGER NOT NULL DEFAULT 1 CHECK (batch_count BETWEEN 1 AND 5),
     material_mode TEXT NOT NULL CHECK (material_mode IN ('producer_supplies', 'publisher_supplies')),
     status TEXT NOT NULL CHECK (status IN ('draft', 'published', 'accepted', 'locked', 'processing', 'completed', 'failed', 'delivered', 'settled', 'cancelled', 'expired')),
     published_at TEXT NOT NULL,
@@ -2765,6 +2838,8 @@ CREATE TABLE IF NOT EXISTS quest_progress (
 
 CREATE INDEX IF NOT EXISTS idx_quest_progress_player
     ON quest_progress(player_id, quest_key, status);
+CREATE INDEX IF NOT EXISTS idx_quest_progress_player_status
+    ON quest_progress(player_id, status, quest_key);
 
 CREATE TABLE IF NOT EXISTS quest_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

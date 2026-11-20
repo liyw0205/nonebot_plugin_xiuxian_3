@@ -28,6 +28,21 @@ def ensure_dao_origin_schema(connection: sqlite3.Connection) -> None:
             ON dao_origin_runs(player_id, quota_key, status);
         CREATE UNIQUE INDEX IF NOT EXISTS idx_dao_origin_player_active
             ON dao_origin_runs(player_id) WHERE status IN ('routing', 'cleared');
+
+        CREATE TABLE IF NOT EXISTS dao_origin_qualifications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            player_id INTEGER NOT NULL REFERENCES players(id),
+            season_id TEXT NOT NULL,
+            readiness_flag TEXT NOT NULL,
+            status TEXT NOT NULL CHECK (status IN ('qualified')),
+            snapshot_json TEXT NOT NULL,
+            operation_id TEXT NOT NULL UNIQUE,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE (player_id, season_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_dao_origin_qualification_player_season
+            ON dao_origin_qualifications(player_id, season_id);
         """
     )
 

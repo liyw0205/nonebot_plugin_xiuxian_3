@@ -43,11 +43,13 @@ from ..utils.player import change_player_state, player_inventory, player_integer
 from .models import MarketOrderRecord
 from .bindings import active_binding_totals
 from .commission_models import ProductionCommissionRecord
+from .batch_commission_content import batch_commission_definitions, resolve_batch_commission
 from .rules import (
     COMMISSION_MAX_REWARD,
     COMMISSION_MIN_REWARD,
     COMMISSION_RECOVERY_GRACE_SECONDS,
     COMMISSION_RECIPES,
+    COMMISSION_MAX_BATCH,
     COMMISSION_TTL_SECONDS,
     MARKET_MAX_LISTINGS,
     MARKET_ORDER_TTL_SECONDS,
@@ -103,6 +105,7 @@ COMMISSION_PROJECTION_KEYS = (
     "recipe_key",
     "material_mode",
     "reward_stones",
+    "batch_count",
     "outputs",
     "refunds",
     "producer_payment",
@@ -207,6 +210,8 @@ class EconomyRepositoryMixin:
         reward_stones: int,
         material_mode: str,
         operation_id: str,
+        batch_count: int = 1,
+        reward_per_unit: int | None = None,
     ) -> ProductionCommissionRecord:
         await self.initialize()
         async with self._inflight:
@@ -218,6 +223,8 @@ class EconomyRepositoryMixin:
                 reward_stones,
                 material_mode,
                 operation_id,
+                batch_count,
+                reward_per_unit,
             )
 
     async def list_production_commissions(
@@ -226,6 +233,13 @@ class EconomyRepositoryMixin:
         await self.initialize()
         async with self._inflight:
             return await asyncio.to_thread(self._commission_list_once, platform, platform_user_id)
+
+    async def get_production_commission(
+        self, *, platform: str, platform_user_id: str, commission_id: str
+    ) -> ProductionCommissionRecord:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(self._commission_get_once, platform, platform_user_id, commission_id)
 
     async def accept_production_commission(
         self,
@@ -833,6 +847,18 @@ class EconomyRepositoryMixin:
             raise CommissionRecipeForbiddenError("recipe is not available for commissions")
         return recipe
 
+    def _commission_batch_definition(self, recipe_key: str, *, open_only: bool = True):
+        for definition in batch_commission_definitions(self.content).values():
+            if definition.recipe_key == recipe_key and (not open_only or definition.status in {"active", "open"}):
+                return definition
+        from ..persistence.errors import CommissionRecipeForbiddenError
+
+        raise CommissionRecipeForbiddenError("recipe is not available for batch commissions")
+
+    @staticmethod
+    def _scale_assets(values: dict[str, int], count: int) -> dict[str, int]:
+        return {str(key): int(value) * count for key, value in values.items()}
+
     @staticmethod
     def _commission_mode(value: str) -> str:
         aliases = {
@@ -897,10 +923,15 @@ class EconomyRepositoryMixin:
         expected = set(COMMISSION_HEAD_KEYS)
         if worked:
             expected.update(COMMISSION_WORK_KEYS)
-        if set(snapshot) != expected:
+        snapshot_fields = set(snapshot)
+        modern_expected = expected | {"batch_count", "reward_per_unit"}
+        if snapshot_fields not in (expected, modern_expected):
             raise OperationResultMalformedError("commission frozen snapshot fields are invalid")
         recipe = cls._commission_recipe(str(order["recipe_key"]))
+        batch_count = int(order["batch_count"] or 1)
         mode = str(order["material_mode"])
+        if batch_count < 1 or batch_count > COMMISSION_MAX_BATCH:
+            raise OperationResultMalformedError("commission batch count is invalid")
         if str(snapshot["recipe_key"]) != str(order["recipe_key"]):
             raise OperationResultMalformedError("commission snapshot recipe differs from its order")
         if str(snapshot["recipe_name"]) != str(recipe.name):
@@ -914,19 +945,29 @@ class EconomyRepositoryMixin:
         if cls._commission_integer(snapshot["reward_stones"], "reward stones") != int(order["reward_stones"]):
             raise OperationResultMalformedError("commission snapshot reward differs from its order")
         recipe_inputs = cls._commission_amounts(recipe.inputs, "recipe input")
+        recipe_inputs = cls._scale_assets(recipe_inputs, batch_count)
         expected_inputs = recipe_inputs if mode == "publisher_supplies" else {}
         if cls._commission_amounts(snapshot["publisher_inputs"], "publisher input") != expected_inputs:
             raise OperationResultMalformedError("commission snapshot publisher materials differ from the recipe")
         expected_inputs = recipe_inputs if mode == "producer_supplies" else {}
         if cls._commission_amounts(snapshot["producer_inputs"], "producer input") != expected_inputs:
             raise OperationResultMalformedError("commission snapshot producer materials differ from the recipe")
+        snapshot_count = snapshot.get("batch_count", 1)
+        if cls._commission_integer(snapshot_count, "batch count", minimum=1, maximum=COMMISSION_MAX_BATCH) != batch_count:
+            raise OperationResultMalformedError("commission snapshot batch count differs from its order")
+        if batch_count > 1 or "reward_per_unit" in snapshot:
+            if "reward_per_unit" not in snapshot:
+                raise OperationResultMalformedError("batch commission snapshot is missing unit reward")
+            unit_reward = cls._commission_integer(snapshot["reward_per_unit"], "unit reward", minimum=1)
+            if unit_reward * batch_count != int(order["reward_stones"]):
+                raise OperationResultMalformedError("batch commission reward differs from its snapshot")
         if not worked:
             return snapshot
         if cls._commission_integer(snapshot["producer_player_id"], "producer player id") != int(
             order["producer_player_id"]
         ):
             raise OperationResultMalformedError("commission snapshot producer differs from its order")
-        if cls._commission_integer(snapshot["energy_cost"], "energy cost") != int(recipe.energy_cost):
+        if cls._commission_integer(snapshot["energy_cost"], "energy cost") != int(recipe.energy_cost) * batch_count:
             raise OperationResultMalformedError("commission snapshot energy cost differs from the recipe")
         tool_key = snapshot["tool_key"]
         if tool_key is not None and (not isinstance(tool_key, str) or not tool_key):
@@ -941,7 +982,7 @@ class EconomyRepositoryMixin:
         else:
             before_value = cls._commission_integer(before, "tool durability", maximum=TOOL_MAX_DURABILITY_BP)
             after_value = cls._commission_integer(after, "tool durability")
-            if after_value > before_value or before_value - after_value != int(recipe.tool_cost_bp):
+            if after_value > before_value or before_value - after_value != int(recipe.tool_cost_bp) * batch_count:
                 raise OperationResultMalformedError("commission snapshot tool durability is inconsistent")
         if cls._commission_integer(snapshot["random_quality_bp"], "quality roll") not in COMMISSION_QUALITY_ROLL_BP:
             raise OperationResultMalformedError("commission snapshot quality roll is invalid")
@@ -981,6 +1022,9 @@ class EconomyRepositoryMixin:
         if set(result) != COMMISSION_OUTCOME_KEYS or str(result["status"]) != status:
             raise OperationResultMalformedError(f"commission {status} result is invalid")
         recipe = cls._commission_recipe(str(order["recipe_key"]))
+        batch_count = int(snapshot.get("batch_count", order["batch_count"] or 1))
+        if batch_count < 1 or batch_count > COMMISSION_MAX_BATCH:
+            raise OperationResultMalformedError("commission batch count is invalid")
         quality_roll = cls._commission_integer(snapshot["random_quality_bp"], "quality roll")
         quality = production_quality(
             material_quality_bp=cls._commission_integer(snapshot["material_quality_bp"], "material quality"),
@@ -999,16 +1043,16 @@ class EconomyRepositoryMixin:
             raise OperationResultMalformedError("commission delivery roll differs from its snapshot")
         expected_outputs: dict[str, int] = {}
         if success:
-            expected_outputs = cls._commission_amounts(recipe.outputs, "recipe output")
+            expected_outputs = cls._scale_assets(cls._commission_amounts(recipe.outputs, "recipe output"), batch_count)
             if quality >= HIGH_QUALITY_THRESHOLD_BP:
                 for key, quantity in cls._commission_amounts(recipe.high_quality_bonus, "recipe bonus").items():
-                    expected_outputs[key] = expected_outputs.get(key, 0) + quantity
+                    expected_outputs[key] = expected_outputs.get(key, 0) + quantity * batch_count
         if cls._commission_amounts(result["outputs"], "delivery output") != expected_outputs:
             raise OperationResultMalformedError("commission delivery outputs differ from the recipe")
         expected_refunds: dict[str, int] = {}
         if not success:
             expected_refunds = {
-                key: quantity
+                key: quantity * batch_count
                 for key, quantity in cls._commission_amounts(recipe.failure_refunds, "recipe refund").items()
                 if quantity > 0
             }
@@ -1032,7 +1076,9 @@ class EconomyRepositoryMixin:
 
     @staticmethod
     def _commission_projection(payload: dict[str, Any]) -> dict[str, Any]:
-        return {key: payload.get(key) for key in COMMISSION_PROJECTION_KEYS}
+        projected = {key: payload.get(key) for key in COMMISSION_PROJECTION_KEYS}
+        projected["batch_count"] = int(payload.get("batch_count") or 1)
+        return projected
 
     def _commission_replayed(
         self, connection: Any, payload: dict[str, Any], operation_name: str
@@ -1067,15 +1113,33 @@ class EconomyRepositoryMixin:
         reward_stones: int,
         material_mode: str,
         operation_id: str,
+        batch_count: int = 1,
+        reward_per_unit: int | None = None,
     ) -> ProductionCommissionRecord:
         from ..persistence.errors import CommissionEscrowConflictError, CommissionRequirementError
 
         recipe = self._commission_recipe(recipe_key)
         mode = self._commission_mode(material_mode)
         try:
-            reward = int(reward_stones)
+            batch = int(batch_count)
+        except (TypeError, ValueError) as exc:
+            raise CommissionRequirementError("batch count is invalid") from exc
+        if batch < 1 or batch > COMMISSION_MAX_BATCH:
+            raise CommissionRequirementError("batch count is outside the commission range")
+        batch_definition = self._commission_batch_definition(recipe.key) if batch > 1 else None
+        try:
+            unit_reward = int(reward_per_unit) if reward_per_unit is not None else int(reward_stones)
         except (TypeError, ValueError) as exc:
             raise CommissionRequirementError("reward is invalid") from exc
+        if batch > 1:
+            if batch_definition is None or not batch_definition.max_quantity >= batch:
+                raise CommissionRequirementError("batch count is not supported for this recipe")
+            if not batch_definition.min_reward_per_unit <= unit_reward <= batch_definition.max_reward_per_unit:
+                raise CommissionRequirementError("unit reward is outside the batch range")
+            reward = unit_reward * batch
+        else:
+            reward = int(reward_stones)
+            unit_reward = reward
         if not COMMISSION_MIN_REWARD <= reward <= COMMISSION_MAX_REWARD:
             raise CommissionRequirementError("reward is outside the commission range")
         operation_name = "economy.create_production_commission"
@@ -1087,11 +1151,14 @@ class EconomyRepositoryMixin:
                 "recipe_key": recipe.key,
                 "reward_stones": reward,
                 "material_mode": mode,
+                "batch_count": batch,
+                "reward_per_unit": unit_reward,
             },
         )
         now = self._now()
         now_text = serialize_datetime(now)
-        expires_at = serialize_datetime(now + timedelta(seconds=COMMISSION_TTL_SECONDS))
+        ttl_seconds = batch_definition.ttl_seconds if batch_definition is not None else COMMISSION_TTL_SECONDS
+        expires_at = serialize_datetime(now + timedelta(seconds=ttl_seconds))
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             existing = operation_replay(connection, operation_id, operation_name, request_hash)
@@ -1099,10 +1166,16 @@ class EconomyRepositoryMixin:
                 payload = self._commission_replayed(connection, existing, operation_name)
                 return self._commission_record_from_payload(payload, replay=True)
             publisher = self._require_player(connection, platform, platform_user_id)
+            if batch > 1 and connection.execute(
+                "SELECT 1 FROM production_commission_orders WHERE publisher_player_id=? "
+                "AND recipe_key=? AND batch_count>1 AND status IN ('published','processing','delivered') LIMIT 1",
+                (publisher["id"], recipe.key),
+            ).fetchone() is not None:
+                raise CommissionRequirementError("publisher already has an active batch commission")
             if player_currency(publisher) < reward:
                 raise CommissionEscrowConflictError("reward cannot be escrowed")
             inventory = player_inventory(publisher)
-            publisher_inputs = dict(recipe.inputs) if mode == "publisher_supplies" else {}
+            publisher_inputs = self._scale_assets(dict(recipe.inputs), batch) if mode == "publisher_supplies" else {}
             if publisher_inputs:
                 missing = {
                     key: quantity - inventory_amount(inventory, key)
@@ -1117,24 +1190,27 @@ class EconomyRepositoryMixin:
                 "recipe_name": recipe.name,
                 "material_mode": mode,
                 "publisher_inputs": publisher_inputs,
-                "producer_inputs": dict(recipe.inputs) if mode == "producer_supplies" else {},
+                "producer_inputs": self._scale_assets(dict(recipe.inputs), batch) if mode == "producer_supplies" else {},
                 "publisher_player_id": int(publisher["id"]),
                 "reward_stones": reward,
+                "batch_count": batch,
+                "reward_per_unit": unit_reward,
             }
             connection.execute(
                 """
                 INSERT INTO production_commission_orders(
                     commission_id, publisher_player_id, producer_player_id, recipe_key,
-                    reward_stones, material_mode, status, published_at, accepted_at,
+                    reward_stones, batch_count, material_mode, status, published_at, accepted_at,
                     starts_at, ends_at, expires_at, settled_at, snapshot_json, result_json,
                     created_at, updated_at
-                ) VALUES (?, ?, NULL, ?, ?, ?, 'published', ?, NULL, NULL, NULL, ?, NULL, ?, '{}', ?, ?)
+                ) VALUES (?, ?, NULL, ?, ?, ?, ?, 'published', ?, NULL, NULL, NULL, ?, NULL, ?, '{}', ?, ?)
                 """,
                 (
                     commission_id,
                     publisher["id"],
                     recipe.key,
                     reward,
+                    batch,
                     mode,
                     now_text,
                     expires_at,
@@ -1209,6 +1285,11 @@ class EconomyRepositoryMixin:
                 for row in rows
             )
 
+    def _commission_get_once(self, platform: str, platform_user_id: str, commission_id: str) -> ProductionCommissionRecord:
+        with self._connect() as connection:
+            self._require_player(connection, platform, platform_user_id, writable=False)
+            return self._commission_record_from_payload(self._commission_payload(connection, commission_id))
+
     def _commission_accept_once(
         self, platform: str, platform_user_id: str, commission_id: str, operation_id: str
     ) -> ProductionCommissionRecord:
@@ -1259,6 +1340,7 @@ class EconomyRepositoryMixin:
             if active is not None:
                 raise CommissionStateConflictError("producer already has an active commission")
             recipe = self._commission_recipe(str(order["recipe_key"]))
+            batch_count = int(order["batch_count"] or 1)
             try:
                 self._check_production_requirements(connection, producer, recipe)
             except Exception as exc:
@@ -1266,7 +1348,7 @@ class EconomyRepositoryMixin:
             inventory = player_inventory(producer)
             durability = self._commission_durability(producer)
             mode = str(order["material_mode"])
-            producer_inputs = dict(recipe.inputs) if mode == "producer_supplies" else {}
+            producer_inputs = self._scale_assets(dict(recipe.inputs), batch_count) if mode == "producer_supplies" else {}
             if producer_inputs:
                 for key, quantity in producer_inputs.items():
                     available = inventory_amount(inventory, key) - self._commission_locked_quantity(
@@ -1275,7 +1357,7 @@ class EconomyRepositoryMixin:
                     if available < quantity:
                         raise CommissionRequirementError("producer materials are insufficient")
                 inventory = inventory_spend(inventory, producer_inputs)
-            energy_cost = int(recipe.energy_cost)
+            energy_cost = int(recipe.energy_cost) * batch_count
             locked_energy = self._commission_locked_quantity(connection, int(producer["id"]), "energy", "energy")
             if player_integer(producer, "energy") - locked_energy < energy_cost:
                 raise CommissionRequirementError("producer energy is insufficient")
@@ -1285,9 +1367,10 @@ class EconomyRepositoryMixin:
                 if inventory_amount(inventory, recipe.tool_key) < 1:
                     raise CommissionRequirementError("producer tool is missing")
                 tool_before = int(durability.get(recipe.tool_key, TOOL_MAX_DURABILITY_BP))
-                if tool_before < recipe.tool_cost_bp:
+                tool_cost = int(recipe.tool_cost_bp) * batch_count
+                if tool_before < tool_cost:
                     raise CommissionRequirementError("producer tool durability is insufficient")
-                tool_after = tool_before - recipe.tool_cost_bp
+                tool_after = tool_before - tool_cost
                 durability[recipe.tool_key] = tool_after
             if producer_inputs:
                 for key, quantity in producer_inputs.items():
@@ -1299,10 +1382,10 @@ class EconomyRepositoryMixin:
             )
             if recipe.tool_key:
                 self._commission_insert_lock(
-                    connection, commission_id, int(producer["id"]), "tool", recipe.tool_key, recipe.tool_cost_bp, now_text
+                    connection, commission_id, int(producer["id"]), "tool", recipe.tool_key, tool_cost, now_text
                 )
             starts_at = now_text
-            ends_at = serialize_datetime(now + timedelta(seconds=recipe.duration_seconds))
+            ends_at = serialize_datetime(now + timedelta(seconds=recipe.duration_seconds * batch_count))
             snapshot = self._validate_commission_snapshot(order)
             snapshot.update(
                 {
@@ -1382,7 +1465,7 @@ class EconomyRepositoryMixin:
                     recipe.tool_key,
                     "commission.tool_lock",
                     "lock",
-                    recipe.tool_cost_bp,
+                    int(recipe.tool_cost_bp) * batch_count,
                     tool_before,
                     tool_after,
                     commission_id,
@@ -1435,11 +1518,20 @@ class EconomyRepositoryMixin:
             if str(order["status"]) != "processing":
                 raise CommissionDeliveryError("commission is not processing")
             ends_at = datetime.fromisoformat(str(order["ends_at"]))
+            batch_count = int(order["batch_count"] or 1)
+            batch_definition = self._commission_batch_definition(
+                str(order["recipe_key"]), open_only=False
+            ) if batch_count > 1 else None
+            recovery_grace = (
+                batch_definition.recovery_grace_seconds
+                if batch_definition is not None
+                else COMMISSION_RECOVERY_GRACE_SECONDS
+            )
             if not recovery and now < ends_at:
                 raise CommissionDeliveryError("commission is not ready")
-            if not recovery and now > ends_at + timedelta(seconds=COMMISSION_RECOVERY_GRACE_SECONDS):
+            if not recovery and now > ends_at + timedelta(seconds=recovery_grace):
                 raise CommissionExpiredError("commission requires recovery")
-            if recovery and now <= ends_at + timedelta(seconds=COMMISSION_RECOVERY_GRACE_SECONDS):
+            if recovery and now <= ends_at + timedelta(seconds=recovery_grace):
                 raise CommissionDeliveryError("commission is not ready for recovery")
             recipe = recipe_definition(str(order["recipe_key"]))
             snapshot = self._validate_commission_snapshot(order)
@@ -1463,10 +1555,10 @@ class EconomyRepositoryMixin:
                 "recovered": recovery,
             }
             if success:
-                outputs.update(recipe.outputs)
+                outputs.update(self._scale_assets(dict(recipe.outputs), batch_count))
                 if quality >= HIGH_QUALITY_THRESHOLD_BP:
                     for key, quantity in recipe.high_quality_bonus.items():
-                        outputs[key] = outputs.get(key, 0) + quantity
+                        outputs[key] = outputs.get(key, 0) + int(quantity) * batch_count
                 self._commission_delete_locks(connection, commission_id)
                 status = "delivered"
                 result.update({"status": status, "producer_payment": 0, "publisher_refund": 0, "platform_fee": 0})
@@ -1474,7 +1566,7 @@ class EconomyRepositoryMixin:
                 input_owner = int(order["publisher_player_id"]) if str(order["material_mode"]) == "publisher_supplies" else int(order["producer_player_id"])
                 for key, quantity in recipe.failure_refunds.items():
                     if int(quantity) > 0:
-                        refunds[key] = int(quantity)
+                        refunds[key] = int(quantity) * batch_count
                 self._commission_refund_materials(
                     connection, commission_id, input_owner, refunds, operation_id, now_text
                 )
@@ -1911,6 +2003,12 @@ class EconomyRepositoryMixin:
             "recipe_name": recipe.name,
             "reward_stones": int(row["reward_stones"]),
             "material_mode": str(row["material_mode"]),
+            "batch_count": int(row["batch_count"] or 1),
+            "reward_per_unit": int(
+                self._commission_json_object(row["snapshot_json"], "frozen snapshot").get(
+                    "reward_per_unit", int(row["reward_stones"])
+                )
+            ),
             "starts_at": str(row["starts_at"]) if row["starts_at"] else None,
             "ends_at": str(row["ends_at"]) if row["ends_at"] else None,
             "expires_at": str(row["expires_at"]),
@@ -1937,6 +2035,8 @@ class EconomyRepositoryMixin:
             recipe_name=str(payload["recipe_name"]),
             reward_stones=int(payload["reward_stones"]),
             material_mode=str(payload["material_mode"]),
+            batch_count=int(payload.get("batch_count") or 1),
+            reward_per_unit=int(payload.get("reward_per_unit") or payload["reward_stones"]),
             starts_at=payload.get("starts_at"),
             ends_at=payload.get("ends_at"),
             expires_at=str(payload["expires_at"]),

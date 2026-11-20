@@ -42,6 +42,8 @@ def ensure_domain_front_schema(connection: sqlite3.Connection) -> None:
         );
         CREATE INDEX IF NOT EXISTS idx_domain_front_participants_sect
             ON domain_front_participants(round_id, sect_id, status);
+        CREATE INDEX IF NOT EXISTS idx_domain_front_participants_player
+            ON domain_front_participants(player_id);
         CREATE TABLE IF NOT EXISTS domain_front_contributions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             round_id TEXT NOT NULL REFERENCES domain_front_rounds(round_id),
@@ -57,6 +59,8 @@ def ensure_domain_front_schema(connection: sqlite3.Connection) -> None:
         );
         CREATE INDEX IF NOT EXISTS idx_domain_front_contributions_round
             ON domain_front_contributions(round_id, domain_key, occurred_at);
+        CREATE INDEX IF NOT EXISTS idx_domain_front_contributions_player
+            ON domain_front_contributions(player_id);
         CREATE TABLE IF NOT EXISTS domain_front_battle_links (
             battle_id TEXT PRIMARY KEY REFERENCES battle_sessions(battle_id),
             round_id TEXT NOT NULL REFERENCES domain_front_rounds(round_id),
@@ -85,6 +89,8 @@ def ensure_domain_front_schema(connection: sqlite3.Connection) -> None:
             claimed_at TEXT NOT NULL,
             UNIQUE (round_id, player_id)
         );
+        CREATE INDEX IF NOT EXISTS idx_domain_front_claims_player
+            ON domain_front_claims(player_id);
         CREATE TABLE IF NOT EXISTS domain_war_seasons (
             season_id TEXT PRIMARY KEY,
             starts_at TEXT NOT NULL,

@@ -16,10 +16,21 @@ MAINLINE = Path("剧情/主线.json")
 OLD_SHA = "9fd8d8a3675f4b04f58e3b3c631e8995a8bd2db51467abb64f8a4a66e6156341"
 
 
+def pre_union_mainline_seed() -> bytes:
+    blob = (ROOT / "test/fixtures/official_seeds/mainline_pre_union_reachability.json").read_bytes()
+    digest = "993ff09ded623a5294f56cc7af09fb438bb5362a85a422ddb80b0fdacc5780f2"
+    assert hashlib.sha256(blob).hexdigest() == digest
+    rules = json.loads((ROOT / "scripts/seed_migrations.json").read_text(encoding="utf-8"))
+    assert rules[MAINLINE.as_posix()]["old_sha256"][digest] == (
+        "e0ecd1db372097459365243fb14ea82ec3cb9d6a:data/剧情/主线.json"
+    )
+    return blob
+
+
 def old_official_mainline() -> bytes:
     # Reverse only the guard.5-protect.6, void_archive.recorder.1-return.8 and
     # lane.<lane>.chapter.01-10 content deltas; pin the patrol blob.
-    text = (ROOT / "data" / MAINLINE).read_text(encoding="utf-8")
+    text = pre_union_mainline_seed().decode("utf-8")
 
     def replace_record_field(key: str, pattern: str, replacement: str) -> None:
         nonlocal text
@@ -333,6 +344,96 @@ def test_migration_manifest_targets_match_current_official_seeds() -> None:
         assert all(re.fullmatch(r"[0-9a-f]{40}:data/.+\.json", provenance) for provenance in rule["old_sha256"].values())
 
 
+def test_pre_union_mainline_seed_upgrade_backup_repeat_and_custom(host: Path) -> None:
+    old = pre_union_mainline_seed()
+    path = host / "data" / MAINLINE
+    path.write_bytes(old)
+    upgraded = deploy(host)
+    assert upgraded.returncode == 0, upgraded.stdout + upgraded.stderr
+    assert "种子更新 1 个" in upgraded.stdout
+    assert path.read_bytes() == (ROOT / "data" / MAINLINE).read_bytes()
+    backup = next((host / ".xiuxian3/backups").glob("deploy-*"))
+    assert (backup / "data" / MAINLINE).read_bytes() == old
+    preserved(host)
+    repeated = deploy(host)
+    assert repeated.returncode == 0, repeated.stdout + repeated.stderr
+    assert "种子更新 0 个" in repeated.stdout
+
+    custom_document = json.loads(path.read_bytes())
+    custom_document["records"][0]["desc"] += " 本地主线注记。"
+    custom = (json.dumps(custom_document, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+    path.write_bytes(custom)
+    kept = deploy(host)
+    assert kept.returncode == 0, kept.stdout + kept.stderr
+    assert "种子更新 0 个" in kept.stdout
+    assert path.read_bytes() == custom
+    preserved(host)
+
+
+def test_bloodline_recovery_rule_seed_upgrade_backup_repeat_and_custom(host: Path) -> None:
+    relative = Path("养成/规则.json")
+    old = (ROOT / "test/fixtures/official_seeds/rules_pre_bloodline_recovery.json").read_bytes()
+    digest = "ea3eade0d1a01810fd9f32998adcd2f15fb236ab832d062b022b6b0a37418cae"
+    assert hashlib.sha256(old).hexdigest() == digest
+    rules = json.loads((ROOT / "scripts/seed_migrations.json").read_text(encoding="utf-8"))
+    assert rules[relative.as_posix()]["old_sha256"][digest] == (
+        "5388b03390ccb1fc02677a895195b22a65b94060:data/养成/规则.json"
+    )
+    path = host / "data" / relative
+    path.write_bytes(old)
+    upgraded = deploy(host)
+    assert upgraded.returncode == 0, upgraded.stdout + upgraded.stderr
+    assert "种子更新 1 个" in upgraded.stdout
+    assert path.read_bytes() == (ROOT / "data" / relative).read_bytes()
+    backup = next((host / ".xiuxian3/backups").glob("deploy-*"))
+    assert (backup / "data" / relative).read_bytes() == old
+    repeated = deploy(host)
+    assert repeated.returncode == 0, repeated.stdout + repeated.stderr
+    assert "种子更新 0 个" in repeated.stdout
+    custom = json.loads(path.read_bytes())
+    next(row for row in custom["records"] if row["key"] == "recovery.bloodline")["per_period"] = 2
+    custom_blob = (json.dumps(custom, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+    path.write_bytes(custom_blob)
+    kept = deploy(host)
+    assert kept.returncode == 0, kept.stdout + kept.stderr
+    assert "种子更新 0 个" in kept.stdout
+    assert path.read_bytes() == custom_blob
+    preserved(host)
+
+
+def test_permit_enemy_seeds_upgrade_together_with_backup_and_repeat(host: Path) -> None:
+    seeds = {
+        Path("战斗/敌人.json"): (
+            "permit_enemies_pre_split.json",
+            "48159453465992421960a0890869c21719def9386dda50693cb3fed58f784b81",
+            "38244a9ddf34972ce43e3e8f89107e846cff4456:data/战斗/敌人.json",
+        ),
+        Path("事件/事件.json"): (
+            "archive_events_pre_split.json",
+            "fad61951779774598b571715240d666c44abe8e47eda8953d9042ccc2ffe4d5b",
+            "0de04d3378131bbb8a7a9d161bf5ad71ab820a18:data/事件/事件.json",
+        ),
+    }
+    rules = json.loads((ROOT / "scripts/seed_migrations.json").read_text(encoding="utf-8"))
+    originals = {}
+    for relative, (fixture, digest, provenance) in seeds.items():
+        old = (SEED_FIXTURES / fixture).read_bytes()
+        assert hashlib.sha256(old).hexdigest() == digest
+        assert rules[relative.as_posix()]["old_sha256"][digest] == provenance
+        originals[relative] = old
+        (host / "data" / relative).write_bytes(old)
+    result = deploy(host)
+    assert result.returncode == 0, result.stdout + result.stderr
+    backup = next((host / ".xiuxian3/backups").glob("deploy-*"))
+    for relative, old in originals.items():
+        assert (backup / "data" / relative).read_bytes() == old
+        assert (host / "data" / relative).read_bytes() == (ROOT / "data" / relative).read_bytes()
+    repeated = deploy(host)
+    assert repeated.returncode == 0, repeated.stdout + repeated.stderr
+    assert "种子更新 0 个" in repeated.stdout
+    preserved(host)
+
+
 @pytest.mark.parametrize("custom", [False, True])
 def test_cultivation_seed_upgrade_preserves_custom_and_repeats(host: Path, custom: bool) -> None:
     relative = Path("生活/生活.json")
@@ -368,11 +469,26 @@ def test_construction_seed_upgrade_from_v0136_backup_repeat_and_custom(host: Pat
     old = pre_construction_livelihood()
     original = old + b"\n" if custom else old
     path.write_bytes(original)
+    source = host / "src/plugins/nonebot_plugin_xiuxian_3/__init__.py"
+    previous_source = source.read_bytes()
+    previous_toml = (host / "pyproject.toml").read_bytes()
     result = deploy(host)
+    if custom:
+        assert result.returncode != 0
+        assert "relic production/delivery consumer is unavailable" in result.stdout + result.stderr
+        assert "已回退" in result.stderr
+        assert path.read_bytes() == original
+        assert source.read_bytes() == previous_source
+        assert (host / "pyproject.toml").read_bytes() == previous_toml
+        preserved(host)
+        # A curated historical board needs an explicit merge of the new routes.
+        original = (ROOT / "data/生活/生活.json").read_bytes() + b"\n"
+        path.write_bytes(original)
+        result = deploy(host)
     assert result.returncode == 0, result.stdout + result.stderr
     assert path.read_bytes() == (original if custom else (ROOT / "data/生活/生活.json").read_bytes())
     backups = list((host / ".xiuxian3/backups").glob("deploy-*"))
-    assert len(backups) == 1
+    assert len(backups) == (2 if custom else 1)
     if not custom:
         assert (backups[0] / "data/生活/生活.json").read_bytes() == old
     repeated = deploy(host)
@@ -410,11 +526,39 @@ def test_fieldwork_seeds_upgrade_from_v0134_and_preserve_custom(host: Path, cust
     manifest = json.loads((ROOT / "scripts/seed_migrations.json").read_text())
     originals = {}
     for relative, fixture in files.items():
-        original = (ROOT / "test/fixtures/official_seeds" / fixture).read_bytes()
-        assert hashlib.sha256(original).hexdigest() in manifest[relative]["old_sha256"]
-        originals[relative] = original + (b"\n" if custom else b"")
+        if custom:
+            from test_cloud_party_seeds import before_cloud_party_release
+
+            text = (ROOT / "data" / relative).read_text(encoding="utf-8")
+            text = before_cloud_party_release(relative, text)
+            originals[relative] = (text + "\n").encode("utf-8")
+        else:
+            original = (ROOT / "test/fixtures/official_seeds" / fixture).read_bytes()
+            assert hashlib.sha256(original).hexdigest() in manifest[relative]["old_sha256"]
+            originals[relative] = original
         (host / "data" / relative).write_bytes(originals[relative])
+    source = host / "src/plugins/nonebot_plugin_xiuxian_3/__init__.py"
+    previous_source = source.read_bytes()
+    previous_toml = (host / "pyproject.toml").read_bytes()
     result = deploy(host)
+    if custom:
+        assert result.returncode != 0
+        assert "source.party.cloud_boat references unavailable costed party enemy enemy.cloud_boat_guardian" in result.stdout + result.stderr
+        assert "已回退" in result.stderr
+        assert all((host / "data" / relative).read_bytes() == blob for relative, blob in originals.items())
+        assert source.read_bytes() == previous_source
+        assert (host / "pyproject.toml").read_bytes() == previous_toml
+        preserved(host)
+        # Merge the new public producer explicitly into preserved custom data;
+        # the installer must not invent it or overwrite the custom enemy file.
+        enemies = json.loads(originals["战斗/敌人.json"])
+        current = json.loads((ROOT / "data/战斗/敌人.json").read_bytes())
+        current_guard = next(row for row in current["records"] if row["key"] == "enemy.cloud_boat_guardian")
+        guard = next(row for row in enemies["records"] if row["key"] == current_guard["key"])
+        guard["combat_profile"] = current_guard["combat_profile"]
+        originals["战斗/敌人.json"] = (json.dumps(enemies, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+        (host / "data/战斗/敌人.json").write_bytes(originals["战斗/敌人.json"])
+        result = deploy(host)
     assert result.returncode == 0, result.stdout + result.stderr
     backup = next((host / ".xiuxian3/backups").glob("deploy-*"))
     for relative in files:
@@ -439,6 +583,9 @@ def old_official_secret_realms() -> bytes:
         if record["key"]
         not in {"instance.secret_realm.time_fort", "instance.secret_realm.void_ruins"}
     ]
+    for record in document["records"]:
+        if record["key"] == "instance.secret_realm.dao_origin":
+            record["permission"] = "access.dao.origin"
     blob = (json.dumps(document, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
     rule = json.loads((ROOT / "scripts/seed_migrations.json").read_text(encoding="utf-8"))[
         SECRET_REALM_FILE.as_posix()
@@ -465,7 +612,13 @@ def old_official_materials() -> bytes:
             "item.grain.cloud_rice",
             "item.food.cloud_rice_meal",
             "item.material.ward_plate",
-        }
+            "item.mat.root_wedge",
+            "item.relic.excavation_kit",
+                "item.relic.clay_disc",
+                "item.relic.bronze_needle",
+                "item.relic.water_ring",
+                "item.equipment.repair_kit",
+            }
     ]
     blob = (json.dumps(document, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
     rule = json.loads((ROOT / "scripts/seed_migrations.json").read_text(encoding="utf-8"))[
@@ -522,6 +675,12 @@ def old_official_locations() -> bytes:
         "sect_gate", "time_garden", "trade_port", "void_portal", "war_front",
     )
     text = (ROOT / "data" / LOCATION_FILE).read_text(encoding="utf-8")
+    text = text.replace('        "explore.patrol_outskirts",\n', "")
+    text = text.replace('        "explore.relic.creek",\n', "")
+    for slug in ("ironwood", "basalt"):
+        text = text.replace(', "explore.relic.' + slug + '"', "")
+    for slug in ("ironwood", "basalt"):
+        text = text.replace(', "explore.patrol_' + slug + '"', "")
     # The discoverability slice rewrote exploration actions on existing records.
     action_reverts = (
         ('      "actions": ["read_entry_requirements", "explore.cloud_city_patrol", "explore.cloud_city_escort"]', '      "actions": [\n        "read_entry_requirements"\n      ]'),
@@ -661,48 +820,15 @@ TRADE_FILE = Path("经济/跨界贸易.json")
 
 
 def old_official_manifest() -> bytes:
-    # The manifest before the cross-realm trade file was registered: remove
-    # only that entry from the current manifest.
-    document = json.loads((ROOT / "data" / MANIFEST_FILE).read_text(encoding="utf-8"))
-    document["files"] = [
-        entry
-        for entry in document["files"]
-        if entry
-        not in {
-            "经济/跨界贸易.json",
-            "经济/虚空集市.json",
-            "经济/贸易许可.json",
-            "生产/设施.json",
-            "生产/终局配方.json",
-            "任务/跨界任务.json",
-            "特殊/竞技场.json",
-            "特殊/终局天榜.json",
-            "功业/功业.json",
-            "道历/道号.json",
-            "道历/道契.json",
-            "道历/七日目标.json",
-            "战斗/渡劫.json",
-            "社交/道统据点.json",
-            "社交/道统路线.json",
-            "事件/飞升日.json",
-            "社交/道侣协作.json",
-            "经济/虚空物资寄售.json",
-            "灵兽/互动.json",
-            "道具/转修令.json",
-            "道途/切换.json",
-            "道具/重构令.json",
-            "道途/重构.json",
-            "道途/辅修切换.json",
-            "养成/道脉重置.json",
-        }
-    ]
-    blob = (json.dumps(document, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+    # Exact eaed7115257db5a67933e8bdf833c003319d940d:data/内容清单.json;
+    # current manifest additions must never change this historical baseline.
+    blob = (ROOT / "test/fixtures/official_seeds/manifest_pre_trade.json").read_bytes()
+    digest = hashlib.sha256(blob).hexdigest()
+    assert digest == "8121ad7fa52be7f9129bb39f9408494dc8b9c4f051c03387e763831e12cb0c1d"
     rule = json.loads((ROOT / "scripts/seed_migrations.json").read_text(encoding="utf-8"))[
         MANIFEST_FILE.as_posix()
     ]
-    assert hashlib.sha256(blob).hexdigest() in rule["old_sha256"], (
-        "the reversed manifest must equal the registered old official manifest seed"
-    )
+    assert rule["old_sha256"][digest] == "eaed7115257db5a67933e8bdf833c003319d940d:data/内容清单.json"
     return blob
 
 
@@ -986,9 +1112,28 @@ def test_pre_refuge_mainline_migrates_with_real_official_fixture(host: Path) -> 
 def test_custom_pre_refuge_mainline_is_preserved(host: Path) -> None:
     custom = (SEED_FIXTURES / "mainline_pre_refuge.json").read_bytes() + b"\n"
     (host / "data" / MAINLINE).write_bytes(custom)
+    source = host / "src/plugins/nonebot_plugin_xiuxian_3/__init__.py"
+    previous_source = source.read_bytes()
+    previous_toml = (host / "pyproject.toml").read_bytes()
+    result = deploy(host)
+    assert result.returncode != 0
+    assert "idle.leaf_nursery_watch references inactive mainline leaf_watch.2" in result.stdout + result.stderr
+    assert "leaf_watch.2" in result.stdout + result.stderr
+    assert "已回退" in result.stderr
+    assert (host / "data" / MAINLINE).read_bytes() == custom
+    assert source.read_bytes() == previous_source
+    assert (host / "pyproject.toml").read_bytes() == previous_toml
+    preserved(host)
+    # Merge the new stages explicitly while retaining the customized old story.
+    document = json.loads(custom)
+    current = json.loads((ROOT / "data" / MAINLINE).read_bytes())
+    keys = {row["key"] for row in document["records"]}
+    document["records"].extend(row for row in current["records"] if row["key"] not in keys)
+    merged = (json.dumps(document, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+    (host / "data" / MAINLINE).write_bytes(merged)
     result = deploy(host)
     assert result.returncode == 0, result.stdout + result.stderr
-    assert (host / "data" / MAINLINE).read_bytes() == custom
+    assert (host / "data" / MAINLINE).read_bytes() == merged
     preserved(host)
 
 
@@ -1006,7 +1151,16 @@ RECIPE_FILE = Path("生产/配方.json")
 
 PLACE_CODEX_ADDED = frozenset(
     {
+        "codex.story.leaf_watch",
+        "codex.story.camp.outskirts",
+        "codex.story.camp.ironwood",
+        "codex.story.camp.basalt",
+        "codex.story.mist_lamp",
+        "codex.story.mist_lamp_handover",
+        "codex.story.cloud_tide",
+        "codex.story.cloud_tide_handover",
         "codex.story.herb_vale_gather",
+        "codex.story.herb_shelter",
         "codex.story.ironwood_gather",
         "codex.story.basalt_sifting",
         "codex.story.spring_gleaning",
@@ -1104,7 +1258,11 @@ def test_unknown_bounty_source_seeds_are_preserved(host: Path) -> None:
 
 def test_unknown_livelihood_missing_story_source_fails_and_rolls_back(host: Path) -> None:
     path = host / "data/生活/生活.json"
-    custom = (SEED_FIXTURES / "livelihood_pre_reachability.json").read_bytes() + b"\n"
+    document = json.loads(path.read_text(encoding="utf-8"))
+    document["records"] = [
+        row for row in document["records"] if row["key"] != "idle.beast_habitat_patrol"
+    ]
+    custom = (json.dumps(document, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
     path.write_bytes(custom)
     previous_source = (host / "src/plugins/nonebot_plugin_xiuxian_3/__init__.py").read_bytes()
     previous_toml = (host / "pyproject.toml").read_bytes()
@@ -1324,14 +1482,22 @@ def _historical_mainline_prefix(text: str, marker: int) -> str:
 
 
 def test_companion_old_trail_seeds_upgrade_together_and_preserve_custom(host: Path) -> None:
-    mainline = (ROOT / "data" / MAINLINE).read_text(encoding="utf-8")
+    mainline = pre_union_mainline_seed().decode("utf-8")
     marker = mainline.index('    {\n      "key": "companion_old_trail.1"')
     old_mainline = (
         _historical_mainline_prefix(mainline, marker).rstrip()[:-1] + "\n  ]\n}\n"
     ).encode("utf-8")
     assert hashlib.sha256(old_mainline).hexdigest() == "ad6aae6f0a4037c52c17ea17e902188bcca190676d455bca6a49fa178c4ed473"
+    from test_herb_shelter_seeds import before_herb_shelter_release
+
     codex_file = Path("图鉴/条目.json")
     codex = (ROOT / "data" / codex_file).read_text(encoding="utf-8")
+    codex = before_herb_shelter_release(codex_file.as_posix(), codex)
+    codex, count = re.subn(
+        r'^    \{"key":\s*"codex\.story\.(?:mist_lamp|cloud_tide|leaf_watch|camp\.(?:outskirts|ironwood|basalt))",[^\n]*\n',
+        "", codex, flags=re.M,
+    )
+    assert count == 6
     old_codex, count = re.subn(
         r'    \{\n      "key": "codex\.story\.companion_old_trail\.[123]",.*?\n    \},\n',
         "", codex, flags=re.S,
@@ -1367,7 +1533,7 @@ def test_companion_old_trail_seeds_upgrade_together_and_preserve_custom(host: Pa
 
 
 def test_spring_supper_mainline_seed_upgrade_backup_repeat_and_custom_preservation(host: Path) -> None:
-    text = (ROOT / "data" / MAINLINE).read_text(encoding="utf-8")
+    text = pre_union_mainline_seed().decode("utf-8")
     marker = text.index('    {\n      "key": "spring_supper.1"')
     old = (
         _historical_mainline_prefix(text, marker).rstrip()[:-1] + "\n  ]\n}\n"
@@ -1399,7 +1565,7 @@ def test_spring_supper_mainline_seed_upgrade_backup_repeat_and_custom_preservati
 
 
 def _pre_ironwood_mainline() -> bytes:
-    text = (ROOT / "data" / MAINLINE).read_text(encoding="utf-8")
+    text = pre_union_mainline_seed().decode("utf-8")
     marker = text.index('    {\n      "key": "ironwood_craft.1"')
     old = (
         _historical_mainline_prefix(text, marker).rstrip()[:-1] + "\n  ]\n}\n"
