@@ -13,11 +13,14 @@ from uuid import uuid4
 from ...contracts import serialize_datetime
 from ..persistence.errors import (
     CompanionAlreadyBondedError,
+    CompanionBusyError,
     CompanionCapacityError,
     CompanionGearError,
     CompanionInjuredError,
     CompanionNotFoundError,
     CompanionRequirementError,
+    CompanionSlotError,
+    CompanionTechniqueError,
     OperationConflictError,
     OperationResultMalformedError,
     PlayerNotFoundError,
@@ -36,7 +39,7 @@ from .interaction_content import (
     affinity_gain,
     companion_interaction_definition,
 )
-from ..utils.operations import operation_replay
+from ..utils.operations import operation_replay, record_operation
 from ..specials.codex_projection import record_codex_discovery
 from ..utils.player import (
     PLAYER_NUMERIC_FIELDS,
@@ -44,12 +47,22 @@ from ..utils.player import (
     player_field,
     player_integer,
 )
-from .models import CompanionMutationRecord, CompanionSnapshot, CompanionStatusRecord, CompanionView
+from .models import (
+    CompanionMutationRecord,
+    CompanionSnapshot,
+    CompanionStatusRecord,
+    CompanionTechniqueResult,
+    CompanionView,
+)
 from .rules import (
     CompanionDefinition,
     companion_definition,
     companion_evolution_definition,
     level_after_experience,
+)
+from .technique_content import (
+    companion_technique_definitions,
+    companion_technique_eligible,
 )
 
 
@@ -191,6 +204,60 @@ class CompanionRepositoryMixin:
                 operation_id,
             )
 
+    async def preview_companion_techniques(
+        self, *, platform: str, platform_user_id: str, companion_ref: str
+    ) -> dict[str, Any]:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._preview_companion_techniques_sync, platform, platform_user_id, companion_ref
+            )
+
+    async def equip_companion_technique(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        companion_ref: str,
+        slot_no: int,
+        technique_ref: str,
+        operation_id: str,
+    ) -> CompanionTechniqueResult:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._change_companion_technique_sync,
+                platform,
+                platform_user_id,
+                companion_ref,
+                slot_no,
+                technique_ref,
+                operation_id,
+                "equip",
+            )
+
+    async def remove_companion_technique(
+        self,
+        *,
+        platform: str,
+        platform_user_id: str,
+        companion_ref: str,
+        slot_no: int,
+        operation_id: str,
+    ) -> CompanionTechniqueResult:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._change_companion_technique_sync,
+                platform,
+                platform_user_id,
+                companion_ref,
+                slot_no,
+                None,
+                operation_id,
+                "remove",
+            )
+
     def companion_battle_snapshot(
         self, connection: sqlite3.Connection, player_id: int
     ) -> CompanionSnapshot:
@@ -204,6 +271,14 @@ class CompanionRepositoryMixin:
         for row in rows:
             definition = companion_definition(str(row["companion_key"]), getattr(self, "content", None))
             gear = self._gear_snapshot(connection, int(row["id"]))
+            techniques = self._companion_technique_snapshot(
+                connection,
+                player_id,
+                int(row["id"]),
+                str(row["companion_key"]),
+                int(player_field(row, "skill_slots", 0) or 0),
+                str(player_field(row, "evolution_stage", "base")),
+            )
             snapshots.append(
                 {
                     "instance_id": str(row["instance_id"]),
@@ -216,6 +291,7 @@ class CompanionRepositoryMixin:
                     "skill_slots": int(player_field(row, "skill_slots", 0) or 0),
                     "effect": dict(definition.effect or {}),
                     "gear": gear,
+                    "techniques": techniques,
                 }
             )
         player = connection.execute("SELECT player_id FROM players WHERE id = ?", (player_id,)).fetchone()
@@ -249,6 +325,335 @@ class CompanionRepositoryMixin:
 
     def companion_carry_capacity(self, connection: sqlite3.Connection, player_id: int) -> int:
         return sum(int(item["carry_capacity"]) for item in self.companion_carry_snapshot(connection, player_id))
+
+    def _preview_companion_techniques_sync(
+        self, platform: str, platform_user_id: str, companion_ref: str
+    ) -> dict[str, Any]:
+        with self._connect() as connection:
+            player = self._require_player(connection, platform, platform_user_id, writable=False)
+            instance = self._find_instance(connection, int(player["id"]), companion_ref)
+            if str(instance["kind"]) != "beast":
+                raise CompanionTechniqueError("techniques only fit beasts")
+            companion = companion_definition(str(instance["companion_key"]), self.content)
+            skill_slots = int(player_field(instance, "skill_slots", 0) or 0)
+            evolution_stage = str(player_field(instance, "evolution_stage", "base"))
+            bundle = getattr(self, "content", None)
+            if bundle is None:
+                from ..content import bundled_content
+
+                bundle = bundled_content()
+            definitions = companion_technique_definitions(bundle)
+            equipped_rows = connection.execute(
+                "SELECT slot_no, technique_key FROM companion_technique_loadouts "
+                "WHERE player_id=? AND companion_instance_id=? ORDER BY slot_no",
+                (player["id"], instance["id"]),
+            ).fetchall()
+            equipped = {int(row["slot_no"]): str(row["technique_key"]) for row in equipped_rows}
+            slots = []
+            for slot_no in (1, 2):
+                key = equipped.get(slot_no)
+                technique = definitions.get(key or "")
+                content_available = technique is not None and companion_technique_eligible(
+                    technique,
+                    companion_key=companion.key,
+                    skill_slots=skill_slots,
+                    evolution_stage=evolution_stage,
+                    content=bundle,
+                )
+                slots.append(
+                    {
+                        "slot_no": slot_no,
+                        "open": evolution_stage == "evolved" and skill_slots >= slot_no,
+                        "technique_key": key,
+                        "name": technique.label if technique is not None else None,
+                        "effect": dict(technique.effect) if technique is not None else None,
+                        "content_available": content_available,
+                    }
+                )
+            choices = [
+                {
+                    "key": definition.key,
+                    "name": definition.label,
+                    "desc": definition.description,
+                    "slot_no": definition.slot_no,
+                    "effect": dict(definition.effect),
+                }
+                for definition in definitions.values()
+                if companion_technique_eligible(
+                    definition,
+                    companion_key=companion.key,
+                    skill_slots=skill_slots,
+                    evolution_stage=evolution_stage,
+                    content=bundle,
+                )
+            ]
+            return {
+                "instance_id": str(instance["instance_id"]),
+                "companion_key": companion.key,
+                "name": companion.label,
+                "kind": companion.kind,
+                "status": str(instance["status"]),
+                "deployed": bool(instance["deployed"]),
+                "evolution_stage": evolution_stage,
+                "skill_slots": skill_slots,
+                "slots": slots,
+                "choices": choices,
+            }
+
+    def _change_companion_technique_sync(
+        self,
+        platform: str,
+        platform_user_id: str,
+        companion_ref: str,
+        slot_no: int,
+        technique_ref: str | None,
+        operation_id: str,
+        action: str,
+    ) -> CompanionTechniqueResult:
+        operation_name = f"companion.technique.{action}"
+        request_hash = self._request_hash(
+            operation_name,
+            {
+                "platform": platform,
+                "platform_user_id": platform_user_id,
+                "companion_ref": companion_ref,
+                "slot_no": slot_no,
+                "technique_ref": technique_ref,
+            },
+        )
+        now_text = serialize_datetime(self._now())
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT player_id FROM operations WHERE operation_id=?", (operation_id,)
+            ).fetchone()
+            if existing is not None:
+                replay = operation_replay(
+                    connection,
+                    operation_id,
+                    operation_name,
+                    request_hash,
+                    player_id=int(existing["player_id"]),
+                )
+                return self._technique_result_from_payload(replay, replay=True)
+
+            player = self._require_player(connection, platform, platform_user_id)
+            if type(slot_no) is not int or slot_no not in {1, 2}:
+                raise CompanionSlotError("slot number is invalid")
+            instance = self._find_instance(connection, int(player["id"]), companion_ref)
+            if str(instance["kind"]) != "beast":
+                raise CompanionTechniqueError("techniques only fit beasts")
+            if str(instance["status"]) == "travelling":
+                raise CompanionBusyError("companion is travelling")
+            if connection.execute(
+                "SELECT 1 FROM battle_sessions WHERE player_id=? AND status IN ('created','running') "
+                "UNION ALL SELECT 1 FROM party_battle_members WHERE player_id=? "
+                "AND asset_lock_status='locked' LIMIT 1",
+                (player["id"], player["id"]),
+            ).fetchone() is not None:
+                raise CompanionBusyError("companion assets are locked by combat")
+
+            companion_key = str(instance["companion_key"])
+            technique_key: str | None = None
+            if action == "equip":
+                bundle = getattr(self, "content", None)
+                if bundle is None:
+                    from ..content import bundled_content
+
+                    bundle = bundled_content()
+                definitions = companion_technique_definitions(bundle)
+                definition = definitions.get(str(technique_ref))
+                if definition is None:
+                    matches = [
+                        item for item in definitions.values()
+                        if item.label == str(technique_ref)
+                    ]
+                    definition = matches[0] if len(matches) == 1 else None
+                if definition is None or definition.closed:
+                    raise CompanionTechniqueError("technique is unavailable or closed")
+                if definition.slot_no != slot_no:
+                    raise CompanionSlotError("technique belongs to a different slot")
+                skill_slots = int(player_field(instance, "skill_slots", 0) or 0)
+                evolution_stage = str(player_field(instance, "evolution_stage", "base"))
+                if evolution_stage != "evolved" or slot_no > skill_slots:
+                    raise CompanionSlotError("technique slot is not open")
+                if not companion_technique_eligible(
+                    definition,
+                    companion_key=companion_key,
+                    skill_slots=skill_slots,
+                    evolution_stage=evolution_stage,
+                    content=bundle,
+                ):
+                    raise CompanionTechniqueError("technique is incompatible with this beast")
+                duplicate = connection.execute(
+                    "SELECT slot_no FROM companion_technique_loadouts "
+                    "WHERE companion_instance_id=? AND technique_key=? AND slot_no<>?",
+                    (instance["id"], definition.key, slot_no),
+                ).fetchone()
+                if duplicate is not None:
+                    raise CompanionTechniqueError("technique is already equipped in another slot")
+                technique_key = definition.key
+
+            current = connection.execute(
+                "SELECT id, technique_key FROM companion_technique_loadouts "
+                "WHERE player_id=? AND companion_instance_id=? AND slot_no=?",
+                (player["id"], instance["id"], slot_no),
+            ).fetchone()
+            previous_key = str(current["technique_key"]) if current is not None else None
+            changed = previous_key != technique_key
+            if changed and action == "equip":
+                if current is None:
+                    connection.execute(
+                        "INSERT INTO companion_technique_loadouts "
+                        "(player_id, companion_instance_id, slot_no, technique_key, operation_id, created_at, updated_at) "
+                        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                        (player["id"], instance["id"], slot_no, technique_key, operation_id, now_text, now_text),
+                    )
+                else:
+                    connection.execute(
+                        "UPDATE companion_technique_loadouts SET technique_key=?, operation_id=?, updated_at=? WHERE id=?",
+                        (technique_key, operation_id, now_text, current["id"]),
+                    )
+            elif changed and action == "remove" and current is not None:
+                connection.execute(
+                    "DELETE FROM companion_technique_loadouts WHERE id=?", (current["id"],)
+                )
+
+            loadout = self._companion_technique_loadout(
+                connection, int(player["id"]), int(instance["id"]), bundle=getattr(self, "content", None)
+            )
+            payload = {
+                "instance_id": str(instance["instance_id"]),
+                "companion_key": companion_key,
+                "slot_no": slot_no,
+                "technique_key": technique_key,
+                "action": action,
+                "changed": changed,
+                "loadout": loadout,
+            }
+            record_operation(
+                connection,
+                operation_id,
+                operation_name,
+                int(player["id"]),
+                request_hash,
+                payload,
+                now_text,
+            )
+            return self._technique_result_from_payload(payload, replay=False)
+
+    def _companion_technique_loadout(
+        self,
+        connection: sqlite3.Connection,
+        player_id: int,
+        companion_instance_id: int,
+        *,
+        bundle: Any = None,
+    ) -> list[dict[str, Any]]:
+        if bundle is None:
+            from ..content import bundled_content
+
+            bundle = bundled_content()
+        definitions = companion_technique_definitions(bundle)
+        rows = connection.execute(
+            "SELECT slot_no, technique_key FROM companion_technique_loadouts "
+            "WHERE player_id=? AND companion_instance_id=? ORDER BY slot_no",
+            (player_id, companion_instance_id),
+        ).fetchall()
+        return [
+            {
+                "slot_no": int(row["slot_no"]),
+                "technique_key": str(row["technique_key"]),
+                "name": definitions[str(row["technique_key"])].label
+                if str(row["technique_key"]) in definitions
+                else str(row["technique_key"]),
+                "effect": dict(definitions[str(row["technique_key"])].effect)
+                if str(row["technique_key"]) in definitions
+                else {},
+            }
+            for row in rows
+        ]
+
+    def _companion_technique_snapshot(
+        self,
+        connection: sqlite3.Connection,
+        player_id: int,
+        companion_instance_id: int,
+        companion_key: str,
+        skill_slots: int,
+        evolution_stage: str,
+    ) -> list[dict[str, object]]:
+        bundle = getattr(self, "content", None)
+        if bundle is None:
+            from ..content import bundled_content
+
+            bundle = bundled_content()
+        definitions = companion_technique_definitions(bundle)
+        rows = connection.execute(
+            "SELECT slot_no, technique_key FROM companion_technique_loadouts "
+            "WHERE player_id=? AND companion_instance_id=? ORDER BY slot_no",
+            (player_id, companion_instance_id),
+        ).fetchall()
+        result = []
+        for row in rows:
+            key = str(row["technique_key"])
+            definition = definitions.get(key)
+            if (
+                definition is None
+                or definition.closed
+                or definition.slot_no != int(row["slot_no"])
+                or not companion_technique_eligible(
+                    definition,
+                    companion_key=companion_key,
+                    skill_slots=skill_slots,
+                    evolution_stage=evolution_stage,
+                    content=bundle,
+                )
+            ):
+                raise CompanionTechniqueError("equipped companion technique is no longer eligible")
+            result.append(
+                {
+                    "technique_key": definition.key,
+                    "name": definition.label,
+                    "slot_no": definition.slot_no,
+                    "effect": dict(definition.effect),
+                }
+            )
+        return result
+
+    @staticmethod
+    def _technique_result_from_payload(
+        payload: dict[str, Any], *, replay: bool
+    ) -> CompanionTechniqueResult:
+        expected = {
+            "instance_id", "companion_key", "slot_no", "technique_key", "action", "changed", "loadout"
+        }
+        if set(payload) != expected:
+            raise OperationResultMalformedError("companion technique operation result is invalid")
+        if (
+            not isinstance(payload["instance_id"], str)
+            or not isinstance(payload["companion_key"], str)
+            or type(payload["slot_no"]) is not int
+            or payload["slot_no"] not in {1, 2}
+            or payload["action"] not in {"equip", "remove"}
+            or type(payload["changed"]) is not bool
+            or not isinstance(payload["loadout"], list)
+            or any(not isinstance(item, dict) for item in payload["loadout"])
+        ):
+            raise OperationResultMalformedError("companion technique operation fields are invalid")
+        technique_key = payload["technique_key"]
+        if technique_key is not None and not isinstance(technique_key, str):
+            raise OperationResultMalformedError("companion technique key is invalid")
+        return CompanionTechniqueResult(
+            instance_id=payload["instance_id"],
+            companion_key=payload["companion_key"],
+            slot_no=payload["slot_no"],
+            technique_key=technique_key,
+            action=payload["action"],
+            changed=payload["changed"],
+            loadout=tuple(dict(item) for item in payload["loadout"]),
+            already_completed=replay,
+        )
 
     def _list_companions_sync(self, platform: str, platform_user_id: str) -> CompanionStatusRecord:
         with self._connect() as connection:

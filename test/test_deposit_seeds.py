@@ -15,6 +15,7 @@ BASELINES = {
     "生产/配方.json": "99d3707d4734869336a1e9d44a0fbcf62f588dce4b8d39be200f384566bb0823",
     "道具/材料.json": "f94230676682ce3d76a96692f630f2c0ecf3ae9051a75a079f1a6165fb1c484a",
 }
+OLD_MANIFEST = ROOT / "test/fixtures/official_seeds/manifest_pre_deposits.json"
 
 
 def old_deposit_seeds():
@@ -25,10 +26,16 @@ def old_deposit_seeds():
                '    {"key":"recipe.equipment.repair_kit',
                '    {"key":"item.equipment.repair_kit')
     for relative, expected in BASELINES.items():
-        text = before_cloud_party_release(relative, (ROOT / "data" / relative).read_text(encoding="utf-8"))
-        text = "".join(line for line in text.splitlines(keepends=True)
-                       if not line.startswith(markers) and line != '    "探索/资源脉.json",\n')
-        result[relative] = text.encode("utf-8")
+        if relative == "内容清单.json":
+            blob = OLD_MANIFEST.read_bytes()
+        else:
+            text = before_cloud_party_release(
+                relative, (ROOT / "data" / relative).read_text(encoding="utf-8")
+            )
+            text = "".join(line for line in text.splitlines(keepends=True)
+                           if not line.startswith(markers))
+            blob = text.encode("utf-8")
+        result[relative] = blob
         assert hashlib.sha256(result[relative]).hexdigest() == expected, relative
     return result
 

@@ -12,19 +12,23 @@ BASELINES = {
     "内容清单.json": "c4246fa9c525bc454c17e5a345c389b07d44c9526620e35c27a0a8d5f8853bd5",
     "来源/来源.json": "e942a880ea0b533ffa00564d89219c25eb9d54314604215cfda7a48178ee24af",
 }
+OLD_MANIFEST = ROOT / "test/fixtures/official_seeds/manifest_pre_land_surveys.json"
 
 
 def old_survey_seeds():
     result = {}
     for relative, expected in BASELINES.items():
-        text = before_cloud_party_release(relative, (ROOT / "data" / relative).read_text(encoding="utf-8"))
         if relative == "内容清单.json":
-            text = text.replace('    "探索/地貌.json",\n', "").replace('    "探索/资源脉.json",\n', "")
+            blob = OLD_MANIFEST.read_bytes()
         else:
+            text = before_cloud_party_release(
+                relative, (ROOT / "data" / relative).read_text(encoding="utf-8")
+            )
             text = "".join(line for line in text.splitlines(keepends=True)
                            if not line.startswith(('    {"key":"source.survey.', '    {"key":"source.deposit.',
                                                    '    {"key":"source.relic.')))
-        result[relative] = text.encode("utf-8")
+            blob = text.encode("utf-8")
+        result[relative] = blob
         assert hashlib.sha256(result[relative]).hexdigest() == expected
     return result
 

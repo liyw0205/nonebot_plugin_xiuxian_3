@@ -96,6 +96,18 @@ class CompanionGearError(RuntimeError):
     """The gear cannot be equipped on the requested companion."""
 
 
+class CompanionTechniqueError(RuntimeError):
+    """A companion technique is unavailable or incompatible with its beast."""
+
+
+class CompanionSlotError(RuntimeError):
+    """A companion technique slot is not open or cannot accept the technique."""
+
+
+class CompanionBusyError(RuntimeError):
+    """The companion or its owner currently has locked combat assets."""
+
+
 class TradePermitRequirementError(RuntimeError):
     """The player lacks a trade permit's quest, faction reputation, or currency."""
 

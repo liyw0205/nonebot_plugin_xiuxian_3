@@ -82,6 +82,10 @@ class ContentBundle:
             from .progression.recovery_rules import endgame_stamina_rule
 
             endgame_stamina_rule(bundle)
+        if any(kind == "companion_technique" for kind, _ in records):
+            from .companions.rules import companion_technique_definitions
+
+            companion_technique_definitions(bundle)
         return bundle
 
     @classmethod

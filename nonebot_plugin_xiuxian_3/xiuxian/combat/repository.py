@@ -44,6 +44,7 @@ from .skill_effects import (
     prepare_skill_action,
     reflected_enemy_damage,
 )
+from .companion_techniques import apply_companion_techniques
 from .enemy_skills import (
     absorb_with_shield,
     apply_enemy_status,
@@ -946,6 +947,10 @@ class CombatRepositoryMixin:
             enemy_skill = enemy.get("skill")
             device = snapshot["player"].get("device")
             device = dict(device) if isinstance(device, dict) else None
+            companion_techniques_enabled = (
+                snapshot.get("battle_type") == "pve.exploration"
+                and bool(snapshot.get("exploration_id"))
+            )
             device_actions = int(state.get("device_actions", 0)) if device is not None else 0
             is_tribulation_trial = str(snapshot.get("profile_key", "")) == PROFILE_KEY
             tribulation = self._json_object(snapshot.get("tribulation"), {})
@@ -1068,6 +1073,7 @@ class CombatRepositoryMixin:
                         mana_cost = int(selected_skill.get("mana_cost", 0))
                         if mana_cost > 0:
                             player_mana = max(0, player_mana - mana_cost)
+                    direct_damage = int(action["damage"])
                     hit = int(action["hit_roll_bp"]) < int(action["hit_bp"])
                     ongoing_damage = apply_player_skill_style(
                         selected_skill,
@@ -1076,9 +1082,20 @@ class CombatRepositoryMixin:
                         player_attack=int(player_stats["attack"]),
                         hit=hit,
                         enemy_acted=actor_order[0] == "enemy",
-                        direct_damage=int(action["damage"]),
+                        direct_damage=direct_damage,
                     )
-                    action["damage"] = min(enemy_hp, int(action["damage"]) + ongoing_damage)
+                    if companion_techniques_enabled and not charging:
+                        changed_damage, technique_events, used = apply_companion_techniques(
+                            list(snapshot["player"].get("companions", [])),
+                            trigger="first_attack",
+                            amount=direct_damage,
+                            used=set(state.get("companion_technique_uses", [])),
+                        )
+                        if technique_events:
+                            direct_damage = changed_damage
+                            action["companion_techniques"] = technique_events
+                            state["companion_technique_uses"] = sorted(used)
+                    action["damage"] = min(enemy_hp, direct_damage + ongoing_damage)
                     if phase is not None:
                         effective_damage_bp = phase.player_damage_bp * (10_000 - debt_shield_bp) // 10_000
                         base_damage = int(action["damage"])
@@ -1177,6 +1194,17 @@ class CombatRepositoryMixin:
                         int(action["damage"]), state, round_no=expected_round,
                         equipment_reduction_bp=int(player_stats.get("damage_reduction_bp", 0)),
                     )
+                    if companion_techniques_enabled and int(action["damage"]) > 0:
+                        changed_damage, technique_events, used = apply_companion_techniques(
+                            list(snapshot["player"].get("companions", [])),
+                            trigger="first_received_damage",
+                            amount=int(action["damage"]),
+                            used=set(state.get("companion_technique_uses", [])),
+                        )
+                        if technique_events:
+                            action["damage"] = changed_damage
+                            action["companion_techniques"] = technique_events
+                            state["companion_technique_uses"] = sorted(used)
                     reflected = reflected_enemy_damage(
                         int(action["damage"]), state, round_no=expected_round
                     )
@@ -1205,6 +1233,10 @@ class CombatRepositoryMixin:
                     action["state"]["status"] = status_applied
                 if "recovery" in action:
                     action["state"]["recovery"] = action["recovery"]
+                if action.get("companion_techniques"):
+                    action["state"]["companion_techniques"] = deepcopy(
+                        action["companion_techniques"]
+                    )
                 if int(action.get("reflected_damage", 0)) > 0:
                     action["state"]["reflected_damage"] = int(action["reflected_damage"])
                 for key in (

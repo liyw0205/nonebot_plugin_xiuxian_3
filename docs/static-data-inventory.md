@@ -33,6 +33,7 @@ data/
   社交/玩家互动.json
   生活/生活.json
   灵兽/灵兽.json
+  灵兽/战技.json
   装备/{法器,防具,饰品,成长,词条,工具}.json
   道具/{材料,丹药,功法,凭证}.json
   阵法/阵法.json
@@ -182,6 +183,7 @@ data/
 | `技能/技能.json` | 基础攻击、六大道途在九境各自的稳定攻势与战术备选（108 条）、敌方技能及天劫阶段技能；技能名按招式意象命名，战斗消费器结算爆发、辅御、持续、削弱、蓄力、中毒、灼烧和反伤，高阶备选要求悬赏可得的传承残卷 | `gameplay/combat/content-v0.1.md`、`gameplay/combat/workflow.md` |
 | `事件/飞升日.json` | 飞升日展示口径：24 小时窗口、三榜键、新篇章入口，强制 `allow_assets: false` | `gameplay/events/content-v0.7.md` |
 | `灵兽/互动.json` | 灵兽相伴互动（基础亲和 3、御兽每点 +1、上限 100、体力 10、每日一次） | `gameplay/companions/content-v0.7.md` |
+| `灵兽/战技.json` | 灵兽战技：物种、已开灵窍、蜕变门槛及首击/首受击效果 | `gameplay/companions/content-v0.8.md` |
 | `功业/功业.json` | 功业定义（含计数型 `achievement.dao_service`：十次道统派单成功、授予 `title.dao_service`） | `gameplay/routine/content-v0.9.md` |
 | `任务/悬赏.json` | 悬赏定义（含 `bounty.dao_origin_service`：合道 L1、12 小时、三次公共服务、道统名望） | `gameplay/adventures/content-v0.7.md` |
 | `经济/虚空物资寄售.json` | 虚空物资寄售：炼虚/功勋准入、6 小时挂单、800 bp 手续费、可寄售白名单（须可交易且非绑定） | `gameplay/economy/content-v0.8.md` |

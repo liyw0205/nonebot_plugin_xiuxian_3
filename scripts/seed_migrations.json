@@ -47,6 +47,11 @@
     "new_sha256": "f354db009593ec9ba936a40debb0df7801287cd12cc77e356fadf071aa977fdc",
     "new_commit": "f3dbdbdd770aad25b232f2c23c91b32f1a8ccb97"
   },
+  "灵兽/战技.json": {
+    "old_sha256": {},
+    "new_sha256": "a0f55d981c152d9e4329534f4d199c478922f955c433c721efba43fde56b5bc1",
+    "new_commit": "231f2293858b0069e07b3a7df5cd5b368eb5d871"
+  },
   "道具/材料.json": {
     "old_sha256": {
       "a1d03eb055fe89b1a240e695589b40edaf1407202a0d5c5f09d722b6131d217e": "579c3ab277d90eafd9d267693be89e678b533282:data/道具/材料.json",
@@ -167,10 +172,11 @@
       "d66b5f5a78982d619ab0dfffe0eae1499b5a204eb44719481a464fbb07e17574": "bb3a31f6972773e33091ba783a1038bf84ada000:data/内容清单.json",
       "525f2f68ff2ba33502b05e872743ea288562d5060d8014cac4b7b11d5b06af18": "0e9460daef418578253da2f31a3358abc551fd78:data/内容清单.json",
       "c4246fa9c525bc454c17e5a345c389b07d44c9526620e35c27a0a8d5f8853bd5": "59d2448d87ddc13f9596de2938e4790fc45b7cd6:data/内容清单.json",
+      "8334baff0b88e57f9eff7848112bac2da5baaae235eaa57918fa531ab8e69bf6": "2b213949cc94415eab0096e2029e95428c00e925:data/内容清单.json",
       "d7060c48cac18ec33924aea7f8337fcc58ded6ad65cbdcf4a74d8e4753def60a": "07edd1dc7aa604f7045d61814c43b47e667cb9c4:data/内容清单.json"
     },
-    "new_sha256": "8334baff0b88e57f9eff7848112bac2da5baaae235eaa57918fa531ab8e69bf6",
-    "new_commit": "f5c91acbfddce2c0dcc41e80355d7fc7b3cb7152"
+    "new_sha256": "e1a27570d5656b90a3a975f8aa892e1cce314efb465c8b0b644444c9d38e3266",
+    "new_commit": "231f2293858b0069e07b3a7df5cd5b368eb5d871"
   },
   "地图/地点.json": {
     "old_sha256": {

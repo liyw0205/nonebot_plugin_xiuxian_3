@@ -5,11 +5,14 @@ from __future__ import annotations
 from ...contracts import CommandContext, CommandResult
 from ..repository import (
     CompanionAlreadyBondedError,
+    CompanionBusyError,
     CompanionCapacityError,
     CompanionGearError,
     CompanionInjuredError,
     CompanionNotFoundError,
     CompanionRequirementError,
+    CompanionSlotError,
+    CompanionTechniqueError,
     OperationConflictError,
     PlayerNotFoundError,
     PlayerSuspendedError,
@@ -111,6 +114,152 @@ class CompanionApplication:
                     for item in record.companions
                 ]
             },
+        )
+
+    @staticmethod
+    def _technique_effect(effect: dict[str, object]) -> str:
+        value = int(effect.get("value", 0))
+        percent = f"{value / 100:g}%"
+        if effect.get("type") == "opening_attack_bp":
+            return f"首次主动攻击伤害 +{percent}"
+        if effect.get("type") == "first_guard_bp":
+            return f"首次受击伤害 -{percent}"
+        return "效果无效"
+
+    async def preview_techniques(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) != 1:
+            return CommandResult(
+                False,
+                "INVALID_COMPANION_COMMAND",
+                "请指定灵兽编号查看战技与灵窍。",
+                context.request_id,
+            )
+        try:
+            preview = await self.repository.preview_companion_techniques(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                companion_ref=context.command_args[0],
+            )
+        except CompanionNotFoundError:
+            return CommandResult(False, "COMPANION_NOT_FOUND", "没有找到这只灵兽。", context.request_id)
+        except CompanionTechniqueError:
+            return CommandResult(False, "COMPANION_TECHNIQUE_UNAVAILABLE", "灵兽战技只适用于灵兽。", context.request_id)
+        except (PlayerNotFoundError, PlayerSuspendedError):
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有可用的修仙角色。", context.request_id)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, retryable=True)
+        lines = [
+            "## 灵兽战技",
+            "",
+            f"**{self._name(str(preview['name']))}**（编号 `{preview['instance_id']}`）",
+        ]
+        for slot in preview["slots"]:
+            slot_no = int(slot["slot_no"])
+            if not slot["open"]:
+                lines.append(f"- 灵窍 {slot_no}：未开启")
+            elif slot["technique_key"]:
+                effect = self._technique_effect(slot["effect"] or {}) if slot["content_available"] else "当前不可用，可卸下"
+                lines.append(f"- 灵窍 {slot_no}：**{slot['name'] or slot['technique_key']}**，{effect}")
+            else:
+                lines.append(f"- 灵窍 {slot_no}：空置")
+        if preview["choices"]:
+            lines.extend(("", "可装配："))
+            for choice in preview["choices"]:
+                lines.append(
+                    f"- 灵窍 {choice['slot_no']} · **{choice['name']}**："
+                    f"{self._technique_effect(choice['effect'])}（`{choice['key']}`）"
+                )
+        elif not any(slot["open"] for slot in preview["slots"]):
+            lines.extend(("", "尚无已开启的灵窍。"))
+        return CommandResult(
+            True,
+            "COMPANION_TECHNIQUE_PREVIEW",
+            "\n".join(lines),
+            context.request_id,
+            data=preview,
+        )
+
+    @staticmethod
+    def _parse_technique_slot(value: str) -> int | None:
+        if not value.isascii() or not value.isdecimal():
+            return None
+        slot_no = int(value)
+        return slot_no if slot_no in {1, 2} else None
+
+    async def equip_technique(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) != 3:
+            return CommandResult(False, "INVALID_COMPANION_COMMAND", "格式：装配灵兽战技 灵兽编号 灵窍 战技名或键。", context.request_id)
+        slot_no = self._parse_technique_slot(context.command_args[1])
+        if slot_no is None:
+            return CommandResult(False, "COMPANION_TECHNIQUE_SLOT", "灵窍编号只能是 1 或 2。", context.request_id)
+        operation_id = self._operation_id(context, "companion.technique.equip")
+        try:
+            result = await self.repository.equip_companion_technique(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                companion_ref=context.command_args[0],
+                slot_no=slot_no,
+                technique_ref=context.command_args[2],
+                operation_id=operation_id,
+            )
+        except CompanionNotFoundError:
+            return CommandResult(False, "COMPANION_NOT_FOUND", "没有找到这只灵兽。", context.request_id, operation_id)
+        except CompanionBusyError:
+            return CommandResult(False, "COMPANION_BUSY", "灵兽正在行动或战斗资产已锁定，未改变装配。", context.request_id, operation_id)
+        except CompanionSlotError:
+            return CommandResult(False, "COMPANION_TECHNIQUE_SLOT", "该灵窍尚未开启，或战技不属于这个灵窍。", context.request_id, operation_id)
+        except CompanionTechniqueError:
+            return CommandResult(False, "COMPANION_TECHNIQUE_UNAVAILABLE", "该战技已关闭、不适配此灵兽或已装在其他灵窍。", context.request_id, operation_id)
+        except (PlayerNotFoundError, PlayerSuspendedError):
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有可用的修仙角色。", context.request_id, operation_id)
+        except OperationConflictError:
+            return CommandResult(False, "OPERATION_CONFLICT", "这次装配请求已用于其他操作，请重新发起。", context.request_id, operation_id)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+        name = next((str(item["name"]) for item in result.loadout if item["technique_key"] == result.technique_key), result.technique_key or "空位")
+        return CommandResult(
+            True,
+            "COMPANION_TECHNIQUE_EQUIPPED",
+            f"灵窍 {result.slot_no} 已装配 **{name}**。",
+            context.request_id,
+            operation_id,
+            data={"instance_id": result.instance_id, "slot_no": result.slot_no, "technique_key": result.technique_key, "changed": result.changed, "loadout": [dict(item) for item in result.loadout], "idempotent_replay": result.already_completed},
+        )
+
+    async def remove_technique(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) != 2:
+            return CommandResult(False, "INVALID_COMPANION_COMMAND", "格式：卸下灵兽战技 灵兽编号 灵窍。", context.request_id)
+        slot_no = self._parse_technique_slot(context.command_args[1])
+        if slot_no is None:
+            return CommandResult(False, "COMPANION_TECHNIQUE_SLOT", "灵窍编号只能是 1 或 2。", context.request_id)
+        operation_id = self._operation_id(context, "companion.technique.remove")
+        try:
+            result = await self.repository.remove_companion_technique(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                companion_ref=context.command_args[0],
+                slot_no=slot_no,
+                operation_id=operation_id,
+            )
+        except CompanionNotFoundError:
+            return CommandResult(False, "COMPANION_NOT_FOUND", "没有找到这只灵兽。", context.request_id, operation_id)
+        except CompanionBusyError:
+            return CommandResult(False, "COMPANION_BUSY", "灵兽正在行动或战斗资产已锁定，未改变装配。", context.request_id, operation_id)
+        except CompanionTechniqueError:
+            return CommandResult(False, "COMPANION_TECHNIQUE_UNAVAILABLE", "灵兽战技只适用于灵兽。", context.request_id, operation_id)
+        except (PlayerNotFoundError, PlayerSuspendedError):
+            return CommandResult(False, "PLAYER_NOT_FOUND", "还没有可用的修仙角色。", context.request_id, operation_id)
+        except OperationConflictError:
+            return CommandResult(False, "OPERATION_CONFLICT", "这次卸下请求已用于其他操作，请重新发起。", context.request_id, operation_id)
+        except Exception:
+            return CommandResult(False, "PERSISTENCE_ERROR", "仙缘簿暂时不可用，请稍后再试。", context.request_id, operation_id, retryable=True)
+        return CommandResult(
+            True,
+            "COMPANION_TECHNIQUE_REMOVED",
+            f"灵窍 {result.slot_no} 已卸下战技。",
+            context.request_id,
+            operation_id,
+            data={"instance_id": result.instance_id, "slot_no": result.slot_no, "changed": result.changed, "loadout": [dict(item) for item in result.loadout], "idempotent_replay": result.already_completed},
         )
 
     async def bond(self, context: CommandContext) -> CommandResult:

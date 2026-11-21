@@ -7,6 +7,11 @@ from dataclasses import dataclass
 from typing import Any
 
 from ..content import ContentBundle, bundled_content
+from .technique_content import (
+    CompanionTechniqueDefinition,
+    companion_technique_definitions,
+    companion_technique_eligible,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,9 +54,11 @@ def _bundle(content: ContentBundle | None) -> ContentBundle:
     return content or bundled_content()
 
 
-def companion_definitions(content: ContentBundle | None = None) -> dict[str, CompanionDefinition]:
+def companion_definitions(
+    content: ContentBundle | None = None, *, include_locked: bool = False
+) -> dict[str, CompanionDefinition]:
     result: dict[str, CompanionDefinition] = {}
-    for row in _bundle(content).list("companion", include_locked=False):
+    for row in _bundle(content).list("companion", include_locked=include_locked):
         key = row.get("key")
         kind = row.get("kind")
         name = row.get("name")
@@ -137,11 +144,13 @@ def companion_definition(value: str, content: ContentBundle | None = None) -> Co
 
 def companion_evolution_definitions(
     content: ContentBundle | None = None,
+    *,
+    include_locked: bool = False,
 ) -> dict[str, CompanionEvolutionDefinition]:
     bundle = _bundle(content)
-    companions = companion_definitions(bundle)
+    companions = companion_definitions(bundle, include_locked=include_locked)
     result: dict[str, CompanionEvolutionDefinition] = {}
-    for row in bundle.list("companion_evolution", include_locked=False):
+    for row in bundle.list("companion_evolution", include_locked=include_locked):
         key = row.get("key")
         source_key = row.get("source_key")
         target_key = row.get("target_key")
@@ -278,10 +287,13 @@ def companion_exploration_discovery_bp(
 __all__ = [
     "CompanionDefinition",
     "CompanionEvolutionDefinition",
+    "CompanionTechniqueDefinition",
     "companion_definition",
     "companion_definitions",
     "companion_evolution_definition",
     "companion_evolution_definitions",
+    "companion_technique_definitions",
+    "companion_technique_eligible",
     "companion_exploration_discovery_bp",
     "level_after_experience",
     "mount_transport_duration",

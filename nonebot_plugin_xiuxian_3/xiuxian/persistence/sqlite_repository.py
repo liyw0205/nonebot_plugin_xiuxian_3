@@ -557,7 +557,7 @@ class SQLitePlayerRepository(
 
     @staticmethod
     def _migrate_companion_schema(connection: sqlite3.Connection) -> None:
-        """Add persistent fields required by companion evolution."""
+        """Add persistent companion fields without rewriting player rows."""
 
         columns = {str(row["name"]) for row in connection.execute("PRAGMA table_info(companion_instances)")}
         if "evolution_stage" not in columns:
@@ -568,6 +568,26 @@ class SQLitePlayerRepository(
             connection.execute(
                 "ALTER TABLE companion_instances ADD COLUMN skill_slots INTEGER NOT NULL DEFAULT 0 CHECK (skill_slots >= 0)"
             )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS companion_technique_loadouts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                player_id INTEGER NOT NULL REFERENCES players(id),
+                companion_instance_id INTEGER NOT NULL REFERENCES companion_instances(id) ON DELETE CASCADE,
+                slot_no INTEGER NOT NULL CHECK (slot_no BETWEEN 1 AND 2),
+                technique_key TEXT NOT NULL,
+                operation_id TEXT NOT NULL UNIQUE,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                UNIQUE (companion_instance_id, slot_no),
+                UNIQUE (companion_instance_id, technique_key)
+            )
+            """
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_companion_technique_player "
+            "ON companion_technique_loadouts(player_id, companion_instance_id, slot_no)"
+        )
 
     @staticmethod
     def _migrate_field_plot_schema(connection: sqlite3.Connection) -> None:

@@ -180,6 +180,17 @@ def test_companion_replay_keeps_frozen_result_after_content_changes(action: str)
                         record = next(row for row in content["records"] if row["key"] == "beast.evolution.wood_rat_1")
                         record["costs"]["spirit_stones"] = 400
                     content_path.write_text(json.dumps(content, ensure_ascii=False), encoding="utf-8")
+                    if action == "equip":
+                        recipe_path = data_dir / "生产" / "配方.json"
+                        recipes = json.loads(recipe_path.read_text(encoding="utf-8"))
+                        recipe = next(
+                            row for row in recipes["records"]
+                            if row["key"] == "recipe.companion.sack_small"
+                        )
+                        recipe["status"] = "locked"
+                        recipe_path.write_text(
+                            json.dumps(recipes, ensure_ascii=False), encoding="utf-8"
+                        )
                     runtime = create_runtime(data_dir=data_dir)
                     await runtime.repository.initialize()
                     with runtime.repository._connect() as connection:
