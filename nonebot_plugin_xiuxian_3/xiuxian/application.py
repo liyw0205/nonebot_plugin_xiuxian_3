@@ -62,6 +62,7 @@ from .social.sect_use_cases import SectApplication
 from .social.party_use_cases import PartyApplication
 from .social.mentor_use_cases import MentorApplication
 from .social.partner_use_cases import PartnerApplication
+from .social.dual_cultivation_use_cases import DualCultivationApplication
 from .social.sect_war_use_cases import SectWarApplication
 from .social.sect_war_cross_server_use_cases import SectWarCrossServerApplication
 from .social.sect_beacon_use_cases import SectBeaconApplication
@@ -633,6 +634,7 @@ class XiuxianApplication:
         self.party = PartyApplication(repository)
         self.mentor = MentorApplication(repository)
         self.partner = PartnerApplication(repository)
+        self.dual_cultivation = DualCultivationApplication(repository)
         self.sect_war = SectWarApplication(repository)
         self.cross_server_sect_war = SectWarCrossServerApplication(repository)
         self.sect_beacon = SectBeaconApplication(repository)
@@ -737,6 +739,7 @@ class XiuxianApplication:
                 partner_lines = self._partner_task_help_lines()
                 if partner_lines:
                     body += "\n\n" + partner_lines
+                body += "\n\n道侣共修：`双修预览`、`双修状态`、`发起双修 道号`、`接受双修 邀请号`、`拒绝双修 邀请号`、`取消双修 邀请号`。"
             return CommandResult(
                 True,
                 "HELP_CATEGORY",
@@ -2679,6 +2682,24 @@ class XiuxianApplication:
 
     async def reject_partner(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.partner.reject_partner(context), write_message="当前事件不允许拒绝结缘之请。")
+
+    async def dual_cultivation_preview(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.dual_cultivation.run(context, "preview"), require_write=False)
+
+    async def dual_cultivation_status(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.dual_cultivation.run(context, "status"), require_write=False)
+
+    async def invite_dual_cultivation(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.dual_cultivation.run(context, "invite"), write_message="当前事件不允许发出共修邀请。")
+
+    async def accept_dual_cultivation(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.dual_cultivation.run(context, "accept"), write_message="当前事件不允许接受共修邀请。")
+
+    async def reject_dual_cultivation(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.dual_cultivation.run(context, "reject"), write_message="当前事件不允许拒绝共修邀请。")
+
+    async def cancel_dual_cultivation(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.dual_cultivation.run(context, "cancel"), write_message="当前事件不允许取消共修邀请。")
 
     async def get_partner(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.partner.get_partner(context), require_write=False)

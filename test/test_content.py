@@ -53,16 +53,22 @@ def test_runtime_content_uses_normalized_records() -> None:
         }
     assert len(accessories) >= 54
     path_keys = {row["path_key"] for row in accessories}
-    assert path_keys == {"body", "spell", "device", "demonic", "beast", "support"}
+    assert path_keys == {"body", "spell", "device", "demonic", "beast", "support", None}
+    assert {row["key"] for row in accessories if row.get("path_key") is None} == {
+        "item.accessory.field_compass"
+    }
     for path_key in path_keys:
         path_items = [row for row in accessories if row["path_key"] == path_key]
-        assert len(path_items) >= 9
-        assert {
-            row["requirements"][0]["realm_key"] for row in path_items
-        } >= {
-            "qi_sensing", "qi_gathering", "foundation", "golden_core", "nascent_soul",
-            "soul_transformation", "void_refining", "dao_union", "tribulation",
-        }
+        assert len(path_items) >= (1 if path_key is None else 9)
+        required_realms = (
+            {"qi_gathering"}
+            if path_key is None
+            else {
+                "qi_sensing", "qi_gathering", "foundation", "golden_core", "nascent_soul",
+                "soul_transformation", "void_refining", "dao_union", "tribulation",
+            }
+        )
+        assert {row["requirements"][0]["realm_key"] for row in path_items} >= required_realms
 
 
 def test_bundled_content_prefers_host_working_directory_data(tmp_path: Path, monkeypatch) -> None:

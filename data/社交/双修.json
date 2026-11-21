@@ -1,0 +1,24 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "partner_cultivation",
+  "records": [
+    {
+      "key": "social.partner_cultivation",
+      "name": "道侣共修",
+      "aliases": ["双修"],
+      "desc": "道侣在青石镇或云上城相约共修。另一方应允后，各自支付灵石与精力，按本人的当前层修为区间获得修为；不自动晋层或突破。",
+      "status": "active",
+      "required_realm": "nascent_soul",
+      "required_layer": 1,
+      "allowed_locations": ["xuantian.new_town", "xuantian.cloud_city"],
+      "invitation_ttl_seconds": 600,
+      "daily_limit": 2,
+      "quota_timezone": "UTC",
+      "cost": {"spirit_stones": 100, "energy": 5},
+      "effect": "personal_layer_progress",
+      "gain_bp": 200,
+      "gain_min": 1,
+      "gain_max": 1500
+    }
+  ]
+}

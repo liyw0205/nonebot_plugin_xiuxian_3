@@ -86,6 +86,10 @@ class ContentBundle:
             from .companions.rules import companion_technique_definitions
 
             companion_technique_definitions(bundle)
+        if any(kind == "partner_cultivation" for kind, _ in records):
+            from .partner_cultivation_content import dual_cultivation_definition
+
+            dual_cultivation_definition(bundle)
         return bundle
 
     @classmethod
