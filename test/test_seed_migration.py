@@ -894,6 +894,38 @@ def test_manifest_seed_migrates_when_the_trade_file_is_registered(host: Path) ->
     assert len(backups) == 1
     assert (backups[0] / "data" / MANIFEST_FILE).read_bytes() == old
     preserved(host)
+
+
+def test_beast_technique_manifest_seed_upgrade_backup_and_repeat(host: Path) -> None:
+    relative = Path("灵兽/战技.json")
+    manifest_path = host / "data" / MANIFEST_FILE
+    old_manifest_path = ROOT / "test/fixtures/official_seeds/manifest_pre_beast_techniques.json"
+    old_manifest = old_manifest_path.read_bytes()
+    digest = hashlib.sha256(old_manifest).hexdigest()
+    assert digest == "8334baff0b88e57f9eff7848112bac2da5baaae235eaa57918fa531ab8e69bf6"
+    migration = json.loads((ROOT / "scripts/seed_migrations.json").read_text(encoding="utf-8"))
+    assert migration[MANIFEST_FILE.as_posix()]["old_sha256"][digest].endswith(
+        ":data/内容清单.json"
+    )
+    assert migration[relative.as_posix()]["old_sha256"] == {}
+
+    manifest_path.write_bytes(old_manifest)
+    technique_path = host / "data" / relative
+    technique_path.unlink()
+    installed = deploy(host)
+    assert installed.returncode == 0, installed.stdout + installed.stderr
+    assert manifest_path.read_bytes() == (ROOT / "data" / MANIFEST_FILE).read_bytes()
+    assert technique_path.read_bytes() == (ROOT / "data" / relative).read_bytes()
+    backups = list((host / ".xiuxian3/backups").glob("deploy-*"))
+    assert len(backups) == 1
+    assert (backups[0] / "data" / MANIFEST_FILE).read_bytes() == old_manifest
+    assert not (backups[0] / "data" / relative).exists()
+    preserved(host)
+
+    repeated = deploy(host)
+    assert repeated.returncode == 0, repeated.stdout + repeated.stderr
+    assert "种子更新 0 个" in repeated.stdout
+    preserved(host)
     repeated = deploy(host)
     assert repeated.returncode == 0, repeated.stdout + repeated.stderr
     assert "种子更新 0 个" in repeated.stdout

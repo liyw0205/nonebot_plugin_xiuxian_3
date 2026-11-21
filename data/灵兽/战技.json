@@ -1,0 +1,45 @@
+{
+  "kind": "companion_technique",
+  "records": [
+    {
+      "key": "technique.beast.rat_first_strike",
+      "name": "踏风先声",
+      "desc": "灵兽在战斗中为主人助阵，强化首次主动攻击。",
+      "compatible_species": ["beast.iron_rat", "beast.jade_rat"],
+      "slot_no": 1,
+      "unlock_evolution_key": "beast.evolution.wood_rat_1",
+      "effect": {
+        "type": "opening_attack_bp",
+        "value": 1800
+      },
+      "status": "active"
+    },
+    {
+      "key": "technique.beast.rat_root_guard",
+      "name": "根甲护主",
+      "desc": "灵兽在主人首次承受攻击时分担部分冲击。",
+      "compatible_species": ["beast.iron_rat", "beast.jade_rat"],
+      "slot_no": 1,
+      "unlock_evolution_key": "beast.evolution.wood_rat_1",
+      "effect": {
+        "type": "first_guard_bp",
+        "value": 1500
+      },
+      "status": "active"
+    },
+    {
+      "key": "technique.beast.jade_resonance",
+      "name": "青玉共鸣",
+      "desc": "青玉鼠脉动共鸣，在主人首次受击时凝成护势。",
+      "compatible_species": ["beast.jade_rat"],
+      "slot_no": 2,
+      "unlock_evolution_key": "beast.evolution.iron_rat_2",
+      "effect": {
+        "type": "first_guard_bp",
+        "value": 1200
+      },
+      "status": "active"
+    }
+  ],
+  "schema": "xiuxian.content"
+}

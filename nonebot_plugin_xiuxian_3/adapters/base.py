@@ -454,6 +454,12 @@ def register_core_commands(router: CommandRouter, application: XiuxianApplicatio
     router.register("穿戴法器", application.equip_equipment, aliases=("穿戴装备",))
     router.register("卸下法器", application.unequip_equipment, aliases=("卸下装备",))
     router.register("灵兽状态", application.get_companion_status, aliases=("灵骑状态", "我的灵兽"))
+    router.register(
+        "灵兽战技", application.get_companion_technique_preview,
+        aliases=("灵兽战技预览",),
+    )
+    router.register("装配灵兽战技", application.equip_companion_technique, aliases=("装备灵兽战技",))
+    router.register("卸下灵兽战技", application.remove_companion_technique, aliases=("移除灵兽战技",))
     router.register("结缘灵兽", application.bond_companion, aliases=("结缘灵骑",))
     router.register("喂养灵兽", application.feed_companion, aliases=("喂灵兽",))
     router.register(

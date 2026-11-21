@@ -2960,6 +2960,22 @@ CREATE TABLE IF NOT EXISTS companion_gear_instances (
 CREATE INDEX IF NOT EXISTS idx_companion_gear_player
     ON companion_gear_instances(player_id, status, created_at);
 
+CREATE TABLE IF NOT EXISTS companion_technique_loadouts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    companion_instance_id INTEGER NOT NULL REFERENCES companion_instances(id) ON DELETE CASCADE,
+    slot_no INTEGER NOT NULL CHECK (slot_no BETWEEN 1 AND 2),
+    technique_key TEXT NOT NULL,
+    operation_id TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (companion_instance_id, slot_no),
+    UNIQUE (companion_instance_id, technique_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_companion_technique_player
+    ON companion_technique_loadouts(player_id, companion_instance_id, slot_no);
+
 CREATE TABLE IF NOT EXISTS void_market_purchases (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     purchase_id TEXT NOT NULL UNIQUE,

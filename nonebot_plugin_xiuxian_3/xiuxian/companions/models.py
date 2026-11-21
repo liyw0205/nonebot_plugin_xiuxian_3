@@ -47,9 +47,22 @@ class CompanionSnapshot:
     companions: tuple[dict[str, object], ...] = ()
 
 
+@dataclass(frozen=True, slots=True)
+class CompanionTechniqueResult:
+    instance_id: str
+    companion_key: str
+    slot_no: int
+    technique_key: str | None
+    action: str
+    changed: bool
+    loadout: tuple[dict[str, object], ...] = ()
+    already_completed: bool = False
+
+
 __all__ = [
     "CompanionMutationRecord",
     "CompanionSnapshot",
     "CompanionStatusRecord",
+    "CompanionTechniqueResult",
     "CompanionView",
 ]

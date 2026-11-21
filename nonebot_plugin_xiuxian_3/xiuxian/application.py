@@ -423,6 +423,9 @@ _HELP_PAGES = {
         f"{command_link('道历问安', '道历问安')}领取当日问安所得。\n\n"
         f"{command_link('灵兽状态', '灵兽状态')}可查看同行灵兽与灵骑；"
         f"{command_link('灵兽相伴', '灵兽相伴')}填写灵兽名或编号可与它静处，每日一次，御兽体质另有加成。"
+        f"{command_link('灵兽战技', '灵兽战技')}填写灵兽编号可预览灵窍与战技；"
+        f"{command_link('装配灵兽战技', '装配灵兽战技 灵兽编号 1 踏风先声')}装配战技，"
+        f"{command_link('卸下灵兽战技', '卸下灵兽战技 灵兽编号 1')}可清空指定灵窍。"
         f"行囊和鞍具可先查{command_link('生产预览 小型灵兽行囊', '生产预览 小型灵兽行囊')}"
         f"或{command_link('生产预览 竹鹿鞍具', '生产预览 竹鹿鞍具')}；"
         f"制成后用{command_link('装备灵具', '装备灵具')}填写灵兽号与灵具名。\n\n"
@@ -2850,6 +2853,25 @@ class XiuxianApplication:
 
     async def get_companion_status(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.companions.status(context), require_write=False)
+
+    async def get_companion_technique_preview(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context, lambda: self.companions.preview_techniques(context), require_write=False
+        )
+
+    async def equip_companion_technique(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.companions.equip_technique(context),
+            write_message="当前事件不允许装配灵兽战技。",
+        )
+
+    async def remove_companion_technique(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.companions.remove_technique(context),
+            write_message="当前事件不允许卸下灵兽战技。",
+        )
 
     async def bond_companion(self, context: CommandContext) -> CommandResult:
         return await self._invoke(context, lambda: self.companions.bond(context), write_message="当前事件不允许结缘灵兽。")

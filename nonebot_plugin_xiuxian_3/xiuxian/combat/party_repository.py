@@ -59,6 +59,7 @@ from .rules import TURN_TIMEOUT_SECONDS, battle_roll_bp, hit_chance_bp, enemy_de
 from ..stats.rules import frozen_combat_stats
 from ..utils.json_cache import decode_json_strict
 from .skill_effects import prepare_skill_action
+from .companion_techniques import apply_companion_techniques
 from ..social.party_rules import (
     party_definition_for,
     PARTY_TYPE_BOUNDARY_REALM,
@@ -1071,6 +1072,19 @@ class PartyCombatRepositoryMixin:
                 damage = int(stats["attack"]) * damage_multiplier_bp // 10_000 if roll < hit_bp else 0
                 if critical:
                     damage = damage * (15_000 + int(stats.get("crit_damage_bp", 0))) // 10_000
+                if snapshot.get("party_type") == PARTY_TYPE_STANDARD_PVE and not charging:
+                    used_by_member = dict(state.get("companion_technique_uses", {}))
+                    damage, technique_events, used = apply_companion_techniques(
+                        list(member.get("companions", [])),
+                        trigger="first_attack",
+                        amount=damage,
+                        used=set(used_by_member.get(player_id, [])),
+                    )
+                    if technique_events:
+                        used_by_member[player_id] = sorted(used)
+                        state["companion_technique_uses"] = used_by_member
+                else:
+                    technique_events = []
                 damage = min(enemy_hp, max(0, damage))
                 enemy_hp = max(0, enemy_hp - damage)
                 contribution[player_id] += damage
@@ -1086,19 +1100,20 @@ class PartyCombatRepositoryMixin:
                     + damage * int(stats.get("mana_leech_bp", 0)) // 10_000,
                 ) if not charging else 0
                 member_mana[player_id] += mana_recovery
-                actions.append(
-                    {
-                        "sequence_no": sequence,
-                        "actor_key": f"member:{player_id}",
-                        "strategy_key": "party.auto_skill",
-                        "skill_key": str(selected_skill.get("skill_key", "skill.basic_attack")),
-                        "target_key": "enemy",
-                        "hit_roll_bp": roll,
-                        "damage": damage,
-                        "critical": critical,
-                        "recovery": {"hp": recovery, "mana": mana_recovery},
-                    }
-                )
+                member_action = {
+                    "sequence_no": sequence,
+                    "actor_key": f"member:{player_id}",
+                    "strategy_key": "party.auto_skill",
+                    "skill_key": str(selected_skill.get("skill_key", "skill.basic_attack")),
+                    "target_key": "enemy",
+                    "hit_roll_bp": roll,
+                    "damage": damage,
+                    "critical": critical,
+                    "recovery": {"hp": recovery, "mana": mana_recovery},
+                }
+                if technique_events:
+                    member_action["companion_techniques"] = technique_events
+                actions.append(member_action)
             alive = [
                 member
                 for member in members
@@ -1131,13 +1146,29 @@ class PartyCombatRepositoryMixin:
                 damage = damage * (
                     10_000 - min(10_000, target_stats["damage_reduction_bp"])
                 ) // 10_000
+                if snapshot.get("party_type") == PARTY_TYPE_STANDARD_PVE and damage > 0:
+                    used_by_member = dict(state.get("companion_technique_uses", {}))
+                    damage, technique_events, used = apply_companion_techniques(
+                        list(target.get("companions", [])),
+                        trigger="first_received_damage",
+                        amount=damage,
+                        used=set(used_by_member.get(target_id, [])),
+                    )
+                    if technique_events:
+                        used_by_member[target_id] = sorted(used)
+                        state["companion_technique_uses"] = used_by_member
+                else:
+                    technique_events = []
                 damage = min(member_hp[target_id], damage)
                 reflected = damage * int(target_stats.get("damage_reflection_bp", 0)) // 10_000
                 enemy_hp = max(0, enemy_hp - reflected)
                 member_hp[target_id] = max(0, member_hp[target_id] - damage)
                 if member_hp[target_id] <= 0:
                     member_status[target_id] = "downed"
-                actions.append({"sequence_no": sequence, "actor_key": "enemy", "strategy_key": "enemy.auto", "skill_key": str(enemy["skill_key"]), "target_key": f"member:{target_id}", "hit_roll_bp": roll, "damage": damage, "critical": critical, "reflected_damage": reflected})
+                enemy_action = {"sequence_no": sequence, "actor_key": "enemy", "strategy_key": "enemy.auto", "skill_key": str(enemy["skill_key"]), "target_key": f"member:{target_id}", "hit_roll_bp": roll, "damage": damage, "critical": critical, "reflected_damage": reflected}
+                if technique_events:
+                    enemy_action["companion_techniques"] = technique_events
+                actions.append(enemy_action)
                 target_index += 1
             storm = dict(snapshot.get("time_storm", {}))
             if time_fort_party and storm.get("enabled") and expected_round % int(storm.get("interval_rounds", TIME_FORT_STORM_INTERVAL)) == 0:
@@ -1360,11 +1391,11 @@ class PartyCombatRepositoryMixin:
                     "contribution": contribution,
                     "enemy_hp": enemy_hp,
                 }
-                for metadata_key in ("soul_power_cost", "soul_power_loss", "pollution_gain", "summon_count", "domain_energy_loss", "critical", "recovery", "reflected_damage"):
+                for metadata_key in ("soul_power_cost", "soul_power_loss", "pollution_gain", "summon_count", "domain_energy_loss", "critical", "recovery", "reflected_damage", "companion_techniques"):
                     if metadata_key in action:
                         state_after[metadata_key] = (
                             action[metadata_key]
-                            if metadata_key in {"critical", "recovery"}
+                            if metadata_key in {"critical", "recovery", "companion_techniques"}
                             else int(action[metadata_key])
                         )
                 connection.execute(
