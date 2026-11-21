@@ -7,6 +7,7 @@
       "name": "道侣同行日课",
       "desc": "道侣每日可相约走访山野资源脉。双方各自完成一次真实取材后，分别领取同行所得。",
       "aliases": ["同行日课"],
+      "history_aliases": ["同行日课记录"],
       "status": "active",
       "source_kind": "deposit.extract",
       "deposit_keys": ["deposit.creek_roots", "deposit.ironwood_layer", "deposit.basalt_sand"],

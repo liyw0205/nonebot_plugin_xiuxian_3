@@ -22,6 +22,7 @@ REQUIRED_FIELDS = {
     "name",
     "desc",
     "aliases",
+    "history_aliases",
     "status",
     "source_kind",
     "deposit_keys",
@@ -93,16 +94,12 @@ def partner_daily_definition(content: ContentBundle | None = None, *, require_ac
             or len(set(raw_deposits)) != len(raw_deposits)):
         raise ContentError(f"{DEFAULTS_KEY} has invalid resource deposit references")
 
-    raw_aliases = row.get("aliases")
-    if not isinstance(raw_aliases, list) or any(
-        not isinstance(alias, str) or not alias.strip() or alias != alias.strip()
-        or any(character.isspace() for character in alias)
-        for alias in raw_aliases
-    ):
-        raise ContentError(f"{DEFAULTS_KEY} aliases are malformed")
-    aliases = [_text(row, "name"), *(alias.strip() for alias in raw_aliases)]
-    if len({alias.casefold() for alias in aliases}) != len(aliases):
-        raise ContentError(f"{DEFAULTS_KEY} aliases are not unique")
+    name = _text(row, "name")
+    aliases = _command_aliases(row.get("aliases"), "aliases")
+    history_aliases = _command_aliases(row.get("history_aliases"), "history_aliases")
+    selectors = [name, *aliases, *history_aliases]
+    if len({selector.casefold() for selector in selectors}) != len(selectors):
+        raise ContentError(f"{DEFAULTS_KEY} command aliases are not unique")
 
     rewards = row.get("reward_items")
     if not isinstance(rewards, dict) or not rewards:
@@ -122,9 +119,10 @@ def partner_daily_definition(content: ContentBundle | None = None, *, require_ac
         raise ContentError(f"{DEFAULTS_KEY} must be limited to one task per UTC day")
     return {
         "key": DEFAULTS_KEY,
-        "name": aliases[0],
+        "name": name,
         "description": _text(row, "desc"),
-        "aliases": tuple(aliases),
+        "aliases": (name, *aliases),
+        "history_aliases": history_aliases,
         "source_kind": SOURCE_KIND,
         "deposit_keys": tuple(raw_deposits),
         "target_each": _positive_int(row.get("target_each"), "target_each", maximum=10),
@@ -133,6 +131,24 @@ def partner_daily_definition(content: ContentBundle | None = None, *, require_ac
         "reward_world_merit": _positive_int(row.get("reward_world_merit"), "reward_world_merit", maximum=1000),
         "reward_items": normalized_rewards,
     }
+
+
+def _command_aliases(value: Any, field: str) -> tuple[str, ...]:
+    if not isinstance(value, list) or any(
+        not isinstance(alias, str) or not alias.strip() or alias != alias.strip()
+        or any(character.isspace() for character in alias)
+        for alias in value
+    ):
+        raise ContentError(f"{DEFAULTS_KEY} {field} are malformed")
+    aliases = tuple(value)
+    if len({alias.casefold() for alias in aliases}) != len(aliases):
+        raise ContentError(f"{DEFAULTS_KEY} {field} are not unique")
+    return aliases
+
+
+def partner_daily_task_snapshot(definition: dict[str, Any]) -> dict[str, Any]:
+    """Keep routing-only configuration out of persisted task promises."""
+    return {field: definition[field] for field in SNAPSHOT_FIELDS}
 
 
 def partner_daily_snapshot(snapshot: Any) -> dict[str, Any]:

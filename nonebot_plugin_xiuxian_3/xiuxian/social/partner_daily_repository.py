@@ -11,7 +11,11 @@ from uuid import uuid4
 
 from ...contracts import serialize_datetime
 from ..content import ContentError, ContentBundle, bundled_content
-from ..partner_daily_content import partner_daily_definition, partner_daily_snapshot
+from ..partner_daily_content import (
+    partner_daily_definition,
+    partner_daily_snapshot,
+    partner_daily_task_snapshot,
+)
 from ..persistence.errors import (
     OperationResultMalformedError,
     PartnerTaskNoPartnerError,
@@ -178,7 +182,7 @@ class PartnerDailyTaskRepositoryMixin:
                 raise PartnerDailyTaskError("ACTIVE")
             task_id = "partner-daily-" + uuid4().hex
             expires_at = serialize_datetime(now + timedelta(seconds=rule["window_seconds"]))
-            snapshot = dict(rule)
+            snapshot = partner_daily_task_snapshot(rule)
             snapshot_json = _json(snapshot)
             snapshot_hash = self._request_hash("social.partner_daily.snapshot", snapshot)
             connection.execute(

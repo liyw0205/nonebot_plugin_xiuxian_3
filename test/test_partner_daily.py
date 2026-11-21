@@ -21,6 +21,7 @@ from nonebot_plugin_xiuxian_3.xiuxian.content import ContentBundle, ContentError
 from nonebot_plugin_xiuxian_3.xiuxian.partner_daily_content import (
     partner_daily_definition,
     partner_daily_snapshot,
+    partner_daily_task_snapshot,
 )
 from test_field_journeys import FieldJourney
 from test_companion_old_trail_mainline import _database_state
@@ -42,8 +43,9 @@ def _content(mutator):
 def test_partner_daily_static_rule_is_strict_and_snapshot_is_frozen():
     content = bundled_content()
     definition = partner_daily_definition(content)
-    frozen = json.loads(json.dumps(definition, ensure_ascii=False))
-    assert partner_daily_snapshot(frozen) == definition
+    frozen = json.loads(json.dumps(partner_daily_task_snapshot(definition), ensure_ascii=False))
+    assert partner_daily_snapshot(frozen) == partner_daily_task_snapshot(definition)
+    assert "history_aliases" not in frozen
 
     changed = _content(lambda records: records["partner_daily_task", TASK_KEY].update(reward_world_merit=999))
     assert partner_daily_definition(changed)["reward_world_merit"] == 999
@@ -61,6 +63,8 @@ def test_partner_daily_static_rule_is_strict_and_snapshot_is_frozen():
         lambda row: row.update(aliases=["two words"]),
         lambda row: row.update(aliases=[" spaced "]),
         lambda row: row.update(aliases=["Alias", "alias"]),
+        lambda row: row.update(history_aliases=["同行日课", "同行日课"]),
+        lambda row: row.update(history_aliases=["同行日课"]),
         lambda row: row.update(reward_items={"item.tribulation_token": 1}),
     )
     for mutate in mutations:
@@ -78,6 +82,7 @@ def test_partner_daily_static_rule_is_strict_and_snapshot_is_frozen():
     ("reward_items", {"item.missing": 1}), ("reward_items", {"item.spirit_water": True}),
     ("deposit_keys", ["deposit.creek_roots", "deposit.creek_roots"]),
     ("source_kind", "client.success"), ("aliases", [" "]),
+    ("history_aliases", ["two words"]),
     ("name", " "), ("status", "unknown"),
 ])
 def test_partner_daily_rejects_invalid_rule_fields(field, value):
@@ -453,7 +458,7 @@ def test_partner_daily_command_aliases_follow_static_rule(adapter, tmp_path):
         journey = FieldJourney(_copy_content(tmp_path), adapter)
         try:
             content = _content(lambda records: records["partner_daily_task", TASK_KEY].update(
-                aliases=["新同行日课"]
+                aliases=["新同行日课"], history_aliases=["新同行记录"]
             ))
             application = XiuxianApplication(journey.runtime.repository, content)
             router = CommandRouter()
@@ -470,6 +475,10 @@ def test_partner_daily_command_aliases_follow_static_rule(adapter, tmp_path):
             assert not current.data["has_partner"]
             removed = await journey.send("同行日课", user="a", writable=False)
             assert removed.code == "COMMAND_NOT_FOUND"
+            current_history = await journey.send("新同行记录", user="a", writable=False)
+            assert current_history.ok and current_history.code == "PARTNER_DAILY_HISTORY"
+            removed_history = await journey.send("同行日课记录", user="a", writable=False)
+            assert removed_history.code == "COMMAND_NOT_FOUND"
         finally:
             await journey.runtime.close()
 
@@ -479,11 +488,12 @@ def test_partner_daily_command_aliases_follow_static_rule(adapter, tmp_path):
 def test_partner_daily_command_alias_conflicts_fail_router_registration(tmp_path):
     runtime = create_runtime(data_dir=tmp_path, adapters=("web",))
     try:
-        content = _content(lambda records: records["partner_daily_task", TASK_KEY].update(
-            aliases=["开始道侣日课"]
-        ))
-        with pytest.raises(ValueError, match="command already registered"):
-            register_core_commands(CommandRouter(), XiuxianApplication(runtime.repository, content))
+        for field in ("aliases", "history_aliases"):
+            content = _content(lambda records, field=field: records["partner_daily_task", TASK_KEY].update(
+                {field: ["开始道侣日课"]}
+            ))
+            with pytest.raises(ValueError, match="command already registered"):
+                register_core_commands(CommandRouter(), XiuxianApplication(runtime.repository, content))
     finally:
         asyncio.run(runtime.close())
 
