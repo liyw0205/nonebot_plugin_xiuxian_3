@@ -31,6 +31,19 @@ REQUIRED_FIELDS = {
     "reward_world_merit",
     "reward_items",
 }
+SNAPSHOT_FIELDS = {
+    "key",
+    "name",
+    "description",
+    "aliases",
+    "source_kind",
+    "deposit_keys",
+    "target_each",
+    "window_seconds",
+    "daily_limit",
+    "reward_world_merit",
+    "reward_items",
+}
 
 
 def _bundle(content: ContentBundle | None) -> ContentBundle:
@@ -50,17 +63,25 @@ def _positive_int(value: Any, field: str, *, maximum: int) -> int:
     return value
 
 
-def partner_daily_definition(content: ContentBundle | None = None) -> dict[str, Any]:
+def partner_daily_definition(content: ContentBundle | None = None, *, require_active: bool = True) -> dict[str, Any]:
     bundle = _bundle(content)
+    if {row['key'] for row in bundle.list(KIND)} != {DEFAULTS_KEY}:
+        raise ContentError("partner daily tasks must contain exactly the supported rule")
     try:
         row = bundle.require(KIND, DEFAULTS_KEY, include_locked=True)
     except KeyError as exc:
         raise ContentError(f"missing partner daily task content: {DEFAULTS_KEY}") from exc
-    if row.get("status") != "active":
+    if row.get("status") not in {"active", "closed", "locked", "placeholder"}:
+        raise ContentError("partner daily task status is invalid")
+    if require_active and row.get("status") != "active":
         raise ContentError(f"{DEFAULTS_KEY} is not active")
-    missing = REQUIRED_FIELDS - set(row)
-    if missing:
-        raise ContentError(f"{DEFAULTS_KEY} is missing fields: {sorted(missing)}")
+    if set(row) != REQUIRED_FIELDS:
+        missing = REQUIRED_FIELDS - set(row)
+        unknown = set(row) - REQUIRED_FIELDS
+        raise ContentError(
+            f"{DEFAULTS_KEY} fields differ from contract: missing={sorted(missing)}, "
+            f"unknown={sorted(unknown)}"
+        )
     if _text(row, "source_kind") != SOURCE_KIND:
         raise ContentError(f"{DEFAULTS_KEY} has an unsupported source kind")
 
@@ -107,5 +128,54 @@ def partner_daily_definition(content: ContentBundle | None = None) -> dict[str, 
         "window_seconds": _positive_int(row.get("window_seconds"), "window_seconds", maximum=86400),
         "daily_limit": daily_limit,
         "reward_world_merit": _positive_int(row.get("reward_world_merit"), "reward_world_merit", maximum=1000),
+        "reward_items": normalized_rewards,
+    }
+
+
+def partner_daily_snapshot(snapshot: Any) -> dict[str, Any]:
+    """Validate the frozen, normalized rule without consulting today's rule state."""
+    if not isinstance(snapshot, dict) or set(snapshot) != SNAPSHOT_FIELDS:
+        raise ContentError("partner daily snapshot fields differ from contract")
+    if snapshot.get("key") != DEFAULTS_KEY or snapshot.get("source_kind") != SOURCE_KIND:
+        raise ContentError("partner daily snapshot uses an unsupported task or source")
+    name = _text(snapshot, "name")
+    description = _text(snapshot, "description")
+    raw_aliases = snapshot.get("aliases")
+    raw_deposits = snapshot.get("deposit_keys")
+    if (not isinstance(raw_aliases, (list, tuple))
+            or any(not isinstance(alias, str) or not alias.strip() for alias in raw_aliases)
+            or not isinstance(raw_deposits, (list, tuple))
+            or not raw_deposits
+            or any(not isinstance(key, str) or not key.startswith("deposit.") for key in raw_deposits)
+            or len(set(raw_deposits)) != len(raw_deposits)):
+        raise ContentError("partner daily snapshot references are malformed")
+    aliases = [alias.strip() for alias in raw_aliases]
+    if not aliases or aliases[0] != name or len(set(aliases)) != len(aliases):
+        raise ContentError("partner daily snapshot aliases are not unique")
+    rewards = snapshot.get("reward_items")
+    if not isinstance(rewards, dict) or not rewards:
+        raise ContentError("partner daily snapshot rewards are malformed")
+    normalized_rewards: dict[str, int] = {}
+    for item_key, quantity in rewards.items():
+        if (not isinstance(item_key, str) or not item_key.startswith("item.")
+                or item_key in FORBIDDEN_REWARD_ITEMS):
+            raise ContentError("partner daily snapshot contains an invalid reward item")
+        normalized_rewards[item_key] = _positive_int(
+            quantity, f"reward_items[{item_key}]", maximum=1000
+        )
+    daily_limit = _positive_int(snapshot.get("daily_limit"), "daily_limit", maximum=1)
+    if daily_limit != 1:
+        raise ContentError("partner daily snapshot daily_limit is invalid")
+    return {
+        "key": DEFAULTS_KEY,
+        "name": name,
+        "description": description,
+        "aliases": tuple(aliases),
+        "source_kind": SOURCE_KIND,
+        "deposit_keys": tuple(raw_deposits),
+        "target_each": _positive_int(snapshot.get("target_each"), "target_each", maximum=10),
+        "window_seconds": _positive_int(snapshot.get("window_seconds"), "window_seconds", maximum=86400),
+        "daily_limit": daily_limit,
+        "reward_world_merit": _positive_int(snapshot.get("reward_world_merit"), "reward_world_merit", maximum=1000),
         "reward_items": normalized_rewards,
     }

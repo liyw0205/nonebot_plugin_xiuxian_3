@@ -185,6 +185,14 @@ class DepositRepositoryMixin:
                            "text": text, "idempotent_replay": False, "action": action, "stock_before": stock_before,
                            "plan_key": option["key"] if action == "extract" else None}
                 record_operation(connection, operation_id, name, int(player["id"]), request_hash, payload, now_text)
+                if action == "extract":
+                    self._record_partner_daily_evidence(
+                        connection,
+                        player_id=int(player["id"]),
+                        source_operation_id=operation_id,
+                        source_key=key,
+                        occurred_at=now_text,
+                    )
                 if key not in saved:
                     connection.execute("INSERT INTO field_deposits VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                                        (player["id"], key, operation_id, operation_id, state["stock"], state["regenerates_at"],

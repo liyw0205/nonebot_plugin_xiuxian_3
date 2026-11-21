@@ -83,6 +83,7 @@ from .social.dao_hall_use_cases import DaoHallApplication
 from .social.dao_route_use_cases import DaoRouteApplication
 from .events.ascension_day_use_cases import AscensionDayApplication
 from .social.partner_task_use_cases import PartnerTaskApplication
+from .social.partner_daily_use_cases import PartnerDailyApplication
 from .economy.void_material_use_cases import VoidMaterialApplication
 from .economy.auction_use_cases import AuctionApplication
 from .economy.purchase_order_use_cases import PurchaseOrderApplication
@@ -655,6 +656,7 @@ class XiuxianApplication:
         self.dao_route = DaoRouteApplication(repository)
         self.ascension_day = AscensionDayApplication(repository)
         self.partner_task = PartnerTaskApplication(repository)
+        self.partner_daily = PartnerDailyApplication(repository)
         self.void_material = VoidMaterialApplication(repository)
         self.auction = AuctionApplication(repository)
         self.purchase_orders = PurchaseOrderApplication(repository)
@@ -739,6 +741,9 @@ class XiuxianApplication:
                 partner_lines = self._partner_task_help_lines()
                 if partner_lines:
                     body += "\n\n" + partner_lines
+                partner_daily_lines = self._partner_daily_help_lines()
+                if partner_daily_lines:
+                    body += "\n\n" + partner_daily_lines
                 body += "\n\n道侣共修：`双修预览`、`双修状态`、`发起双修 道号`、`接受双修 邀请号`、`拒绝双修 邀请号`、`取消双修 邀请号`。"
             return CommandResult(
                 True,
@@ -885,6 +890,31 @@ class XiuxianApplication:
                     f"{record['target_amount']} 场，各得世界功勋 {record['reward_world_merit']}"
                     "；协作不改任何一方的结局。",
                     f"- {command_link('道侣协作', '道侣协作')}查看进度与领取",
+                ]
+            )
+        except Exception:
+            return ""
+
+    def _partner_daily_help_lines(self) -> str:
+        """Describe the shared fieldwork task and its independent reward claims."""
+
+        try:
+            from .partner_daily_content import partner_daily_definition
+
+            rule = partner_daily_definition(self.content)
+            reward = [f"世界功勋 {rule['reward_world_merit']}"]
+            reward.extend(
+                f"{self.content.label('item', key)} ×{amount}"
+                for key, amount in rule["reward_items"].items()
+            )
+            return "\n".join(
+                [
+                    f"**{rule['name']}**",
+                    f"> UTC 每日限开 {rule['daily_limit']} 次；开启后双方各自完成 "
+                    f"{rule['target_each']} 次成功资源脉取材，再由本人分别领取 {'、'.join(reward)}。",
+                    f"- {command_link('道侣日课', '道侣日课')}查看状态",
+                    f"- {command_link('开始道侣日课', '开始道侣日课')}开启今日同行任务",
+                    f"- {command_link('领取道侣日课', '领取道侣日课')}领取本人奖励",
                 ]
             )
         except Exception:
@@ -3134,6 +3164,27 @@ class XiuxianApplication:
             context,
             lambda: self.partner_task.claim(context),
             write_message="当前事件不允许领取道侣协作。",
+        )
+
+    async def partner_daily_status(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.partner_daily.status(context),
+            require_write=False,
+        )
+
+    async def start_partner_daily_task(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.partner_daily.start(context),
+            write_message="当前事件不允许开启道侣日课。",
+        )
+
+    async def claim_partner_daily_task(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.partner_daily.claim(context),
+            write_message="当前事件不允许领取道侣日课。",
         )
 
     async def ascension_day_overview(self, context: CommandContext) -> CommandResult:

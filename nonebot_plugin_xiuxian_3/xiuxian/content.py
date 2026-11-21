@@ -93,7 +93,7 @@ class ContentBundle:
         if any(kind == "partner_daily_task" for kind, _ in records):
             from .partner_daily_content import partner_daily_definition
 
-            partner_daily_definition(bundle)
+            partner_daily_definition(bundle, require_active=False)
         return bundle
 
     @classmethod
