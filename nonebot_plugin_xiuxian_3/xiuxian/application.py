@@ -921,6 +921,14 @@ class XiuxianApplication:
         except Exception:
             return ""
 
+    def partner_daily_command_aliases(self) -> tuple[str, ...]:
+        """Expose strictly validated task aliases to the shared command router."""
+
+        from .partner_daily_content import partner_daily_definition
+
+        rule = partner_daily_definition(self.content, require_active=False)
+        return tuple(rule["aliases"][1:])
+
     def _ascension_day_help_lines(self) -> str:
         """Describe the ascension day on the explore page."""
 

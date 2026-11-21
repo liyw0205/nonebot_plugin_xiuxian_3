@@ -94,11 +94,14 @@ def partner_daily_definition(content: ContentBundle | None = None, *, require_ac
         raise ContentError(f"{DEFAULTS_KEY} has invalid resource deposit references")
 
     raw_aliases = row.get("aliases")
-    if not isinstance(raw_aliases, list) or any(not isinstance(alias, str) or not alias.strip()
-                                                for alias in raw_aliases):
+    if not isinstance(raw_aliases, list) or any(
+        not isinstance(alias, str) or not alias.strip() or alias != alias.strip()
+        or any(character.isspace() for character in alias)
+        for alias in raw_aliases
+    ):
         raise ContentError(f"{DEFAULTS_KEY} aliases are malformed")
     aliases = [_text(row, "name"), *(alias.strip() for alias in raw_aliases)]
-    if len(set(aliases)) != len(aliases):
+    if len({alias.casefold() for alias in aliases}) != len(aliases):
         raise ContentError(f"{DEFAULTS_KEY} aliases are not unique")
 
     rewards = row.get("reward_items")

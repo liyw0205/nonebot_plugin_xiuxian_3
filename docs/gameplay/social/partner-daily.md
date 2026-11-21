@@ -21,7 +21,7 @@
 
 ## 内容与快照
 
-静态规则位于 `data/社交/道侣日课.json`，类型为 `partner_daily_task`，唯一键为 `task.partner.daily.fieldwork`。内容声明任务状态、稳定键、名称/描述、别名、真实来源类型、允许资源脉、双方目标、任务时限、UTC 每日额度、世界功勋与物品奖励。所有可调目标和奖励来自 JSON；严格解析拒绝未知/缺失字段、重复别名、错误类型/范围、非白名单来源、缺失资源引用、不存在物品及终局奖励物品。
+静态规则位于 `data/社交/道侣日课.json`，类型为 `partner_daily_task`，唯一键为 `task.partner.daily.fieldwork`。内容声明任务状态、稳定键、名称/描述、命令别名、真实来源类型、允许资源脉、双方目标、任务时限、UTC 每日额度、世界功勋与物品奖励。任务别名直接由此规则注册到 QQ/OneBot 共用 router，不再在 Python 重复维护；必须是无空白的单词命令，和现有命令冲突会阻止 router 注册。严格解析拒绝未知/缺失字段、大小写归一后重复别名、错误类型/范围、非白名单来源、缺失资源引用、不存在物品及终局奖励物品。
 
 `partner_daily_tasks`、`partner_daily_evidence` 和 `partner_daily_claims` 由可重复执行的 additive SQLite migration 创建，不更新玩家、关系、双修、事件、资产或既有 operation 表。唯一约束分别保证每段关系每天一个任务、每个来源 operation 只投影一次、每名玩家每个任务最多领奖一次。新增官方种子通过 `scripts/seed_migrations.json` 记录实际 Git 来源和新旧 SHA-256；安装升级保留未识别的自定义文件。
 

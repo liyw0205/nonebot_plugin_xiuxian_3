@@ -10,7 +10,13 @@ from urllib.parse import unquote
 import pytest
 
 from nonebot_plugin_xiuxian_3.contracts import CommandContext
+from nonebot_plugin_xiuxian_3.adapters.base import (
+    AdapterRegistry,
+    CommandRouter,
+    register_core_commands,
+)
 from nonebot_plugin_xiuxian_3.runtime import create_runtime
+from nonebot_plugin_xiuxian_3.xiuxian.application import XiuxianApplication
 from nonebot_plugin_xiuxian_3.xiuxian.content import ContentBundle, ContentError, bundled_content
 from nonebot_plugin_xiuxian_3.xiuxian.partner_daily_content import (
     partner_daily_definition,
@@ -52,6 +58,9 @@ def test_partner_daily_static_rule_is_strict_and_snapshot_is_frozen():
         lambda row: row.update(target_each=True),
         lambda row: row.update(deposit_keys=["deposit.missing"]),
         lambda row: row.update(aliases=[row["name"], row["name"]]),
+        lambda row: row.update(aliases=["two words"]),
+        lambda row: row.update(aliases=[" spaced "]),
+        lambda row: row.update(aliases=["Alias", "alias"]),
         lambda row: row.update(reward_items={"item.tribulation_token": 1}),
     )
     for mutate in mutations:
@@ -436,6 +445,47 @@ def test_partner_daily_history_pagination_privacy_and_recovery(tmp_path, adapter
             await journey.runtime.close()
 
     asyncio.run(run())
+
+
+@pytest.mark.parametrize("adapter", ["onebot.v11", "qq.official"])
+def test_partner_daily_command_aliases_follow_static_rule(adapter, tmp_path):
+    async def run():
+        journey = FieldJourney(_copy_content(tmp_path), adapter)
+        try:
+            content = _content(lambda records: records["partner_daily_task", TASK_KEY].update(
+                aliases=["新同行日课"]
+            ))
+            application = XiuxianApplication(journey.runtime.repository, content)
+            router = CommandRouter()
+            register_core_commands(router, application)
+            journey.runtime.application = application
+            journey.runtime.router = router
+            journey.runtime.adapters = AdapterRegistry.create(router)
+            journey.runtime.adapters.register(adapter)
+            journey.runtime.repository.content = content
+
+            await starter(journey.runtime, user="a", adapter=adapter)
+            current = await journey.send("新同行日课", user="a", writable=False)
+            assert current.ok and current.code == "PARTNER_DAILY_STATUS"
+            assert not current.data["has_partner"]
+            removed = await journey.send("同行日课", user="a", writable=False)
+            assert removed.code == "COMMAND_NOT_FOUND"
+        finally:
+            await journey.runtime.close()
+
+    asyncio.run(run())
+
+
+def test_partner_daily_command_alias_conflicts_fail_router_registration(tmp_path):
+    runtime = create_runtime(data_dir=tmp_path, adapters=("web",))
+    try:
+        content = _content(lambda records: records["partner_daily_task", TASK_KEY].update(
+            aliases=["开始道侣日课"]
+        ))
+        with pytest.raises(ValueError, match="command already registered"):
+            register_core_commands(CommandRouter(), XiuxianApplication(runtime.repository, content))
+    finally:
+        asyncio.run(runtime.close())
 
 
 def test_partner_daily_permissions_relationship_recovery_and_quota(tmp_path):
