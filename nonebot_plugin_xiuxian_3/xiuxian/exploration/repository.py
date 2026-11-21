@@ -125,6 +125,7 @@ from ..adventures.mainline import (
     mainline_stage_status,
     resolve_mainline,
 )
+
 from ..content import bundled_content
 from ..adventures.rules import bounty_definition, DEFINITIONS as BOUNTY_DEFINITIONS, meets_realm as bounty_meets_realm, reward_map
 from ..routine.models import (
@@ -182,7 +183,6 @@ from ..utils.player import (
     player_reputation,
 )
 from ..rewards.rules import RewardContentError
-
 
 class ExplorationRepositoryMixin:
     async def relic_preview(self, *, platform, platform_user_id, selector=""):
@@ -636,7 +636,12 @@ class ExplorationRepositoryMixin:
                 "stat_snapshot": stat_snapshot,
                 "constitution_effect": stat_snapshot["constitution_effect"],
                 "equipment": stat_snapshot["equipment"],
-                "skills": self._battle_skill_snapshot(connection, player_id, str(player_state["path_key"] or "")),
+                "skills": (skills := self._battle_skill_snapshot(
+                    connection, player_id, str(player_state["path_key"] or "")
+                )),
+                "preferred_skill_key": self._usable_preferred_combat_tactic_key(
+                    connection, row, skills
+                ),
                 "companions": companion_snapshots,
             }
             # Freeze the weighted, realm-eligible encounter with the exploration

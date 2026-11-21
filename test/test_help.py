@@ -119,3 +119,28 @@ def test_social_help_exposes_party_preparation_and_recovery() -> None:
                 await runtime.close()
 
     asyncio.run(run())
+
+
+def test_cultivation_help_exposes_battle_tactic_configuration() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            try:
+                result = await runtime.dispatch(
+                    CommandContext(adapter="qq.official", user_id="tactic-help"),
+                    "修仙帮助 修炼",
+                )
+                assert result.ok
+                assert "战术预览" in result.message
+                commands = {
+                    unquote(payload)
+                    for _, payload in re.findall(r"\[([^]]+)\]\(command:([^)]+)\)", result.message)
+                }
+                assert "设置战术 神通名" in commands
+                assert "设置战术 自动" in commands
+                assert "法力不足" in result.message
+                assert "开战时冻结" in result.message
+            finally:
+                await runtime.close()
+
+    asyncio.run(run())

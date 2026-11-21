@@ -26,7 +26,9 @@ from ..persistence.errors import (
     PlayerNotFoundError,
     QuestWeeklyLimitError,
     RepositoryBusyError,
+    SkillNotAvailableError,
 )
+from ..advancement.skill_rules import available_skill_keys, skill_definition, skill_definitions
 from .models import (
     BattleReplayRecord,
     BattleResolutionRecord,
@@ -87,6 +89,150 @@ class CombatRepositoryMixin:
             return await asyncio.to_thread(
                 self._retry_sync, self._preview_training_dummy_once, platform, platform_user_id
             )
+
+    async def combat_tactics_profile(self, *, platform: str, platform_user_id: str) -> dict[str, Any]:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._combat_tactics_profile_once, platform, platform_user_id
+            )
+
+    async def set_combat_tactic(
+        self, *, platform: str, platform_user_id: str, skill_reference: str,
+        operation_id: str,
+    ) -> dict[str, Any]:
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._retry_sync, self._set_combat_tactic_once,
+                platform, platform_user_id, skill_reference, operation_id,
+            )
+
+    def _combat_tactics_profile_once(self, platform: str, platform_user_id: str) -> dict[str, Any]:
+        content = getattr(self, "content", None) or bundled_content()
+        with self._connect() as connection:
+            connection.execute("BEGIN")
+            player = self._require_player(connection, platform, platform_user_id, writable=False)
+            if str(player["stage"]) != "cultivator" or not player["path_key"]:
+                raise BattleRequirementError("combat tactics require cultivation entry")
+            state = player_combat_values(player)
+            skills = self._battle_skill_snapshot(
+                connection, int(player["id"]), str(state["path_key"] or "")
+            )
+            mastered = {str(item["skill_key"]): item for item in skills}
+            available = set(available_skill_keys(
+                str(state["path_key"] or ""), content,
+                realm_key=str(state["realm_key"]),
+                realm_layer=int(state["realm_layer"]),
+                inventory=state["inventory"],
+                mastered_keys=tuple(mastered),
+            ))
+            definitions = skill_definitions(content)
+            candidates = [
+                {
+                    "skill_key": key,
+                    "label": definitions[key].label,
+                    "level": int(mastered[key].get("level", 0)),
+                    "mana_cost": int(mastered[key].get("mana_cost", 0)),
+                }
+                for key in sorted(set(mastered) & available)
+            ]
+            row = connection.execute(
+                "SELECT preferred_skill_key FROM player_combat_tactics WHERE player_id=?",
+                (player["id"],),
+            ).fetchone()
+            preference = str(row["preferred_skill_key"]) if row and row["preferred_skill_key"] else None
+            valid_preference = preference if preference in available and preference in mastered else None
+            max_mana = int(self._build_player_stat_snapshot(connection, player)["combat_stats"]["max_mana"])
+            automatic = self._select_battle_skill(skills, available_mana=max_mana)
+            selected = next((item for item in skills if item["skill_key"] == valid_preference), None)
+            if selected is None or int(selected.get("mana_cost", 0)) > max_mana:
+                selected = automatic
+            selected_key = str(selected["skill_key"])
+            return {
+                "preferred_skill_key": preference,
+                "preference_available": preference is None or valid_preference is not None,
+                "selected_skill_key": selected_key,
+                "selected_skill_label": definitions[selected_key].label if selected_key in definitions else "基础攻击",
+                "max_mana": max_mana,
+                "candidates": candidates,
+                "fallback": "当前回合法力不足时按自动选招；没有可用神通则使用基础攻击。",
+            }
+
+    def _set_combat_tactic_once(
+        self, platform: str, platform_user_id: str, skill_reference: str, operation_id: str,
+    ) -> dict[str, Any]:
+        operation_name = "combat.tactic.set"
+        normalized = skill_reference.strip()
+        request_hash = self._request_hash(operation_name, {
+            "platform": platform,
+            "platform_user_id": platform_user_id,
+            "skill_reference": normalized,
+        })
+        now_text = serialize_datetime(self._now())
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT operation_name, request_hash, result_json FROM operations WHERE operation_id=?",
+                (operation_id,),
+            ).fetchone()
+            if existing is not None:
+                if existing["operation_name"] != operation_name or existing["request_hash"] != request_hash:
+                    raise OperationConflictError("combat tactic operation conflicts")
+                result = decode_json_strict(existing["result_json"])
+                result["idempotent_replay"] = True
+                return result
+            player = self._require_player(connection, platform, platform_user_id)
+            if str(player["stage"]) != "cultivator" or not player["path_key"]:
+                raise BattleRequirementError("combat tactics require cultivation entry")
+            if self._has_active_long_action(connection, int(player["id"])):
+                raise BattleBusyError("combat tactics cannot change during an active action")
+
+            key: str | None
+            label: str
+            if normalized in {"自动", "自动选择"}:
+                key = None
+                label = "自动选择"
+            else:
+                try:
+                    definition = skill_definition(normalized, self.content)
+                except ValueError as exc:
+                    raise SkillNotAvailableError("unknown player skill") from exc
+                state = player_combat_values(player)
+                skills = self._battle_skill_snapshot(
+                    connection, int(player["id"]), str(state["path_key"] or "")
+                )
+                mastered = {str(item["skill_key"]) for item in skills}
+                available = available_skill_keys(
+                    str(state["path_key"] or ""), self.content,
+                    realm_key=str(state["realm_key"]),
+                    realm_layer=int(state["realm_layer"]),
+                    inventory=state["inventory"],
+                    mastered_keys=tuple(mastered),
+                )
+                if definition.key not in mastered or definition.key not in available:
+                    raise SkillNotAvailableError("preferred skill is not currently mastered and usable")
+                key = definition.key
+                label = definition.label
+            if key is None:
+                connection.execute(
+                    "DELETE FROM player_combat_tactics WHERE player_id=?", (player["id"],)
+                )
+            else:
+                connection.execute(
+                    "INSERT INTO player_combat_tactics(player_id, preferred_skill_key, updated_at) "
+                    "VALUES (?, ?, ?) ON CONFLICT(player_id) DO UPDATE SET "
+                    "preferred_skill_key=excluded.preferred_skill_key, updated_at=excluded.updated_at",
+                    (player["id"], key, now_text),
+                )
+            result = {"preferred_skill_key": key, "label": label, "updated_at": now_text}
+            connection.execute(
+                "INSERT INTO operations(operation_id, operation_name, player_id, request_hash, result_json, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (operation_id, operation_name, player["id"], request_hash,
+                 json.dumps(result, ensure_ascii=False, sort_keys=True), now_text),
+            )
+            return result
 
     async def preview_player_spar(
         self, *, platform: str, platform_user_id: str, target_ref: str
@@ -475,6 +621,13 @@ class CombatRepositoryMixin:
                 if exploration is not None
                 else self._battle_skill_snapshot(connection, int(player["id"]), str(path_key or ""))
             )
+            preferred_skill_key = (
+                exploration_snapshot.get("preferred_skill_key")
+                if exploration is not None
+                else self._usable_preferred_combat_tactic_key(connection, player, skills)
+                if battle_type == "pve.encounter"
+                else None
+            )
             companion_snapshot = (
                 tuple(dict(item) for item in exploration_snapshot["companions"])
                 if exploration is not None
@@ -505,6 +658,7 @@ class CombatRepositoryMixin:
                     "manual_effects": manual_effects,
                     "equipment": list(equipment),
                     "skills": skills,
+                    **({"preferred_skill_key": preferred_skill_key} if battle_type in {"pve.encounter", "pve.exploration"} else {}),
                     "companions": [dict(item) for item in companion_snapshot],
                     "device": dict(device_snapshot) if device_snapshot is not None else None,
                     "cross_realm_penalty_bp": int(exploration_snapshot["cross_realm_penalty_bp"]) if exploration is not None else 0,
@@ -803,7 +957,15 @@ class CombatRepositoryMixin:
             debt_shield_bp = int(tribulation.get("debt_shield_bp", 0)) if is_tribulation_trial else 0
             player_skills = list(snapshot.get("player", {}).get("skills", []))
             player_mana = int(state.get("player_mana", player_stats.get("max_mana", 0)))
-            selected_skill = self._select_battle_skill(player_skills, available_mana=player_mana)
+            selected_skill = self._select_battle_skill(
+                player_skills,
+                available_mana=player_mana,
+                preferred_skill_key=(
+                    snapshot["player"].get("preferred_skill_key")
+                    if snapshot.get("battle_type") in {"pve.encounter", "pve.exploration"}
+                    else None
+                ),
+            )
             player_hp = int(state["player_hp"])
             enemy_hp = int(state["enemy_hp"])
             timeout = now >= datetime.fromisoformat(str(session["turn_deadline"]))
@@ -1646,8 +1808,33 @@ class CombatRepositoryMixin:
         return skills
 
     @staticmethod
+    def _preferred_combat_tactic_key(connection: sqlite3.Connection, player_id: int) -> str | None:
+        row = connection.execute(
+            "SELECT preferred_skill_key FROM player_combat_tactics WHERE player_id=?",
+            (player_id,),
+        ).fetchone()
+        return str(row["preferred_skill_key"]) if row and row["preferred_skill_key"] else None
+
+    def _usable_preferred_combat_tactic_key(
+        self, connection: sqlite3.Connection, player: sqlite3.Row,
+        skills: list[dict[str, object]],
+    ) -> str | None:
+        key = self._preferred_combat_tactic_key(connection, int(player["id"]))
+        if key is None or key not in {str(skill.get("skill_key")) for skill in skills}:
+            return None
+        state = player_combat_values(player)
+        available = available_skill_keys(
+            str(state["path_key"] or ""), getattr(self, "content", None),
+            realm_key=str(state["realm_key"]), realm_layer=int(state["realm_layer"]),
+            inventory=state["inventory"],
+            mastered_keys=tuple(str(skill.get("skill_key")) for skill in skills),
+        )
+        return key if key in available else None
+
+    @staticmethod
     def _select_battle_skill(
-        skills: list[dict[str, object]], *, available_mana: int | None = None
+        skills: list[dict[str, object]], *, available_mana: int | None = None,
+        preferred_skill_key: str | None = None,
     ) -> dict[str, object]:
         """Choose the strongest mastered active skill deterministically."""
 
@@ -1655,6 +1842,13 @@ class CombatRepositoryMixin:
             skill for skill in skills
             if available_mana is None or int(skill.get("mana_cost", 0)) <= available_mana
         ]
+        if preferred_skill_key is not None:
+            preferred = next(
+                (skill for skill in affordable if skill.get("skill_key") == preferred_skill_key),
+                None,
+            )
+            if preferred is not None:
+                return preferred
         if not affordable:
             return {"skill_key": "skill.basic_attack", "effect": {"value": 10000, "level": 0}}
         return sorted(

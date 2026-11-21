@@ -218,7 +218,10 @@ _HELP_PAGES = {
         f"平日以{command_link('开始修炼', '开始修炼')}积累修为，到时{command_link('结算修炼', '结算修炼')}。"
         f"修为足够后{command_link('晋升境界', '晋升境界')}，逐层向前。\n\n"
         f"跨越大境界前，先用{command_link('突破预览', '突破预览')}填写目标境界查看所需准备，"
-        f"再用{command_link('开始突破', '开始突破')}填写同一目标。"
+        f"再用{command_link('开始突破', '开始突破')}填写同一目标。\n\n"
+        f"{command_link('战术预览', '战术预览')}查看已参悟的战斗神通与自动选招；"
+        f"用{command_link('设置战术', '设置战术 神通名')}指定偏好，或{command_link('恢复自动选招', '设置战术 自动')}清除偏好。"
+        "仅普通野外历练和普通多人副本使用；战斗时若当回合法力不足会自动选用可负担的招式。偏好在探索/开战时冻结，之后的更改不影响既有战斗。"
     ),
     "探索": (
         "**探索**\n\n"
@@ -1645,6 +1648,16 @@ class XiuxianApplication:
             lambda: self.combat.start_training_battle(context),
             require_write=False,
             write_message="当前事件不允许开始训练战。",
+        )
+
+    async def preview_combat_tactics(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(context, lambda: self.combat.preview_tactics(context), require_write=False)
+
+    async def set_combat_tactic(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.combat.set_tactic(context),
+            write_message="当前事件不允许更改自动战术。",
         )
 
     async def start_demon_war_front_battle(self, context: CommandContext) -> CommandResult:
