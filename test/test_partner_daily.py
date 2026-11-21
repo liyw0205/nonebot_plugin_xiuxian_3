@@ -317,6 +317,18 @@ def test_partner_daily_real_fieldwork_atomic_progress_and_independent_claims(tmp
             assert (await journey.send(
                 f"领取道侣日课 {task_id}", "daily-claim-a", user="a"
             )).data["idempotent_replay"]
+            before_history = _database_state(journey.runtime)
+            for user in ("a", "b"):
+                history = await journey.send("道侣日课记录", user=user, writable=False)
+                assert history.ok and history.code == "PARTNER_DAILY_HISTORY", history.message
+                historical = history.data["tasks"][0]
+                assert historical["task_id"] == task_id and historical["status"] == "completed"
+                assert historical["progress"] == {"self": 1, "partner": 1}
+                assert historical["claimed"] and historical["partner_claimed"]
+                assert historical["reward_world_merit"] == 5
+                assert historical["reward_items"] == {"item.spirit_water": 1}
+                await journey.render(history, f"道侣日课 {task_id}")
+            assert _database_state(journey.runtime) == before_history
             with journey.runtime.repository._connect() as connection:
                 connection.execute(
                     "UPDATE economy_ledger_entries SET amount=amount+1 "
@@ -326,6 +338,8 @@ def test_partner_daily_real_fieldwork_atomic_progress_and_independent_claims(tmp
             assert (await journey.send(
                 f"领取道侣日课 {task_id}", "daily-claim-a", user="a"
             )).code == "PERSISTENCE_ERROR"
+            bad_history = await journey.send("道侣日课记录", user="a", writable=False)
+            assert bad_history.code == "PERSISTENCE_ERROR" and bad_history.retryable
             assert _database_state(journey.runtime) == before_corrupt
         finally:
             await journey.runtime.close()
@@ -338,6 +352,90 @@ async def _command(runtime, user, text, operation="", *, writable=True):
         "web", CommandContext(adapter="web", user_id=user, operation_id=operation,
                               can_write_assets=writable), text,
     )
+
+
+@pytest.mark.parametrize("adapter", ["onebot.v11", "qq.official"])
+def test_partner_daily_history_pagination_privacy_and_recovery(tmp_path, adapter):
+    async def run():
+        journey = FieldJourney(_copy_content(tmp_path), adapter)
+        try:
+            assert (await journey.send("道侣日课记录", user="missing")).code == "PLAYER_NOT_FOUND"
+            for user, name in (("a", "同行甲"), ("b", "同行乙"), ("c", "旁观丙")):
+                await _player(journey.runtime, adapter, user, name)
+            before = _database_state(journey.runtime)
+            empty = await journey.send("道侣日课记录", user="a", writable=False)
+            assert empty.ok and empty.data["tasks"] == [] and not empty.actions
+            for value in ("0", "-1", "10001", "1.0", "x", "1 2", "１", "9" * 5000):
+                invalid = await journey.send(f"道侣日课记录 {value}", user="a")
+                assert invalid.code == "INVALID_PARTNER_DAILY_COMMAND", invalid.message
+            for value in (True, 0, -1, 10001, "1"):
+                with pytest.raises(ValueError):
+                    await journey.runtime.repository.partner_daily_history(
+                        platform=adapter, platform_user_id="a", page=value,
+                    )
+            assert _database_state(journey.runtime) == before
+            invite = await journey.send("邀请结为道侣 同行乙", "history-invite", user="a")
+            assert invite.ok, invite.message
+            relation_id = invite.data["relation_id"]
+            assert (await journey.send(f"接受道侣邀请 {relation_id}", "history-accept", user="b")).ok
+            task_ids = []
+            for day in range(6):
+                start = await journey.send("开始道侣日课", f"history-day-{day}", user="a")
+                assert start.ok, start.message
+                task_ids.append(start.data["task_id"])
+                journey.clock.advance(days=1)
+            assert (await journey.send(f"申请解除道侣 {relation_id}", "history-end-ask", user="a")).ok
+            assert (await journey.send(f"确认解除道侣 {relation_id}", "history-end-confirm", user="b")).ok
+            await journey.restart()
+            journey.runtime.repository.content = _content(
+                lambda records: records["partner_daily_task", TASK_KEY].update(status="closed", reward_world_merit=999)
+            )
+            before = _database_state(journey.runtime)
+            first = await journey.send("道侣日课记录", user="a", writable=False)
+            assert first.ok, first.message
+            assert [task["task_id"] for task in first.data["tasks"]] == list(reversed(task_ids[1:]))
+            assert first.data["page"] == 1 and first.data["page_size"] == 5 and first.data["has_next"]
+            assert [action.command for action in first.actions] == ["道侣日课记录 2"]
+            await journey.render(first, "道侣日课记录 2", keyboard=True)
+            second = await journey.send(first.actions[0].command, user="a", writable=False)
+            assert second.ok and len(second.data["tasks"]) == 1 and not second.data["has_next"]
+            assert second.data["tasks"][0]["task_id"] == task_ids[0]
+            assert [action.command for action in second.actions] == ["道侣日课记录 1"]
+            await journey.render(second, f"道侣日课 {task_ids[0]}", keyboard=True)
+            for task in first.data["tasks"] + second.data["tasks"]:
+                assert task["status"] == "expired" and not task["relation_active"]
+                assert task["progress"] == {"self": 0, "partner": 0}
+                assert not task["claimed"] and not task["partner_claimed"]
+                assert task["reward_world_merit"] == 5
+                assert not {"player_a_id", "player_b_id", "relation_id", "platform", "platform_user_id"} & task.keys()
+                assert f"道侣日课 {task['task_id']}" in unquote(first.message + second.message)
+            details = await journey.send(f"道侣日课 {task_ids[0]}", user="a", writable=False)
+            assert details.ok and details.data["task"] == second.data["tasks"][0]
+            other_side = await journey.send("同行日课记录 2", user="b", writable=False)
+            assert second.data["tasks"][0]["partner_name"] == "同行乙"
+            assert other_side.ok and other_side.data == dict(
+                second.data, tasks=[dict(second.data["tasks"][0], partner_name="同行甲")],
+            )
+            stranger = await journey.send("道侣日课记录", user="c", writable=False)
+            assert stranger.ok and stranger.data["tasks"] == []
+            assert not any(task_id in stranger.message for task_id in task_ids)
+            far_page = await journey.send("道侣日课记录 10000", user="a", writable=False)
+            assert far_page.ok and far_page.data["tasks"] == [] and not far_page.data["has_next"]
+            assert [action.command for action in far_page.actions] == ["道侣日课记录 9999"]
+            assert _database_state(journey.runtime) == before
+            with journey.runtime.repository._connect() as connection:
+                connection.execute("UPDATE players SET status='suspended' WHERE platform_user_id='b'")
+            assert (await journey.send("道侣日课记录", user="b")).code == "PLAYER_SUSPENDED"
+            with journey.runtime.repository._connect() as connection:
+                connection.execute("UPDATE partner_daily_tasks SET snapshot_json='{}' WHERE task_id=?", (task_ids[-1],))
+            before_bad = _database_state(journey.runtime)
+            corrupt = await journey.send("道侣日课记录", user="a", writable=False)
+            assert corrupt.code == "PERSISTENCE_ERROR" and corrupt.retryable
+            assert _database_state(journey.runtime) == before_bad
+        finally:
+            await journey.runtime.close()
+
+    asyncio.run(run())
 
 
 def test_partner_daily_permissions_relationship_recovery_and_quota(tmp_path):

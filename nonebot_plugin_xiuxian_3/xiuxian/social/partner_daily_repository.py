@@ -36,6 +36,35 @@ class PartnerDailyTaskRepositoryMixin:
     def _partner_daily_content(self) -> ContentBundle:
         return self.content if self.content is not None else bundled_content()
 
+    async def partner_daily_history(self, *, platform: str, platform_user_id: str,
+                                    page: int = 1) -> dict[str, Any]:
+        if type(page) is not int or not 1 <= page <= 10000:
+            raise ValueError("partner daily history page must be between 1 and 10000")
+        await self.initialize()
+        async with self._inflight:
+            return await asyncio.to_thread(
+                self._partner_daily_history_once, platform, platform_user_id, page
+            )
+
+    def _partner_daily_history_once(self, platform: str, platform_user_id: str,
+                                    page: int) -> dict[str, Any]:
+        now = self._now().astimezone(timezone.utc)
+        page_size = 5
+        with self._connect() as connection:
+            connection.execute("BEGIN")
+            actor = self._require_player(connection, platform, platform_user_id, writable=False)
+            tasks = connection.execute(
+                "SELECT * FROM partner_daily_tasks WHERE player_a_id=? OR player_b_id=? "
+                "ORDER BY created_at DESC,task_id DESC LIMIT ? OFFSET ?",
+                (actor["id"], actor["id"], page_size + 1, (page - 1) * page_size),
+            ).fetchall()
+            return {
+                "page": page, "page_size": page_size,
+                "has_next": len(tasks) > page_size and page < 10000,
+                "tasks": [self._partner_daily_task_view(connection, task, int(actor["id"]), now)
+                          for task in tasks[:page_size]],
+            }
+
     async def partner_daily_status(self, *, platform: str, platform_user_id: str,
                                    task_id: str = "") -> dict[str, Any]:
         await self.initialize()

@@ -913,6 +913,7 @@ class XiuxianApplication:
                     f"> UTC 每日限开 {rule['daily_limit']} 次；开启后双方各自完成 "
                     f"{rule['target_each']} 次成功资源脉取材，再由本人分别领取 {'、'.join(reward)}。",
                     f"- {command_link('道侣日课', '道侣日课')}查看状态",
+                    f"- {command_link('道侣日课记录', '道侣日课记录')}查找历史任务与领取记录",
                     f"- {command_link('开始道侣日课', '开始道侣日课')}开启今日同行任务",
                     f"- {command_link('领取道侣日课', '领取道侣日课')}领取本人奖励",
                 ]
@@ -3170,6 +3171,13 @@ class XiuxianApplication:
         return await self._invoke(
             context,
             lambda: self.partner_daily.status(context),
+            require_write=False,
+        )
+
+    async def partner_daily_history(self, context: CommandContext) -> CommandResult:
+        return await self._invoke(
+            context,
+            lambda: self.partner_daily.history(context),
             require_write=False,
         )
 

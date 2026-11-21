@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 STATUS_COMMAND = "道侣日课"
 START_COMMAND = "开始道侣日课"
 CLAIM_COMMAND = "领取道侣日课"
+HISTORY_COMMAND = "道侣日课记录"
 
 
 class PartnerDailyApplication:
@@ -54,7 +55,8 @@ class PartnerDailyApplication:
     def _status_result(self, context: CommandContext, record: dict) -> CommandResult:
         task, rule = record["task"], record["rule"]
         actions: tuple[CommandAction, ...] = ()
-        lines = ["## 道侣同行日课", ""]
+        lines = ["## 道侣同行日课", "",
+                 command_link("历史日课与领取记录", HISTORY_COMMAND), ""]
         if not record["has_partner"] and task is None:
             lines.append("当前没有有效的道侣关系，无法开启同行日课。")
             return CommandResult(True, "PARTNER_DAILY_STATUS", "\n".join(lines),
@@ -140,6 +142,53 @@ class PartnerDailyApplication:
             return CommandResult(False, "PERSISTENCE_ERROR", "同行日课状态暂不可读取，请稍后重试。",
                                  context.request_id, retryable=True)
         return self._status_result(context, record)
+
+    async def history(self, context: CommandContext) -> CommandResult:
+        args = context.command_args
+        if (len(args) > 1 or args and (
+                not args[0].isascii() or not args[0].isdecimal()
+                or len(args[0]) > 5 or not 1 <= int(args[0]) <= 10000)):
+            return CommandResult(False, "INVALID_PARTNER_DAILY_COMMAND",
+                                 "道侣日课记录可带一个 1 至 10000 的页码。", context.request_id)
+        page = int(args[0]) if args else 1
+        try:
+            record = await self.repository.partner_daily_history(
+                platform=context.adapter, platform_user_id=context.user_id, page=page,
+            )
+        except PlayerNotFoundError:
+            return CommandResult(False, "PLAYER_NOT_FOUND", "尚未登记，先发送“开始修仙”。",
+                                 context.request_id)
+        except PlayerSuspendedError:
+            return CommandResult(False, "PLAYER_SUSPENDED", "当前角色不能查看同行日课。",
+                                 context.request_id)
+        except (OperationResultMalformedError, ContentError, ValueError, TypeError, KeyError,
+                sqlite3.Error, RepositoryBusyError):
+            logger.exception("partner daily history failed user=%s", context.user_id)
+            return CommandResult(False, "PERSISTENCE_ERROR", "同行日课记录暂不可读取，请稍后重试。",
+                                 context.request_id, retryable=True)
+        lines = ["## 道侣日课记录", "", f"第 {page} 页"]
+        statuses = {"open": "进行中", "claimable": "双方达标", "completed": "双方已领取", "expired": "已过期"}
+        for task in record["tasks"]:
+            command = f"{STATUS_COMMAND} {task['task_id']}"
+            progress = task["progress"]
+            lines.extend([
+                "", command_link(f"{task['quota_day']} · {task['name']}", command),
+                f"- {statuses[task['status']]}；你的取材 {progress['self']}/{task['target_each']}，"
+                f"道侣取材 {progress['partner']}/{task['target_each']}",
+                f"- 你的奖励：{'已领取' if task['claimed'] else '未领取'}；"
+                f"道侣奖励：{'已领取' if task['partner_claimed'] else '未领取'}",
+            ])
+        if not record["tasks"]:
+            lines.append("本页没有属于你的同行日课。")
+        actions = []
+        if page > 1:
+            actions.append(CommandAction("上一页", f"{HISTORY_COMMAND} {page - 1}"))
+        if record["has_next"]:
+            actions.append(CommandAction("下一页", f"{HISTORY_COMMAND} {page + 1}"))
+        if actions:
+            lines.extend(["", " · ".join(command_link(action.label, action.command) for action in actions)])
+        return CommandResult(True, "PARTNER_DAILY_HISTORY", "\n".join(lines),
+                             context.request_id, data=record, actions=tuple(actions))
 
     @staticmethod
     def _operation_id(context: CommandContext, suffix: str) -> str:

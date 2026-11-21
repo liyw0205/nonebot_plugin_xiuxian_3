@@ -56,7 +56,7 @@
 
 ## 道侣同行日课
 
-`道侣日课 [任务号]`、`开始道侣日课` 与 `领取道侣日课 [任务号]` 由 `PartnerDailyApplication` 统一承接，
+`道侣日课 [任务号]`、`道侣日课记录 [页码]`、`开始道侣日课` 与 `领取道侣日课 [任务号]` 由 `PartnerDailyApplication` 统一承接，
 QQ 官方和 OneBot V11 共用同一 router、application 与 SQLite repository。日课只接受内容白名单内的
 `deposit.extract` 成功 operation；来源回执、资源成本/产出、资源脉投影和双方进度证据处于同一事务。
 来源操作重放不重新投影；维护、预览、失败与任务开启前的 receipt 不计数。
@@ -65,6 +65,7 @@ QQ 官方和 OneBot V11 共用同一 router、application 与 SQLite repository�
 双方各自达标后，按 `(task_id, player_id)` 独立领奖；本人资产、claim 行和 operation receipt 在同一事务提交。
 当前规则关闭只阻止创建新任务，不改变已创建任务或奖励；关系不再 active 时不接收新证据或领奖。
 状态只读显示本人/道侣进度、截止时间与领取情况，不公开平台 ID 或内部 player ID。
+历史列表在同一读事务中仅查询本人参与的任务，每页五份、创建时间倒序，使用冻结快照及原有来源/领取流水校验；关系解除后仍可翻页进入详情，坏记录零写失败。
 
 错误码：`PARTNER_DAILY_NO_PARTNER`、`PARTNER_DAILY_PLAYER`、`PARTNER_DAILY_ACTIVE`、
 `PARTNER_DAILY_NOT_FOUND`、`PARTNER_DAILY_RELATION`、`PARTNER_DAILY_CLAIMED`、
