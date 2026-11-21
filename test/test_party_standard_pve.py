@@ -203,6 +203,104 @@ def test_standard_pve_qq_onebot_party_limits_snapshot_and_idempotency() -> None:
     asyncio.run(run())
 
 
+def test_standard_party_freezes_and_uses_each_members_combat_tactic() -> None:
+    async def run() -> None:
+        with TemporaryDirectory() as data_dir:
+            runtime = create_runtime(data_dir=data_dir)
+            members = (
+                ("qq.official", "tactic-party-leader"),
+                ("onebot.v11", "tactic-party-member"),
+                ("qq.official", "tactic-party-third"),
+                ("onebot.v11", "tactic-party-fourth"),
+            )
+            for adapter, user in members:
+                await _create_standard_player(runtime, adapter, user)
+
+            for index, (adapter, user) in enumerate(members[:2]):
+                with sqlite3.connect(runtime.settings.database_path) as connection:
+                    connection.execute(
+                        "UPDATE players SET path_key='body', skill_insights=20, spirit_stones=10000 "
+                        "WHERE platform=? AND platform_user_id=?",
+                        (adapter, user),
+                    )
+                for skill_index, skill in enumerate(("基础攻击", "重击")):
+                    trained = await runtime.adapters.dispatch(
+                        adapter,
+                        _ctx(adapter, user, f"tactic-party-train:{index}:{skill_index}"),
+                        f"参悟神通 {skill}",
+                    )
+                    assert trained.code == "SKILL_TRAINED", (skill, trained.code, trained.message)
+                preference = "基础攻击" if index == 0 else "重击"
+                configured = await runtime.adapters.dispatch(
+                    adapter, _ctx(adapter, user, f"tactic-party-configure:{index}"),
+                    f"设置战术 {preference}",
+                )
+                assert configured.code == "COMBAT_TACTIC_SET"
+
+            leader_adapter, leader = members[0]
+            created = await runtime.adapters.dispatch(
+                leader_adapter, _ctx(leader_adapter, leader, "tactic-party-create"),
+                "创建四人副本队伍",
+            )
+            assert created.code == "PARTY_CREATED"
+            party_id = str(created.data["party_id"])
+            for index, (adapter, user) in enumerate(members[1:], start=1):
+                await _invite_and_accept(runtime, leader_adapter, leader, adapter, user, party_id, index)
+            for index, (adapter, user) in enumerate(members):
+                confirmed = await runtime.adapters.dispatch(
+                    adapter, _ctx(adapter, user, f"tactic-party-confirm:{index}"),
+                    f"确认入队 {party_id}",
+                )
+                assert confirmed.code in {"PARTY_CONFIRMED", "PARTY_READY"}
+
+            started = await runtime.repository.start_party_battle(
+                platform=leader_adapter, platform_user_id=leader,
+                party_id=party_id, operation_id="tactic-party-start",
+            )
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                session_snapshot_text, state_text = connection.execute(
+                    "SELECT snapshot_json, state_json FROM party_battle_sessions WHERE battle_id=?",
+                    (started.battle_id,),
+                ).fetchone()
+                session_snapshot = json.loads(session_snapshot_text)
+                state = json.loads(state_text)
+                # Keep the encounter alive long enough for both member policies to act.
+                session_snapshot["enemy"]["max_hp"] = 1_000_000
+                state["enemy_hp"] = 1_000_000
+                connection.execute(
+                    "UPDATE party_battle_sessions SET snapshot_json=?, state_json=? WHERE battle_id=?",
+                    (json.dumps(session_snapshot, sort_keys=True), json.dumps(state, sort_keys=True), started.battle_id),
+                )
+            snapshots = {
+                str(member["player_id"]): member
+                for member in session_snapshot["members"]
+            }
+            assert snapshots[started.member_player_ids[0]]["preferred_skill_key"] == "skill.basic_attack"
+            assert snapshots[started.member_player_ids[1]]["preferred_skill_key"] == "skill.body.heavy_strike"
+
+            denied = await runtime.adapters.dispatch(
+                leader_adapter, _ctx(leader_adapter, leader, "tactic-party-edit-locked"),
+                "设置战术 自动",
+            )
+            assert denied.code == "TACTIC_BUSY"
+            await runtime.repository.run_party_battle_turn(
+                battle_id=started.battle_id, expected_round=1
+            )
+            with sqlite3.connect(runtime.settings.database_path) as connection:
+                actions = {
+                    str(row[0]): str(row[1])
+                    for row in connection.execute(
+                        "SELECT actor_key, skill_key FROM party_battle_actions WHERE battle_id=?",
+                        (started.battle_id,),
+                    ).fetchall()
+                }
+            assert actions[f"member:{started.member_player_ids[0]}"] == "skill.basic_attack"
+            assert actions[f"member:{started.member_player_ids[1]}"] == "skill.body.heavy_strike"
+            await runtime.close()
+
+    asyncio.run(run())
+
+
 def test_standard_pve_rejects_unsupported_location_and_keeps_other_party_types_separate() -> None:
     async def run() -> None:
         with TemporaryDirectory() as data_dir:

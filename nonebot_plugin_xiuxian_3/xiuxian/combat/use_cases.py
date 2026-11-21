@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ...contracts import CommandContext, CommandResult
+from ...contracts import CommandAction, CommandContext, CommandResult
 from ..persistence.errors import (
     BattleAlreadySettledError,
     BattleBusyError,
@@ -17,6 +17,7 @@ from ..persistence.errors import (
     PlayerNotFoundError,
     PlayerSuspendedError,
     RepositoryBusyError,
+    SkillNotAvailableError,
 )
 from ..utils.text import escape_markdown
 from .repository import CombatRepositoryMixin
@@ -56,6 +57,85 @@ class CombatApplication:
     @staticmethod
     def _display_name(player) -> str:
         return escape_markdown(player.dao_name or "未命名")
+
+    async def preview_tactics(self, context: CommandContext) -> CommandResult:
+        if context.command_args:
+            return CommandResult(False, "INVALID_TACTIC_COMMAND", "战术预览无需附加参数。", context.request_id)
+        try:
+            profile = await self.repository.combat_tactics_profile(
+                platform=context.adapter, platform_user_id=context.user_id,
+            )
+        except Exception as exc:
+            return self._error(context, "", exc)
+        preferred = profile["preferred_skill_key"]
+        candidates = profile["candidates"]
+        definition_labels = {item["skill_key"]: item["label"] for item in candidates}
+        if preferred is None:
+            preference_text = "自动选择"
+        elif not profile["preference_available"]:
+            preference_text = "所选神通当前不可用，战斗将按自动规则选择"
+        else:
+            preference_text = definition_labels.get(preferred, "已设置神通")
+        lines = [
+            "## 自动战术",
+            "",
+            f"- **当前偏好**：{preference_text}",
+            f"- **当前首选**：{profile['selected_skill_label']}",
+            "- **已掌握可用神通**：",
+        ]
+        if candidates:
+            lines.extend(
+                f"  - {item['label']} · {item['level']}级 · 法力 {item['mana_cost']}"
+                for item in candidates
+            )
+        else:
+            lines.append("  - 尚无可配置的已掌握神通")
+        lines.extend(("", f"> {profile['fallback']}", "> 战术仅用于野外探索和普通多人副本；开战后按冻结快照执行。"))
+        actions = [CommandAction("恢复自动选择", "设置战术 自动")]
+        return CommandResult(
+            True, "COMBAT_TACTICS_PREVIEW", "\n".join(lines), context.request_id,
+            data=profile, actions=tuple(actions),
+        )
+
+    async def set_tactic(self, context: CommandContext) -> CommandResult:
+        if len(context.command_args) != 1:
+            return CommandResult(
+                False, "INVALID_TACTIC_COMMAND", "请指定已掌握的神通名称，或使用 `自动` 恢复自动选招。",
+                context.request_id,
+            )
+        operation_id = self._operation_id(context, "combat.tactic.set")
+        try:
+            result = await self.repository.set_combat_tactic(
+                platform=context.adapter,
+                platform_user_id=context.user_id,
+                skill_reference=context.command_args[0],
+                operation_id=operation_id,
+            )
+        except SkillNotAvailableError:
+            return CommandResult(
+                False, "TACTIC_SKILL_UNAVAILABLE", "只能选择当前道途与境界下已参悟且可用的自身神通。",
+                context.request_id, operation_id,
+            )
+        except BattleBusyError:
+            return CommandResult(
+                False, "TACTIC_BUSY", "当前有进行中的行程或战斗，暂不能更改战术。",
+                context.request_id, operation_id,
+            )
+        except BattleRequirementError:
+            return CommandResult(
+                False, "TACTIC_REQUIREMENT_MISSING", "完成入道后才能配置自动战术。",
+                context.request_id, operation_id,
+            )
+        except Exception as exc:
+            return self._error(context, operation_id, exc)
+        replay = bool(result.get("idempotent_replay"))
+        label = escape_markdown(str(result["label"]))
+        return CommandResult(
+            True, "COMBAT_TACTIC_SET", f"自动战术已{'恢复为' if result['preferred_skill_key'] is None else '设为'} **{label}**。",
+            context.request_id, operation_id,
+            data={**result, "idempotent_replay": replay},
+            actions=(CommandAction("查看战术", "战术预览"),),
+        )
 
     @staticmethod
     def _error(context: CommandContext, operation_id: str, exc: Exception) -> CommandResult:

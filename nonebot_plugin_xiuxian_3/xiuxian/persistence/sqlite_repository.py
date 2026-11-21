@@ -29,6 +29,7 @@ from ..exploration.deposit_repository import DepositRepositoryMixin
 from ..exploration.deposit_migration import ensure_deposit_schema
 from ..combat.repository import CombatRepositoryMixin
 from ..combat.party_repository import PartyCombatRepositoryMixin
+from ..combat.tactics_migration import ensure_combat_tactics_schema
 from ..companions.repository import CompanionRepositoryMixin
 from ..adventures.repository import AdventuresRepositoryMixin
 from ..adventures.secret_realm_repository import SecretRealmRepositoryMixin
@@ -348,6 +349,7 @@ class SQLitePlayerRepository(
     def _initialize_sync(self) -> None:
         with self._connect() as connection:
             connection.executescript(SCHEMA)
+            ensure_combat_tactics_schema(connection)
             self._migrate_arena_mode_schema(connection)
             self._migrate_cultivation_session_status(connection)
             self._migrate_economy_ledger_asset_kind(connection)

@@ -637,6 +637,11 @@ class PartyCombatRepositoryMixin:
                         "manual_effects": stat_snapshot["manual_effects"],
                         "equipment": list(equipment),
                         "skills": skills,
+                        "preferred_skill_key": (
+                            self._usable_preferred_combat_tactic_key(connection, row, skills)
+                            if party_type == PARTY_TYPE_STANDARD_PVE
+                            else None
+                        ),
                         "companions": companions,
                         "soul_power": int(entry_snapshot.get("soul_power", player_state["soul_power"]) if entry_snapshot else player_state["soul_power"]),
                         "domain_key": (entry_snapshot.get("domain_key") if entry_snapshot else row["domain_key"]),
@@ -1040,6 +1045,11 @@ class PartyCombatRepositoryMixin:
                 selected_skill = self._select_battle_skill(
                     list(member.get("skills", [])),
                     available_mana=member_mana.get(player_id, 0),
+                    preferred_skill_key=(
+                        member.get("preferred_skill_key")
+                        if snapshot.get("party_type") == PARTY_TYPE_STANDARD_PVE
+                        else None
+                    ),
                 )
                 damage_multiplier_bp, skill_hit_bonus_bp, charging = prepare_skill_action(
                     selected_skill, state, expected_round
