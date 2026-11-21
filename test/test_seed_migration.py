@@ -832,6 +832,50 @@ def old_official_manifest() -> bytes:
     return blob
 
 
+def pre_dual_cultivation_manifest() -> bytes:
+    document = json.loads((ROOT / "data" / MANIFEST_FILE).read_text(encoding="utf-8"))
+    document["files"].remove("社交/双修.json")
+    blob = (json.dumps(document, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+    digest = hashlib.sha256(blob).hexdigest()
+    assert digest == "e1a27570d5656b90a3a975f8aa892e1cce314efb465c8b0b644444c9d38e3266"
+    rule = json.loads((ROOT / "scripts/seed_migrations.json").read_text(encoding="utf-8"))[
+        MANIFEST_FILE.as_posix()
+    ]
+    assert rule["old_sha256"][digest] == (
+        "623a0963688748273d86503e16125a9b9d3edcb1:data/内容清单.json"
+    )
+    return blob
+
+
+def test_dual_cultivation_manifest_and_missing_seed_upgrade(host: Path) -> None:
+    old_manifest = pre_dual_cultivation_manifest()
+    manifest_path = host / "data" / MANIFEST_FILE
+    rule_path = host / "data" / "社交/双修.json"
+    manifest_path.write_bytes(old_manifest)
+    rule_path.unlink()
+
+    installed = deploy(host)
+    assert installed.returncode == 0, installed.stdout + installed.stderr
+    assert "种子更新 2 个" in installed.stdout
+    assert manifest_path.read_bytes() == (ROOT / "data" / MANIFEST_FILE).read_bytes()
+    assert rule_path.read_bytes() == (ROOT / "data" / "社交/双修.json").read_bytes()
+    backups = list((host / ".xiuxian3/backups").glob("deploy-*"))
+    assert len(backups) == 1
+    assert (backups[0] / "data" / MANIFEST_FILE).read_bytes() == old_manifest
+    assert not (backups[0] / "data" / "社交/双修.json").exists()
+    preserved(host)
+
+    repeated = deploy(host)
+    assert repeated.returncode == 0, repeated.stdout + repeated.stderr
+    assert "种子更新 0 个" in repeated.stdout
+    custom = rule_path.read_bytes() + b"\n"
+    rule_path.write_bytes(custom)
+    kept = deploy(host)
+    assert kept.returncode == 0, kept.stdout + kept.stderr
+    assert rule_path.read_bytes() == custom
+    preserved(host)
+
+
 def test_manifest_seed_migrates_when_the_trade_file_is_registered(host: Path) -> None:
     # An old official manifest without the trade file must migrate, and the
     # new data file must be installed alongside it (it does not exist yet).

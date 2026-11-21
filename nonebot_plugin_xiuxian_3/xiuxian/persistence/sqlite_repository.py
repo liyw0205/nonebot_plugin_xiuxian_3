@@ -105,6 +105,8 @@ from ..social.dao_hall_repository import DaoHallRepositoryMixin
 from ..social.dao_route_repository import DaoRouteRepositoryMixin
 from ..events.ascension_day_repository import AscensionDayRepositoryMixin
 from ..social.partner_task_repository import PartnerTaskRepositoryMixin
+from ..social.dual_cultivation_repository import DualCultivationRepositoryMixin
+from ..social.dual_cultivation_migration import ensure_dual_cultivation_schema
 from ..economy.void_material_repository import VoidMaterialRepositoryMixin
 from ..specials.three_realms_tower_repository import ThreeRealmsTowerRepositoryMixin
 from ..specials.three_realms_tower_duo_repository import ThreeRealmsTowerDuoRepositoryMixin
@@ -212,6 +214,7 @@ class SQLitePlayerRepository(
     DaoRouteRepositoryMixin,
     AscensionDayRepositoryMixin,
     PartnerTaskRepositoryMixin,
+    DualCultivationRepositoryMixin,
     VoidMaterialRepositoryMixin,
     ThreeRealmsTowerRepositoryMixin,
     ThreeRealmsTowerDuoRepositoryMixin,
@@ -360,6 +363,7 @@ class SQLitePlayerRepository(
             self._migrate_sect_war_schema(connection)
             self._migrate_sect_alliance_schema(connection)
             ensure_social_recovery_schema(connection)
+            ensure_dual_cultivation_schema(connection)
             ensure_domain_front_schema(connection)
             ensure_void_archive_schema(connection)
             ensure_void_frontier_schema(connection)
