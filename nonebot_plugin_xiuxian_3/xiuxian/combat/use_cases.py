@@ -65,6 +65,11 @@ class CombatApplication:
             profile = await self.repository.combat_tactics_profile(
                 platform=context.adapter, platform_user_id=context.user_id,
             )
+        except BattleRequirementError:
+            return CommandResult(
+                False, "TACTIC_REQUIREMENT_MISSING", "完成入道后才能查看自动战术。",
+                context.request_id,
+            )
         except Exception as exc:
             return self._error(context, "", exc)
         preferred = profile["preferred_skill_key"]

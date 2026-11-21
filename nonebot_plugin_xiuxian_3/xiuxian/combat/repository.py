@@ -113,6 +113,8 @@ class CombatRepositoryMixin:
         with self._connect() as connection:
             connection.execute("BEGIN")
             player = self._require_player(connection, platform, platform_user_id, writable=False)
+            if str(player["stage"]) != "cultivator" or not player["path_key"]:
+                raise BattleRequirementError("combat tactics require cultivation entry")
             state = player_combat_values(player)
             skills = self._battle_skill_snapshot(
                 connection, int(player["id"]), str(state["path_key"] or "")

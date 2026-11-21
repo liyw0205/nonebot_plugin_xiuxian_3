@@ -312,6 +312,10 @@ def test_tactics_require_active_cultivator_and_active_player_status() -> None:
                 "web", _context("web", "tactic-novice", "tactic-novice-create"), "开始修仙"
             )
             assert novice.code == "PLAYER_CREATED"
+            novice_preview = await runtime.adapters.dispatch(
+                "web", _context("web", "tactic-novice", "tactic-novice-preview"), "战术预览"
+            )
+            assert novice_preview.code == "TACTIC_REQUIREMENT_MISSING"
             rejected = await runtime.adapters.dispatch(
                 "web",
                 _context("web", "tactic-novice", "tactic-novice-set", "tactic-novice-set"),
