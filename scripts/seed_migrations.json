@@ -438,9 +438,11 @@
     "new_commit": "936e6248ab540f758912c04887b52f68fc427c10"
   },
   "社交/道侣日课.json": {
-    "old_sha256": {},
-    "new_sha256": "301f417099e2d5fcbbb417c6b9123ae971ab5122b669ee621bacc5e739938851",
-    "new_commit": "63c5df3fd3edb59b310eb0fd83d99fa5c929d4df"
+    "old_sha256": {
+      "301f417099e2d5fcbbb417c6b9123ae971ab5122b669ee621bacc5e739938851": "e8606b4dc4290cb6d7d15e9f8b3033e7cb1a9638:data/社交/道侣日课.json"
+    },
+    "new_sha256": "06c207133c235bb69b10d8f3eaae353556f5ff85538704f69c7b5dfe28ceb685",
+    "new_commit": "deb0d196676a0c4e56018088305bbb41ace4982b"
   },
   "经济/虚空物资寄售.json": {
     "old_sha256": {},
