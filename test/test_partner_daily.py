@@ -156,6 +156,43 @@ def test_partner_daily_real_fieldwork_atomic_progress_and_independent_claims(tmp
                 assert connection.execute(
                     "SELECT COUNT(*) FROM partner_daily_tasks"
                 ).fetchone()[0] == 1
+                inventory = json.loads(connection.execute(
+                    "SELECT inventory_json FROM players WHERE id=?", (ids["a"],)
+                ).fetchone()[0])
+                inventory["item.mat.root_wedge"] = 1
+                connection.execute(
+                    "UPDATE players SET inventory_json=? WHERE id=?",
+                    (json.dumps(inventory), ids["a"]),
+                )
+
+            maintained = await journey.send(
+                "养护资源脉 deposit.creek_roots", "daily-maintenance", user="a"
+            )
+            assert maintained.ok, maintained.message
+            assert (await journey.send("道侣日课", user="a")).data["task"]["progress"] == {"self": 0, "partner": 0}
+            journey.clock.advance(minutes=15)
+            with journey.runtime.repository._connect() as connection:
+                connection.execute("UPDATE players SET status='suspended' WHERE id=?", (ids["b"],))
+            unavailable_extract = await journey.send(
+                "取用资源脉 deposit.creek_roots gentle", "daily-unavailable-extract", user="a"
+            )
+            assert unavailable_extract.ok, unavailable_extract.message
+            assert (await journey.send("道侣日课", user="a")).data["task"]["progress"] == {"self": 0, "partner": 0}
+            with journey.runtime.repository._connect() as connection:
+                connection.execute("UPDATE players SET status='active' WHERE id=?", (ids["b"],))
+            journey.clock.advance(minutes=5)
+            assert (await journey.send(
+                f"申请解除道侣 {relation_id}", "daily-pause", user="a"
+            )).ok
+            paused_extract = await journey.send(
+                "取用资源脉 deposit.creek_roots gentle", "daily-paused-extract", user="a"
+            )
+            assert paused_extract.ok, paused_extract.message
+            assert (await journey.send("道侣日课", user="a")).data["task"]["progress"] == {"self": 0, "partner": 0}
+            assert (await journey.send(
+                f"拒绝解除道侣 {relation_id}", "daily-restore", user="b"
+            )).ok
+            journey.clock.advance(minutes=5)
 
             # Closing today's rule cannot rewrite the frozen task or its reward.
             original_content = journey.runtime.repository.content
