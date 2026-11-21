@@ -1,0 +1,20 @@
+{
+  "schema": "xiuxian.content",
+  "kind": "partner_daily_task",
+  "records": [
+    {
+      "key": "task.partner.daily.fieldwork",
+      "name": "道侣同行日课",
+      "desc": "道侣每日可相约走访山野资源脉。双方各自完成一次真实取材后，分别领取同行所得。",
+      "aliases": ["同行日课"],
+      "status": "active",
+      "source_kind": "deposit.extract",
+      "deposit_keys": ["deposit.creek_roots", "deposit.ironwood_layer", "deposit.basalt_sand"],
+      "target_each": 1,
+      "window_seconds": 86400,
+      "daily_limit": 1,
+      "reward_world_merit": 5,
+      "reward_items": {"item.spirit_water": 1}
+    }
+  ]
+}
