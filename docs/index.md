@@ -2,7 +2,7 @@
 
 ## 玩家与安装
 
-- [当前可用能力](availability.md)：v0.1.61 的开放玩法与能力边界。
+- [当前可用能力](availability.md)：v0.1.62 的开放玩法与能力边界。
 - [安装、配置与更新](installation.md)：Linux、Termux、Windows、Docker 和已有 NoneBot 宿主。
 - [玩家使用指南](usage.md)：角色创建、修炼、探索、挂机、剧情与委托流程。
 - [运行与安全](operations.md)：配置优先级、备份、恢复、权限与运行安全。
@@ -27,6 +27,7 @@
 
 - [基础领域](foundation/README.md)：角色、境界、道途、属性、物品和养成。
 - [玩法领域](gameplay/README.md)：世界、探索、战斗、生产、经济、社交、生活与剧情。
+- [道侣同行日课](gameplay/social/partner-daily.md)：真实取材来源、双人进度与逐人领奖合同。
 - [扩展领域](extensions/README.md)：适配器、Web 运维和内容包。
 - [架构](architecture.md)：模块边界、依赖方向和运行时组成。
 - [运行框架](runtime-framework.md)：宿主生命周期、命令路由和持久化流程。

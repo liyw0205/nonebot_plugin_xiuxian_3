@@ -54,6 +54,24 @@
 不返回平台用户号或数据库编号。查询时若 `invited` 已到截止时间，只在结果中显示 `expired`，不修改关系表，也不写 operation。
 无关系返回空列表；坏状态、身份或时间字段直接返回可重试的持久化错误。
 
+## 道侣同行日课
+
+`道侣日课 [任务号]`、`道侣日课记录 [页码]`、`开始道侣日课` 与 `领取道侣日课 [任务号]` 由 `PartnerDailyApplication` 统一承接，
+QQ 官方和 OneBot V11 共用同一 router、application 与 SQLite repository。日课只接受内容白名单内的
+`deposit.extract` 成功 operation；来源回执、资源成本/产出、资源脉投影和双方进度证据处于同一事务。
+来源操作重放不重新投影；维护、预览、失败与任务开启前的 receipt 不计数。
+
+任务唯一键为 `(relation_id, quota_day)`，日期使用 UTC。开启时冻结规则 JSON 与哈希；同日重开返回同一任务。
+双方各自达标后，按 `(task_id, player_id)` 独立领奖；本人资产、claim 行和 operation receipt 在同一事务提交。
+当前规则关闭只阻止创建新任务，不改变已创建任务或奖励；关系不再 active 时不接收新证据或领奖。
+状态只读显示本人/道侣进度、截止时间与领取情况，不公开平台 ID 或内部 player ID。
+历史列表在同一读事务中仅查询本人参与的任务，每页五份、创建时间倒序，使用冻结快照及原有来源/领取流水校验；关系解除后仍可翻页进入详情，坏记录零写失败。
+
+错误码：`PARTNER_DAILY_NO_PARTNER`、`PARTNER_DAILY_PLAYER`、`PARTNER_DAILY_ACTIVE`、
+`PARTNER_DAILY_NOT_FOUND`、`PARTNER_DAILY_RELATION`、`PARTNER_DAILY_CLAIMED`、
+`PARTNER_DAILY_NOT_COMPLETE`、`PARTNER_DAILY_UNAVAILABLE`、`INVALID_PARTNER_DAILY_COMMAND`、
+`OPERATION_CONFLICT` 和可重试的 `PERSISTENCE_ERROR`。失败或并发冲突不能留下部分资源、进度或奖励。
+
 出师验收包含聚气下界与筑基/金丹等更高境界、缺少服务证据、非师傅权限、重复请求与不同关系冲突、当前
 内容改值/关闭、坏 JSON/字段只读拒绝、写入失败回滚与重启后原请求恢复。QQ 官方和 OneBot V11 均走同一
 application/repository，不在适配器补奖励或境界判断；邀请准入与关系解除不在本条扩展。
@@ -75,3 +93,5 @@ application/repository，不在适配器补奖励或境界判断；邀请准入�
 服务失败按约定退款/赔偿；宗门贡献重试只增加一次。
 
 道侣验收覆盖 QQ 官方与 OneBot V11：邀请后提高准入/修改解除期限与冷却不影响原缘契，内容关闭后仍可查询、接受/拒绝和协商解除，历史 operation 跨重启回放；新邀请服从当前内容。缺字段、重复 JSON 键、非法数值、坏账本、输入冲突和事务末段故障均不得留下部分关系或占用记录，修复后原 operation 可重试。并发接受/解除只产生一次状态转换，资产、战斗和图鉴保持不变。
+
+同行日课另覆盖两适配器真实命令链、来源 receipt 同事务投影、来源/领奖并发、旧 operation 和失败动作不计数、快照关闭后履约、UTC 配额、关系变化、奖励隔离、迁移重放及数据库故障回滚。

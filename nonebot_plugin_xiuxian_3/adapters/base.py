@@ -523,6 +523,15 @@ def register_core_commands(router: CommandRouter, application: XiuxianApplicatio
     router.register("道侣协作", application.partner_task_status, aliases=("道侣终局协作",))
     router.register("开始道侣协作", application.start_partner_task)
     router.register("领取道侣协作", application.claim_partner_task)
+    partner_daily_aliases = application.partner_daily_command_aliases()
+    router.register("道侣日课", application.partner_daily_status,
+                    aliases=partner_daily_aliases)
+    router.register(
+        "道侣日课记录", application.partner_daily_history,
+        aliases=application.partner_daily_history_command_aliases(),
+    )
+    router.register("开始道侣日课", application.start_partner_daily_task)
+    router.register("领取道侣日课", application.claim_partner_daily_task)
     router.register("虚空寄售", application.void_material_board, aliases=("寄售列表",))
     router.register("寄售物资", application.list_void_material)
     router.register("购入寄售", application.buy_void_material)

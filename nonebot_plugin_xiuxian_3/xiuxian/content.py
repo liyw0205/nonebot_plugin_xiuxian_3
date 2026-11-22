@@ -90,6 +90,10 @@ class ContentBundle:
             from .partner_cultivation_content import dual_cultivation_definition
 
             dual_cultivation_definition(bundle)
+        if any(kind == "partner_daily_task" for kind, _ in records):
+            from .partner_daily_content import partner_daily_definition
+
+            partner_daily_definition(bundle, require_active=False)
         return bundle
 
     @classmethod

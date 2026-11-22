@@ -283,7 +283,8 @@ def test_rendering_and_help() -> None:
                     actions=page.actions,
                 )
                 assert fallback.sent_format == "text" and fallback.degraded is True
-                assert str(bot.sent[0]).endswith("可发送：开始道侣协作")
+                assert str(bot.sent[0]) == text
+                assert str(bot.sent[0]).count("开始道侣协作") == 1
 
                 class FakeQQBot(FakeBot):
                     __module__ = "nonebot.adapters.qq.bot"

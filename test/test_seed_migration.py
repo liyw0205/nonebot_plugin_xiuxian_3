@@ -834,6 +834,8 @@ def old_official_manifest() -> bytes:
 
 def pre_dual_cultivation_manifest() -> bytes:
     document = json.loads((ROOT / "data" / MANIFEST_FILE).read_text(encoding="utf-8"))
+    # Keep reconstructing the exact published manifest before both later additions.
+    document["files"].remove("社交/道侣日课.json")
     document["files"].remove("社交/双修.json")
     blob = (json.dumps(document, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
     digest = hashlib.sha256(blob).hexdigest()
@@ -873,6 +875,79 @@ def test_dual_cultivation_manifest_and_missing_seed_upgrade(host: Path) -> None:
     kept = deploy(host)
     assert kept.returncode == 0, kept.stdout + kept.stderr
     assert rule_path.read_bytes() == custom
+    preserved(host)
+
+
+def test_partner_daily_manifest_seed_upgrade_backup_repeat_and_custom(host: Path) -> None:
+    document = json.loads((ROOT / "data" / MANIFEST_FILE).read_text(encoding="utf-8"))
+    document["files"].remove("社交/道侣日课.json")
+    old = (json.dumps(document, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+    digest = hashlib.sha256(old).hexdigest()
+    assert digest == "0dec8799b688854229cdacb7801d15426a13c732708ca5726bd030fa4b78f712"
+    migrations = json.loads((ROOT / "scripts/seed_migrations.json").read_text(encoding="utf-8"))
+    assert migrations["内容清单.json"]["old_sha256"][digest] == (
+        "c63ec97dac133169be6e4ec3431c0b5292735df6:data/内容清单.json"
+    )
+    manifest_path = host / "data" / MANIFEST_FILE
+    daily_path = host / "data/社交/道侣日课.json"
+    manifest_path.write_bytes(old)
+    daily_path.unlink()
+    installed = deploy(host)
+    assert installed.returncode == 0, installed.stdout + installed.stderr
+    assert "种子更新 2 个" in installed.stdout
+    assert manifest_path.read_bytes() == (ROOT / "data" / MANIFEST_FILE).read_bytes()
+    assert daily_path.read_bytes() == (ROOT / "data/社交/道侣日课.json").read_bytes()
+    backups = list((host / ".xiuxian3/backups").glob("deploy-*"))
+    assert len(backups) == 1
+    assert (backups[0] / "data" / MANIFEST_FILE).read_bytes() == old
+    repeated = deploy(host)
+    assert repeated.returncode == 0, repeated.stdout + repeated.stderr
+    assert "种子更新 0 个" in repeated.stdout
+    custom = daily_path.read_bytes() + b"\n"
+    daily_path.write_bytes(custom)
+    kept = deploy(host)
+    assert kept.returncode == 0, kept.stdout + kept.stderr
+    assert daily_path.read_bytes() == custom
+    preserved(host)
+    damaged = json.loads(custom)
+    damaged["records"][0]["target_each"] = True
+    daily_path.write_text(json.dumps(damaged, ensure_ascii=False), encoding="utf-8")
+    failed = deploy(host)
+    assert failed.returncode != 0
+    assert json.loads(daily_path.read_bytes()) == damaged
+    preserved(host)
+
+
+def test_partner_daily_history_alias_seed_upgrade_backup_repeat_and_custom(host: Path) -> None:
+    relative = Path("社交/道侣日课.json")
+    old = (SEED_FIXTURES / "partner_daily_pre_history_alias.json").read_bytes()
+    digest = hashlib.sha256(old).hexdigest()
+    assert digest == "301f417099e2d5fcbbb417c6b9123ae971ab5122b669ee621bacc5e739938851"
+    migrations = json.loads((ROOT / "scripts/seed_migrations.json").read_text(encoding="utf-8"))
+    rule = migrations[relative.as_posix()]
+    assert rule["old_sha256"][digest] == (
+        "e8606b4dc4290cb6d7d15e9f8b3033e7cb1a9638:data/社交/道侣日课.json"
+    )
+
+    path = host / "data" / relative
+    path.write_bytes(old)
+    upgraded = deploy(host)
+    assert upgraded.returncode == 0, upgraded.stdout + upgraded.stderr
+    assert "种子更新 1 个" in upgraded.stdout
+    assert path.read_bytes() == (ROOT / "data" / relative).read_bytes()
+    backup = next((host / ".xiuxian3/backups").glob("deploy-*"))
+    assert (backup / "data" / relative).read_bytes() == old
+    preserved(host)
+
+    repeated = deploy(host)
+    assert repeated.returncode == 0, repeated.stdout + repeated.stderr
+    assert "种子更新 0 个" in repeated.stdout
+    custom = path.read_bytes() + b"\n"
+    path.write_bytes(custom)
+    kept = deploy(host)
+    assert kept.returncode == 0, kept.stdout + kept.stderr
+    assert "\u81ea\u5b9a\u4e49" in kept.stdout
+    assert path.read_bytes() == custom
     preserved(host)
 
 

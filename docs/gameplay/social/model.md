@@ -53,3 +53,10 @@
 `SectWarFederationSnapshot` / `SectWarFederationResult`：跨服宗门战前置数据。前者保存本地宗门最多 15 名实际出战成员的不可变快照和 shard 键，后者保存带来源 operation 的远端轮次分数/胜负。两者只写联邦审计表，不触发跨服匹配、身份合并、奖励发放或本地资产变化；同一结果重放幂等，字段冲突拒绝。
 
 `ServiceOrder`：委托人、服务者、服务类型、材料锁定、报价、目标品质、截止时间和交付状态。
+
+`PartnerDailyTask`：关系、UTC 日份、双方角色、open/claimable/completed/expired 状态、创建/截止时间、规则快照与哈希；
+唯一约束为 `(relation_id, quota_day)`。`PartnerDailyEvidence`：任务、贡献玩家、唯一来源 operation、资源脉键与发生时间；
+证据仅在成功 `deposit.extract` 来源事务内写入。`PartnerDailyClaim`：任务、领奖玩家、奖励快照、operation 与领取时间，
+以 `(task_id, player_id)` 唯一约束保证每人只领一次。三表由 additive、幂等迁移创建，不迁移或重写既有关系、资产或账本。
+
+任务规则位于 `data/社交/道侣日课.json`。规则关闭阻止新任务，但既有任务依据快照完成查询和领奖；只有关系仍 active 时才能追加来源证据或领奖。状态投影只对外暴露 `self`/`partner` 两侧进度，不暴露平台标识或内部 player ID。
